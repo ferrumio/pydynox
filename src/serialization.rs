@@ -23,7 +23,9 @@
 //! | set[bytes] | BS | `{"BS": ["base64..."]}` |
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
+use pyo3::types::{
+    PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PyModule, PySet, PyString,
+};
 use std::collections::HashMap;
 
 /// Convert a Python object to a DynamoDB AttributeValue representation.
@@ -78,8 +80,8 @@ use std::collections::HashMap;
 /// result = py_to_dynamo({"name": "John", "age": 30})
 /// assert result == {"M": {"name": {"S": "John"}, "age": {"N": "30"}}}
 /// ```
-pub fn py_to_dynamo(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<PyObject> {
-    let result = PyDict::new_bound(py);
+pub fn py_to_dynamo<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<Py<PyDict>> {
+    let result = PyDict::new(py);
 
     if obj.is_none() {
         result.set_item("NULL", true)?;
@@ -93,8 +95,7 @@ pub fn py_to_dynamo(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<PyObject
         result.set_item("N", obj.str()?.to_str()?)?;
     } else if let Ok(bytes) = obj.downcast::<PyBytes>() {
         // Binary data - encode as base64
-        use pyo3::types::PyModule;
-        let base64 = PyModule::import_bound(py, "base64")?;
+        let base64 = PyModule::import(py, "base64")?;
         let encoded = base64.call_method1("b64encode", (bytes,))?;
         let encoded_str = encoded.call_method0("decode")?;
         result.set_item("B", encoded_str)?;
@@ -103,13 +104,13 @@ pub fn py_to_dynamo(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<PyObject
     } else if let Ok(frozen_set) = obj.downcast::<PyFrozenSet>() {
         convert_set_to_dynamo(py, frozen_set.iter(), &result)?;
     } else if let Ok(list) = obj.downcast::<PyList>() {
-        let items: Vec<PyObject> = list
+        let items: Vec<Py<PyDict>> = list
             .iter()
             .map(|item| py_to_dynamo(py, &item))
             .collect::<PyResult<Vec<_>>>()?;
         result.set_item("L", items)?;
     } else if let Ok(dict) = obj.downcast::<PyDict>() {
-        let map: HashMap<String, PyObject> = dict
+        let map: HashMap<String, Py<PyDict>> = dict
             .iter()
             .map(|(k, v)| {
                 let key = k.extract::<String>()?;
@@ -125,7 +126,7 @@ pub fn py_to_dynamo(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<PyObject
         )));
     }
 
-    Ok(result.into())
+    Ok(result.unbind())
 }
 
 /// Convert a Python set to DynamoDB set format (SS, NS, or BS).
@@ -183,8 +184,7 @@ where
         result.set_item("NS", numbers)?;
     } else if first.downcast::<PyBytes>().is_ok() {
         // Binary Set (BS) - encode each as base64
-        use pyo3::types::PyModule;
-        let base64 = PyModule::import_bound(py, "base64")?;
+        let base64 = PyModule::import(py, "base64")?;
         let binaries: Vec<String> = items
             .iter()
             .map(|item| {
@@ -255,7 +255,7 @@ where
 pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<PyObject> {
     // String
     if let Some(s) = attr.get_item("S")? {
-        return Ok(s.to_object(py));
+        return Ok(s.unbind());
     }
 
     // Number (stored as string, convert to int or float)
@@ -268,7 +268,7 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<PyObje
                     n_str
                 ))
             })?;
-            return Ok(f.to_object(py));
+            return Ok(f.into_pyobject(py)?.unbind().into_any());
         } else {
             let i: i64 = n_str.parse().map_err(|_| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
@@ -276,13 +276,13 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<PyObje
                     n_str
                 ))
             })?;
-            return Ok(i.to_object(py));
+            return Ok(i.into_pyobject(py)?.unbind().into_any());
         }
     }
 
     // Boolean
     if let Some(b) = attr.get_item("BOOL")? {
-        return Ok(b.to_object(py));
+        return Ok(b.unbind());
     }
 
     // Null
@@ -292,44 +292,43 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<PyObje
 
     // Binary (base64 encoded)
     if let Some(b) = attr.get_item("B")? {
-        use pyo3::types::PyModule;
-        let base64 = PyModule::import_bound(py, "base64")?;
+        let base64 = PyModule::import(py, "base64")?;
         let decoded = base64.call_method1("b64decode", (b,))?;
-        return Ok(decoded.to_object(py));
+        return Ok(decoded.unbind());
     }
 
     // List
     if let Some(list) = attr.get_item("L")? {
-        let py_list = PyList::empty_bound(py);
+        let py_list = PyList::empty(py);
         for item in list.downcast::<PyList>()?.iter() {
             let dict = item.downcast::<PyDict>()?;
             py_list.append(dynamo_to_py(py, dict)?)?;
         }
-        return Ok(py_list.to_object(py));
+        return Ok(py_list.unbind().into_any());
     }
 
     // Map
     if let Some(map) = attr.get_item("M")? {
-        let py_dict = PyDict::new_bound(py);
+        let py_dict = PyDict::new(py);
         for (k, v) in map.downcast::<PyDict>()?.iter() {
             let dict = v.downcast::<PyDict>()?;
             py_dict.set_item(k, dynamo_to_py(py, dict)?)?;
         }
-        return Ok(py_dict.to_object(py));
+        return Ok(py_dict.unbind().into_any());
     }
 
     // String Set
     if let Some(ss) = attr.get_item("SS")? {
-        let py_set = PySet::empty_bound(py)?;
+        let py_set = PySet::empty(py)?;
         for item in ss.downcast::<PyList>()?.iter() {
             py_set.add(item)?;
         }
-        return Ok(py_set.to_object(py));
+        return Ok(py_set.unbind().into_any());
     }
 
     // Number Set
     if let Some(ns) = attr.get_item("NS")? {
-        let py_set = PySet::empty_bound(py)?;
+        let py_set = PySet::empty(py)?;
         for item in ns.downcast::<PyList>()?.iter() {
             let n_str: String = item.extract()?;
             if n_str.contains('.') || n_str.contains('e') || n_str.contains('E') {
@@ -350,19 +349,18 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<PyObje
                 py_set.add(i)?;
             }
         }
-        return Ok(py_set.to_object(py));
+        return Ok(py_set.unbind().into_any());
     }
 
     // Binary Set
     if let Some(bs) = attr.get_item("BS")? {
-        use pyo3::types::PyModule;
-        let base64 = PyModule::import_bound(py, "base64")?;
-        let py_set = PySet::empty_bound(py)?;
+        let base64 = PyModule::import(py, "base64")?;
+        let py_set = PySet::empty(py)?;
         for item in bs.downcast::<PyList>()?.iter() {
             let decoded = base64.call_method1("b64decode", (item,))?;
             py_set.add(decoded)?;
         }
-        return Ok(py_set.to_object(py));
+        return Ok(py_set.unbind().into_any());
     }
 
     Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -383,7 +381,7 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<PyObje
 /// A dict in DynamoDB AttributeValue format.
 #[pyfunction]
 #[pyo3(name = "py_to_dynamo")]
-pub fn py_to_dynamo_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+pub fn py_to_dynamo_py(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Py<PyDict>> {
     py_to_dynamo(py, value)
 }
 
@@ -430,14 +428,14 @@ pub fn dynamo_to_py_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<PyO
 /// # }
 /// ```
 #[pyfunction]
-pub fn item_to_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<PyObject> {
-    let result = PyDict::new_bound(py);
+pub fn item_to_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<Py<PyDict>> {
+    let result = PyDict::new(py);
     for (k, v) in item.iter() {
         let key: String = k.extract()?;
         let value = py_to_dynamo(py, &v)?;
         result.set_item(key, value)?;
     }
-    Ok(result.into())
+    Ok(result.unbind())
 }
 
 /// Convert a DynamoDB item (dict of AttributeValues) back to a Python dict.
@@ -466,13 +464,13 @@ pub fn item_to_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<PyOb
 /// # result = {"pk": "USER#123", "name": "John", "age": 30}
 /// ```
 #[pyfunction]
-pub fn item_from_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<PyObject> {
-    let result = PyDict::new_bound(py);
+pub fn item_from_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<Py<PyDict>> {
+    let result = PyDict::new(py);
     for (k, v) in item.iter() {
         let key: String = k.extract()?;
         let attr = v.downcast::<PyDict>()?;
         let value = dynamo_to_py(py, attr)?;
         result.set_item(key, value)?;
     }
-    Ok(result.into())
+    Ok(result.unbind())
 }

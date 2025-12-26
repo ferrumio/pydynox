@@ -31,16 +31,17 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      # Removed clippy because it's early development stage
-      #- name: Clippy
-      #  run: cargo clippy --all-targets --all-features -- -D warnings
-
       - name: Run Rust tests
         run: cargo test
 
-  build-wheel:
-    name: Build Wheel
+  test-python:
+    name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -58,78 +59,27 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build wheel
-        run: uvx maturin build --release
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel
-          path: target/wheels/*.whl
-
-  test-python:
-    name: Test Python ${{ matrix.python-version }}
-    needs: build-wheel
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+          key: ${{ runner.os }}-cargo-py${{ matrix.python-version }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Download wheel
-        uses: actions/download-artifact@v4
-        with:
-          name: wheel
-          path: dist/
-
-      - name: Create venv and install dependencies
+      - name: Build wheel for Python ${{ matrix.python-version }}
         run: |
-          uv venv
-          uv pip install pytest pytest-asyncio hypothesis "moto[dynamodb]" boto3 pydantic ruff
-          uv pip install dist/*.whl
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install maturin
+          uv run maturin build --release --interpreter python${{ matrix.python-version }}
+
+      - name: Install wheel and test dependencies
+        run: |
+          uv pip install pytest pytest-asyncio hypothesis "moto[dynamodb,server]" boto3 pydantic ruff
+          uv pip install target/wheels/*.whl
 
       - name: Run Python tests
         run: uv run pytest tests/ -v
 
-  test-minimum-versions:
-    name: Test Minimum Versions
-    needs: build-wheel
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
         with:
-          enable-cache: true
-
-      - name: Set up Python 3.11
-        run: uv python install 3.11
-
-      - name: Download wheel
-        uses: actions/download-artifact@v4
-        with:
-          name: wheel
-          path: dist/
-
-      - name: Create venv and install dependencies
-        run: |
-          uv venv
-          uv pip install pytest pytest-asyncio hypothesis "moto[dynamodb]" boto3 pydantic ruff
-          uv pip install dist/*.whl
-
-      - name: Run Python tests
-        run: uv run pytest tests/ -v
+          name: wheel-py${{ matrix.python-version }}
+          path: target/wheels/*.whl

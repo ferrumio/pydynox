@@ -13,6 +13,7 @@ use pyo3::prelude::*;
 
 mod client;
 mod errors;
+mod operations;
 mod serialization;
 
 use client::DynamoClient;
