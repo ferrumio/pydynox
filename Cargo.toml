@@ -1,0 +1,34 @@
+[package]
+name = "pydynox"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leandro Cavalcante Damascena <leandro.damascena@gmail.com>"]
+description = "A fast DynamoDB ORM for Python with a Rust core"
+license = "Apache-2.0"
+repository = "https://github.com/leandrodamascena/pydynox"
+homepage = "https://github.com/leandrodamascena/pydynox"
+documentation = "https://pydynox.readthedocs.io"
+readme = "README.md"
+keywords = ["dynamodb", "orm", "aws", "database", "pyo3"]
+categories = ["database", "api-bindings"]
+
+[lib]
+name = "pydynox"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+aws-sdk-dynamodb = "1.54"
+aws-config = { version = "1.5", features = ["behavior-version-latest"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+pyo3 = { version = "0.22", features = ["auto-initialize"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
