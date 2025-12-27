@@ -4,10 +4,10 @@
 //! AttributeValue types.
 
 use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_dynamodb::Client;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
-use aws_sdk_dynamodb::Client;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -265,7 +265,6 @@ fn attribute_value_to_py(py: Python<'_>, value: AttributeValue) -> PyResult<Py<P
 
     dynamo_to_py(py, &dict)
 }
-
 
 // ============================================================================
 // DynamoDB Basic Operations
@@ -541,7 +540,11 @@ pub fn update_item(
 fn build_set_expression(
     py: Python<'_>,
     updates: &Bound<'_, PyDict>,
-) -> PyResult<(String, HashMap<String, String>, HashMap<String, AttributeValue>)> {
+) -> PyResult<(
+    String,
+    HashMap<String, String>,
+    HashMap<String, AttributeValue>,
+)> {
     let mut set_parts = Vec::new();
     let mut names = HashMap::new();
     let mut values = HashMap::new();

@@ -16,6 +16,7 @@ mod batch_operations;
 mod client;
 mod errors;
 mod serialization;
+mod transaction_operations;
 
 use client::DynamoClient;
 use serialization::{dynamo_to_py_py, item_from_dynamo, item_to_dynamo, py_to_dynamo_py};

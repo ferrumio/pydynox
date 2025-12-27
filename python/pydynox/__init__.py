@@ -14,6 +14,7 @@ from pydynox import pydynox_core  # noqa: F401
 from .batch_operations import BatchWriter
 from .client import DynamoClient
 from .query import QueryResult
+from .transaction import Transaction
 
 __version__ = "0.1.0"
 
@@ -21,5 +22,6 @@ __all__ = [
     "BatchWriter",
     "DynamoClient",
     "QueryResult",
+    "Transaction",
     "__version__",
 ]

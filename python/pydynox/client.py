@@ -292,3 +292,54 @@ class DynamoClient:
             ...     print(item["name"])
         """
         return self._client.batch_get(table, keys)
+
+    def transact_write(self, operations: list[dict[str, Any]]) -> None:
+        """Execute a transactional write operation.
+
+        All operations run atomically. Either all succeed or all fail.
+        Use this when you need data consistency across multiple items.
+
+        Args:
+            operations: List of operation dicts, each with:
+                - type: "put", "delete", "update", or "condition_check"
+                - table: Table name
+                - item: Item to put (for "put" type)
+                - key: Key dict (for "delete", "update", "condition_check")
+                - update_expression: Update expression (for "update" type)
+                - condition_expression: Optional condition expression
+                - expression_attribute_names: Optional name placeholders
+                - expression_attribute_values: Optional value placeholders
+
+        Raises:
+            ValueError: If a condition check fails or validation error occurs.
+            RuntimeError: If the transaction fails for other reasons.
+
+        Example:
+            >>> # Transfer money between accounts atomically
+            >>> client.transact_write([
+            ...     {
+            ...         "type": "update",
+            ...         "table": "accounts",
+            ...         "key": {"pk": "ACC#1", "sk": "BALANCE"},
+            ...         "update_expression": "SET #b = #b - :amt",
+            ...         "condition_expression": "#b >= :amt",
+            ...         "expression_attribute_names": {"#b": "balance"},
+            ...         "expression_attribute_values": {":amt": 100}
+            ...     },
+            ...     {
+            ...         "type": "update",
+            ...         "table": "accounts",
+            ...         "key": {"pk": "ACC#2", "sk": "BALANCE"},
+            ...         "update_expression": "SET #b = #b + :amt",
+            ...         "expression_attribute_names": {"#b": "balance"},
+            ...         "expression_attribute_values": {":amt": 100}
+            ...     }
+            ... ])
+
+            >>> # Put multiple items atomically
+            >>> client.transact_write([
+            ...     {"type": "put", "table": "orders", "item": {"pk": "ORD#1", "sk": "INFO", "status": "new"}},
+            ...     {"type": "put", "table": "orders", "item": {"pk": "ORD#1", "sk": "ITEM#1", "product": "Widget"}}
+            ... ])
+        """
+        self._client.transact_write(operations)

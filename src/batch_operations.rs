@@ -171,7 +171,6 @@ pub fn batch_write(
     Ok(())
 }
 
-
 /// Batch get items from a DynamoDB table.
 ///
 /// Handles:
@@ -262,8 +261,7 @@ pub fn batch_get(
                                 pending = keys.to_vec();
                                 retries += 1;
                                 // Exponential backoff
-                                let delay =
-                                    std::time::Duration::from_millis(50 * (1 << retries));
+                                let delay = std::time::Duration::from_millis(50 * (1 << retries));
                                 std::thread::sleep(delay);
                                 continue;
                             }
