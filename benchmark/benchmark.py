@@ -450,3 +450,164 @@ def test_boto3_delete_item_10x(benchmark, boto_client):
             )
 
     benchmark(delete_items)
+
+
+# =============================================================================
+# BATCH WRITE BENCHMARKS (100 items)
+# =============================================================================
+
+
+def test_pydynox_batch_write_100(benchmark, pydynox_client):
+    """Benchmark pydynox batch_write - 100 items."""
+    counter = [0]
+
+    def batch_write():
+        counter[0] += 1
+        items = [
+            {
+                "pk": f"BATCH_WRITE_PYDYNOX#{counter[0]}",
+                "sk": f"ITEM#{i:04d}",
+                "name": f"Item {i}",
+                "age": i,
+            }
+            for i in range(100)
+        ]
+        pydynox_client.batch_write(TABLE_NAME, put_items=items)
+
+    benchmark(batch_write)
+
+
+def test_pynamodb_batch_write_100(benchmark, pynamodb_model):
+    """Benchmark PynamoDB batch_write - 100 items."""
+    counter = [0]
+
+    def batch_write():
+        counter[0] += 1
+        with pynamodb_model.batch_write() as batch:
+            for i in range(100):
+                item = pynamodb_model(
+                    pk=f"BATCH_WRITE_PYNAMODB#{counter[0]}",
+                    sk=f"ITEM#{i:04d}",
+                    name=f"Item {i}",
+                    age=i,
+                )
+                batch.save(item)
+
+    benchmark(batch_write)
+
+
+def test_boto3_batch_write_100(benchmark, boto_client):
+    """Benchmark boto3 batch_write - 100 items."""
+    counter = [0]
+
+    def batch_write():
+        counter[0] += 1
+        # boto3 batch_write_item has 25-item limit, so we need multiple calls
+        items = [
+            {
+                "PutRequest": {
+                    "Item": {
+                        "pk": {"S": f"BATCH_WRITE_BOTO3#{counter[0]}"},
+                        "sk": {"S": f"ITEM#{i:04d}"},
+                        "name": {"S": f"Item {i}"},
+                        "age": {"N": str(i)},
+                    }
+                }
+            }
+            for i in range(100)
+        ]
+        # Split into chunks of 25
+        for chunk_start in range(0, 100, 25):
+            chunk = items[chunk_start : chunk_start + 25]
+            boto_client.batch_write_item(RequestItems={TABLE_NAME: chunk})
+
+    benchmark(batch_write)
+
+
+# =============================================================================
+# BATCH GET BENCHMARKS (100 items)
+# =============================================================================
+
+
+@pytest.fixture(scope="session")
+def pydynox_batch_get_keys(pydynox_client):
+    """Create 100 items for pydynox batch_get benchmark."""
+    pk = f"BATCH_GET_PYDYNOX#{uuid.uuid4()}"
+    keys = []
+    items = []
+    for i in range(100):
+        sk = f"ITEM#{i:04d}"
+        items.append({"pk": pk, "sk": sk, "name": f"Item {i}", "age": i})
+        keys.append({"pk": pk, "sk": sk})
+    pydynox_client.batch_write(TABLE_NAME, put_items=items)
+    return keys
+
+
+@pytest.fixture(scope="session")
+def pynamodb_batch_get_keys(pydynox_client):
+    """Create 100 items for PynamoDB batch_get benchmark."""
+    pk = f"BATCH_GET_PYNAMODB#{uuid.uuid4()}"
+    keys = []
+    items = []
+    for i in range(100):
+        sk = f"ITEM#{i:04d}"
+        items.append({"pk": pk, "sk": sk, "name": f"Item {i}", "age": i})
+        keys.append((pk, sk))
+    pydynox_client.batch_write(TABLE_NAME, put_items=items)
+    return keys
+
+
+@pytest.fixture(scope="session")
+def boto3_batch_get_keys(pydynox_client):
+    """Create 100 items for boto3 batch_get benchmark."""
+    pk = f"BATCH_GET_BOTO3#{uuid.uuid4()}"
+    keys = []
+    items = []
+    for i in range(100):
+        sk = f"ITEM#{i:04d}"
+        items.append({"pk": pk, "sk": sk, "name": f"Item {i}", "age": i})
+        keys.append({"pk": {"S": pk}, "sk": {"S": sk}})
+    pydynox_client.batch_write(TABLE_NAME, put_items=items)
+    return keys
+
+
+def test_pydynox_batch_get_100(benchmark, pydynox_client, pydynox_batch_get_keys):
+    """Benchmark pydynox batch_get - 100 items."""
+
+    def batch_get():
+        return pydynox_client.batch_get(TABLE_NAME, pydynox_batch_get_keys)
+
+    result = benchmark(batch_get)
+    assert len(result) == 100
+
+
+def test_pynamodb_batch_get_100(benchmark, pynamodb_model, pynamodb_batch_get_keys):
+    """Benchmark PynamoDB batch_get - 100 items."""
+
+    def batch_get():
+        return list(pynamodb_model.batch_get(pynamodb_batch_get_keys))
+
+    result = benchmark(batch_get)
+    assert len(result) == 100
+
+
+def test_boto3_batch_get_100(benchmark, boto_client, boto3_batch_get_keys):
+    """Benchmark boto3 batch_get - 100 items."""
+
+    def batch_get():
+        # boto3 batch_get_item has 100-item limit
+        response = boto_client.batch_get_item(
+            RequestItems={TABLE_NAME: {"Keys": boto3_batch_get_keys}}
+        )
+        return response["Responses"][TABLE_NAME]
+
+    result = benchmark(batch_get)
+    assert len(result) == 100
+
+
+# =============================================================================
+# TRANSACTION WRITE BENCHMARKS (10 items)
+# Note: Transaction benchmarks are skipped because moto's transact_write
+# implementation is slow/unstable. The functionality is tested in
+# tests/integration/operations/test_transaction.py
+# =============================================================================
