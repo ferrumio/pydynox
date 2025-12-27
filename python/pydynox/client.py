@@ -1,11 +1,8 @@
 """DynamoDB client wrapper."""
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional
 
 from .query import QueryResult
-
-if TYPE_CHECKING:
-    from pydynox._rust import DynamoClient as _RustClient
 
 
 class DynamoClient:
@@ -218,4 +215,46 @@ class DynamoClient:
             scan_index_forward=scan_index_forward,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
+        )
+
+    def batch_write(
+        self,
+        table: str,
+        put_items: Optional[list[dict[str, Any]]] = None,
+        delete_keys: Optional[list[dict[str, Any]]] = None,
+    ) -> None:
+        """Batch write items to a DynamoDB table.
+
+        Writes multiple items in a single request. Handles:
+        - Splitting requests to respect the 25-item limit per batch
+        - Retrying unprocessed items with exponential backoff
+
+        Args:
+            table: The name of the DynamoDB table.
+            put_items: List of items to put (as dicts).
+            delete_keys: List of keys to delete (as dicts).
+
+        Example:
+            >>> # Batch put items
+            >>> client.batch_write(
+            ...     "users",
+            ...     put_items=[
+            ...         {"pk": "USER#1", "sk": "PROFILE", "name": "Alice"},
+            ...         {"pk": "USER#2", "sk": "PROFILE", "name": "Bob"},
+            ...     ]
+            ... )
+
+            >>> # Batch delete items
+            >>> client.batch_write(
+            ...     "users",
+            ...     delete_keys=[
+            ...         {"pk": "USER#3", "sk": "PROFILE"},
+            ...         {"pk": "USER#4", "sk": "PROFILE"},
+            ...     ]
+            ... )
+        """
+        self._client.batch_write(
+            table,
+            put_items or [],
+            delete_keys or [],
         )

@@ -12,6 +12,7 @@
 use pyo3::prelude::*;
 
 mod basic_operations;
+mod batch_operations;
 mod client;
 mod errors;
 mod serialization;

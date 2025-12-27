@@ -16,6 +16,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use crate::basic_operations;
+use crate::batch_operations;
 
 /// DynamoDB client with flexible credential configuration.
 ///
@@ -361,6 +362,60 @@ impl DynamoClient {
             index_name,
         )?;
         Ok((result.items, result.last_evaluated_key))
+    }
+
+    /// Batch write items to a DynamoDB table.
+    ///
+    /// Writes multiple items in a single request. Handles:
+    /// - Splitting requests to respect the 25-item limit per batch
+    /// - Retrying unprocessed items with exponential backoff
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The name of the DynamoDB table
+    /// * `put_items` - List of items to put (as dicts)
+    /// * `delete_keys` - List of keys to delete (as dicts)
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// client = DynamoClient()
+    ///
+    /// # Batch put items
+    /// client.batch_write(
+    ///     "users",
+    ///     put_items=[
+    ///         {"pk": "USER#1", "sk": "PROFILE", "name": "Alice"},
+    ///         {"pk": "USER#2", "sk": "PROFILE", "name": "Bob"},
+    ///     ],
+    ///     delete_keys=[]
+    /// )
+    ///
+    /// # Batch delete items
+    /// client.batch_write(
+    ///     "users",
+    ///     put_items=[],
+    ///     delete_keys=[
+    ///         {"pk": "USER#3", "sk": "PROFILE"},
+    ///         {"pk": "USER#4", "sk": "PROFILE"},
+    ///     ]
+    /// )
+    ///
+    /// # Mixed put and delete
+    /// client.batch_write(
+    ///     "users",
+    ///     put_items=[{"pk": "USER#1", "sk": "PROFILE", "name": "Alice"}],
+    ///     delete_keys=[{"pk": "USER#2", "sk": "PROFILE"}]
+    /// )
+    /// ```
+    pub fn batch_write(
+        &self,
+        py: Python<'_>,
+        table: &str,
+        put_items: &Bound<'_, pyo3::types::PyList>,
+        delete_keys: &Bound<'_, pyo3::types::PyList>,
+    ) -> PyResult<()> {
+        batch_operations::batch_write(py, &self.client, &self.runtime, table, put_items, delete_keys)
     }
 }
 

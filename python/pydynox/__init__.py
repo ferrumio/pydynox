@@ -8,15 +8,17 @@ Example:
 """
 
 # Import from Rust core
-from pydynox import pydynox_core
+from pydynox import pydynox_core  # noqa: F401
 
 # Import Python wrappers
-from .query import QueryResult
+from .batch_operations import BatchWriter
 from .client import DynamoClient
+from .query import QueryResult
 
 __version__ = "0.1.0"
 
 __all__ = [
+    "BatchWriter",
     "DynamoClient",
     "QueryResult",
     "__version__",
