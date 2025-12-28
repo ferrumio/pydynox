@@ -335,6 +335,7 @@ impl DynamoClient {
     /// as exclusive_start_key for the next page.
     #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None))]
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::type_complexity)]
     pub fn query_page(
         &self,
         py: Python<'_>,

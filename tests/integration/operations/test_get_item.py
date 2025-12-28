@@ -2,7 +2,6 @@
 
 import pytest
 
-
 GET_ITEM_CASES = [
     pytest.param(
         {"pk": "GET#1", "sk": "PROFILE", "name": "Alice"},

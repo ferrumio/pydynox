@@ -2,7 +2,6 @@
 
 import pytest
 
-
 PUT_ITEM_CASES = [
     pytest.param(
         {"pk": "USER#1", "sk": "PROFILE", "name": "John", "email": "john@test.com"},

@@ -45,7 +45,7 @@ pub fn py_dict_to_attribute_values(
 ///
 /// The dict should be in the format {"S": "value"}, {"N": "42"}, etc.
 pub fn py_dict_to_attribute_value(
-    py: Python<'_>,
+    _py: Python<'_>,
     dict: &Bound<'_, PyDict>,
 ) -> PyResult<AttributeValue> {
     // String
@@ -93,7 +93,7 @@ pub fn py_dict_to_attribute_value(
         let mut items = Vec::new();
         for item in py_list.iter() {
             let item_dict = item.cast::<PyDict>()?;
-            items.push(py_dict_to_attribute_value(py, item_dict)?);
+            items.push(py_dict_to_attribute_value(_py, item_dict)?);
         }
         return Ok(AttributeValue::L(items));
     }
@@ -105,7 +105,7 @@ pub fn py_dict_to_attribute_value(
         for (k, v) in py_map.iter() {
             let key: String = k.extract()?;
             let value_dict = v.cast::<PyDict>()?;
-            items.insert(key, py_dict_to_attribute_value(py, value_dict)?);
+            items.insert(key, py_dict_to_attribute_value(_py, value_dict)?);
         }
         return Ok(AttributeValue::M(items));
     }
@@ -537,6 +537,7 @@ pub fn update_item(
 }
 
 /// Build a SET update expression from a dict of field:value pairs.
+#[allow(clippy::type_complexity)]
 fn build_set_expression(
     py: Python<'_>,
     updates: &Bound<'_, PyDict>,

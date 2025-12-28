@@ -338,8 +338,10 @@ class DynamoClient:
 
             >>> # Put multiple items atomically
             >>> client.transact_write([
-            ...     {"type": "put", "table": "orders", "item": {"pk": "ORD#1", "sk": "INFO", "status": "new"}},
-            ...     {"type": "put", "table": "orders", "item": {"pk": "ORD#1", "sk": "ITEM#1", "product": "Widget"}}
+            ...     {"type": "put", "table": "orders",
+            ...      "item": {"pk": "ORD#1", "sk": "INFO", "status": "new"}},
+            ...     {"type": "put", "table": "orders",
+            ...      "item": {"pk": "ORD#1", "sk": "ITEM#1", "product": "Widget"}}
             ... ])
         """
         self._client.transact_write(operations)

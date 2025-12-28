@@ -1,7 +1,5 @@
 """Integration tests for batch_write operation."""
 
-import pytest
-
 
 def test_batch_write_puts_items(dynamo):
     """Test batch write with a few items."""

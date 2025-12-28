@@ -1,6 +1,6 @@
 """Query result and pagination."""
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core

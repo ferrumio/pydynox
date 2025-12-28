@@ -8,9 +8,7 @@ import time
 
 import boto3
 import pytest
-
 from pydynox import DynamoClient
-
 
 MOTO_PORT = 5556
 MOTO_ENDPOINT = f"http://127.0.0.1:{MOTO_PORT}"
@@ -24,11 +22,13 @@ def _is_port_in_use(port: int) -> bool:
 @pytest.fixture(scope="session")
 def moto_server():
     """Start moto server for the test session."""
+    import sys
+
     proc = subprocess.Popen(
-        ["uv", "run", "moto_server", "-p", str(MOTO_PORT)],
+        [sys.executable, "-m", "moto.server", "-p", str(MOTO_PORT)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        preexec_fn=os.setsid,
+        preexec_fn=os.setsid if os.name != "nt" else None,
     )
 
     max_wait = 10
@@ -43,7 +43,10 @@ def moto_server():
 
     yield proc
 
-    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    if os.name == "nt":
+        proc.terminate()
+    else:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
     proc.wait()
 
 

@@ -5,7 +5,6 @@ Requirements: 9.3, 9.4
 """
 
 import pytest
-
 from pydynox import Transaction
 
 
