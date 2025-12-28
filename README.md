@@ -1,6 +1,10 @@
 # pydynox 🐍⚙️
 
-[![CodSpeed](https://img.shields.io/badge/CodSpeed-Performance%20Monitoring-blue?logo=github&style=flat-square)](https://codspeed.io/leandrodamascena/pydynox?utm_source=badge)
+[![CI](https://github.com/leandrodamascena/pydynox/actions/workflows/ci.yml/badge.svg)](https://github.com/leandrodamascena/pydynox/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/pydynox.svg)](https://pypi.org/project/pydynox/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pydynox.svg)](https://pypi.org/project/pydynox/)
+[![License](https://img.shields.io/pypi/l/pydynox.svg)](https://github.com/leandrodamascena/pydynox/blob/main/LICENSE)
+[![Downloads](https://static.pepy.tech/badge/pydynox/month)](https://pepy.tech/project/pydynox)
 
 A fast DynamoDB ORM for Python with a Rust core.
 
