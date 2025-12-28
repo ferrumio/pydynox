@@ -16,6 +16,16 @@ A fast DynamoDB ORM for Python with a Rust core.
 
 **Py**(thon) + **Dyn**(amoDB) + **Ox**(ide/Rust)
 
+## GenAI Contributions 🤖
+
+This project welcomes GenAI-assisted contributions! Parts of the code and docstrings were written with AI help.
+
+If you're using AI tools to contribute:
+- Follow the project's coding style and patterns
+- Make sure the code makes sense and is tested
+- Don't submit random or low-quality generated code
+- Review and understand what the AI generated before submitting
+
 ## Features
 
 - Simple class-based API like PynamoDB
