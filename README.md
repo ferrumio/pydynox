@@ -1,5 +1,7 @@
 # pydynox 🐍⚙️
 
+[![CodSpeed](https://img.shields.io/badge/CodSpeed-Performance%20Monitoring-blue?logo=github&style=flat-square)](https://codspeed.io/leandrodamascena/pydynox?utm_source=badge)
+
 A fast DynamoDB ORM for Python with a Rust core.
 
 > ⚠️ **Alpha Software**: This project is in early development. The API may change before v1.0. Use in production at your own risk. Contributions are welcome!
