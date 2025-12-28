@@ -50,19 +50,43 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+          allow-prereleases: true
 
-      - name: Build and install with maturin
+      - name: Create venv
+        run: python -m venv .venv
+
+      - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
-          command: develop
-          args: --release
+          command: build
+          args: --release --out dist
           sccache: true
 
-      - name: Install test dependencies
-        run: pip install pytest pytest-asyncio hypothesis "moto[dynamodb,server]" boto3 pydantic
+      - name: Install wheel and dependencies (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          pip install dist/*.whl
+          pip install pytest pytest-asyncio hypothesis "moto[dynamodb,server]" boto3 pydantic
 
-      - name: Run tests
-        run: pytest tests/ -v --ignore=tests/benchmark
+      - name: Install wheel and dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .venv\Scripts\activate
+          pip install (Get-ChildItem dist\*.whl)
+          pip install pytest pytest-asyncio hypothesis "moto[dynamodb,server]" boto3 pydantic
+
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -v --ignore=tests/benchmark
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .venv\Scripts\activate
+          pytest tests/ -v --ignore=tests/benchmark
 
   test-minimum-versions:
     name: Test Minimum Versions
@@ -75,18 +99,26 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build and install with maturin
+      - name: Create venv
+        run: python -m venv .venv
+
+      - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
-          command: develop
-          args: --release
+          command: build
+          args: --release --out dist
           sccache: true
 
-      - name: Install minimum dependencies
-        run: pip install "pytest==8.0.0" "pytest-asyncio==0.24.0" "hypothesis==6.100.0" "moto[dynamodb,server]==5.0.0" "boto3==1.35.0" "pydantic==2.0.0"
+      - name: Install wheel and minimum dependencies
+        run: |
+          source .venv/bin/activate
+          pip install dist/*.whl
+          pip install "pytest==8.0.0" "pytest-asyncio==0.24.0" "hypothesis==6.100.0" "moto[dynamodb,server]==5.0.0" "boto3==1.35.0" "pydantic==2.0.0"
 
       - name: Run tests
-        run: pytest tests/ -v --ignore=tests/benchmark
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -v --ignore=tests/benchmark
 
   coverage:
     name: Coverage
@@ -99,18 +131,26 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build and install with maturin
+      - name: Create venv
+        run: python -m venv .venv
+
+      - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
-          command: develop
-          args: --release
+          command: build
+          args: --release --out dist
           sccache: true
 
-      - name: Install dependencies
-        run: pip install pytest pytest-asyncio pytest-cov hypothesis "moto[dynamodb,server]" boto3 pydantic
+      - name: Install wheel and dependencies
+        run: |
+          source .venv/bin/activate
+          pip install dist/*.whl
+          pip install pytest pytest-asyncio pytest-cov hypothesis "moto[dynamodb,server]" boto3 pydantic
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
