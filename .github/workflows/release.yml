@@ -14,12 +14,11 @@ permissions:
 
 jobs:
   build-linux:
-    name: Build Linux (manylinux2014)
+    name: Build Linux (${{ matrix.target }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         target: [x86_64, aarch64]
-        python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
@@ -27,33 +26,56 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist -i python${{ matrix.python }}
+          args: --release --out dist -i python3.11 -i python3.12 -i python3.13 -i python3.14
           manylinux: 2014
           sccache: true
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python }}
+          name: wheels-linux-${{ matrix.target }}
           path: dist/*.whl
 
-  build-macos:
-    name: Build macOS
-    runs-on: ${{ matrix.runner }}
+  build-musllinux:
+    name: Build musllinux (${{ matrix.target }})
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - runner: macos-13
-            target: x86_64
-          - runner: macos-14
-            target: aarch64
+        target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}-apple-darwin
+          target: ${{ matrix.target }}
+          args: --release --out dist -i python3.11 -i python3.12 -i python3.13 -i python3.14
+          manylinux: musllinux_1_1
+          sccache: true
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-musllinux-${{ matrix.target }}
+          path: dist/*.whl
+
+  build-macos:
+    name: Build macOS (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: macos-13
+            target: x86_64-apple-darwin
+          - runner: macos-14
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
           args: --release --out dist -i python3.11 -i python3.12 -i python3.13 -i python3.14
           sccache: true
 
@@ -64,7 +86,7 @@ jobs:
           path: dist/*.whl
 
   build-windows:
-    name: Build Windows
+    name: Build Windows (${{ matrix.target }})
     runs-on: windows-latest
     strategy:
       matrix:
@@ -105,7 +127,8 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: [build-linux, build-macos, build-windows, build-sdist]
+    needs:
+      [build-linux, build-musllinux, build-macos, build-windows, build-sdist]
     runs-on: ubuntu-latest
     environment:
       name: pypi
