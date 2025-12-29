@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from pydynox.client import DynamoClient
+    from pydynox.client import DynamoDBClient
 
 
 class BatchWriter:
@@ -20,11 +20,11 @@ class BatchWriter:
         ...     batch.delete({"pk": "USER#3", "sk": "PROFILE"})
     """
 
-    def __init__(self, client: "DynamoClient", table: str):
+    def __init__(self, client: "DynamoDBClient", table: str):
         """Create a BatchWriter.
 
         Args:
-            client: The DynamoClient to use.
+            client: The DynamoDBClient to use.
             table: The table name.
         """
         self._client = client

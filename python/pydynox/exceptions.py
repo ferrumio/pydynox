@@ -4,10 +4,10 @@ These exceptions mirror the error structure from botocore's ClientError,
 making it easy for users familiar with boto3 to handle errors.
 
 Example:
-    >>> from pydynox import DynamoClient
+    >>> from pydynox import DynamoDBClient
     >>> from pydynox.exceptions import TableNotFoundError, ValidationError
     >>>
-    >>> client = DynamoClient()
+    >>> client = DynamoDBClient()
     >>> try:
     ...     client.get_item("nonexistent-table", {"pk": "123"})
     ... except TableNotFoundError as e:

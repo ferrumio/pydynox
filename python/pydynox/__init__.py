@@ -1,8 +1,8 @@
 """pydynox - A fast DynamoDB client for Python with a Rust core.
 
 Example:
-    >>> from pydynox import DynamoClient
-    >>> client = DynamoClient(region="us-east-1")
+    >>> from pydynox import DynamoDBClient
+    >>> client = DynamoDBClient(region="us-east-1")
     >>> client.ping()
     True
 """
@@ -12,7 +12,7 @@ from pydynox import pydynox_core  # noqa: F401
 
 # Import Python wrappers
 from .batch_operations import BatchWriter
-from .client import DynamoClient
+from .client import DynamoDBClient
 from .exceptions import (
     AccessDeniedError,
     ConditionCheckFailedError,
@@ -27,12 +27,12 @@ from .exceptions import (
 from .query import QueryResult
 from .transaction import Transaction
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     # Client
     "BatchWriter",
-    "DynamoClient",
+    "DynamoDBClient",
     "QueryResult",
     "Transaction",
     # Exceptions

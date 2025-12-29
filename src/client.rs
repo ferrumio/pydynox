@@ -4,6 +4,8 @@
 //! - Environment variables
 //! - Hardcoded credentials
 //! - AWS profiles
+//!
+//! The main struct is [`DynamoDBClient`], which wraps the AWS SDK client.
 
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::profile::ProfileFileCredentialsProvider;
@@ -31,30 +33,30 @@ use crate::transaction_operations;
 ///
 /// ```python
 /// # Use environment variables
-/// client = DynamoClient()
+/// client = DynamoDBClient()
 ///
 /// # Use hardcoded credentials
-/// client = DynamoClient(
+/// client = DynamoDBClient(
 ///     access_key="AKIA...",
 ///     secret_key="secret...",
 ///     region="us-east-1"
 /// )
 ///
 /// # Use AWS profile
-/// client = DynamoClient(profile="my-profile")
+/// client = DynamoDBClient(profile="my-profile")
 ///
 /// # Use local endpoint (localstack, moto)
-/// client = DynamoClient(endpoint_url="http://localhost:4566")
+/// client = DynamoDBClient(endpoint_url="http://localhost:4566")
 /// ```
 #[pyclass]
-pub struct DynamoClient {
+pub struct DynamoDBClient {
     client: Client,
     runtime: Arc<Runtime>,
     region: String,
 }
 
 #[pymethods]
-impl DynamoClient {
+impl DynamoDBClient {
     /// Create a new DynamoDB client.
     ///
     /// # Arguments
@@ -68,7 +70,7 @@ impl DynamoClient {
     ///
     /// # Returns
     ///
-    /// A new DynamoClient instance.
+    /// A new DynamoDBClient instance.
     #[new]
     #[pyo3(signature = (region=None, access_key=None, secret_key=None, session_token=None, profile=None, endpoint_url=None))]
     pub fn new(
@@ -111,7 +113,7 @@ impl DynamoClient {
                 .unwrap_or_else(|_| "us-east-1".to_string())
         });
 
-        Ok(DynamoClient {
+        Ok(DynamoDBClient {
             client,
             runtime: Arc::new(runtime),
             region: final_region,
@@ -150,7 +152,7 @@ impl DynamoClient {
     /// # Examples
     ///
     /// ```python
-    /// client = DynamoClient()
+    /// client = DynamoDBClient()
     /// client.put_item("users", {"pk": "USER#123", "name": "John", "age": 30})
     /// ```
     pub fn put_item(&self, py: Python<'_>, table: &str, item: &Bound<'_, PyDict>) -> PyResult<()> {
@@ -171,7 +173,7 @@ impl DynamoClient {
     /// # Examples
     ///
     /// ```python
-    /// client = DynamoClient()
+    /// client = DynamoDBClient()
     /// item = client.get_item("users", {"pk": "USER#123"})
     /// if item:
     ///     print(item["name"])  # "John"
@@ -202,7 +204,7 @@ impl DynamoClient {
     /// # Examples
     ///
     /// ```python
-    /// client = DynamoClient()
+    /// client = DynamoDBClient()
     ///
     /// # Simple delete
     /// client.delete_item("users", {"pk": "USER#123"})
@@ -260,7 +262,7 @@ impl DynamoClient {
     /// # Examples
     ///
     /// ```python
-    /// client = DynamoClient()
+    /// client = DynamoDBClient()
     ///
     /// # Simple update - set fields
     /// client.update_item("users", {"pk": "USER#123"}, updates={"name": "John", "age": 31})
@@ -381,7 +383,7 @@ impl DynamoClient {
     /// # Examples
     ///
     /// ```python
-    /// client = DynamoClient()
+    /// client = DynamoDBClient()
     ///
     /// # Batch put items
     /// client.batch_write(
@@ -446,7 +448,7 @@ impl DynamoClient {
     /// # Examples
     ///
     /// ```python
-    /// client = DynamoClient()
+    /// client = DynamoDBClient()
     ///
     /// # Batch get items
     /// keys = [
@@ -486,7 +488,7 @@ impl DynamoClient {
     /// # Examples
     ///
     /// ```python
-    /// client = DynamoClient()
+    /// client = DynamoDBClient()
     ///
     /// # Transfer money between accounts atomically
     /// client.transact_write([

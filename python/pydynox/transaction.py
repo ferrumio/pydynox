@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
-    from pydynox.client import DynamoClient
+    from pydynox.client import DynamoDBClient
 
 
 class Transaction:
@@ -37,11 +37,11 @@ class Transaction:
         ...     )
     """
 
-    def __init__(self, client: "DynamoClient"):
+    def __init__(self, client: "DynamoDBClient"):
         """Create a Transaction.
 
         Args:
-            client: The DynamoClient to use.
+            client: The DynamoDBClient to use.
         """
         self._client = client
         self._operations: list[dict[str, Any]] = []

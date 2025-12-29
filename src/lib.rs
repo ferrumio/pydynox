@@ -18,7 +18,7 @@ mod errors;
 mod serialization;
 mod transaction_operations;
 
-use client::DynamoClient;
+use client::DynamoDBClient;
 use serialization::{dynamo_to_py_py, item_from_dynamo, item_to_dynamo, py_to_dynamo_py};
 
 /// Python module for pydynox's Rust core.
@@ -27,7 +27,7 @@ use serialization::{dynamo_to_py_py, item_from_dynamo, item_to_dynamo, py_to_dyn
 /// the low-level DynamoDB client implementation.
 #[pymodule]
 fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<DynamoClient>()?;
+    m.add_class::<DynamoDBClient>()?;
 
     // Serialization functions
     m.add_function(wrap_pyfunction!(py_to_dynamo_py, m)?)?;

@@ -5,7 +5,7 @@ from typing import Any, Optional
 from .query import QueryResult
 
 
-class DynamoClient:
+class DynamoDBClient:
     """DynamoDB client with flexible credential configuration.
 
     Supports multiple credential sources in order of priority:
@@ -16,20 +16,20 @@ class DynamoClient:
 
     Example:
         >>> # Use environment variables
-        >>> client = DynamoClient()
+        >>> client = DynamoDBClient()
 
         >>> # Use hardcoded credentials
-        >>> client = DynamoClient(
+        >>> client = DynamoDBClient(
         ...     access_key="AKIA...",
         ...     secret_key="secret...",
         ...     region="us-east-1"
         ... )
 
         >>> # Use AWS profile
-        >>> client = DynamoClient(profile="my-profile")
+        >>> client = DynamoDBClient(profile="my-profile")
 
         >>> # Use local endpoint (localstack, moto)
-        >>> client = DynamoClient(endpoint_url="http://localhost:4566")
+        >>> client = DynamoDBClient(endpoint_url="http://localhost:4566")
     """
 
     def __init__(
@@ -43,7 +43,7 @@ class DynamoClient:
     ):
         from pydynox import pydynox_core
 
-        self._client = pydynox_core.DynamoClient(
+        self._client = pydynox_core.DynamoDBClient(
             region=region,
             access_key=access_key,
             secret_key=secret_key,

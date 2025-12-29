@@ -14,9 +14,9 @@ A clear description of the bug.
 
 ```python
 # Minimal code to reproduce the issue
-from pydynox import DynamoClient
+from pydynox import DynamoDBClient
 
-client = DynamoClient()
+client = DynamoDBClient()
 # ...
 ```
 
