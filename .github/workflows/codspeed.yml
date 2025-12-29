@@ -45,15 +45,15 @@ jobs:
         run: |
           uv venv --python 3.12
           uv pip install maturin
-          uv run maturin build --release --interpreter python3.12
+          uv run maturin build --release --interpreter python3.12 --out dist
 
       - name: Install dependencies and wheel
         run: |
           uv pip install pytest pytest-asyncio pytest-codspeed hypothesis "moto[dynamodb,server]" boto3 pydantic pynamodb
-          uv pip install target/wheels/*.whl
+          uv pip install dist/pydynox-*.whl --force-reinstall --no-deps
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4.5.1
         with:
           mode: simulation
-          run: uv run pytest benchmark/ --codspeed
+          run: uv run pytest --ignore=tests/benchmark --codspeed

@@ -36,31 +36,6 @@ If you're using AI tools to contribute:
 - Async support
 - Pydantic integration
 
-## Performance
-
-pydynox is faster than PynamoDB and boto3 in all operations. Benchmarks run against moto (local DynamoDB mock):
-
-| Operation | pydynox | PynamoDB | boto3 | vs PynamoDB | vs boto3 |
-|-----------|---------|----------|-------|-------------|----------|
-| batch_get (100 items) | 2.55ms | 4.24ms | 3.92ms | **1.66x faster** | **1.54x faster** |
-| batch_write (100 items) | 7.74ms | 9.53ms | 9.68ms | **1.23x faster** | **1.25x faster** |
-| get_item (10x) | 13.83ms | 16.57ms | 16.86ms | **1.20x faster** | **1.22x faster** |
-| put_item (10x) | 14.13ms | 16.78ms | 16.80ms | **1.19x faster** | **1.19x faster** |
-| query (100 items) | 12.92ms | 14.88ms | 14.79ms | **1.15x faster** | **1.15x faster** |
-| update_item (10x) | 19.04ms | 38.15ms | 21.81ms | **2.00x faster** | **1.15x faster** |
-| delete_item (10x) | 26.96ms | 33.07ms | 32.93ms | **1.23x faster** | **1.22x faster** |
-
-**Highlights:**
-- **batch_get**: 66% faster than PynamoDB
-- **update_item**: 2x faster than PynamoDB
-
-Run benchmarks yourself:
-
-```bash
-uv run maturin develop --release
-uv run pytest benchmark/benchmark.py -v --benchmark-only
-```
-
 ## Installation
 
 ```bash

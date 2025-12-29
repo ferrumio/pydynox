@@ -11,7 +11,7 @@ import pytest
 from pynamodb.attributes import UnicodeAttribute, NumberAttribute
 from pynamodb.models import Model
 
-from pydynox import DynamoClient
+from pydynox import DynamoDBClient
 
 
 MOTO_PORT = 5557
@@ -91,8 +91,8 @@ def bench_table(boto_client):
 
 @pytest.fixture(scope="session")
 def pydynox_client(bench_table):
-    """Create a pydynox DynamoClient."""
-    return DynamoClient(
+    """Create a pydynox DynamoDBClient."""
+    return DynamoDBClient(
         region="us-east-1",
         endpoint_url=MOTO_ENDPOINT,
         access_key="testing",

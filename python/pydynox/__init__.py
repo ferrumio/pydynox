@@ -14,6 +14,16 @@ Example:
     ...     name = StringAttribute()
     >>> user = User(pk="USER#1", name="John")
     >>> user.save()
+
+    >>> # With Pydantic
+    >>> from pydynox import dynamodb_model
+    >>> from pydantic import BaseModel
+    >>> @dynamodb_model(table="users", hash_key="pk")
+    ... class User(BaseModel):
+    ...     pk: str
+    ...     name: str
+    >>> user = User(pk="USER#1", name="John")
+    >>> user.save()
 """
 
 # Import from Rust core
@@ -43,10 +53,11 @@ from .exceptions import (
     ValidationError,
 )
 from .model import Model
+from .pydantic_integration import dynamodb_model, from_pydantic
 from .query import QueryResult
 from .transaction import Transaction
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 __all__ = [
     # Client
@@ -63,6 +74,9 @@ __all__ = [
     "BinaryAttribute",
     "ListAttribute",
     "MapAttribute",
+    # Pydantic integration
+    "dynamodb_model",
+    "from_pydantic",
     # Exceptions
     "AccessDeniedError",
     "ConditionCheckFailedError",
