@@ -82,29 +82,6 @@ jobs:
           name: pydynox-cp${{ matrix.python }}-macos-${{ matrix.target }}
           path: dist/*.whl
 
-  # build-windows:
-  #   name: Build Windows (${{ matrix.target }}, py${{ matrix.python }})
-  #   runs-on: windows-latest
-  #   strategy:
-  #     matrix:
-  #       target: [x64]
-  #       python: ["3.11", "3.12", "3.13", "3.14"]
-  #   steps:
-  #     - uses: actions/checkout@v4
-
-  #     - name: Build wheels
-  #       uses: PyO3/maturin-action@v1
-  #       with:
-  #         target: ${{ matrix.target }}
-  #         args: --release --out dist -i python${{ matrix.python }}
-  #         sccache: true
-
-  #     - name: Upload wheels
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: wheels-windows-${{ matrix.target }}-py${{ matrix.python }}
-  #         path: dist/*.whl
-
   build-sdist:
     name: Build sdist
     runs-on: ubuntu-latest
@@ -123,26 +100,26 @@ jobs:
           name: pydynox-sdist
           path: dist/*.tar.gz
 
-  # publish:
-  #   name: Publish to PyPI
-  #   needs: [build-linux, build-musllinux, build-macos, build-sdist]
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: pypi
-  #     url: https://pypi.org/p/pydynox
-  #   steps:
-  #     - name: Download all artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         pattern: wheels-*
-  #         path: dist
-  #         merge-multiple: true
+  publish:
+    name: Publish to PyPI
+    needs: [build-linux-x86, build-linux-arm, build-macos, build-sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pydynox
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pydynox-*
+          path: dist
+          merge-multiple: true
 
-  #     - name: List artifacts
-  #       run: ls -la dist/
+      - name: List artifacts
+        run: ls -la dist/
 
-  #     - name: Publish to PyPI
-  #       uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
   # github-release:
   #   name: Create GitHub Release
