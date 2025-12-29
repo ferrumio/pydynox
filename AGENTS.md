@@ -20,7 +20,7 @@ pydynox/
 │   └── transaction_operations.rs # transact_write
 ├── python/pydynox/        # Python wrappers
 │   ├── __init__.py        # Public API exports
-│   ├── client.py          # DynamoClient wrapper
+│   ├── client.py          # DynamoDBClient wrapper
 │   ├── query.py           # QueryResult wrapper
 │   └── transaction.py     # Transaction wrapper
 ├── tests/
@@ -98,7 +98,7 @@ Tests use moto server (DynamoDB mock). The conftest.py starts it automatically.
 from pydynox import pydynox_core
 
 # Use Rust classes
-client = pydynox_core.DynamoClient(...)
+client = pydynox_core.DynamoDBClient(...)
 ```
 
 Never import from `_rust` or other private modules.

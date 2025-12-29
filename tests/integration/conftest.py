@@ -8,7 +8,7 @@ import time
 
 import boto3
 import pytest
-from pydynox import DynamoClient
+from pydynox import DynamoDBClient
 
 MOTO_PORT = 5556
 MOTO_ENDPOINT = f"http://127.0.0.1:{MOTO_PORT}"
@@ -24,12 +24,21 @@ def moto_server():
     """Start moto server for the test session."""
     import sys
 
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "moto.server", "-p", str(MOTO_PORT)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        preexec_fn=os.setsid if os.name != "nt" else None,
-    )
+    if os.name == "nt":
+        # Windows: use CREATE_NEW_PROCESS_GROUP for proper cleanup
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "moto.server", "-p", str(MOTO_PORT)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+    else:
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "moto.server", "-p", str(MOTO_PORT)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            preexec_fn=os.setsid,
+        )
 
     max_wait = 10
     waited = 0
@@ -44,10 +53,14 @@ def moto_server():
     yield proc
 
     if os.name == "nt":
-        proc.terminate()
+        # Windows: kill the process tree
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+            capture_output=True,
+        )
     else:
         os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-    proc.wait()
+    proc.wait(timeout=5)
 
 
 @pytest.fixture
@@ -88,8 +101,8 @@ def table(boto_client):
 
 @pytest.fixture
 def dynamo(table):
-    """Create a pydynox DynamoClient."""
-    return DynamoClient(
+    """Create a pydynox DynamoDBClient."""
+    return DynamoDBClient(
         region="us-east-1",
         endpoint_url=MOTO_ENDPOINT,
         access_key="testing",
