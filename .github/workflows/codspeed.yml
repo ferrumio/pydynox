@@ -56,4 +56,4 @@ jobs:
         uses: CodSpeedHQ/action@v4.5.1
         with:
           mode: simulation
-          run: uv run pytest benchmark/ --codspeed
+          run: uv run pytest --ignore=tests/benchmark --codspeed
