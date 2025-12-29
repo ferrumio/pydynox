@@ -6,7 +6,8 @@ Example:
     >>> client.ping()
     True
 
-    >>> from pydynox import Model, StringAttribute, NumberAttribute
+    >>> from pydynox import Model
+    >>> from pydynox.attributes import StringAttribute, NumberAttribute
     >>> class User(Model):
     ...     class Meta:
     ...         table = "users"
@@ -16,7 +17,7 @@ Example:
     >>> user.save()
 
     >>> # With Pydantic
-    >>> from pydynox import dynamodb_model
+    >>> from pydynox.integrations.pydantic import dynamodb_model
     >>> from pydantic import BaseModel
     >>> @dynamodb_model(table="users", hash_key="pk")
     ... class User(BaseModel):
@@ -30,32 +31,11 @@ Example:
 from pydynox import pydynox_core  # noqa: F401
 
 # Import Python wrappers
-from .attributes import (
-    Attribute,
-    BinaryAttribute,
-    BooleanAttribute,
-    ListAttribute,
-    MapAttribute,
-    NumberAttribute,
-    StringAttribute,
-)
-from .batch_operations import BatchWriter
-from .client import DynamoDBClient
-from .exceptions import (
-    AccessDeniedError,
-    ConditionCheckFailedError,
-    CredentialsError,
-    PydynoxError,
-    SerializationError,
-    TableNotFoundError,
-    ThrottlingError,
-    TransactionCanceledError,
-    ValidationError,
-)
-from .model import Model
-from .pydantic_integration import dynamodb_model, from_pydantic
-from .query import QueryResult
-from .transaction import Transaction
+from pydynox.batch_operations import BatchWriter
+from pydynox.client import DynamoDBClient
+from pydynox.model import Model
+from pydynox.query import QueryResult
+from pydynox.transaction import Transaction
 
 __version__ = "0.2.0"
 
@@ -67,26 +47,6 @@ __all__ = [
     "Transaction",
     # Model ORM
     "Model",
-    "Attribute",
-    "StringAttribute",
-    "NumberAttribute",
-    "BooleanAttribute",
-    "BinaryAttribute",
-    "ListAttribute",
-    "MapAttribute",
-    # Pydantic integration
-    "dynamodb_model",
-    "from_pydantic",
-    # Exceptions
-    "AccessDeniedError",
-    "ConditionCheckFailedError",
-    "CredentialsError",
-    "PydynoxError",
-    "SerializationError",
-    "TableNotFoundError",
-    "ThrottlingError",
-    "TransactionCanceledError",
-    "ValidationError",
     # Version
     "__version__",
 ]

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel, Field
-from pydynox import dynamodb_model, from_pydantic
+from pydynox.integrations.pydantic import dynamodb_model, from_pydantic
 
 
 @dynamodb_model(table="users", hash_key="pk", range_key="sk")
@@ -62,7 +62,7 @@ def test_get_key_returns_hash_and_range():
     assert key == {"pk": "USER#1", "sk": "PROFILE"}
 
 
-@patch("pydynox.pydantic_integration.DynamoDBClient")
+@patch("pydynox.integrations.pydantic.DynamoDBClient")
 def test_get_fetches_from_dynamodb(mock_client_class):
     """get() fetches item from DynamoDB and returns Pydantic model."""
     mock_client = MagicMock()
@@ -84,7 +84,7 @@ def test_get_fetches_from_dynamodb(mock_client_class):
     mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
 
 
-@patch("pydynox.pydantic_integration.DynamoDBClient")
+@patch("pydynox.integrations.pydantic.DynamoDBClient")
 def test_get_returns_none_when_not_found(mock_client_class):
     """get() returns None when item not found."""
     mock_client = MagicMock()
@@ -97,7 +97,7 @@ def test_get_returns_none_when_not_found(mock_client_class):
     assert user is None
 
 
-@patch("pydynox.pydantic_integration.DynamoDBClient")
+@patch("pydynox.integrations.pydantic.DynamoDBClient")
 def test_save_puts_to_dynamodb(mock_client_class):
     """save() puts item to DynamoDB."""
     mock_client = MagicMock()
@@ -112,7 +112,7 @@ def test_save_puts_to_dynamodb(mock_client_class):
     )
 
 
-@patch("pydynox.pydantic_integration.DynamoDBClient")
+@patch("pydynox.integrations.pydantic.DynamoDBClient")
 def test_delete_removes_from_dynamodb(mock_client_class):
     """delete() removes item from DynamoDB."""
     mock_client = MagicMock()
@@ -125,7 +125,7 @@ def test_delete_removes_from_dynamodb(mock_client_class):
     mock_client.delete_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
 
 
-@patch("pydynox.pydantic_integration.DynamoDBClient")
+@patch("pydynox.integrations.pydantic.DynamoDBClient")
 def test_update_updates_dynamodb(mock_client_class):
     """update() updates item in DynamoDB."""
     mock_client = MagicMock()

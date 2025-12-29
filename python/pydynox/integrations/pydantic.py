@@ -3,7 +3,7 @@
 Use Pydantic models directly with DynamoDB without redefining your schema.
 
 Example:
-    >>> from pydynox import dynamodb_model
+    >>> from pydynox.integrations.pydantic import dynamodb_model
     >>> from pydantic import BaseModel
     >>>
     >>> @dynamodb_model(table="users", hash_key="pk", range_key="sk")
@@ -26,9 +26,11 @@ try:
 except ImportError:
     BaseModel = None  # type: ignore
 
-from .client import DynamoDBClient
+from pydynox.client import DynamoDBClient
 
 T = TypeVar("T")
+
+__all__ = ["dynamodb_model", "from_pydantic"]
 
 
 def _check_pydantic() -> None:
