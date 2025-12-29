@@ -259,4 +259,39 @@ Full documentation: [https://pydynox.readthedocs.io](https://pydynox.readthedocs
 
 ## License
 
-Apache 2.0 License
+MIT License
+
+## Building from Source
+
+### Requirements
+
+- Python 3.11+
+- Rust 1.70+
+- maturin
+
+### Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/leandrodamascena/pydynox.git
+cd pydynox
+
+# Install maturin
+pip install maturin
+
+# Build and install locally
+maturin develop
+
+# Or with uv
+uv run maturin develop
+```
+
+### Running Tests
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+```
