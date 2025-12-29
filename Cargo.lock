@@ -1232,6 +1232,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
  "base64",
+ "once_cell",
  "pyo3",
  "serde",
  "serde_json",

@@ -12,6 +12,7 @@ use aws_config::profile::ProfileFileCredentialsProvider;
 use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::config::Credentials;
 use aws_sdk_dynamodb::Client;
+use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::sync::Arc;
@@ -20,6 +21,13 @@ use tokio::runtime::Runtime;
 use crate::basic_operations;
 use crate::batch_operations;
 use crate::transaction_operations;
+
+/// Global shared Tokio runtime.
+///
+/// Using a single runtime avoids deadlocks on Windows when multiple
+/// DynamoDBClient instances are created.
+static RUNTIME: Lazy<Arc<Runtime>> =
+    Lazy::new(|| Arc::new(Runtime::new().expect("Failed to create global Tokio runtime")));
 
 /// DynamoDB client with flexible credential configuration.
 ///
@@ -81,12 +89,7 @@ impl DynamoDBClient {
         profile: Option<String>,
         endpoint_url: Option<String>,
     ) -> PyResult<Self> {
-        let runtime = Runtime::new().map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                "Failed to create tokio runtime: {}",
-                e
-            ))
-        })?;
+        let runtime = RUNTIME.clone();
 
         let client = runtime
             .block_on(async {
@@ -115,7 +118,7 @@ impl DynamoDBClient {
 
         Ok(DynamoDBClient {
             client,
-            runtime: Arc::new(runtime),
+            runtime,
             region: final_region,
         })
     }
