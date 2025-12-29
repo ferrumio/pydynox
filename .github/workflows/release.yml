@@ -13,24 +13,19 @@ permissions:
   id-token: write
 
 jobs:
-  build-linux:
-    name: Build Linux (${{ matrix.target }}, py${{ matrix.python }})
-    runs-on: ${{ matrix.runner }}
+  build-linux-x86:
+    name: Build Linux (x86_64, py${{ matrix.python }})
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
-        include:
-          - target: x86_64
-            runner: ubuntu-latest
-          - target: aarch64
-            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
+          target: x86_64
           args: --release --out dist -i python${{ matrix.python }}
           manylinux: auto
           sccache: true
@@ -38,27 +33,45 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux-${{ matrix.target }}-py${{ matrix.python }}
+          name: wheels-linux-x86_64-py${{ matrix.python }}
           path: dist/*.whl
 
-  build-musllinux:
-    name: Build musllinux (${{ matrix.target }}, py${{ matrix.python }})
-    runs-on: ${{ matrix.runner }}
+  build-linux-arm:
+    name: Build Linux (aarch64, py${{ matrix.python }})
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
-        include:
-          - target: x86_64
-            runner: ubuntu-latest
-          - target: aarch64
-            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
+          target: aarch64
+          args: --release --out dist -i python${{ matrix.python }}
+          manylinux: auto
+          sccache: true
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-aarch64-py${{ matrix.python }}
+          path: dist/*.whl
+
+  build-musllinux-x86:
+    name: Build musllinux (x86_64, py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: x86_64
           args: --release --out dist -i python${{ matrix.python }}
           manylinux: musllinux_1_2
           sccache: true
@@ -66,7 +79,30 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-musllinux-${{ matrix.target }}-py${{ matrix.python }}
+          name: wheels-musllinux-x86_64-py${{ matrix.python }}
+          path: dist/*.whl
+
+  build-musllinux-arm:
+    name: Build musllinux (aarch64, py${{ matrix.python }})
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: aarch64
+          args: --release --out dist -i python${{ matrix.python }}
+          manylinux: musllinux_1_2
+          sccache: true
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-musllinux-aarch64-py${{ matrix.python }}
           path: dist/*.whl
 
   build-macos:
