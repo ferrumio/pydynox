@@ -1,8 +1,9 @@
 """Model base class with ORM-style CRUD operations."""
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, ClassVar, Optional, Type, TypeVar
 
-from .attributes import Attribute
+from .attributes import Attribute, TTLAttribute
 from .client import DynamoDBClient
 
 M = TypeVar("M", bound="Model")
@@ -239,10 +240,10 @@ class Model(metaclass=ModelMeta):
             {'pk': 'USER#123', 'sk': 'PROFILE', 'name': 'John'}
         """
         result = {}
-        for attr_name in self._attributes:
+        for attr_name, attr in self._attributes.items():
             value = getattr(self, attr_name, None)
             if value is not None:
-                result[attr_name] = value
+                result[attr_name] = attr.serialize(value)
         return result
 
     @classmethod
@@ -259,7 +260,13 @@ class Model(metaclass=ModelMeta):
             >>> data = {'pk': 'USER#123', 'sk': 'PROFILE', 'name': 'John'}
             >>> user = User.from_dict(data)
         """
-        return cls(**data)
+        deserialized = {}
+        for attr_name, value in data.items():
+            if attr_name in cls._attributes:
+                deserialized[attr_name] = cls._attributes[attr_name].deserialize(value)
+            else:
+                deserialized[attr_name] = value
+        return cls(**deserialized)
 
     def __repr__(self) -> str:
         """Return a string representation of the model."""
@@ -271,3 +278,81 @@ class Model(metaclass=ModelMeta):
         if not isinstance(other, self.__class__):
             return False
         return self._get_key() == other._get_key()
+
+    def _get_ttl_attr_name(self) -> Optional[str]:
+        """Find the TTLAttribute field name if one exists."""
+        for attr_name, attr in self._attributes.items():
+            if isinstance(attr, TTLAttribute):
+                return attr_name
+        return None
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if the TTL has passed.
+
+        Returns:
+            True if expired, False otherwise. Returns False if no TTL attribute.
+
+        Example:
+            >>> session = Session.get(pk="SESSION#123")
+            >>> if session.is_expired:
+            ...     print("Session expired")
+        """
+        ttl_attr = self._get_ttl_attr_name()
+        if ttl_attr is None:
+            return False
+
+        expires_at = getattr(self, ttl_attr, None)
+        if expires_at is None:
+            return False
+
+        return datetime.now(timezone.utc) > expires_at
+
+    @property
+    def expires_in(self) -> Optional[timedelta]:
+        """Get time remaining until expiration.
+
+        Returns:
+            timedelta until expiration, or None if no TTL or already expired.
+
+        Example:
+            >>> session = Session.get(pk="SESSION#123")
+            >>> remaining = session.expires_in
+            >>> if remaining:
+            ...     print(f"Expires in {remaining.total_seconds()} seconds")
+        """
+        ttl_attr = self._get_ttl_attr_name()
+        if ttl_attr is None:
+            return None
+
+        expires_at = getattr(self, ttl_attr, None)
+        if expires_at is None:
+            return None
+
+        remaining = expires_at - datetime.now(timezone.utc)
+        if remaining.total_seconds() < 0:
+            return None
+
+        return remaining
+
+    def extend_ttl(self, new_expiration: datetime) -> None:
+        """Extend the TTL to a new expiration time.
+
+        Updates both the local instance and DynamoDB.
+
+        Args:
+            new_expiration: New expiration datetime. Use ExpiresIn helper.
+
+        Raises:
+            ValueError: If model has no TTLAttribute.
+
+        Example:
+            >>> from pydynox.attributes import ExpiresIn
+            >>> session = Session.get(pk="SESSION#123")
+            >>> session.extend_ttl(ExpiresIn.hours(1))  # extend by 1 hour
+        """
+        ttl_attr = self._get_ttl_attr_name()
+        if ttl_attr is None:
+            raise ValueError(f"Model {self.__class__.__name__} has no TTLAttribute")
+
+        self.update(**{ttl_attr: new_expiration})
