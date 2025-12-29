@@ -35,5 +35,8 @@ fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(item_to_dynamo, m)?)?;
     m.add_function(wrap_pyfunction!(item_from_dynamo, m)?)?;
 
+    // Register exception classes
+    errors::register_exceptions(m)?;
+
     Ok(())
 }

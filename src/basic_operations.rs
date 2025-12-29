@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
+use crate::errors::map_sdk_error;
 use crate::serialization::{dynamo_to_py, py_to_dynamo};
 
 /// Convert a Python dict to a HashMap of DynamoDB AttributeValues.
@@ -294,25 +295,7 @@ pub fn put_item(
 
     match result {
         Ok(_) => Ok(()),
-        Err(e) => {
-            let err_msg = e.to_string();
-            if err_msg.contains("ResourceNotFoundException") {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Table not found: {}",
-                    table
-                )))
-            } else if err_msg.contains("ValidationException") {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Validation error: {}",
-                    err_msg
-                )))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Failed to put item: {}",
-                    err_msg
-                )))
-            }
-        }
+        Err(e) => Err(map_sdk_error(e, Some(table))),
     }
 }
 
@@ -347,20 +330,7 @@ pub fn get_item(
                 Ok(None)
             }
         }
-        Err(e) => {
-            let err_msg = e.to_string();
-            if err_msg.contains("ResourceNotFoundException") {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Table not found: {}",
-                    table
-                )))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Failed to get item: {}",
-                    err_msg
-                )))
-            }
-        }
+        Err(e) => Err(map_sdk_error(e, Some(table))),
     }
 }
 
@@ -409,34 +379,7 @@ pub fn delete_item(
 
     match result {
         Ok(_) => Ok(()),
-        Err(e) => {
-            let err_msg = e.to_string();
-            if err_msg.contains("ConditionalCheckFailedException")
-                || err_msg.contains("ConditionalCheckFailed")
-                || err_msg.contains("conditional request failed")
-            {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Condition check failed: the condition expression evaluated to false",
-                ))
-            } else if err_msg.contains("ResourceNotFoundException")
-                || err_msg.contains("resource not found")
-            {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Table not found: {}",
-                    table
-                )))
-            } else if err_msg.contains("ValidationException") {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Validation error: {}",
-                    err_msg
-                )))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Failed to delete item: {}",
-                    err_msg
-                )))
-            }
-        }
+        Err(e) => Err(map_sdk_error(e, Some(table))),
     }
 }
 
@@ -505,34 +448,7 @@ pub fn update_item(
 
     match result {
         Ok(_) => Ok(()),
-        Err(e) => {
-            let err_msg = e.to_string();
-            if err_msg.contains("ConditionalCheckFailedException")
-                || err_msg.contains("ConditionalCheckFailed")
-                || err_msg.contains("conditional request failed")
-            {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Condition check failed: the condition expression evaluated to false",
-                ))
-            } else if err_msg.contains("ResourceNotFoundException")
-                || err_msg.contains("resource not found")
-            {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Table not found: {}",
-                    table
-                )))
-            } else if err_msg.contains("ValidationException") {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Validation error: {}",
-                    err_msg
-                )))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Failed to update item: {}",
-                    err_msg
-                )))
-            }
-        }
+        Err(e) => Err(map_sdk_error(e, Some(table))),
     }
 }
 
@@ -677,26 +593,6 @@ pub fn query(
                 last_evaluated_key: last_key,
             })
         }
-        Err(e) => {
-            let err_msg = e.to_string();
-            if err_msg.contains("ResourceNotFoundException")
-                || err_msg.contains("resource not found")
-            {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Table not found: {}",
-                    table
-                )))
-            } else if err_msg.contains("ValidationException") {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Validation error: {}",
-                    err_msg
-                )))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Failed to query: {}",
-                    err_msg
-                )))
-            }
-        }
+        Err(e) => Err(map_sdk_error(e, Some(table))),
     }
 }

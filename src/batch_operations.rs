@@ -13,6 +13,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use crate::basic_operations::{attribute_values_to_py_dict, py_dict_to_attribute_values};
+use crate::errors::map_sdk_error;
 
 /// Maximum items per batch write request (DynamoDB limit).
 const BATCH_WRITE_MAX_ITEMS: usize = 25;
@@ -135,25 +136,7 @@ pub fn batch_write(
                     pending.clear();
                 }
                 Err(e) => {
-                    let err_msg = e.to_string();
-                    if err_msg.contains("ResourceNotFoundException")
-                        || err_msg.contains("resource not found")
-                    {
-                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Table not found: {}",
-                            table
-                        )));
-                    } else if err_msg.contains("ValidationException") {
-                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Validation error: {}",
-                            err_msg
-                        )));
-                    } else {
-                        return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                            "Failed to batch write: {}",
-                            err_msg
-                        )));
-                    }
+                    return Err(map_sdk_error(e, Some(table)));
                 }
             }
         }
@@ -271,25 +254,7 @@ pub fn batch_get(
                     pending.clear();
                 }
                 Err(e) => {
-                    let err_msg = e.to_string();
-                    if err_msg.contains("ResourceNotFoundException")
-                        || err_msg.contains("resource not found")
-                    {
-                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Table not found: {}",
-                            table
-                        )));
-                    } else if err_msg.contains("ValidationException") {
-                        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Validation error: {}",
-                            err_msg
-                        )));
-                    } else {
-                        return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                            "Failed to batch get: {}",
-                            err_msg
-                        )));
-                    }
+                    return Err(map_sdk_error(e, Some(table)));
                 }
             }
         }

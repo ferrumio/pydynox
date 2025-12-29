@@ -2,6 +2,8 @@
 
 import pytest
 
+from pydynox.exceptions import ConditionCheckFailedError, TableNotFoundError
+
 
 def test_delete_item_removes_item(dynamo):
     """Test that delete_item removes an existing item."""
@@ -50,7 +52,7 @@ def test_delete_item_with_condition_fails(dynamo):
     dynamo.put_item("test_table", item)
 
     # Try to delete only if status is inactive (it's active, so should fail)
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(ConditionCheckFailedError):
         dynamo.delete_item(
             "test_table",
             {"pk": "USER#DEL3", "sk": "PROFILE"},
@@ -58,9 +60,6 @@ def test_delete_item_with_condition_fails(dynamo):
             expression_attribute_names={"#s": "status"},
             expression_attribute_values={":val": "inactive"},
         )
-
-    # Should raise some error (ValueError or RuntimeError depending on moto response)
-    assert exc_info.type in (ValueError, RuntimeError)
 
     # Item should still exist
     result = dynamo.get_item("test_table", {"pk": "USER#DEL3", "sk": "PROFILE"})
@@ -87,5 +86,5 @@ def test_delete_item_with_attribute_exists_condition(dynamo):
 
 def test_delete_item_table_not_found(dynamo):
     """Test delete from non-existent table raises error."""
-    with pytest.raises((ValueError, RuntimeError)):
+    with pytest.raises(TableNotFoundError):
         dynamo.delete_item("nonexistent_table", {"pk": "X", "sk": "Y"})

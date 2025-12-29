@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use crate::basic_operations::py_dict_to_attribute_values;
+use crate::errors::map_sdk_error;
 
 /// Maximum items per transaction (DynamoDB limit).
 const TRANSACTION_MAX_ITEMS: usize = 100;
@@ -76,40 +77,7 @@ pub fn transact_write(
 
     match result {
         Ok(_) => Ok(()),
-        Err(e) => {
-            let err_msg = e.to_string();
-            if err_msg.contains("TransactionCanceledException")
-                || err_msg.contains("TransactionCanceled")
-                || err_msg.contains("transaction was canceled")
-            {
-                if err_msg.contains("ConditionalCheckFailed") {
-                    Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Transaction failed: a condition check failed",
-                    ))
-                } else {
-                    Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Transaction failed: {}",
-                        err_msg
-                    )))
-                }
-            } else if err_msg.contains("ValidationException") {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Validation error: {}",
-                    err_msg
-                )))
-            } else if err_msg.contains("ResourceNotFoundException")
-                || err_msg.contains("resource not found")
-            {
-                Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Transaction failed: table not found",
-                ))
-            } else {
-                Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Transaction failed: {}",
-                    err_msg
-                )))
-            }
-        }
+        Err(e) => Err(map_sdk_error(e, None)),
     }
 }
 

@@ -2,6 +2,8 @@
 
 import pytest
 
+from pydynox.exceptions import ConditionCheckFailedError, TableNotFoundError
+
 
 def test_update_item_simple_set(dynamo):
     """Test simple update that sets field values."""
@@ -126,7 +128,7 @@ def test_update_item_with_condition_fails(dynamo):
     item = {"pk": "USER#UPD5", "sk": "PROFILE", "status": "active"}
     dynamo.put_item("test_table", item)
 
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(ConditionCheckFailedError):
         dynamo.update_item(
             "test_table",
             {"pk": "USER#UPD5", "sk": "PROFILE"},
@@ -135,8 +137,6 @@ def test_update_item_with_condition_fails(dynamo):
             expression_attribute_names={"#s": "status"},
             expression_attribute_values={":expected": "pending"},
         )
-
-    assert exc_info.type in (ValueError, RuntimeError)
 
     result = dynamo.get_item("test_table", {"pk": "USER#UPD5", "sk": "PROFILE"})
     assert result["status"] == "active"
@@ -182,7 +182,7 @@ def test_update_item_nonexistent_creates_item(dynamo):
 
 def test_update_item_table_not_found(dynamo):
     """Test update on non-existent table raises error."""
-    with pytest.raises((ValueError, RuntimeError)):
+    with pytest.raises(TableNotFoundError):
         dynamo.update_item(
             "nonexistent_table",
             {"pk": "X", "sk": "Y"},
