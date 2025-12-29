@@ -1,6 +1,6 @@
 [package]
 name = "pydynox"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Leandro Cavalcante Damascena <leandro.damascena@gmail.com>"]
 description = "A fast DynamoDB ORM for Python with a Rust core"

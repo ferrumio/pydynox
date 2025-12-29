@@ -33,7 +33,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: pydynox-cp${{ matrix.python }}-manylinux-x86_64
+          name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-manylinux-x86_64
           path: dist/*.whl
 
   build-linux-arm:
@@ -56,7 +56,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: pydynox-cp${{ matrix.python }}-manylinux-aarch64
+          name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-manylinux-aarch64
           path: dist/*.whl
 
   build-macos:
@@ -79,7 +79,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: pydynox-cp${{ matrix.python }}-macos-${{ matrix.target }}
+          name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-macos-${{ matrix.target }}
           path: dist/*.whl
 
   build-sdist:
@@ -97,7 +97,7 @@ jobs:
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
-          name: pydynox-sdist
+          name: pydynox-${{ inputs.version }}-sdist
           path: dist/*.tar.gz
 
   publish:
@@ -111,7 +111,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: pydynox-*
+          pattern: pydynox-${{ inputs.version }}-*
           path: dist
           merge-multiple: true
 
