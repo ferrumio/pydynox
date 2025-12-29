@@ -345,3 +345,112 @@ class DynamoDBClient:
             ... ])
         """
         self._client.transact_write(operations)
+
+    def create_table(
+        self,
+        table_name: str,
+        hash_key: tuple[str, str],
+        range_key: Optional[tuple[str, str]] = None,
+        billing_mode: str = "PAY_PER_REQUEST",
+        read_capacity: Optional[int] = None,
+        write_capacity: Optional[int] = None,
+        table_class: Optional[str] = None,
+        encryption: Optional[str] = None,
+        kms_key_id: Optional[str] = None,
+        wait: bool = False,
+    ) -> None:
+        """Create a new DynamoDB table.
+
+        Useful for local development and testing with moto/localstack.
+        For production, use CDK, CloudFormation, or Terraform instead.
+
+        Args:
+            table_name: Name of the table to create.
+            hash_key: Tuple of (attribute_name, attribute_type) for the hash key.
+                      Type can be "S" (string), "N" (number), or "B" (binary).
+            range_key: Optional tuple of (attribute_name, attribute_type) for the range key.
+            billing_mode: "PAY_PER_REQUEST" (default) or "PROVISIONED".
+            read_capacity: Read capacity units (only for PROVISIONED, default: 5).
+            write_capacity: Write capacity units (only for PROVISIONED, default: 5).
+            table_class: "STANDARD" (default) or "STANDARD_INFREQUENT_ACCESS".
+            encryption: "AWS_OWNED" (default), "AWS_MANAGED", or "CUSTOMER_MANAGED".
+            kms_key_id: KMS key ARN (required when encryption is "CUSTOMER_MANAGED").
+            wait: If True, wait for table to become ACTIVE before returning.
+
+        Example:
+            >>> # Create table with on-demand billing
+            >>> client.create_table(
+            ...     "users",
+            ...     hash_key=("pk", "S"),
+            ...     range_key=("sk", "S")
+            ... )
+
+            >>> # Create table with customer managed KMS encryption
+            >>> client.create_table(
+            ...     "orders",
+            ...     hash_key=("pk", "S"),
+            ...     encryption="CUSTOMER_MANAGED",
+            ...     kms_key_id="arn:aws:kms:us-east-1:123456789:key/abc-123",
+            ...     wait=True
+            ... )
+        """
+        self._client.create_table(
+            table_name,
+            hash_key,
+            range_key=range_key,
+            billing_mode=billing_mode,
+            read_capacity=read_capacity,
+            write_capacity=write_capacity,
+            table_class=table_class,
+            encryption=encryption,
+            kms_key_id=kms_key_id,
+            wait=wait,
+        )
+
+    def table_exists(self, table_name: str) -> bool:
+        """Check if a table exists.
+
+        Args:
+            table_name: Name of the table to check.
+
+        Returns:
+            True if the table exists, False otherwise.
+
+        Example:
+            >>> if not client.table_exists("users"):
+            ...     client.create_table("users", hash_key=("pk", "S"))
+        """
+        return self._client.table_exists(table_name)
+
+    def delete_table(self, table_name: str) -> None:
+        """Delete a table.
+
+        Args:
+            table_name: Name of the table to delete.
+
+        Example:
+            >>> client.delete_table("users")
+        """
+        self._client.delete_table(table_name)
+
+    def wait_for_table_active(
+        self,
+        table_name: str,
+        timeout_seconds: Optional[int] = None,
+    ) -> None:
+        """Wait for a table to become active.
+
+        Polls the table status until it becomes ACTIVE or times out.
+
+        Args:
+            table_name: Name of the table to wait for.
+            timeout_seconds: Maximum time to wait (default: 60).
+
+        Raises:
+            TimeoutError: If the table doesn't become active within the timeout.
+
+        Example:
+            >>> client.create_table("users", hash_key=("pk", "S"))
+            >>> client.wait_for_table_active("users", timeout_seconds=30)
+        """
+        self._client.wait_for_table_active(table_name, timeout_seconds=timeout_seconds)

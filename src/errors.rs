@@ -11,6 +11,7 @@ use pyo3::prelude::*;
 // Create Python exception classes
 create_exception!(pydynox, PydynoxError, PyException);
 create_exception!(pydynox, TableNotFoundError, PydynoxError);
+create_exception!(pydynox, TableAlreadyExistsError, PydynoxError);
 create_exception!(pydynox, ValidationError, PydynoxError);
 create_exception!(pydynox, ConditionCheckFailedError, PydynoxError);
 create_exception!(pydynox, TransactionCanceledError, PydynoxError);
@@ -25,6 +26,10 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "TableNotFoundError",
         m.py().get_type::<TableNotFoundError>(),
+    )?;
+    m.add(
+        "TableAlreadyExistsError",
+        m.py().get_type::<TableAlreadyExistsError>(),
     )?;
     m.add("ValidationError", m.py().get_type::<ValidationError>())?;
     m.add(
@@ -98,6 +103,14 @@ where
             };
             TableNotFoundError::new_err(msg)
         }
+        Some("ResourceInUseException") => {
+            let msg = if let Some(t) = table {
+                format!("Table '{}' already exists", t)
+            } else {
+                "Resource already in use".to_string()
+            };
+            TableAlreadyExistsError::new_err(msg)
+        }
         Some("ValidationException") => {
             // Try to extract the actual validation message
             let msg = extract_message(&err_debug).unwrap_or(err_display);
@@ -166,6 +179,7 @@ fn extract_error_code(err_str: &str) -> Option<String> {
     // Also check for error type names in the string
     let known_errors = [
         "ResourceNotFoundException",
+        "ResourceInUseException",
         "ValidationException",
         "ConditionalCheckFailedException",
         "TransactionCanceledException",

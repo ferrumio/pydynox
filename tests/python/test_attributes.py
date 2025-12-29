@@ -1,9 +1,7 @@
 """Tests for attribute types."""
 
 import pytest
-
 from pydynox import (  # noqa: I001
-    Attribute,
     BinaryAttribute,
     BooleanAttribute,
     ListAttribute,

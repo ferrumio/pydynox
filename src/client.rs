@@ -20,6 +20,7 @@ use tokio::runtime::Runtime;
 
 use crate::basic_operations;
 use crate::batch_operations;
+use crate::table_operations;
 use crate::transaction_operations;
 
 /// Global shared Tokio runtime.
@@ -520,6 +521,153 @@ impl DynamoDBClient {
         operations: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<()> {
         transaction_operations::transact_write(py, &self.client, &self.runtime, operations)
+    }
+
+    /// Create a new DynamoDB table.
+    ///
+    /// # Arguments
+    ///
+    /// * `table_name` - Name of the table to create
+    /// * `hash_key` - Tuple of (attribute_name, attribute_type) for the hash key
+    /// * `range_key` - Optional tuple of (attribute_name, attribute_type) for the range key
+    /// * `billing_mode` - "PAY_PER_REQUEST" (default) or "PROVISIONED"
+    /// * `read_capacity` - Read capacity units (only for PROVISIONED, default: 5)
+    /// * `write_capacity` - Write capacity units (only for PROVISIONED, default: 5)
+    /// * `table_class` - "STANDARD" (default) or "STANDARD_INFREQUENT_ACCESS"
+    /// * `encryption` - "AWS_OWNED" (default), "AWS_MANAGED", or "CUSTOMER_MANAGED"
+    /// * `kms_key_id` - KMS key ARN (required when encryption is "CUSTOMER_MANAGED")
+    /// * `wait` - If true, wait for table to become ACTIVE (default: false)
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// client = DynamoDBClient()
+    ///
+    /// # Create table with on-demand billing
+    /// client.create_table(
+    ///     "users",
+    ///     hash_key=("pk", "S"),
+    ///     range_key=("sk", "S")
+    /// )
+    ///
+    /// # Create table with customer managed KMS encryption
+    /// client.create_table(
+    ///     "orders",
+    ///     hash_key=("pk", "S"),
+    ///     encryption="CUSTOMER_MANAGED",
+    ///     kms_key_id="arn:aws:kms:us-east-1:123456789:key/abc-123",
+    ///     wait=True
+    /// )
+    /// ```
+    #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, wait=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_table(
+        &self,
+        table_name: &str,
+        hash_key: (&str, &str),
+        range_key: Option<(&str, &str)>,
+        billing_mode: &str,
+        read_capacity: Option<i64>,
+        write_capacity: Option<i64>,
+        table_class: Option<&str>,
+        encryption: Option<&str>,
+        kms_key_id: Option<&str>,
+        wait: bool,
+    ) -> PyResult<()> {
+        let (range_key_name, range_key_type) = match range_key {
+            Some((name, typ)) => (Some(name), Some(typ)),
+            None => (None, None),
+        };
+
+        table_operations::create_table(
+            &self.client,
+            &self.runtime,
+            table_name,
+            hash_key.0,
+            hash_key.1,
+            range_key_name,
+            range_key_type,
+            billing_mode,
+            read_capacity,
+            write_capacity,
+            table_class,
+            encryption,
+            kms_key_id,
+        )?;
+
+        if wait {
+            table_operations::wait_for_table_active(&self.client, &self.runtime, table_name, None)?;
+        }
+
+        Ok(())
+    }
+
+    /// Check if a table exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `table_name` - Name of the table to check
+    ///
+    /// # Returns
+    ///
+    /// True if the table exists, false otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// client = DynamoDBClient()
+    ///
+    /// if not client.table_exists("users"):
+    ///     client.create_table("users", hash_key=("pk", "S"))
+    /// ```
+    pub fn table_exists(&self, table_name: &str) -> PyResult<bool> {
+        table_operations::table_exists(&self.client, &self.runtime, table_name)
+    }
+
+    /// Delete a table.
+    ///
+    /// # Arguments
+    ///
+    /// * `table_name` - Name of the table to delete
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// client = DynamoDBClient()
+    /// client.delete_table("users")
+    /// ```
+    pub fn delete_table(&self, table_name: &str) -> PyResult<()> {
+        table_operations::delete_table(&self.client, &self.runtime, table_name)
+    }
+
+    /// Wait for a table to become active.
+    ///
+    /// Polls the table status until it becomes ACTIVE or times out.
+    ///
+    /// # Arguments
+    ///
+    /// * `table_name` - Name of the table to wait for
+    /// * `timeout_seconds` - Maximum time to wait (default: 60)
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// client = DynamoDBClient()
+    /// client.create_table("users", hash_key=("pk", "S"))
+    /// client.wait_for_table_active("users", timeout_seconds=30)
+    /// ```
+    #[pyo3(signature = (table_name, timeout_seconds=None))]
+    pub fn wait_for_table_active(
+        &self,
+        table_name: &str,
+        timeout_seconds: Option<u64>,
+    ) -> PyResult<()> {
+        table_operations::wait_for_table_active(
+            &self.client,
+            &self.runtime,
+            table_name,
+            timeout_seconds,
+        )
     }
 }
 

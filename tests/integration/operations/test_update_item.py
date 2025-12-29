@@ -1,7 +1,6 @@
 """Integration tests for update_item operation."""
 
 import pytest
-
 from pydynox.exceptions import ConditionCheckFailedError, TableNotFoundError
 
 

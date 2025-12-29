@@ -16,6 +16,7 @@ mod batch_operations;
 mod client;
 mod errors;
 mod serialization;
+mod table_operations;
 mod transaction_operations;
 
 use client::DynamoDBClient;

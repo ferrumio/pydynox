@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel, Field
-
 from pydynox import dynamodb_model, from_pydantic
 
 

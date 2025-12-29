@@ -20,6 +20,7 @@ from pydynox import pydynox_core
 # These are the actual exception classes from Rust
 PydynoxError = pydynox_core.PydynoxError
 TableNotFoundError = pydynox_core.TableNotFoundError
+TableAlreadyExistsError = pydynox_core.TableAlreadyExistsError
 ValidationError = pydynox_core.ValidationError
 ConditionCheckFailedError = pydynox_core.ConditionCheckFailedError
 TransactionCanceledError = pydynox_core.TransactionCanceledError
@@ -31,6 +32,7 @@ SerializationError = pydynox_core.SerializationError
 __all__ = [
     "PydynoxError",
     "TableNotFoundError",
+    "TableAlreadyExistsError",
     "ValidationError",
     "ConditionCheckFailedError",
     "TransactionCanceledError",

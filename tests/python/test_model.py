@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from pydynox import Model, NumberAttribute, StringAttribute  # noqa: I001
 
 
