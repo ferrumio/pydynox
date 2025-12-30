@@ -1,6 +1,6 @@
 """Query result and pagination."""
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core
@@ -33,6 +33,7 @@ class QueryResult:
         scan_index_forward: Optional[bool] = None,
         index_name: Optional[str] = None,
         last_evaluated_key: Optional[dict[str, Any]] = None,
+        acquire_rcu: Optional[Callable[[float], None]] = None,
     ):
         self._client = client
         self._table = table
@@ -44,6 +45,7 @@ class QueryResult:
         self._scan_index_forward = scan_index_forward
         self._index_name = index_name
         self._start_key = last_evaluated_key
+        self._acquire_rcu = acquire_rcu
 
         self._current_page: list[dict[str, Any]] = []
         self._page_index = 0
@@ -95,6 +97,11 @@ class QueryResult:
         # Use start_key on first fetch, then last_evaluated_key
         start_key = self._start_key if self._first_fetch else self._last_evaluated_key
         self._first_fetch = False
+
+        # Acquire RCU before fetching (estimate based on limit or default)
+        if self._acquire_rcu is not None:
+            rcu_estimate = float(self._limit) if self._limit else 1.0
+            self._acquire_rcu(rcu_estimate)
 
         items, self._last_evaluated_key = self._client.query_page(
             self._table,

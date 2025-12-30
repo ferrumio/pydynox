@@ -4,10 +4,8 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
-
 from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
 from pydynox.model import Model
-
 
 # --- ExpiresIn tests ---
 

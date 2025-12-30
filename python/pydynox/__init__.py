@@ -25,6 +25,10 @@ Example:
     ...     name: str
     >>> user = User(pk="USER#1", name="John")
     >>> user.save()
+
+    >>> # With rate limiting
+    >>> from pydynox import DynamoDBClient, FixedRate
+    >>> client = DynamoDBClient(rate_limit=FixedRate(rcu=50))
 """
 
 # Import from Rust core
@@ -37,7 +41,7 @@ from pydynox.model import Model
 from pydynox.query import QueryResult
 from pydynox.transaction import Transaction
 
-__version__ = "0.2.0"
+__version__ = "0.4.0"
 
 __all__ = [
     # Client

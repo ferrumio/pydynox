@@ -15,11 +15,13 @@ mod basic_operations;
 mod batch_operations;
 mod client;
 mod errors;
+pub mod rate_limiter;
 mod serialization;
 mod table_operations;
 mod transaction_operations;
 
 use client::DynamoDBClient;
+use rate_limiter::{AdaptiveRate, FixedRate, RateLimitMetrics};
 use serialization::{dynamo_to_py_py, item_from_dynamo, item_to_dynamo, py_to_dynamo_py};
 
 /// Python module for pydynox's Rust core.
@@ -29,6 +31,11 @@ use serialization::{dynamo_to_py_py, item_from_dynamo, item_to_dynamo, py_to_dyn
 #[pymodule]
 fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DynamoDBClient>()?;
+
+    // Rate limiter classes
+    m.add_class::<FixedRate>()?;
+    m.add_class::<AdaptiveRate>()?;
+    m.add_class::<RateLimitMetrics>()?;
 
     // Serialization functions
     m.add_function(wrap_pyfunction!(py_to_dynamo_py, m)?)?;

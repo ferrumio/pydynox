@@ -1,8 +1,13 @@
 """DynamoDB client wrapper."""
 
-from typing import Any, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from .query import QueryResult
+
+if TYPE_CHECKING:
+    from .rate_limit import AdaptiveRate, FixedRate
 
 
 class DynamoDBClient:
@@ -30,6 +35,11 @@ class DynamoDBClient:
 
         >>> # Use local endpoint (localstack, moto)
         >>> client = DynamoDBClient(endpoint_url="http://localhost:4566")
+
+        >>> # With rate limiting
+        >>> from pydynox import FixedRate, AdaptiveRate
+        >>> client = DynamoDBClient(rate_limit=FixedRate(rcu=50))
+        >>> client = DynamoDBClient(rate_limit=AdaptiveRate(max_rcu=100))
     """
 
     def __init__(
@@ -40,6 +50,7 @@ class DynamoDBClient:
         session_token: Optional[str] = None,
         profile: Optional[str] = None,
         endpoint_url: Optional[str] = None,
+        rate_limit: Optional[Union[FixedRate, AdaptiveRate]] = None,
     ):
         from pydynox import pydynox_core
 
@@ -51,6 +62,27 @@ class DynamoDBClient:
             profile=profile,
             endpoint_url=endpoint_url,
         )
+        self._rate_limit = rate_limit
+
+    @property
+    def rate_limit(self) -> Optional[Union[FixedRate, AdaptiveRate]]:
+        """Get the rate limiter for this client."""
+        return self._rate_limit
+
+    def _acquire_rcu(self, rcu: float = 1.0) -> None:
+        """Acquire read capacity before an operation."""
+        if self._rate_limit is not None:
+            self._rate_limit._acquire_rcu(rcu)
+
+    def _acquire_wcu(self, wcu: float = 1.0) -> None:
+        """Acquire write capacity before an operation."""
+        if self._rate_limit is not None:
+            self._rate_limit._acquire_wcu(wcu)
+
+    def _on_throttle(self) -> None:
+        """Record a throttle event."""
+        if self._rate_limit is not None:
+            self._rate_limit._on_throttle()
 
     def get_region(self) -> str:
         """Get the configured AWS region."""
@@ -70,6 +102,7 @@ class DynamoDBClient:
         Example:
             >>> client.put_item("users", {"pk": "USER#123", "name": "John", "age": 30})
         """
+        self._acquire_wcu(1.0)
         self._client.put_item(table, item)
 
     def get_item(self, table: str, key: dict[str, Any]) -> Optional[dict[str, Any]]:
@@ -87,6 +120,7 @@ class DynamoDBClient:
             >>> if item:
             ...     print(item["name"])
         """
+        self._acquire_rcu(1.0)
         return self._client.get_item(table, key)
 
     def delete_item(
@@ -109,6 +143,7 @@ class DynamoDBClient:
         Example:
             >>> client.delete_item("users", {"pk": "USER#123"})
         """
+        self._acquire_wcu(1.0)
         self._client.delete_item(
             table,
             key,
@@ -151,6 +186,7 @@ class DynamoDBClient:
             ...     expression_attribute_values={":val": 1}
             ... )
         """
+        self._acquire_wcu(1.0)
         self._client.update_item(
             table,
             key,
@@ -215,6 +251,7 @@ class DynamoDBClient:
             scan_index_forward=scan_index_forward,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
+            acquire_rcu=self._acquire_rcu,
         )
 
     def batch_write(
@@ -253,6 +290,9 @@ class DynamoDBClient:
             ...     ]
             ... )
         """
+        put_count = len(put_items) if put_items else 0
+        delete_count = len(delete_keys) if delete_keys else 0
+        self._acquire_wcu(float(put_count + delete_count))
         self._client.batch_write(
             table,
             put_items or [],
@@ -291,6 +331,7 @@ class DynamoDBClient:
             >>> for item in items:
             ...     print(item["name"])
         """
+        self._acquire_rcu(float(len(keys)))
         return self._client.batch_get(table, keys)
 
     def transact_write(self, operations: list[dict[str, Any]]) -> None:
