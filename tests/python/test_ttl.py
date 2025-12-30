@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from pydynox import Model, ModelConfig, clear_default_client
 from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
 

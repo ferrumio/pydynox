@@ -1,7 +1,6 @@
 """Integration tests for lifecycle hooks with real DynamoDB operations."""
 
 import pytest
-
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 from pydynox.hooks import after_delete, after_save, before_delete, before_save

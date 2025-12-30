@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-
 from pydynox import Model, ModelConfig, clear_default_client, set_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 
