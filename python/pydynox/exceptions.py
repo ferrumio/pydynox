@@ -28,6 +28,7 @@ ThrottlingError = pydynox_core.ThrottlingError
 AccessDeniedError = pydynox_core.AccessDeniedError
 CredentialsError = pydynox_core.CredentialsError
 SerializationError = pydynox_core.SerializationError
+ConnectionError = pydynox_core.ConnectionError
 
 __all__ = [
     "PydynoxError",
@@ -40,4 +41,5 @@ __all__ = [
     "AccessDeniedError",
     "CredentialsError",
     "SerializationError",
+    "ConnectionError",
 ]

@@ -19,6 +19,7 @@ create_exception!(pydynox, ThrottlingError, PydynoxError);
 create_exception!(pydynox, AccessDeniedError, PydynoxError);
 create_exception!(pydynox, CredentialsError, PydynoxError);
 create_exception!(pydynox, SerializationError, PydynoxError);
+create_exception!(pydynox, ConnectionError, PydynoxError);
 
 /// Register exception classes with the Python module.
 pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -47,6 +48,7 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
         "SerializationError",
         m.py().get_type::<SerializationError>(),
     )?;
+    m.add("ConnectionError", m.py().get_type::<ConnectionError>())?;
     Ok(())
 }
 
@@ -62,6 +64,23 @@ where
     // Get both display and debug representations
     let err_display = err.to_string();
     let err_debug = format!("{:?}", err);
+
+    // Check for connection/dispatch errors first
+    if err_debug.contains("dispatch failure")
+        || err_debug.contains("DispatchFailure")
+        || err_debug.contains("connection refused")
+        || err_debug.contains("Connection refused")
+        || err_debug.contains("ConnectError")
+    {
+        return ConnectionError::new_err(
+            "Connection failed. Check if DynamoDB endpoint is reachable. \
+            For local testing, make sure DynamoDB Local/LocalStack/Moto or any other emulator is running.",
+        );
+    }
+
+    if err_debug.contains("timeout") || err_debug.contains("Timeout") {
+        return ConnectionError::new_err("Connection timed out. Check your network or endpoint.");
+    }
 
     // Check for credential errors first (these are dispatch failures, not service errors)
     if err_debug.contains("NoCredentialsError")
