@@ -1,22 +1,23 @@
 """Integration tests for item size calculator with Model."""
 
 import pytest
-from pydynox import Model
+
+from pydynox import Model, ModelConfig
 from pydynox.attributes import ListAttribute, MapAttribute, NumberAttribute, StringAttribute
 from pydynox.exceptions import ItemTooLargeError
 
 
-def test_calculate_size_simple_item(moto_server):
+def test_calculate_size_simple_item(dynamo):
     """calculate_size returns correct size for simple item."""
 
     class User(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         name = StringAttribute(null=True)
         age = NumberAttribute(null=True)
+
+    User._client_instance = None
 
     user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
     size = user.calculate_size()
@@ -27,18 +28,18 @@ def test_calculate_size_simple_item(moto_server):
     assert size.is_over_limit is False
 
 
-def test_calculate_size_with_nested_data(moto_server):
+def test_calculate_size_with_nested_data(dynamo):
     """calculate_size handles nested structures."""
 
     class User(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         name = StringAttribute(null=True)
         tags = ListAttribute(null=True)
         metadata = MapAttribute(null=True)
+
+    User._client_instance = None
 
     user = User(
         pk="USER#2",
@@ -53,17 +54,17 @@ def test_calculate_size_with_nested_data(moto_server):
     assert size.is_over_limit is False
 
 
-def test_calculate_size_detailed_breakdown(moto_server):
+def test_calculate_size_detailed_breakdown(dynamo):
     """calculate_size with detailed=True returns field breakdown."""
 
     class User(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         name = StringAttribute(null=True)
         bio = StringAttribute(null=True)
+
+    User._client_instance = None
 
     user = User(
         pk="USER#3",
@@ -82,15 +83,12 @@ def test_save_succeeds_under_limit(dynamo):
     """save() works when item is under max_size."""
 
     class LimitedUser(Model):
-        class Meta:
-            table = "test_table"
-            max_size = 500
-
+        model_config = ModelConfig(table="test_table", client=dynamo, max_size=500)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         bio = StringAttribute(null=True)
 
-    LimitedUser._client = dynamo
+    LimitedUser._client_instance = None
 
     user = LimitedUser(pk="USER#4", sk="PROFILE", bio="Short bio")
     user.save()
@@ -100,17 +98,16 @@ def test_save_succeeds_under_limit(dynamo):
     assert result["bio"] == "Short bio"
 
 
-def test_save_raises_when_over_limit(moto_server):
+def test_save_raises_when_over_limit(dynamo):
     """save() raises ItemTooLargeError when item exceeds max_size."""
 
     class LimitedUser(Model):
-        class Meta:
-            table = "test_table"
-            max_size = 500
-
+        model_config = ModelConfig(table="test_table", client=dynamo, max_size=500)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         bio = StringAttribute(null=True)
+
+    LimitedUser._client_instance = None
 
     user = LimitedUser(
         pk="USER#5",
@@ -130,14 +127,12 @@ def test_save_without_limit_allows_large_items(dynamo):
     """save() without max_size allows large items."""
 
     class User(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         bio = StringAttribute(null=True)
 
-    User._client = dynamo
+    User._client_instance = None
 
     user = User(
         pk="USER#6",

@@ -229,7 +229,9 @@ class Model(metaclass=ModelMeta):
             self._run_hooks(HookType.BEFORE_SAVE)
 
         # Check size if max_size is set
-        max_size = getattr(self.Meta, "max_size", None)
+        max_size = (
+            getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
+        )
         if max_size is not None:
             size = self.calculate_size()
             if size.bytes > max_size:

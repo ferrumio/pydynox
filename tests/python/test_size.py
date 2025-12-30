@@ -149,20 +149,20 @@ def test_calculate_item_size_nested():
 
 def test_item_too_large_error_on_save(monkeypatch):
     """Model.save() raises ItemTooLargeError when item exceeds max_size."""
-    from pydynox import Model
+    from unittest.mock import MagicMock
+
+    from pydynox import Model, ModelConfig
     from pydynox.attributes import StringAttribute
     from pydynox.exceptions import ItemTooLargeError
 
-    class User(Model):
-        class Meta:
-            table = "users"
-            max_size = 100  # Very small limit for testing
+    mock_client = MagicMock()
 
+    class User(Model):
+        model_config = ModelConfig(table="users", client=mock_client, max_size=100)
         pk = StringAttribute(hash_key=True)
         bio = StringAttribute()
 
-    # Mock the client so we don't hit DynamoDB
-    monkeypatch.setattr(User, "_get_client", lambda cls: None)
+    User._client_instance = None
 
     user = User(pk="USER#123", bio="x" * 200)
 
