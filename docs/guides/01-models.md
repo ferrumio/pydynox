@@ -30,6 +30,7 @@ Models define the structure of your DynamoDB items.
 | `ListAttribute` | L | list |
 | `MapAttribute` | M | dict |
 | `TTLAttribute` | N | datetime |
+| `CompressedAttribute` | S | str |
 
 ### Keys
 
@@ -86,6 +87,75 @@ data = user.to_dict()
 data = {'pk': 'USER#123', 'sk': 'PROFILE', 'name': 'John'}
 user = User.from_dict(data)
 ```
+
+## Compressed attributes
+
+DynamoDB charges by item size. Large text fields eat up your budget and can hit the 400KB limit. `CompressedAttribute` solves this by compressing large text automatically.
+
+### Why use compression?
+
+- **Save money** - Smaller items = lower storage and I/O costs
+- **Avoid limits** - DynamoDB has a 400KB item size limit
+- **Transparent** - Compression/decompression happens automatically
+- **Fast** - Compression runs in Rust, not Python
+
+### Basic usage
+
+=== "basic_compression.py"
+    ```python
+    --8<-- "docs/examples/compression/basic_compression.py"
+    ```
+
+### Compression algorithms
+
+Three algorithms are available:
+
+| Algorithm | Best for | Trade-off |
+|-----------|----------|-----------|
+| `Zstd` | Most cases (default) | Best compression ratio |
+| `Lz4` | High throughput | Fastest, larger output |
+| `Gzip` | Compatibility | Good balance |
+
+=== "algorithm_options.py"
+    ```python
+    --8<-- "docs/examples/compression/algorithm_options.py"
+    ```
+
+### Compression options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `algorithm` | CompressionAlgorithm | Zstd | Compression algorithm |
+| `level` | int | 3 (zstd), 6 (gzip) | Higher = better compression, slower |
+| `min_size` | int | 100 | Only compress if >= this many bytes |
+| `threshold` | float | 0.9 | Only compress if ratio is below this |
+
+=== "compression_options.py"
+    ```python
+    --8<-- "docs/examples/compression/compression_options.py"
+    ```
+
+### How it works
+
+1. When you save, the attribute checks if the value is large enough (`min_size`)
+2. It compresses the data and checks if it's worth it (`threshold`)
+3. If compression helps, it stores the compressed data with a prefix like `ZSTD:`
+4. When you read, it detects the prefix and decompresses automatically
+
+Small values (under `min_size`) are stored as-is. This avoids overhead for short strings.
+
+### Storage format
+
+Compressed values are stored as base64-encoded strings with a prefix:
+
+- `ZSTD:abc123...` - Zstd compressed
+- `LZ4:abc123...` - LZ4 compressed  
+- `GZIP:abc123...` - Gzip compressed
+
+Values without a prefix are stored uncompressed.
+
+!!! tip
+    You can change the algorithm later. Old items will still decompress correctly because the prefix tells pydynox which algorithm was used.
 
 ## TTL (Time-To-Live)
 
