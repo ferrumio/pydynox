@@ -261,6 +261,15 @@ Full documentation: [https://pydynox.readthedocs.io](https://pydynox.readthedocs
 
 MIT License
 
+## Inspirations
+
+This project was inspired by:
+
+- [PynamoDB](https://github.com/pynamodb/PynamoDB) - The ORM-style API and model design
+- [Pydantic](https://github.com/pydantic/pydantic) - Data validation patterns and integration approach
+- [dynarust](https://github.com/Anexen/dynarust) - Rust DynamoDB client patterns
+- [dyntastic](https://github.com/nayaverdier/dyntastic) - Pydantic + DynamoDB integration ideas
+
 ## Building from Source
 
 ### Requirements

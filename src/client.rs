@@ -132,6 +132,7 @@ impl DynamoDBClient {
     /// Check if the client can connect to DynamoDB.
     ///
     /// Makes a simple ListTables call to verify connectivity.
+    /// Returns false if connection fails, true if successful.
     pub fn ping(&self) -> PyResult<bool> {
         let client = self.client.clone();
         let result = self
@@ -140,9 +141,7 @@ impl DynamoDBClient {
 
         match result {
             Ok(_) => Ok(true),
-            Err(e) => Err(PyErr::new::<pyo3::exceptions::PyConnectionError, _>(
-                format!("Failed to connect to DynamoDB: {}", e),
-            )),
+            Err(_) => Ok(false),
         }
     }
 

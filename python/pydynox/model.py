@@ -5,6 +5,7 @@ from typing import Any, ClassVar, Optional, Type, TypeVar
 
 from .attributes import Attribute, TTLAttribute
 from .client import DynamoDBClient
+from .hooks import HookType
 
 M = TypeVar("M", bound="Model")
 
@@ -17,6 +18,7 @@ class ModelMeta(type):
         attributes: dict[str, Attribute] = {}
         hash_key: Optional[str] = None
         range_key: Optional[str] = None
+        hooks: dict[HookType, list] = {hook_type: [] for hook_type in HookType}
 
         for base in bases:
             if hasattr(base, "_attributes"):
@@ -25,8 +27,11 @@ class ModelMeta(type):
                 hash_key = base._hash_key
             if hasattr(base, "_range_key") and base._range_key:
                 range_key = base._range_key
+            if hasattr(base, "_hooks"):
+                for hook_type, hook_list in base._hooks.items():
+                    hooks[hook_type].extend(hook_list)
 
-        # Collect attributes from this class
+        # Collect attributes and hooks from this class
         for attr_name, attr_value in namespace.items():
             if isinstance(attr_value, Attribute):
                 attr_value.attr_name = attr_name
@@ -37,6 +42,10 @@ class ModelMeta(type):
                 if attr_value.range_key:
                     range_key = attr_name
 
+            # Collect hooks
+            if callable(attr_value) and hasattr(attr_value, "_hook_type"):
+                hooks[attr_value._hook_type].append(attr_value)
+
         # Create the class
         cls = super().__new__(mcs, name, bases, namespace)
 
@@ -44,6 +53,7 @@ class ModelMeta(type):
         cls._attributes = attributes
         cls._hash_key = hash_key
         cls._range_key = range_key
+        cls._hooks = hooks
 
         return cls
 
@@ -85,6 +95,7 @@ class Model(metaclass=ModelMeta):
     _attributes: ClassVar[dict[str, Attribute]]
     _hash_key: ClassVar[Optional[str]]
     _range_key: ClassVar[Optional[str]]
+    _hooks: ClassVar[dict[HookType, list]]
     _client: ClassVar[Optional[DynamoDBClient]] = None
 
     class Meta:
@@ -94,11 +105,13 @@ class Model(metaclass=ModelMeta):
             table: DynamoDB table name (required).
             region: AWS region (optional, uses default if not set).
             endpoint_url: Custom endpoint (optional, for local testing).
+            skip_hooks: Skip hooks by default (optional, default False).
         """
 
         table: str
         region: Optional[str] = None
         endpoint_url: Optional[str] = None
+        skip_hooks: bool = False
 
     def __init__(self, **kwargs: Any):
         """Create a model instance.
@@ -134,6 +147,17 @@ class Model(metaclass=ModelMeta):
             raise ValueError(f"Model {cls.__name__} must define Meta.table")
         return cls.Meta.table
 
+    def _should_skip_hooks(self, skip_hooks: Optional[bool]) -> bool:
+        """Check if hooks should be skipped."""
+        if skip_hooks is not None:
+            return skip_hooks
+        return getattr(self.Meta, "skip_hooks", False)
+
+    def _run_hooks(self, hook_type: HookType) -> None:
+        """Run all hooks of the given type."""
+        for hook in self._hooks.get(hook_type, []):
+            hook(self)
+
     @classmethod
     def get(cls: Type[M], **keys: Any) -> Optional[M]:
         """Get an item from DynamoDB by its key.
@@ -156,20 +180,30 @@ class Model(metaclass=ModelMeta):
         if item is None:
             return None
 
-        return cls.from_dict(item)
+        instance = cls.from_dict(item)
+        skip = getattr(cls.Meta, "skip_hooks", False)
+        if not skip:
+            instance._run_hooks(HookType.AFTER_LOAD)
+        return instance
 
-    def save(self, condition: Optional[str] = None) -> None:
+    def save(self, condition: Optional[str] = None, skip_hooks: Optional[bool] = None) -> None:
         """Save the model to DynamoDB.
 
         Creates a new item or replaces an existing one.
 
         Args:
             condition: Optional condition expression.
+            skip_hooks: Skip hooks for this operation. If None, uses Meta.skip_hooks.
 
         Example:
             >>> user = User(pk="USER#123", sk="PROFILE", name="John")
             >>> user.save()
         """
+        skip = self._should_skip_hooks(skip_hooks)
+
+        if not skip:
+            self._run_hooks(HookType.BEFORE_SAVE)
+
         client = self._get_client()
         table = self._get_table()
         item = self.to_dict()
@@ -177,16 +211,25 @@ class Model(metaclass=ModelMeta):
         # TODO: Add condition expression support when put_item supports it
         client.put_item(table, item)
 
-    def delete(self, condition: Optional[str] = None) -> None:
+        if not skip:
+            self._run_hooks(HookType.AFTER_SAVE)
+
+    def delete(self, condition: Optional[str] = None, skip_hooks: Optional[bool] = None) -> None:
         """Delete the model from DynamoDB.
 
         Args:
             condition: Optional condition expression.
+            skip_hooks: Skip hooks for this operation. If None, uses Meta.skip_hooks.
 
         Example:
             >>> user = User.get(pk="USER#123", sk="PROFILE")
             >>> user.delete()
         """
+        skip = self._should_skip_hooks(skip_hooks)
+
+        if not skip:
+            self._run_hooks(HookType.BEFORE_DELETE)
+
         client = self._get_client()
         table = self._get_table()
         key = self._get_key()
@@ -194,18 +237,27 @@ class Model(metaclass=ModelMeta):
         # TODO: Add condition expression support
         client.delete_item(table, key)
 
-    def update(self, **kwargs: Any) -> None:
+        if not skip:
+            self._run_hooks(HookType.AFTER_DELETE)
+
+    def update(self, skip_hooks: Optional[bool] = None, **kwargs: Any) -> None:
         """Update specific attributes on the model.
 
         Updates both the local instance and DynamoDB.
 
         Args:
+            skip_hooks: Skip hooks for this operation. If None, uses Meta.skip_hooks.
             **kwargs: Attribute values to update.
 
         Example:
             >>> user = User.get(pk="USER#123", sk="PROFILE")
             >>> user.update(name="Jane", age=31)
         """
+        skip = self._should_skip_hooks(skip_hooks)
+
+        if not skip:
+            self._run_hooks(HookType.BEFORE_UPDATE)
+
         client = self._get_client()
         table = self._get_table()
         key = self._get_key()
@@ -218,6 +270,9 @@ class Model(metaclass=ModelMeta):
 
         # Update in DynamoDB
         client.update_item(table, key, updates=kwargs)
+
+        if not skip:
+            self._run_hooks(HookType.AFTER_UPDATE)
 
     def _get_key(self) -> dict[str, Any]:
         """Get the key dict for this instance."""
