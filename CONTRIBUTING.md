@@ -1,6 +1,20 @@
-# Contributing to pydyno
+# Contributing to pydynox
 
-Thanks for your interest in pydyno! This guide will help you get started.
+Thanks for your interest in pydynox! This guide will help you get started.
+
+## AI-Assisted Contributions
+
+We appreciate GenAI contributions, but we care about quality.
+
+If you're using AI tools to contribute, check the `.ai/` folder:
+
+- `.ai/README.md` - Quick start
+- `.ai/project-context.md` - What is pydynox
+- `.ai/coding-guidelines.md` - Code style, Python vs Rust
+- `.ai/testing-guidelines.md` - How to write tests
+- `.ai/common-mistakes.md` - Things to avoid
+
+**Important:** We may close PRs that contain low-quality AI-generated code, code that doesn't make sense, or code without tests. Please review and understand what the AI generated before submitting. We're happy to help if you have questions!
 
 ## Setup
 
