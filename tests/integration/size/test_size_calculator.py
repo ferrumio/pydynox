@@ -80,7 +80,7 @@ def test_calculate_size_detailed_breakdown(moto_server):
     assert size.fields["pk"] < size.fields["bio"]
 
 
-def test_save_succeeds_under_limit(dynamo, moto_server):
+def test_save_succeeds_under_limit(dynamo, table):
     """save() works when item is under max_size."""
     user = LimitedUser(pk="USER#4", sk="PROFILE", bio="Short bio")
     user.save()
@@ -106,7 +106,7 @@ def test_save_raises_when_over_limit(moto_server):
     assert exc_info.value.item_key == {"pk": "USER#5", "sk": "PROFILE"}
 
 
-def test_save_without_limit_allows_large_items(dynamo, moto_server):
+def test_save_without_limit_allows_large_items(dynamo, table):
     """save() without max_size allows large items."""
     user = User(
         pk="USER#6",
