@@ -47,7 +47,7 @@ from pydynox.model import Model
 from pydynox.query import QueryResult
 from pydynox.transaction import Transaction
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     # Client
