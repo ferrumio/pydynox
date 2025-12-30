@@ -6,7 +6,9 @@ from typing import Any, ClassVar, Optional, Type, TypeVar
 from .attributes import Attribute, TTLAttribute
 from .client import DynamoDBClient
 from .config import ModelConfig, get_default_client
+from .exceptions import ItemTooLargeError
 from .hooks import HookType
+from .size import ItemSize, calculate_item_size
 
 M = TypeVar("M", bound="Model")
 
@@ -214,6 +216,9 @@ class Model(metaclass=ModelMeta):
             condition: Optional condition expression.
             skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
 
+        Raises:
+            ItemTooLargeError: If max_size is set and item exceeds it.
+
         Example:
             >>> user = User(pk="USER#123", sk="PROFILE", name="John")
             >>> user.save()
@@ -222,6 +227,17 @@ class Model(metaclass=ModelMeta):
 
         if not skip:
             self._run_hooks(HookType.BEFORE_SAVE)
+
+        # Check size if max_size is set
+        max_size = getattr(self.Meta, "max_size", None)
+        if max_size is not None:
+            size = self.calculate_size()
+            if size.bytes > max_size:
+                raise ItemTooLargeError(
+                    size=size.bytes,
+                    max_size=max_size,
+                    item_key=self._get_key(),
+                )
 
         client = self._get_client()
         table = self._get_table()
@@ -319,6 +335,31 @@ class Model(metaclass=ModelMeta):
             if value is not None:
                 result[attr_name] = attr.serialize(value)
         return result
+
+    def calculate_size(self, detailed: bool = False) -> ItemSize:
+        """Calculate the size of this item in bytes.
+
+        DynamoDB has a 400KB item size limit. Use this to check
+        before saving.
+
+        Args:
+            detailed: If True, include per-field size breakdown.
+
+        Returns:
+            ItemSize with bytes, kb, percent, and is_over_limit.
+
+        Example:
+            >>> user = User(pk="USER#123", name="John", bio="..." * 10000)
+            >>> size = user.calculate_size()
+            >>> print(f"{size.bytes} bytes ({size.percent:.1f}% of limit)")
+            >>>
+            >>> # Get field breakdown
+            >>> size = user.calculate_size(detailed=True)
+            >>> for field, bytes in size.fields.items():
+            ...     print(f"{field}: {bytes} bytes")
+        """
+        item = self.to_dict()
+        return calculate_item_size(item, detailed=detailed)
 
     @classmethod
     def from_dict(cls: Type[M], data: dict[str, Any]) -> M:

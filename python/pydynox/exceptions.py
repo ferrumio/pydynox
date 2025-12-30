@@ -17,6 +17,38 @@ Example:
 # Re-export exceptions from Rust core
 from pydynox import pydynox_core
 
+
+class ItemTooLargeError(Exception):
+    """Raised when an item exceeds the DynamoDB 400KB size limit.
+
+    This is a Python-only exception raised before calling DynamoDB,
+    when max_size is set on the model.
+
+    Attributes:
+        size: Actual item size in bytes.
+        max_size: Maximum allowed size in bytes.
+        item_key: Key of the item (if available).
+
+    Example:
+        >>> from pydynox.exceptions import ItemTooLargeError
+        >>> try:
+        ...     user.save()
+        ... except ItemTooLargeError as e:
+        ...     print(f"Item too large: {e.size} bytes (max: {e.max_size})")
+    """
+
+    def __init__(
+        self,
+        size: int,
+        max_size: int,
+        item_key: dict | None = None,
+    ):
+        self.size = size
+        self.max_size = max_size
+        self.item_key = item_key
+        super().__init__(f"Item size {size} bytes exceeds max_size {max_size} bytes")
+
+
 # These are the actual exception classes from Rust
 PydynoxError = pydynox_core.PydynoxError
 TableNotFoundError = pydynox_core.TableNotFoundError
@@ -44,4 +76,5 @@ __all__ = [
     "SerializationError",
     "ConnectionError",
     "EncryptionError",
+    "ItemTooLargeError",
 ]
