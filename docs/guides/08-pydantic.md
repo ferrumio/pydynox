@@ -1,0 +1,179 @@
+# Pydantic integration
+
+Use Pydantic models with DynamoDB. If you already have Pydantic models in your application, you can add DynamoDB persistence without rewriting them.
+
+## Key features
+
+- Use existing Pydantic models
+- Automatic validation
+- Type coercion
+- All pydynox methods available
+
+## Getting started
+
+### Installation
+
+Install pydynox with Pydantic support:
+
+```bash
+pip install pydynox[pydantic]
+```
+
+### Basic usage
+
+Use the `@dynamodb_model` decorator on a Pydantic model:
+
+=== "basic_pydantic.py"
+    ```python
+    --8<-- "docs/examples/pydantic/basic_pydantic.py"
+    ```
+
+The decorator adds all pydynox methods to your model:
+
+- `save()` - Save to DynamoDB
+- `get()` - Get by key
+- `delete()` - Delete from DynamoDB
+- `update()` - Update specific fields
+
+Your Pydantic model works exactly as before - validation, serialization, and all other Pydantic features still work.
+
+### With range key
+
+Add a range key for composite keys:
+
+```python
+@dynamodb_model(table="users", hash_key="pk", range_key="sk")
+class User(BaseModel):
+    pk: str
+    sk: str
+    name: str
+```
+
+### Pydantic validation
+
+All Pydantic validation works. Invalid data raises `ValidationError` before anything is saved:
+
+```python
+from pydantic import BaseModel, EmailStr, Field
+
+@dynamodb_model(table="users", hash_key="pk")
+class User(BaseModel):
+    pk: str
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    age: int = Field(ge=0, le=150)
+
+# This raises ValidationError - email is invalid
+user = User(pk="USER#1", name="", email="not-an-email", age=-1)
+```
+
+## Advanced
+
+### Configuration options
+
+Pass extra options to the decorator:
+
+```python
+@dynamodb_model(
+    table="users",
+    hash_key="pk",
+    range_key="sk",
+    region="us-east-1",
+    endpoint_url="http://localhost:8000",  # For local dev
+)
+class User(BaseModel):
+    pk: str
+    sk: str
+    name: str
+```
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `table` | str | DynamoDB table name (required) |
+| `hash_key` | str | Field name for partition key (required) |
+| `range_key` | str | Field name for sort key (optional) |
+| `region` | str | AWS region (optional) |
+| `endpoint_url` | str | Custom endpoint (optional) |
+
+### Alternative: from_pydantic function
+
+If you prefer not to use decorators, use `from_pydantic`:
+
+```python
+from pydynox.integrations.pydantic import from_pydantic
+
+class User(BaseModel):
+    pk: str
+    sk: str
+    name: str
+
+UserDB = from_pydantic(User, table="users", hash_key="pk", range_key="sk")
+user = UserDB(pk="USER#1", sk="PROFILE", name="John")
+user.save()
+```
+
+### Why use Pydantic integration?
+
+Benefits of using Pydantic with pydynox:
+
+- **Validation** - Pydantic validates data before it reaches DynamoDB
+- **Type coercion** - Strings become ints, etc.
+- **IDE support** - Better autocomplete than raw dicts
+- **Reuse models** - Use the same models for API and database
+- **JSON Schema** - Auto-generated schemas for documentation
+
+### Using Pydantic validators
+
+Use Pydantic's `@field_validator` and `@model_validator` for validation:
+
+```python
+from pydantic import BaseModel, field_validator, model_validator
+
+@dynamodb_model(table="users", hash_key="pk")
+class User(BaseModel):
+    pk: str
+    email: str
+    name: str
+    
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        if "@" not in v:
+            raise ValueError("Invalid email")
+        return v.lower()  # Also normalize
+    
+    @model_validator(mode="before")
+    @classmethod
+    def set_defaults(cls, data: dict) -> dict:
+        # Add computed fields, defaults, etc.
+        return data
+```
+
+### TTL with Pydantic
+
+For TTL, use a datetime field:
+
+```python
+from datetime import datetime, timedelta, timezone
+
+@dynamodb_model(table="sessions", hash_key="pk")
+class Session(BaseModel):
+    pk: str
+    user_id: str
+    expires_at: datetime
+    
+    @classmethod
+    def create(cls, user_id: str, hours: int = 24) -> "Session":
+        return cls(
+            pk=f"SESSION#{uuid4()}",
+            user_id=user_id,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=hours),
+        )
+    
+    @property
+    def is_expired(self) -> bool:
+        return datetime.now(timezone.utc) > self.expires_at
+```
+
+!!! note
+    Remember to enable TTL on your DynamoDB table and set the attribute name to `expires_at`.

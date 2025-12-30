@@ -2,6 +2,8 @@
 /target/
 **/*.rs.bk
 
+/site/
+
 # Python
 __pycache__/
 *.py[cod]

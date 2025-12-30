@@ -1,0 +1,58 @@
+site_name = "pydynox"
+site_description = "Fast DynamoDB ORM for Python with Rust core"
+site_url = "https://leandrodamascena.github.io/pydynox"
+repo_url = "https://github.com/leandrodamascena/pydynox"
+repo_name = "leandrodamascena/pydynox"
+
+nav = [
+    "index.md",
+    "getting-started.md",
+    "guides/01-models.md",
+    "guides/03-crud.md",
+    "guides/04-batch.md",
+    "guides/05-transactions.md",
+    "guides/06-rate-limiting.md",
+    "guides/07-hooks.md",
+    "guides/08-pydantic.md",
+    "guides/09-exceptions.md",
+    "guides/10-tables.md",
+]
+
+[theme]
+name = "material"
+features = [
+    "navigation.sections",
+    "navigation.expand",
+    "content.code.copy",
+    "content.code.annotate",
+]
+
+[[theme.palette]]
+scheme = "default"
+primary = "deep purple"
+accent = "amber"
+[theme.palette.toggle]
+icon = "material/brightness-7"
+name = "Switch to dark mode"
+
+[[theme.palette]]
+scheme = "slate"
+primary = "deep purple"
+accent = "amber"
+[theme.palette.toggle]
+icon = "material/brightness-4"
+name = "Switch to light mode"
+
+[markdown_extensions]
+admonition = {}
+
+[markdown_extensions."pymdownx.highlight"]
+anchor_linenums = true
+
+[markdown_extensions."pymdownx.superfences"]
+
+[markdown_extensions."pymdownx.tabbed"]
+alternate_style = true
+
+[markdown_extensions."pymdownx.snippets"]
+base_path = "."
