@@ -1,10 +1,9 @@
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import CompressedAttribute, StringAttribute
 
 
 class Article(Model):
-    class Meta:
-        table = "articles"
+    model_config = ModelConfig(table="articles")
 
     pk = StringAttribute(hash_key=True)
     content = CompressedAttribute()  # Auto-compresses large text

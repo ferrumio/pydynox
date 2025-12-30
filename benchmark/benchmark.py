@@ -8,7 +8,6 @@ import uuid
 
 import pytest
 
-
 TABLE_NAME = "bench_table"
 
 

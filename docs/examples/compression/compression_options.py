@@ -1,10 +1,9 @@
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import CompressedAttribute, StringAttribute
 
 
 class LogEntry(Model):
-    class Meta:
-        table = "logs"
+    model_config = ModelConfig(table="logs")
 
     pk = StringAttribute(hash_key=True)
 

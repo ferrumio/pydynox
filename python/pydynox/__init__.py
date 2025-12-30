@@ -1,16 +1,16 @@
 """pydynox - A fast DynamoDB client for Python with a Rust core.
 
 Example:
-    >>> from pydynox import DynamoDBClient
+    >>> from pydynox import DynamoDBClient, set_default_client
     >>> client = DynamoDBClient(region="us-east-1")
+    >>> set_default_client(client)
     >>> client.ping()
     True
 
-    >>> from pydynox import Model
+    >>> from pydynox import Model, ModelConfig
     >>> from pydynox.attributes import StringAttribute, NumberAttribute
     >>> class User(Model):
-    ...     class Meta:
-    ...         table = "users"
+    ...     model_config = ModelConfig(table="users")
     ...     pk = StringAttribute(hash_key=True)
     ...     name = StringAttribute()
     >>> user = User(pk="USER#1", name="John")
@@ -37,11 +37,17 @@ from pydynox import pydynox_core  # noqa: F401
 # Import Python wrappers
 from pydynox.batch_operations import BatchWriter
 from pydynox.client import DynamoDBClient
+from pydynox.config import (
+    ModelConfig,
+    clear_default_client,
+    get_default_client,
+    set_default_client,
+)
 from pydynox.model import Model
 from pydynox.query import QueryResult
 from pydynox.transaction import Transaction
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     # Client
@@ -51,6 +57,11 @@ __all__ = [
     "Transaction",
     # Model ORM
     "Model",
+    "ModelConfig",
+    # Client config
+    "set_default_client",
+    "get_default_client",
+    "clear_default_client",
     # Version
     "__version__",
 ]

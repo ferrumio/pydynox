@@ -193,12 +193,11 @@ class TTLAttribute(Attribute[datetime]):
     to auto-delete expired items.
 
     Example:
-        >>> from pydynox import Model
+        >>> from pydynox import Model, ModelConfig
         >>> from pydynox.attributes import StringAttribute, TTLAttribute, ExpiresIn
         >>>
         >>> class Session(Model):
-        ...     class Meta:
-        ...         table = "sessions"
+        ...     model_config = ModelConfig(table="sessions")
         ...     pk = StringAttribute(hash_key=True)
         ...     expires_at = TTLAttribute()
         >>>
@@ -257,12 +256,11 @@ class CompressedAttribute(Attribute[str]):
         null: Whether None is allowed.
 
     Example:
-        >>> from pydynox import Model
+        >>> from pydynox import Model, ModelConfig
         >>> from pydynox.attributes import StringAttribute, CompressedAttribute
         >>>
         >>> class Document(Model):
-        ...     class Meta:
-        ...         table = "documents"
+        ...     model_config = ModelConfig(table="documents")
         ...     pk = StringAttribute(hash_key=True)
         ...     body = CompressedAttribute()  # Uses zstd by default
         ...     logs = CompressedAttribute(algorithm=CompressionAlgorithm.Lz4)
@@ -361,12 +359,11 @@ class EncryptedAttribute(Attribute[str]):
         context: Encryption context dict for extra security (optional).
 
     Example:
-        >>> from pydynox import Model
+        >>> from pydynox import Model, ModelConfig
         >>> from pydynox.attributes import StringAttribute, EncryptedAttribute, EncryptionMode
         >>>
         >>> class IngestService(Model):
-        ...     class Meta:
-        ...         table = "users"
+        ...     model_config = ModelConfig(table="users")
         ...     pk = StringAttribute(hash_key=True)
         ...     # Write-only: can encrypt, fails on decrypt
         ...     ssn = EncryptedAttribute(
@@ -375,8 +372,7 @@ class EncryptedAttribute(Attribute[str]):
         ...     )
         >>>
         >>> class ReportService(Model):
-        ...     class Meta:
-        ...         table = "users"
+        ...     model_config = ModelConfig(table="users")
         ...     pk = StringAttribute(hash_key=True)
         ...     # Read-only: can decrypt, fails on encrypt
         ...     ssn = EncryptedAttribute(
@@ -385,8 +381,7 @@ class EncryptedAttribute(Attribute[str]):
         ...     )
         >>>
         >>> class FullAccess(Model):
-        ...     class Meta:
-        ...         table = "users"
+        ...     model_config = ModelConfig(table="users")
         ...     pk = StringAttribute(hash_key=True)
         ...     # Both (default)
         ...     ssn = EncryptedAttribute(key_id="alias/my-key")

@@ -1,12 +1,11 @@
 """Encryption context example."""
 
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import EncryptedAttribute, StringAttribute
 
 
 class User(Model):
-    class Meta:
-        table = "users"
+    model_config = ModelConfig(table="users")
 
     pk = StringAttribute(hash_key=True)
     ssn = EncryptedAttribute(

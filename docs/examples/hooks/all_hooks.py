@@ -1,4 +1,4 @@
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 from pydynox.hooks import (
     after_delete,
@@ -12,8 +12,7 @@ from pydynox.hooks import (
 
 
 class User(Model):
-    class Meta:
-        table = "users"
+    model_config = ModelConfig(table="users")
 
     pk = StringAttribute(hash_key=True)
     name = StringAttribute()

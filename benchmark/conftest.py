@@ -8,11 +8,9 @@ import time
 
 import boto3
 import pytest
-from pynamodb.attributes import UnicodeAttribute, NumberAttribute
-from pynamodb.models import Model
-
 from pydynox import DynamoDBClient
-
+from pynamodb.attributes import NumberAttribute, UnicodeAttribute
+from pynamodb.models import Model
 
 MOTO_PORT = 5557
 MOTO_ENDPOINT = f"http://127.0.0.1:{MOTO_PORT}"

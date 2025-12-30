@@ -1,4 +1,4 @@
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import (
     BooleanAttribute,
     ListAttribute,
@@ -9,8 +9,7 @@ from pydynox.attributes import (
 
 
 class User(Model):
-    class Meta:
-        table = "users"
+    model_config = ModelConfig(table="users")
 
     pk = StringAttribute(hash_key=True)
     email = StringAttribute(null=False)  # Required field

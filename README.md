@@ -8,9 +8,9 @@
 
 A fast DynamoDB ORM for Python with a Rust core.
 
-> ⚠️ **Alpha Software**: This project is in early development. The API may change before v1.0. Use in production at your own risk. Contributions are welcome!
+> ⚠️ **Early Development**: This project is not ready for production yet. The API may change before v1.0.
 >
-> 📋 Check the [open issues](https://github.com/leandrodamascena/pydynox/issues) to see what's planned and what's being worked on.
+> We welcome feedback and contributions! Check the [open issues](https://github.com/leandrodamascena/pydynox/issues) to see what's planned or to share your ideas.
 
 ## Why "pydynox"?
 
@@ -53,11 +53,10 @@ pip install pydynox[pydantic]
 ### Define a Model
 
 ```python
-from pydynox import Model, String, Number, Boolean, List
+from pydynox import Model, ModelConfig, String, Number, Boolean, List
 
 class User(Model):
-    class Meta:
-        table = "users"
+    model_config = ModelConfig(table="users")
     
     pk = String(hash_key=True)
     sk = String(range_key=True)
@@ -178,11 +177,10 @@ users = User.batch_get([
 ### Global Secondary Index
 
 ```python
-from pydynox import GlobalIndex
+from pydynox import GlobalIndex, ModelConfig
 
 class User(Model):
-    class Meta:
-        table = "users"
+    model_config = ModelConfig(table="users")
     
     pk = String(hash_key=True)
     sk = String(range_key=True)

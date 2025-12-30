@@ -1,11 +1,26 @@
 """Tests for TTL helper classes."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+from pydynox import Model, ModelConfig, clear_default_client
 from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
-from pydynox.model import Model
+
+
+@pytest.fixture(autouse=True)
+def reset_state():
+    """Reset default client before and after each test."""
+    clear_default_client()
+    yield
+    clear_default_client()
+
+
+@pytest.fixture
+def mock_client():
+    """Create a mock DynamoDB client."""
+    return MagicMock()
+
 
 # --- ExpiresIn tests ---
 
@@ -89,39 +104,39 @@ def test_ttl_roundtrip():
 # --- Model TTL integration tests ---
 
 
-class Session(Model):
-    """Test model with TTL."""
-
-    class Meta:
-        table = "sessions"
-
-    pk = StringAttribute(hash_key=True)
-    expires_at = TTLAttribute()
-
-
-def test_model_is_expired_true():
+def test_model_is_expired_true(mock_client):
     """is_expired returns True when TTL has passed."""
+
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        expires_at = TTLAttribute()
+
     past = datetime.now(timezone.utc) - timedelta(hours=1)
     session = Session(pk="SESSION#1", expires_at=past)
 
     assert session.is_expired is True
 
 
-def test_model_is_expired_false():
+def test_model_is_expired_false(mock_client):
     """is_expired returns False when TTL has not passed."""
+
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        expires_at = TTLAttribute()
+
     future = datetime.now(timezone.utc) + timedelta(hours=1)
     session = Session(pk="SESSION#1", expires_at=future)
 
     assert session.is_expired is False
 
 
-def test_model_is_expired_no_ttl_attr():
+def test_model_is_expired_no_ttl_attr(mock_client):
     """is_expired returns False when model has no TTLAttribute."""
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
     user = User(pk="USER#1")
@@ -129,15 +144,27 @@ def test_model_is_expired_no_ttl_attr():
     assert user.is_expired is False
 
 
-def test_model_is_expired_none_value():
+def test_model_is_expired_none_value(mock_client):
     """is_expired returns False when TTL value is None."""
+
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        expires_at = TTLAttribute()
+
     session = Session(pk="SESSION#1", expires_at=None)
 
     assert session.is_expired is False
 
 
-def test_model_expires_in_returns_timedelta():
+def test_model_expires_in_returns_timedelta(mock_client):
     """expires_in returns timedelta until expiration."""
+
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        expires_at = TTLAttribute()
+
     future = datetime.now(timezone.utc) + timedelta(hours=1)
     session = Session(pk="SESSION#1", expires_at=future)
 
@@ -148,21 +175,25 @@ def test_model_expires_in_returns_timedelta():
     assert 3599 <= result.total_seconds() <= 3601
 
 
-def test_model_expires_in_none_when_expired():
+def test_model_expires_in_none_when_expired(mock_client):
     """expires_in returns None when already expired."""
+
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        expires_at = TTLAttribute()
+
     past = datetime.now(timezone.utc) - timedelta(hours=1)
     session = Session(pk="SESSION#1", expires_at=past)
 
     assert session.expires_in is None
 
 
-def test_model_expires_in_none_when_no_ttl():
+def test_model_expires_in_none_when_no_ttl(mock_client):
     """expires_in returns None when model has no TTLAttribute."""
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
     user = User(pk="USER#1")
@@ -170,13 +201,11 @@ def test_model_expires_in_none_when_no_ttl():
     assert user.expires_in is None
 
 
-def test_model_extend_ttl_raises_without_ttl_attr():
+def test_model_extend_ttl_raises_without_ttl_attr(mock_client):
     """extend_ttl raises ValueError when model has no TTLAttribute."""
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
     user = User(pk="USER#1")
@@ -185,8 +214,14 @@ def test_model_extend_ttl_raises_without_ttl_attr():
         user.extend_ttl(ExpiresIn.hours(1))
 
 
-def test_model_to_dict_serializes_ttl():
+def test_model_to_dict_serializes_ttl(mock_client):
     """to_dict serializes TTL datetime to epoch timestamp."""
+
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        expires_at = TTLAttribute()
+
     dt = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
     session = Session(pk="SESSION#1", expires_at=dt)
 
@@ -195,8 +230,14 @@ def test_model_to_dict_serializes_ttl():
     assert result["expires_at"] == int(dt.timestamp())
 
 
-def test_model_from_dict_deserializes_ttl():
+def test_model_from_dict_deserializes_ttl(mock_client):
     """from_dict deserializes epoch timestamp to datetime."""
+
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        expires_at = TTLAttribute()
+
     timestamp = 1750075200
     data = {"pk": "SESSION#1", "expires_at": timestamp}
 

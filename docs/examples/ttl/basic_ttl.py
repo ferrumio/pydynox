@@ -1,10 +1,9 @@
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
 
 
 class Session(Model):
-    class Meta:
-        table = "sessions"
+    model_config = ModelConfig(table="sessions")
 
     pk = StringAttribute(hash_key=True)
     user_id = StringAttribute()

@@ -5,6 +5,7 @@ from typing import Any, ClassVar, Optional, Type, TypeVar
 
 from .attributes import Attribute, TTLAttribute
 from .client import DynamoDBClient
+from .config import ModelConfig, get_default_client
 from .exceptions import ItemTooLargeError
 from .hooks import HookType
 from .size import ItemSize, calculate_item_size
@@ -66,17 +67,27 @@ class Model(metaclass=ModelMeta):
     Define your model by subclassing and adding attributes:
 
     Example:
-        >>> from pydynox import Model, StringAttribute, NumberAttribute
+        >>> from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
+        >>> from pydynox.attributes import StringAttribute, NumberAttribute
+        >>>
+        >>> # Option 1: Set a default client for all models
+        >>> client = DynamoDBClient(region="us-east-1")
+        >>> set_default_client(client)
         >>>
         >>> class User(Model):
-        ...     class Meta:
-        ...         table = "users"
-        ...         region = "us-east-1"
-        ...
+        ...     model_config = ModelConfig(table="users")
         ...     pk = StringAttribute(hash_key=True)
         ...     sk = StringAttribute(range_key=True)
         ...     name = StringAttribute()
         ...     age = NumberAttribute()
+        >>>
+        >>> # Option 2: Pass client to ModelConfig
+        >>> class Order(Model):
+        ...     model_config = ModelConfig(
+        ...         table="orders",
+        ...         client=DynamoDBClient(region="eu-west-1"),
+        ...     )
+        ...     pk = StringAttribute(hash_key=True)
         >>>
         >>> # Create and save
         >>> user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
@@ -98,24 +109,9 @@ class Model(metaclass=ModelMeta):
     _hash_key: ClassVar[Optional[str]]
     _range_key: ClassVar[Optional[str]]
     _hooks: ClassVar[dict[HookType, list]]
-    _client: ClassVar[Optional[DynamoDBClient]] = None
+    _client_instance: ClassVar[Optional[DynamoDBClient]] = None
 
-    class Meta:
-        """Model configuration.
-
-        Attributes:
-            table: DynamoDB table name (required).
-            region: AWS region (optional, uses default if not set).
-            endpoint_url: Custom endpoint (optional, for local testing).
-            skip_hooks: Skip hooks by default (optional, default False).
-            max_size: Max item size in bytes (optional). Raises ItemTooLargeError if exceeded.
-        """
-
-        table: str
-        region: Optional[str] = None
-        endpoint_url: Optional[str] = None
-        skip_hooks: bool = False
-        max_size: Optional[int] = None
+    model_config: ClassVar[ModelConfig]
 
     def __init__(self, **kwargs: Any):
         """Create a model instance.
@@ -135,27 +131,48 @@ class Model(metaclass=ModelMeta):
 
     @classmethod
     def _get_client(cls) -> DynamoDBClient:
-        """Get or create the DynamoDB client."""
-        if cls._client is None:
-            meta = cls.Meta
-            cls._client = DynamoDBClient(
-                region=getattr(meta, "region", None),
-                endpoint_url=getattr(meta, "endpoint_url", None),
-            )
-        return cls._client
+        """Get the DynamoDB client for this model.
+
+        Priority:
+        1. Client from model_config.client
+        2. Global default client (set via set_default_client)
+        3. Error if neither is set
+        """
+        # Check if we have a cached client instance
+        if cls._client_instance is not None:
+            return cls._client_instance
+
+        # Check model_config.client first
+        if hasattr(cls, "model_config") and cls.model_config.client is not None:
+            cls._client_instance = cls.model_config.client
+            return cls._client_instance
+
+        # Check global default
+        default = get_default_client()
+        if default is not None:
+            cls._client_instance = default
+            return cls._client_instance
+
+        # No client configured
+        raise ValueError(
+            f"No client configured for {cls.__name__}. "
+            "Either pass client to ModelConfig or call pydynox.set_default_client()"
+        )
 
     @classmethod
     def _get_table(cls) -> str:
-        """Get the table name from Meta."""
-        if not hasattr(cls.Meta, "table"):
-            raise ValueError(f"Model {cls.__name__} must define Meta.table")
-        return cls.Meta.table
+        """Get the table name from model_config."""
+        if not hasattr(cls, "model_config"):
+            raise ValueError(f"Model {cls.__name__} must define model_config")
+        return cls.model_config.table
 
     def _should_skip_hooks(self, skip_hooks: Optional[bool]) -> bool:
         """Check if hooks should be skipped."""
         if skip_hooks is not None:
             return skip_hooks
-        return getattr(self.Meta, "skip_hooks", False)
+        if hasattr(self, "model_config"):
+            return self.model_config.skip_hooks
+        return False
 
     def _run_hooks(self, hook_type: HookType) -> None:
         """Run all hooks of the given type."""
@@ -185,7 +202,7 @@ class Model(metaclass=ModelMeta):
             return None
 
         instance = cls.from_dict(item)
-        skip = getattr(cls.Meta, "skip_hooks", False)
+        skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
         if not skip:
             instance._run_hooks(HookType.AFTER_LOAD)
         return instance
@@ -197,7 +214,7 @@ class Model(metaclass=ModelMeta):
 
         Args:
             condition: Optional condition expression.
-            skip_hooks: Skip hooks for this operation. If None, uses Meta.skip_hooks.
+            skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
 
         Raises:
             ItemTooLargeError: If max_size is set and item exceeds it.
@@ -212,7 +229,9 @@ class Model(metaclass=ModelMeta):
             self._run_hooks(HookType.BEFORE_SAVE)
 
         # Check size if max_size is set
-        max_size = getattr(self.Meta, "max_size", None)
+        max_size = (
+            getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
+        )
         if max_size is not None:
             size = self.calculate_size()
             if size.bytes > max_size:
@@ -237,7 +256,7 @@ class Model(metaclass=ModelMeta):
 
         Args:
             condition: Optional condition expression.
-            skip_hooks: Skip hooks for this operation. If None, uses Meta.skip_hooks.
+            skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
 
         Example:
             >>> user = User.get(pk="USER#123", sk="PROFILE")
@@ -264,7 +283,7 @@ class Model(metaclass=ModelMeta):
         Updates both the local instance and DynamoDB.
 
         Args:
-            skip_hooks: Skip hooks for this operation. If None, uses Meta.skip_hooks.
+            skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
             **kwargs: Attribute values to update.
 
         Example:

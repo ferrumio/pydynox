@@ -1,7 +1,7 @@
 """Integration tests for lifecycle hooks with real DynamoDB operations."""
 
 import pytest
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 from pydynox.hooks import after_delete, after_save, before_delete, before_save
 
@@ -11,9 +11,7 @@ def test_hooks_run_on_save(dynamo):
     call_log = []
 
     class User(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         name = StringAttribute()
@@ -26,7 +24,7 @@ def test_hooks_run_on_save(dynamo):
         def log_after_save(self):
             call_log.append(f"after_save:{self.pk}")
 
-    User._client = dynamo
+    User._client_instance = None
 
     user = User(pk="USER#1", sk="PROFILE", name="John")
     user.save()
@@ -45,9 +43,7 @@ def test_hooks_run_on_delete(dynamo):
     call_log = []
 
     class User(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         name = StringAttribute()
@@ -60,7 +56,7 @@ def test_hooks_run_on_delete(dynamo):
         def log_after_delete(self):
             call_log.append(f"after_delete:{self.pk}")
 
-    User._client = dynamo
+    User._client_instance = None
 
     user = User(pk="USER#2", sk="PROFILE", name="Jane")
     user.save()
@@ -81,9 +77,7 @@ def test_skip_hooks_on_save(dynamo):
     hook_called = []
 
     class User(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         name = StringAttribute()
@@ -92,7 +86,7 @@ def test_skip_hooks_on_save(dynamo):
         def validate(self):
             hook_called.append("called")
 
-    User._client = dynamo
+    User._client_instance = None
 
     user = User(pk="USER#3", sk="PROFILE", name="Bob")
     user.save(skip_hooks=True)
@@ -109,9 +103,7 @@ def test_before_save_validation_blocks_save(dynamo):
     """Test that before_save can block save with exception."""
 
     class ValidatedUser(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         email = StringAttribute()
@@ -121,7 +113,7 @@ def test_before_save_validation_blocks_save(dynamo):
             if not self.email.endswith("@company.com"):
                 raise ValueError("Email must be @company.com")
 
-    ValidatedUser._client = dynamo
+    ValidatedUser._client_instance = None
 
     user = ValidatedUser(pk="USER#4", sk="PROFILE", email="test@gmail.com")
 
@@ -137,9 +129,7 @@ def test_before_save_can_modify_data(dynamo):
     """Test that before_save can modify data before saving."""
 
     class NormalizedUser(Model):
-        class Meta:
-            table = "test_table"
-
+        model_config = ModelConfig(table="test_table", client=dynamo)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         name = StringAttribute()
@@ -148,7 +138,7 @@ def test_before_save_can_modify_data(dynamo):
         def normalize_name(self):
             self.name = self.name.strip().title()
 
-    NormalizedUser._client = dynamo
+    NormalizedUser._client_instance = None
 
     user = NormalizedUser(pk="USER#5", sk="PROFILE", name="  john doe  ")
     user.save()
@@ -161,15 +151,12 @@ def test_before_save_can_modify_data(dynamo):
     assert loaded.name == "John Doe"
 
 
-def test_meta_skip_hooks_default(dynamo):
-    """Test that Meta.skip_hooks=True skips hooks by default."""
+def test_model_config_skip_hooks_default(dynamo):
+    """Test that model_config.skip_hooks=True skips hooks by default."""
     call_log = []
 
     class BulkModel(Model):
-        class Meta:
-            table = "test_table"
-            skip_hooks = True
-
+        model_config = ModelConfig(table="test_table", client=dynamo, skip_hooks=True)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
 
@@ -177,7 +164,7 @@ def test_meta_skip_hooks_default(dynamo):
         def log_save(self):
             call_log.append("called")
 
-    BulkModel._client = dynamo
+    BulkModel._client_instance = None
 
     item = BulkModel(pk="BULK#1", sk="DATA")
     item.save()
@@ -189,15 +176,12 @@ def test_meta_skip_hooks_default(dynamo):
     assert loaded is not None
 
 
-def test_meta_skip_hooks_override(dynamo):
-    """Test that skip_hooks=False overrides Meta.skip_hooks=True."""
+def test_model_config_skip_hooks_override(dynamo):
+    """Test that skip_hooks=False overrides model_config.skip_hooks=True."""
     call_log = []
 
     class BulkModel(Model):
-        class Meta:
-            table = "test_table"
-            skip_hooks = True
-
+        model_config = ModelConfig(table="test_table", client=dynamo, skip_hooks=True)
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
 
@@ -205,7 +189,7 @@ def test_meta_skip_hooks_override(dynamo):
         def log_save(self):
             call_log.append("called")
 
-    BulkModel._client = dynamo
+    BulkModel._client_instance = None
 
     item = BulkModel(pk="BULK#2", sk="DATA")
     item.save(skip_hooks=False)

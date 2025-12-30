@@ -1,10 +1,9 @@
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import CompressedAttribute, CompressionAlgorithm, StringAttribute
 
 
 class Document(Model):
-    class Meta:
-        table = "documents"
+    model_config = ModelConfig(table="documents")
 
     pk = StringAttribute(hash_key=True)
 

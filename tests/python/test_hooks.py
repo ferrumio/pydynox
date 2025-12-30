@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 import pytest
-from pydynox import Model
+from pydynox import Model, ModelConfig, clear_default_client
 from pydynox.attributes import StringAttribute
 from pydynox.hooks import (
     HookType,
@@ -15,6 +15,20 @@ from pydynox.hooks import (
     before_save,
     before_update,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_state():
+    """Reset default client before and after each test."""
+    clear_default_client()
+    yield
+    clear_default_client()
+
+
+@pytest.fixture
+def mock_client():
+    """Create a mock DynamoDB client."""
+    return MagicMock()
 
 
 def test_hook_decorator_sets_hook_type():
@@ -49,13 +63,11 @@ def test_all_hook_decorators(decorator, expected_type):
     assert hook._hook_type == expected_type
 
 
-def test_model_collects_hooks():
+def test_model_collects_hooks(mock_client):
     """Test that Model metaclass collects hooks."""
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
         @before_save
@@ -70,13 +82,11 @@ def test_model_collects_hooks():
     assert len(User._hooks[HookType.AFTER_SAVE]) == 1
 
 
-def test_model_inherits_hooks():
+def test_model_inherits_hooks(mock_client):
     """Test that hooks are inherited from parent class."""
 
     class BaseModel(Model):
-        class Meta:
-            table = "base"
-
+        model_config = ModelConfig(table="base", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
         @before_save
@@ -84,8 +94,7 @@ def test_model_inherits_hooks():
             pass
 
     class User(BaseModel):
-        class Meta:
-            table = "users"
+        model_config = ModelConfig(table="users", client=mock_client)
 
         @before_save
         def user_validate(self):
@@ -95,22 +104,19 @@ def test_model_inherits_hooks():
     assert len(User._hooks[HookType.BEFORE_SAVE]) == 2
 
 
-def test_before_save_hook_runs():
+def test_before_save_hook_runs(mock_client):
     """Test that before_save hook runs before save."""
     call_order = []
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
         @before_save
         def validate(self):
             call_order.append("before_save")
 
-    mock_client = MagicMock()
-    User._client = mock_client
+    User._client_instance = None
 
     user = User(pk="USER#1")
     user.save()
@@ -119,22 +125,19 @@ def test_before_save_hook_runs():
     mock_client.put_item.assert_called_once()
 
 
-def test_after_save_hook_runs():
+def test_after_save_hook_runs(mock_client):
     """Test that after_save hook runs after save."""
     call_order = []
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
         @after_save
         def notify(self):
             call_order.append("after_save")
 
-    mock_client = MagicMock()
-    User._client = mock_client
+    User._client_instance = None
 
     user = User(pk="USER#1")
     user.save()
@@ -142,22 +145,19 @@ def test_after_save_hook_runs():
     assert "after_save" in call_order
 
 
-def test_skip_hooks_on_save():
+def test_skip_hooks_on_save(mock_client):
     """Test that skip_hooks=True skips hooks."""
     hook_called = []
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
         @before_save
         def validate(self):
             hook_called.append("called")
 
-    mock_client = MagicMock()
-    User._client = mock_client
+    User._client_instance = None
 
     user = User(pk="USER#1")
     user.save(skip_hooks=True)
@@ -166,23 +166,19 @@ def test_skip_hooks_on_save():
     mock_client.put_item.assert_called_once()
 
 
-def test_meta_skip_hooks_default():
-    """Test that Meta.skip_hooks=True skips hooks by default."""
+def test_model_config_skip_hooks_default(mock_client):
+    """Test that model_config.skip_hooks=True skips hooks by default."""
     hook_called = []
 
     class BulkModel(Model):
-        class Meta:
-            table = "bulk"
-            skip_hooks = True
-
+        model_config = ModelConfig(table="bulk", client=mock_client, skip_hooks=True)
         pk = StringAttribute(hash_key=True)
 
         @before_save
         def validate(self):
             hook_called.append("called")
 
-    mock_client = MagicMock()
-    BulkModel._client = mock_client
+    BulkModel._client_instance = None
 
     item = BulkModel(pk="ITEM#1")
     item.save()
@@ -190,23 +186,19 @@ def test_meta_skip_hooks_default():
     assert len(hook_called) == 0
 
 
-def test_meta_skip_hooks_override():
-    """Test that skip_hooks=False overrides Meta.skip_hooks=True."""
+def test_model_config_skip_hooks_override(mock_client):
+    """Test that skip_hooks=False overrides model_config.skip_hooks=True."""
     hook_called = []
 
     class BulkModel(Model):
-        class Meta:
-            table = "bulk"
-            skip_hooks = True
-
+        model_config = ModelConfig(table="bulk", client=mock_client, skip_hooks=True)
         pk = StringAttribute(hash_key=True)
 
         @before_save
         def validate(self):
             hook_called.append("called")
 
-    mock_client = MagicMock()
-    BulkModel._client = mock_client
+    BulkModel._client_instance = None
 
     item = BulkModel(pk="ITEM#1")
     item.save(skip_hooks=False)
@@ -214,22 +206,19 @@ def test_meta_skip_hooks_override():
     assert len(hook_called) == 1
 
 
-def test_before_delete_hook_runs():
+def test_before_delete_hook_runs(mock_client):
     """Test that before_delete hook runs."""
     hook_called = []
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
         @before_delete
         def check_can_delete(self):
             hook_called.append("before_delete")
 
-    mock_client = MagicMock()
-    User._client = mock_client
+    User._client_instance = None
 
     user = User(pk="USER#1")
     user.delete()
@@ -237,14 +226,12 @@ def test_before_delete_hook_runs():
     assert "before_delete" in hook_called
 
 
-def test_before_update_hook_runs():
+def test_before_update_hook_runs(mock_client):
     """Test that before_update hook runs."""
     hook_called = []
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
         name = StringAttribute()
 
@@ -252,8 +239,7 @@ def test_before_update_hook_runs():
         def validate_update(self):
             hook_called.append("before_update")
 
-    mock_client = MagicMock()
-    User._client = mock_client
+    User._client_instance = None
 
     user = User(pk="USER#1", name="John")
     user.update(name="Jane")
@@ -261,13 +247,11 @@ def test_before_update_hook_runs():
     assert "before_update" in hook_called
 
 
-def test_hook_can_raise_exception():
+def test_hook_can_raise_exception(mock_client):
     """Test that hooks can raise exceptions to stop operation."""
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
         email = StringAttribute()
 
@@ -276,8 +260,7 @@ def test_hook_can_raise_exception():
             if not self.email.endswith("@company.com"):
                 raise ValueError("Invalid email domain")
 
-    mock_client = MagicMock()
-    User._client = mock_client
+    User._client_instance = None
 
     user = User(pk="USER#1", email="test@gmail.com")
 
@@ -288,14 +271,12 @@ def test_hook_can_raise_exception():
     mock_client.put_item.assert_not_called()
 
 
-def test_multiple_hooks_run_in_order():
+def test_multiple_hooks_run_in_order(mock_client):
     """Test that multiple hooks run in definition order."""
     call_order = []
 
     class User(Model):
-        class Meta:
-            table = "users"
-
+        model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
 
         @before_save
@@ -306,8 +287,7 @@ def test_multiple_hooks_run_in_order():
         def second_hook(self):
             call_order.append("second")
 
-    mock_client = MagicMock()
-    User._client = mock_client
+    User._client_instance = None
 
     user = User(pk="USER#1")
     user.save()
