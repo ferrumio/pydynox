@@ -255,7 +255,7 @@ User.delete_table()
 
 ## Documentation
 
-Full documentation: [https://pydynox.readthedocs.io](https://pydynox.readthedocs.io)
+Full documentation: [https://leandrodamascena.github.io/pydynox](https://leandrodamascena.github.io/pydynox)
 
 ## License
 

@@ -1,0 +1,70 @@
+# Batch operations
+
+Work with multiple items at once. Instead of making 100 separate API calls, batch operations let you send items in groups of 25 (the DynamoDB limit).
+
+## Key features
+
+- Auto-batching in groups of 25
+- Automatic retry for failed items
+- Mix puts and deletes in one batch
+
+## Getting started
+
+Use `BatchWriter` to save or delete many items. The batch writer handles all the complexity for you: it groups items into batches, sends them to DynamoDB, and retries any items that fail.
+
+=== "batch_write.py"
+    ```python
+    --8<-- "docs/examples/batch/batch_write.py"
+    ```
+
+When you use `BatchWriter` as a context manager (with `with`), it automatically flushes any remaining items when the block ends. This means you don't have to worry about items being left unsent.
+
+The batch writer accepts two types of operations:
+
+- `batch.put(item)` - Add or replace an item
+- `batch.delete(key)` - Remove an item by its key
+
+You can mix both operations in the same batch. DynamoDB processes them in any order, so don't rely on a specific sequence.
+
+## Advanced
+
+### Manual flush
+
+By default, the batch writer sends items to DynamoDB when it has 25 items ready, or when the context exits. If you want to send items earlier, call `flush()`:
+
+```python
+with BatchWriter(client, "users") as batch:
+    for i in range(100):
+        batch.put({"pk": f"USER#{i}", "name": f"User {i}"})
+        
+        # Flush every 50 items instead of waiting
+        if i % 50 == 0:
+            batch.flush()
+```
+
+This is useful when you want to see progress during long-running operations, or when you need to free up memory.
+
+### Error handling
+
+DynamoDB sometimes can't process all items in a batch. This happens when you hit throughput limits or when there's a temporary service issue.
+
+The batch writer automatically retries failed items with exponential backoff. If items still fail after all retries, an exception is raised when the context exits:
+
+```python
+try:
+    with BatchWriter(client, "users") as batch:
+        batch.put({"pk": "USER#1", "name": "John"})
+except Exception as e:
+    print(f"Some items failed: {e}")
+```
+
+!!! tip
+    If you're seeing frequent failures, consider using [rate limiting](rate-limiting.md) to stay within your provisioned capacity.
+
+### Performance tips
+
+1. **Use batch operations for bulk work** - If you're saving more than a few items, batching is faster than individual `put_item` calls.
+
+2. **Don't batch single items** - For one or two items, use regular `put_item`. The overhead of batching isn't worth it.
+
+3. **Consider rate limiting** - If you're writing a lot of data, combine batch operations with rate limiting to avoid throttling.

@@ -1,13 +1,13 @@
 [package]
 name = "pydynox"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 authors = ["Leandro Cavalcante Damascena <leandro.damascena@gmail.com>"]
 description = "A fast DynamoDB ORM for Python with a Rust core"
 license = "MIT"
 repository = "https://github.com/leandrodamascena/pydynox"
 homepage = "https://github.com/leandrodamascena/pydynox"
-documentation = "https://pydynox.readthedocs.io"
+documentation = "https://leandrodamascena.github.io/pydynox"
 readme = "README.md"
 keywords = ["dynamodb", "orm", "aws", "database", "pyo3"]
 categories = ["database", "api-bindings"]
