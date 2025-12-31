@@ -1,6 +1,5 @@
 """Unit tests for atomic update operations."""
 
-import pytest
 
 from pydynox import Model, ModelConfig
 from pydynox._internal._atomic import serialize_atomic

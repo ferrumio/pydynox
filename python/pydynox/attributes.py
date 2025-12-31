@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
+from enum import Enum
 from typing import Any, Generic, TypeVar
 
 from pydynox._internal._atomic import (
@@ -47,6 +49,12 @@ __all__ = [
     "CompressionAlgorithm",
     "EncryptedAttribute",
     "EncryptionMode",
+    # New attribute types
+    "JSONAttribute",
+    "EnumAttribute",
+    "DatetimeAttribute",
+    "StringSetAttribute",
+    "NumberSetAttribute",
 ]
 
 
@@ -579,3 +587,318 @@ class EncryptedAttribute(Attribute[str]):
             return value  # WriteOnly mode: return encrypted value
 
         return self.encryptor.decrypt(value)
+
+
+E = TypeVar("E", bound=Enum)
+
+
+class JSONAttribute(Attribute[dict[str, Any] | list[Any]]):
+    """Store dict/list as JSON string.
+
+    Different from MapAttribute which uses DynamoDB's native Map type.
+    JSONAttribute stores data as a string, which can be useful when you
+    need to store complex nested structures or when you want to avoid
+    DynamoDB's map limitations.
+
+    Example:
+        >>> from pydynox import Model, ModelConfig
+        >>> from pydynox.attributes import StringAttribute, JSONAttribute
+        >>>
+        >>> class Config(Model):
+        ...     model_config = ModelConfig(table="configs")
+        ...     pk = StringAttribute(hash_key=True)
+        ...     settings = JSONAttribute()
+        >>>
+        >>> config = Config(pk="CFG#1", settings={"theme": "dark", "notifications": True})
+        >>> config.save()
+        >>> # Stored as string '{"theme": "dark", "notifications": true}'
+    """
+
+    attr_type = "S"
+
+    def serialize(self, value: dict[str, Any] | list[Any] | None) -> str | None:
+        """Convert dict/list to JSON string.
+
+        Args:
+            value: Dict or list to serialize.
+
+        Returns:
+            JSON string or None.
+        """
+        if value is None:
+            return None
+        return json.dumps(value)
+
+    def deserialize(self, value: Any) -> dict[str, Any] | list[Any] | None:
+        """Convert JSON string back to dict/list.
+
+        Args:
+            value: JSON string from DynamoDB.
+
+        Returns:
+            Parsed dict/list or None.
+        """
+        if value is None:
+            return None
+        if isinstance(value, (dict, list)):
+            return value
+        result: dict[str, Any] | list[Any] = json.loads(value)
+        return result
+
+
+class EnumAttribute(Attribute[E], Generic[E]):
+    """Store Python enum as string.
+
+    Stores the enum's value (not name) in DynamoDB. On load, converts
+    back to the enum type.
+
+    Args:
+        enum_class: The Enum class to use.
+        hash_key: True if this is the partition key.
+        range_key: True if this is the sort key.
+        default: Default enum value.
+        null: Whether None is allowed.
+
+    Example:
+        >>> from enum import Enum
+        >>> from pydynox import Model, ModelConfig
+        >>> from pydynox.attributes import StringAttribute, EnumAttribute
+        >>>
+        >>> class Status(Enum):
+        ...     PENDING = "pending"
+        ...     ACTIVE = "active"
+        >>>
+        >>> class User(Model):
+        ...     model_config = ModelConfig(table="users")
+        ...     pk = StringAttribute(hash_key=True)
+        ...     status = EnumAttribute(Status, default=Status.PENDING)
+        >>>
+        >>> user = User(pk="USER#1", status=Status.ACTIVE)
+        >>> user.save()
+        >>> # Stored as "active", loaded as Status.ACTIVE
+    """
+
+    attr_type = "S"
+
+    def __init__(
+        self,
+        enum_class: type[E],
+        hash_key: bool = False,
+        range_key: bool = False,
+        default: E | None = None,
+        null: bool = True,
+    ):
+        """Create an enum attribute.
+
+        Args:
+            enum_class: The Enum class to use.
+            hash_key: True if this is the partition key.
+            range_key: True if this is the sort key.
+            default: Default enum value.
+            null: Whether None is allowed.
+        """
+        super().__init__(
+            hash_key=hash_key,
+            range_key=range_key,
+            default=default,
+            null=null,
+        )
+        self.enum_class = enum_class
+
+    def serialize(self, value: E | None) -> str | None:
+        """Convert enum to its string value.
+
+        Args:
+            value: Enum member.
+
+        Returns:
+            The enum's value as string.
+        """
+        if value is None:
+            return None
+        return str(value.value)
+
+    def deserialize(self, value: Any) -> E | None:
+        """Convert string back to enum.
+
+        Args:
+            value: String value from DynamoDB.
+
+        Returns:
+            Enum member.
+        """
+        if value is None:
+            return None
+        return self.enum_class(value)
+
+
+class DatetimeAttribute(Attribute[datetime]):
+    """Store datetime as ISO 8601 string.
+
+    Stores datetime in ISO format which is sortable as a string.
+    Naive datetimes (without timezone) are treated as UTC.
+
+    Example:
+        >>> from datetime import datetime, timezone
+        >>> from pydynox import Model, ModelConfig
+        >>> from pydynox.attributes import StringAttribute, DatetimeAttribute
+        >>>
+        >>> class Event(Model):
+        ...     model_config = ModelConfig(table="events")
+        ...     pk = StringAttribute(hash_key=True)
+        ...     created_at = DatetimeAttribute()
+        >>>
+        >>> event = Event(pk="EVT#1", created_at=datetime.now(timezone.utc))
+        >>> event.save()
+        >>> # Stored as "2024-01-15T10:30:00+00:00"
+
+    Note:
+        For auto-set timestamps, use hooks:
+
+        >>> from pydynox.hooks import before_save
+        >>>
+        >>> class Event(Model):
+        ...     model_config = ModelConfig(table="events")
+        ...     pk = StringAttribute(hash_key=True)
+        ...     created_at = DatetimeAttribute(null=True)
+        ...
+        ...     @before_save
+        ...     def set_created_at(self):
+        ...         if self.created_at is None:
+        ...             self.created_at = datetime.now(timezone.utc)
+    """
+
+    attr_type = "S"
+
+    def serialize(self, value: datetime | None) -> str | None:
+        """Convert datetime to ISO 8601 string.
+
+        Args:
+            value: datetime object.
+
+        Returns:
+            ISO format string.
+        """
+        if value is None:
+            return None
+        # Treat naive datetime as UTC
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
+
+    def deserialize(self, value: Any) -> datetime | None:
+        """Convert ISO string back to datetime.
+
+        Args:
+            value: ISO format string from DynamoDB.
+
+        Returns:
+            datetime object.
+        """
+        if value is None:
+            return None
+        return datetime.fromisoformat(value)
+
+
+class StringSetAttribute(Attribute[set[str]]):
+    """DynamoDB native string set (SS).
+
+    Stores a set of unique strings. DynamoDB sets don't allow duplicates
+    and don't preserve order.
+
+    Example:
+        >>> from pydynox import Model, ModelConfig
+        >>> from pydynox.attributes import StringAttribute, StringSetAttribute
+        >>>
+        >>> class User(Model):
+        ...     model_config = ModelConfig(table="users")
+        ...     pk = StringAttribute(hash_key=True)
+        ...     tags = StringSetAttribute()
+        >>>
+        >>> user = User(pk="USER#1", tags={"admin", "verified"})
+        >>> user.save()
+    """
+
+    attr_type = "SS"
+
+    def serialize(self, value: set[str] | None) -> list[str] | None:
+        """Convert set to list for DynamoDB.
+
+        Args:
+            value: Set of strings.
+
+        Returns:
+            List of strings or None.
+        """
+        if value is None or len(value) == 0:
+            return None
+        return list(value)
+
+    def deserialize(self, value: Any) -> set[str]:
+        """Convert list back to set.
+
+        Args:
+            value: List from DynamoDB.
+
+        Returns:
+            Set of strings.
+        """
+        if value is None:
+            return set()
+        return set(value)
+
+
+class NumberSetAttribute(Attribute[set[int | float]]):
+    """DynamoDB native number set (NS).
+
+    Stores a set of unique numbers. DynamoDB sets don't allow duplicates
+    and don't preserve order.
+
+    Example:
+        >>> from pydynox import Model, ModelConfig
+        >>> from pydynox.attributes import StringAttribute, NumberSetAttribute
+        >>>
+        >>> class User(Model):
+        ...     model_config = ModelConfig(table="users")
+        ...     pk = StringAttribute(hash_key=True)
+        ...     scores = NumberSetAttribute()
+        >>>
+        >>> user = User(pk="USER#1", scores={100, 95, 88})
+        >>> user.save()
+    """
+
+    attr_type = "NS"
+
+    def serialize(self, value: set[int | float] | None) -> list[str] | None:
+        """Convert set to list of strings for DynamoDB.
+
+        Args:
+            value: Set of numbers.
+
+        Returns:
+            List of number strings or None.
+        """
+        if value is None or len(value) == 0:
+            return None
+        return [str(v) for v in value]
+
+    def deserialize(self, value: Any) -> set[int | float]:
+        """Convert list of strings back to set of numbers.
+
+        Args:
+            value: List of number strings from DynamoDB.
+
+        Returns:
+            Set of numbers.
+        """
+        if value is None:
+            return set()
+        result: set[int | float] = set()
+        for v in value:
+            num = float(v)
+            # Return int if it's a whole number
+            if num.is_integer():
+                result.add(int(num))
+            else:
+                result.add(num)
+        return result
