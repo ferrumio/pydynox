@@ -10,28 +10,29 @@ nav = [
         "getting-started.md",
     ] },
     { "Core" = [
-        "guides/00-client.md",
-        "guides/01-models.md",
-        "guides/03-crud.md",
-        "guides/14-conditions.md",
+        "guides/client.md",
+        "guides/models.md",
+        "guides/crud.md",
+        "guides/conditions.md",
+        "guides/atomic-updates.md",
     ] },
     { "Operations" = [
-        "guides/04-batch.md",
-        "guides/05-transactions.md",
-        "guides/10-tables.md",
+        "guides/batch.md",
+        "guides/transactions.md",
+        "guides/tables.md",
     ] },
     { "Features" = [
-        "guides/07-hooks.md",
-        "guides/06-rate-limiting.md",
-        "guides/11-encryption.md",
-        "guides/13-size-calculator.md",
+        "guides/hooks.md",
+        "guides/rate-limiting.md",
+        "guides/encryption.md",
+        "guides/size-calculator.md",
     ] },
     { "Integrations" = [
-        "guides/08-pydantic.md",
+        "guides/pydantic.md",
     ] },
     { "Troubleshooting" = [
-        "guides/09-exceptions.md",
-        "guides/12-iam-permissions.md",
+        "guides/exceptions.md",
+        "guides/iam-permissions.md",
     ] },
 ]
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
+from pydynox._internal._atomic import AtomicOp, serialize_atomic
 from pydynox.attributes import Attribute, TTLAttribute
 from pydynox.client import DynamoDBClient
 from pydynox.config import ModelConfig, get_default_client
@@ -324,18 +325,43 @@ class Model(metaclass=ModelMeta):
         if not skip:
             self._run_hooks(HookType.AFTER_DELETE)
 
-    def update(self, skip_hooks: bool | None = None, **kwargs: Any) -> None:
+    def update(
+        self,
+        atomic: list[AtomicOp] | None = None,
+        condition: Condition | None = None,
+        skip_hooks: bool | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Update specific attributes on the model.
 
         Updates both the local instance and DynamoDB.
 
         Args:
+            atomic: List of atomic operations (add, append, remove, etc.).
+            condition: Optional condition that must be true for the update.
             skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
-            **kwargs: Attribute values to update.
+            **kwargs: Attribute values to update (simple SET operations).
 
         Example:
             >>> user = User.get(pk="USER#123", sk="PROFILE")
             >>> user.update(name="Jane", age=31)
+
+            >>> # Atomic operations
+            >>> user.update(atomic=[User.login_count.add(1)])
+            >>> user.update(atomic=[User.tags.append(["premium"])])
+
+            >>> # Multiple atomic operations
+            >>> user.update(atomic=[
+            ...     User.login_count.add(1),
+            ...     User.tags.append(["verified"]),
+            ...     User.temp_token.remove(),
+            ... ])
+
+            >>> # With condition
+            >>> user.update(
+            ...     atomic=[User.balance.add(-100)],
+            ...     condition=User.balance >= 100,
+            ... )
         """
         skip = self._should_skip_hooks(skip_hooks)
 
@@ -346,14 +372,54 @@ class Model(metaclass=ModelMeta):
         table = self._get_table()
         key = self._get_key()
 
-        # Update local instance
-        for attr_name, value in kwargs.items():
-            if attr_name not in self._attributes:
-                raise ValueError(f"Unknown attribute: {attr_name}")
-            setattr(self, attr_name, value)
+        # Handle atomic operations
+        if atomic:
+            update_expr, names, values = serialize_atomic(atomic)
 
-        # Update in DynamoDB
-        client.update_item(table, key, updates=kwargs)
+            # Invert names dict for DynamoDB format: {placeholder: attr_name}
+            attr_names = {v: k for k, v in names.items()}
+
+            # Serialize condition if provided
+            cond_expr = None
+            if condition is not None:
+                # Pass existing names/values to avoid placeholder collisions
+                cond_names: dict[str, str] = dict(names)  # Copy existing names
+                cond_expr = condition.serialize(cond_names, values)
+                # Merge names (condition names also need inversion)
+                cond_attr_names = {v: k for k, v in cond_names.items()}
+                attr_names = {**attr_names, **cond_attr_names}
+
+            client.update_item(
+                table,
+                key,
+                update_expression=update_expr,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names if attr_names else None,
+                expression_attribute_values=values if values else None,
+            )
+        elif kwargs:
+            # Simple key=value updates
+            for attr_name, value in kwargs.items():
+                if attr_name not in self._attributes:
+                    raise ValueError(f"Unknown attribute: {attr_name}")
+                setattr(self, attr_name, value)
+
+            # Serialize condition if provided
+            if condition is not None:
+                kwargs_cond_names: dict[str, str] = {}
+                kwargs_cond_values: dict[str, Any] = {}
+                cond_expr = condition.serialize(kwargs_cond_names, kwargs_cond_values)
+                attr_names = {v: k for k, v in kwargs_cond_names.items()}
+                client.update_item(
+                    table,
+                    key,
+                    updates=kwargs,
+                    condition_expression=cond_expr,
+                    expression_attribute_names=attr_names,
+                    expression_attribute_values=kwargs_cond_values,
+                )
+            else:
+                client.update_item(table, key, updates=kwargs)
 
         if not skip:
             self._run_hooks(HookType.AFTER_UPDATE)
@@ -519,4 +585,11 @@ class Model(metaclass=ModelMeta):
         if ttl_attr is None:
             raise ValueError(f"Model {self.__class__.__name__} has no TTLAttribute")
 
-        self.update(skip_hooks=None, **{ttl_attr: new_expiration})
+        # Update local instance
+        setattr(self, ttl_attr, new_expiration)
+
+        # Update in DynamoDB
+        client = self._get_client()
+        table = self._get_table()
+        key = self._get_key()
+        client.update_item(table, key, updates={ttl_attr: new_expiration})
