@@ -1,7 +1,6 @@
 """Integration tests for atomic update operations."""
 
 import pytest
-
 from pydynox import Model, ModelConfig, set_default_client
 from pydynox.attributes import ListAttribute, NumberAttribute, StringAttribute
 from pydynox.exceptions import ConditionCheckFailedError

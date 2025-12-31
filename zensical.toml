@@ -12,6 +12,7 @@ nav = [
     { "Core" = [
         "guides/client.md",
         "guides/models.md",
+        "guides/attributes.md",
         "guides/crud.md",
         "guides/conditions.md",
         "guides/atomic-updates.md",
