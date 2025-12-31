@@ -151,6 +151,9 @@ impl DynamoDBClient {
     ///
     /// * `table` - The name of the DynamoDB table
     /// * `item` - A Python dict representing the item to save
+    /// * `condition_expression` - Optional condition expression
+    /// * `expression_attribute_names` - Optional name placeholders
+    /// * `expression_attribute_values` - Optional value placeholders
     ///
     /// # Examples
     ///
@@ -158,8 +161,26 @@ impl DynamoDBClient {
     /// client = DynamoDBClient()
     /// client.put_item("users", {"pk": "USER#123", "name": "John", "age": 30})
     /// ```
-    pub fn put_item(&self, py: Python<'_>, table: &str, item: &Bound<'_, PyDict>) -> PyResult<()> {
-        basic_operations::put_item(py, &self.client, &self.runtime, table, item)
+    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    pub fn put_item(
+        &self,
+        py: Python<'_>,
+        table: &str,
+        item: &Bound<'_, PyDict>,
+        condition_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<()> {
+        basic_operations::put_item(
+            py,
+            &self.client,
+            &self.runtime,
+            table,
+            item,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
     }
 
     /// Get an item from a DynamoDB table by its key.

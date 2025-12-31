@@ -18,8 +18,8 @@ Example:
 
 from __future__ import annotations
 
-from enum import Enum
 from collections.abc import Callable
+from enum import Enum
 from typing import Any, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])

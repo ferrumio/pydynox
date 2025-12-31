@@ -39,6 +39,7 @@ from pydynox import pydynox_core  # noqa: F401
 # Import Python wrappers
 from pydynox.batch_operations import BatchWriter
 from pydynox.client import DynamoDBClient
+from pydynox.conditions import Condition
 from pydynox.config import (
     ModelConfig,
     clear_default_client,
@@ -58,6 +59,7 @@ __all__ = [
     "QueryResult",
     "Transaction",
     # Model ORM
+    "Condition",
     "Model",
     "ModelConfig",
     # Client config

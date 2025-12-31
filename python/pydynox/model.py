@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from pydynox.attributes import Attribute, TTLAttribute
 from pydynox.client import DynamoDBClient
@@ -11,6 +11,9 @@ from pydynox.config import ModelConfig, get_default_client
 from pydynox.exceptions import ItemTooLargeError
 from pydynox.hooks import HookType
 from pydynox.size import ItemSize, calculate_item_size
+
+if TYPE_CHECKING:
+    from pydynox.conditions import Condition
 
 M = TypeVar("M", bound="Model")
 
@@ -214,21 +217,25 @@ class Model(metaclass=ModelMeta):
             instance._run_hooks(HookType.AFTER_LOAD)
         return instance
 
-    def save(self, condition: str | None = None, skip_hooks: bool | None = None) -> None:
+    def save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
         """Save the model to DynamoDB.
 
         Creates a new item or replaces an existing one.
 
         Args:
-            condition: Optional condition expression.
+            condition: Optional condition that must be true for the write.
             skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
 
         Raises:
             ItemTooLargeError: If max_size is set and item exceeds it.
+            ConditionCheckFailedError: If the condition is not met.
 
         Example:
             >>> user = User(pk="USER#123", sk="PROFILE", name="John")
             >>> user.save()
+
+            >>> # Only save if item doesn't exist
+            >>> user.save(condition=User.pk.does_not_exist())
         """
         skip = self._should_skip_hooks(skip_hooks)
 
@@ -252,22 +259,42 @@ class Model(metaclass=ModelMeta):
         table = self._get_table()
         item = self.to_dict()
 
-        # TODO: Add condition expression support when put_item supports it
-        client.put_item(table, item)
+        # Serialize condition if provided
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            expr = condition.serialize(names, values)
+            # Invert names dict for DynamoDB format
+            attr_names = {v: k for k, v in names.items()}
+            client.put_item(
+                table,
+                item,
+                condition_expression=expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=values,
+            )
+        else:
+            client.put_item(table, item)
 
         if not skip:
             self._run_hooks(HookType.AFTER_SAVE)
 
-    def delete(self, condition: str | None = None, skip_hooks: bool | None = None) -> None:
+    def delete(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
         """Delete the model from DynamoDB.
 
         Args:
-            condition: Optional condition expression.
+            condition: Optional condition that must be true for the delete.
             skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
+
+        Raises:
+            ConditionCheckFailedError: If the condition is not met.
 
         Example:
             >>> user = User.get(pk="USER#123", sk="PROFILE")
             >>> user.delete()
+
+            >>> # Only delete if version matches
+            >>> user.delete(condition=User.version == 5)
         """
         skip = self._should_skip_hooks(skip_hooks)
 
@@ -278,8 +305,21 @@ class Model(metaclass=ModelMeta):
         table = self._get_table()
         key = self._get_key()
 
-        # TODO: Add condition expression support
-        client.delete_item(table, key)
+        # Serialize condition if provided
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            expr = condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            client.delete_item(
+                table,
+                key,
+                condition_expression=expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=values,
+            )
+        else:
+            client.delete_item(table, key)
 
         if not skip:
             self._run_hooks(HookType.AFTER_DELETE)
