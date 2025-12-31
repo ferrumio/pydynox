@@ -3,26 +3,33 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
+from pydynox._internal._atomic import (
+    AtomicAdd,
+    AtomicAppend,
+    AtomicIfNotExists,
+    AtomicPath,
+    AtomicPrepend,
+    AtomicRemove,
+    AtomicSet,
+)
 from pydynox._internal._compression import (
     CompressionAlgorithm,
     compress_string,
     decompress_string,
 )
+from pydynox._internal._conditions import (
+    ConditionBeginsWith,
+    ConditionBetween,
+    ConditionComparison,
+    ConditionContains,
+    ConditionExists,
+    ConditionIn,
+    ConditionNotExists,
+    ConditionPath,
+)
 from pydynox._internal._encryption import EncryptionMode, KmsEncryptor
-
-if TYPE_CHECKING:
-    from pydynox._internal._conditions import (
-        ConditionBeginsWith,
-        ConditionBetween,
-        ConditionComparison,
-        ConditionContains,
-        ConditionExists,
-        ConditionIn,
-        ConditionNotExists,
-        ConditionPath,
-    )
 
 T = TypeVar("T")
 
@@ -91,38 +98,24 @@ class Attribute(Generic[T]):
     # Condition operators
     def _get_path(self) -> ConditionPath:
         """Get ConditionPath for this attribute."""
-        from pydynox._internal._conditions import ConditionPath
-
         return ConditionPath(attribute=self)
 
     def __eq__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
-        from pydynox._internal._conditions import ConditionComparison
-
         return ConditionComparison("=", self._get_path(), other)
 
     def __ne__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
-        from pydynox._internal._conditions import ConditionComparison
-
         return ConditionComparison("<>", self._get_path(), other)
 
     def __lt__(self, other: Any) -> ConditionComparison:
-        from pydynox._internal._conditions import ConditionComparison
-
         return ConditionComparison("<", self._get_path(), other)
 
     def __le__(self, other: Any) -> ConditionComparison:
-        from pydynox._internal._conditions import ConditionComparison
-
         return ConditionComparison("<=", self._get_path(), other)
 
     def __gt__(self, other: Any) -> ConditionComparison:
-        from pydynox._internal._conditions import ConditionComparison
-
         return ConditionComparison(">", self._get_path(), other)
 
     def __ge__(self, other: Any) -> ConditionComparison:
-        from pydynox._internal._conditions import ConditionComparison
-
         return ConditionComparison(">=", self._get_path(), other)
 
     def __getitem__(self, key: str | int) -> ConditionPath:
@@ -152,6 +145,35 @@ class Attribute(Generic[T]):
     def is_in(self, *values: Any) -> ConditionIn:
         """Check if value is in the given list."""
         return self._get_path().is_in(*values)
+
+    # Atomic update methods
+    def _get_atomic_path(self) -> AtomicPath:
+        """Get AtomicPath for this attribute."""
+        return AtomicPath(attribute=self)
+
+    def set(self, value: Any) -> AtomicSet:
+        """Set attribute to a value."""
+        return AtomicSet(self._get_atomic_path(), value)
+
+    def add(self, value: int | float) -> AtomicAdd:
+        """Add to a number attribute (atomic increment/decrement)."""
+        return AtomicAdd(self._get_atomic_path(), value)
+
+    def remove(self) -> AtomicRemove:
+        """Remove this attribute from the item."""
+        return AtomicRemove(self._get_atomic_path())
+
+    def append(self, items: list[Any]) -> AtomicAppend:
+        """Append items to a list attribute."""
+        return AtomicAppend(self._get_atomic_path(), items)
+
+    def prepend(self, items: list[Any]) -> AtomicPrepend:
+        """Prepend items to a list attribute."""
+        return AtomicPrepend(self._get_atomic_path(), items)
+
+    def if_not_exists(self, value: Any) -> AtomicIfNotExists:
+        """Set attribute only if it doesn't exist."""
+        return AtomicIfNotExists(self._get_atomic_path(), value)
 
 
 class StringAttribute(Attribute[str]):
