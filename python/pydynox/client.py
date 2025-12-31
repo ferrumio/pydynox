@@ -92,18 +92,42 @@ class DynamoDBClient:
         """Check if the client can connect to DynamoDB."""
         return self._client.ping()
 
-    def put_item(self, table: str, item: dict[str, Any]) -> None:
+    def put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
         """Put an item into a DynamoDB table.
 
         Args:
             table: The name of the DynamoDB table.
             item: A dict representing the item to save.
+            condition_expression: Optional condition expression.
+            expression_attribute_names: Optional name placeholders.
+            expression_attribute_values: Optional value placeholders.
 
         Example:
             >>> client.put_item("users", {"pk": "USER#123", "name": "John", "age": 30})
+
+            >>> # With condition (only if item doesn't exist)
+            >>> client.put_item(
+            ...     "users",
+            ...     {"pk": "USER#123", "name": "John"},
+            ...     condition_expression="attribute_not_exists(#pk)",
+            ...     expression_attribute_names={"#pk": "pk"}
+            ... )
         """
         self._acquire_wcu(1.0)
-        self._client.put_item(table, item)
+        self._client.put_item(
+            table,
+            item,
+            condition_expression=condition_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+        )
 
     def get_item(self, table: str, key: dict[str, Any]) -> dict[str, Any] | None:
         """Get an item from a DynamoDB table by its key.

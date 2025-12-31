@@ -5,31 +5,39 @@ repo_url = "https://github.com/leandrodamascena/pydynox"
 repo_name = "leandrodamascena/pydynox"
 
 nav = [
-    "index.md",
-    "getting-started.md",
-    "guides/00-client.md",
-    "guides/01-models.md",
-    "guides/03-crud.md",
-    "guides/04-batch.md",
-    "guides/05-transactions.md",
-    "guides/06-rate-limiting.md",
-    "guides/07-hooks.md",
-    "guides/08-pydantic.md",
-    "guides/09-exceptions.md",
-    "guides/10-tables.md",
-    "guides/11-encryption.md",
-    "guides/12-iam-permissions.md",
-    "guides/13-size-calculator.md",
+    { "Home" = [
+        "index.md",
+        "getting-started.md",
+    ] },
+    { "Core" = [
+        "guides/00-client.md",
+        "guides/01-models.md",
+        "guides/03-crud.md",
+        "guides/14-conditions.md",
+    ] },
+    { "Operations" = [
+        "guides/04-batch.md",
+        "guides/05-transactions.md",
+        "guides/10-tables.md",
+    ] },
+    { "Features" = [
+        "guides/07-hooks.md",
+        "guides/06-rate-limiting.md",
+        "guides/11-encryption.md",
+        "guides/13-size-calculator.md",
+    ] },
+    { "Integrations" = [
+        "guides/08-pydantic.md",
+    ] },
+    { "Troubleshooting" = [
+        "guides/09-exceptions.md",
+        "guides/12-iam-permissions.md",
+    ] },
 ]
 
 [theme]
 name = "material"
-features = [
-    "navigation.sections",
-    "navigation.expand",
-    "content.code.copy",
-    "content.code.annotate",
-]
+features = ["navigation.sections", "content.code.copy", "content.code.annotate"]
 
 [[theme.palette]]
 scheme = "default"

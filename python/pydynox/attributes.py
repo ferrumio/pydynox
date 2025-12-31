@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from pydynox._internal._compression import (
     CompressionAlgorithm,
@@ -11,6 +11,18 @@ from pydynox._internal._compression import (
     decompress_string,
 )
 from pydynox._internal._encryption import EncryptionMode, KmsEncryptor
+
+if TYPE_CHECKING:
+    from pydynox._internal._conditions import (
+        ConditionBeginsWith,
+        ConditionBetween,
+        ConditionComparison,
+        ConditionContains,
+        ConditionExists,
+        ConditionIn,
+        ConditionNotExists,
+        ConditionPath,
+    )
 
 T = TypeVar("T")
 
@@ -75,6 +87,71 @@ class Attribute(Generic[T]):
     def deserialize(self, value: Any) -> T | None:
         """Convert DynamoDB value to Python format."""
         return value  # type: ignore[no-any-return]
+
+    # Condition operators
+    def _get_path(self) -> ConditionPath:
+        """Get ConditionPath for this attribute."""
+        from pydynox._internal._conditions import ConditionPath
+
+        return ConditionPath(attribute=self)
+
+    def __eq__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
+        from pydynox._internal._conditions import ConditionComparison
+
+        return ConditionComparison("=", self._get_path(), other)
+
+    def __ne__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
+        from pydynox._internal._conditions import ConditionComparison
+
+        return ConditionComparison("<>", self._get_path(), other)
+
+    def __lt__(self, other: Any) -> ConditionComparison:
+        from pydynox._internal._conditions import ConditionComparison
+
+        return ConditionComparison("<", self._get_path(), other)
+
+    def __le__(self, other: Any) -> ConditionComparison:
+        from pydynox._internal._conditions import ConditionComparison
+
+        return ConditionComparison("<=", self._get_path(), other)
+
+    def __gt__(self, other: Any) -> ConditionComparison:
+        from pydynox._internal._conditions import ConditionComparison
+
+        return ConditionComparison(">", self._get_path(), other)
+
+    def __ge__(self, other: Any) -> ConditionComparison:
+        from pydynox._internal._conditions import ConditionComparison
+
+        return ConditionComparison(">=", self._get_path(), other)
+
+    def __getitem__(self, key: str | int) -> ConditionPath:
+        """Access nested map key or list index for conditions."""
+        return self._get_path()[key]
+
+    def exists(self) -> ConditionExists:
+        """Check if attribute exists."""
+        return self._get_path().exists()
+
+    def does_not_exist(self) -> ConditionNotExists:
+        """Check if attribute does not exist."""
+        return self._get_path().does_not_exist()
+
+    def begins_with(self, prefix: str) -> ConditionBeginsWith:
+        """Check if string attribute starts with prefix."""
+        return self._get_path().begins_with(prefix)
+
+    def contains(self, value: Any) -> ConditionContains:
+        """Check if list/set contains value or string contains substring."""
+        return self._get_path().contains(value)
+
+    def between(self, lower: Any, upper: Any) -> ConditionBetween:
+        """Check if value is between lower and upper (inclusive)."""
+        return self._get_path().between(lower, upper)
+
+    def is_in(self, *values: Any) -> ConditionIn:
+        """Check if value is in the given list."""
+        return self._get_path().is_in(*values)
 
 
 class StringAttribute(Attribute[str]):

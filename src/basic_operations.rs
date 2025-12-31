@@ -272,26 +272,47 @@ fn attribute_value_to_py(py: Python<'_>, value: AttributeValue) -> PyResult<Py<P
 // ============================================================================
 
 /// Put an item into a DynamoDB table.
+#[allow(clippy::too_many_arguments)]
 pub fn put_item(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     table: &str,
     item: &Bound<'_, PyDict>,
+    condition_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
+    expression_attribute_values: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<()> {
     let dynamo_item = py_dict_to_attribute_values(py, item)?;
 
     let client = client.clone();
     let table_name = table.to_string();
 
-    let result = runtime.block_on(async {
-        client
-            .put_item()
-            .table_name(table_name)
-            .set_item(Some(dynamo_item))
-            .send()
-            .await
-    });
+    let mut request = client
+        .put_item()
+        .table_name(table_name)
+        .set_item(Some(dynamo_item));
+
+    if let Some(condition) = condition_expression {
+        request = request.condition_expression(condition);
+    }
+
+    if let Some(names) = expression_attribute_names {
+        for (k, v) in names.iter() {
+            let placeholder: String = k.extract()?;
+            let attr_name: String = v.extract()?;
+            request = request.expression_attribute_names(placeholder, attr_name);
+        }
+    }
+
+    if let Some(values) = expression_attribute_values {
+        let dynamo_values = py_dict_to_attribute_values(py, values)?;
+        for (placeholder, attr_value) in dynamo_values {
+            request = request.expression_attribute_values(placeholder, attr_value);
+        }
+    }
+
+    let result = runtime.block_on(async { request.send().await });
 
     match result {
         Ok(_) => Ok(()),
