@@ -608,3 +608,196 @@ class Model(metaclass=ModelMeta):
         table = self._get_table()
         key = self._get_key()
         client.update_item(table, key, updates={ttl_attr: new_expiration})
+
+    # ========== ASYNC METHODS ==========
+
+    @classmethod
+    async def async_get(cls: type[M], **keys: Any) -> M | None:
+        """Async version of get.
+
+        Args:
+            **keys: The key attributes (hash_key and optional range_key).
+
+        Returns:
+            The model instance if found, None otherwise.
+
+        Example:
+            >>> user = await User.async_get(pk="USER#123", sk="PROFILE")
+        """
+        client = cls._get_client()
+        table = cls._get_table()
+
+        item = await client.async_get_item(table, keys)
+        if item is None:
+            return None
+
+        instance = cls.from_dict(item)
+        skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+        if not skip:
+            instance._run_hooks(HookType.AFTER_LOAD)
+        return instance
+
+    async def async_save(
+        self, condition: Condition | None = None, skip_hooks: bool | None = None
+    ) -> None:
+        """Async version of save.
+
+        Args:
+            condition: Optional condition that must be true for the write.
+            skip_hooks: Skip hooks for this operation.
+
+        Example:
+            >>> user = User(pk="USER#123", sk="PROFILE", name="John")
+            >>> await user.async_save()
+        """
+        skip = self._should_skip_hooks(skip_hooks)
+
+        if not skip:
+            self._run_hooks(HookType.BEFORE_SAVE)
+
+        # Check size if max_size is set
+        max_size = (
+            getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
+        )
+        if max_size is not None:
+            size = self.calculate_size()
+            if size.bytes > max_size:
+                raise ItemTooLargeError(
+                    size=size.bytes,
+                    max_size=max_size,
+                    item_key=self._get_key(),
+                )
+
+        client = self._get_client()
+        table = self._get_table()
+        item = self.to_dict()
+
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            expr = condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            await client.async_put_item(
+                table,
+                item,
+                condition_expression=expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=values,
+            )
+        else:
+            await client.async_put_item(table, item)
+
+        if not skip:
+            self._run_hooks(HookType.AFTER_SAVE)
+
+    async def async_delete(
+        self, condition: Condition | None = None, skip_hooks: bool | None = None
+    ) -> None:
+        """Async version of delete.
+
+        Args:
+            condition: Optional condition that must be true for the delete.
+            skip_hooks: Skip hooks for this operation.
+
+        Example:
+            >>> user = await User.async_get(pk="USER#123", sk="PROFILE")
+            >>> await user.async_delete()
+        """
+        skip = self._should_skip_hooks(skip_hooks)
+
+        if not skip:
+            self._run_hooks(HookType.BEFORE_DELETE)
+
+        client = self._get_client()
+        table = self._get_table()
+        key = self._get_key()
+
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            expr = condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            await client.async_delete_item(
+                table,
+                key,
+                condition_expression=expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=values,
+            )
+        else:
+            await client.async_delete_item(table, key)
+
+        if not skip:
+            self._run_hooks(HookType.AFTER_DELETE)
+
+    async def async_update(
+        self,
+        atomic: list[AtomicOp] | None = None,
+        condition: Condition | None = None,
+        skip_hooks: bool | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Async version of update.
+
+        Args:
+            atomic: List of atomic operations.
+            condition: Optional condition that must be true.
+            skip_hooks: Skip hooks for this operation.
+            **kwargs: Attribute values to update.
+
+        Example:
+            >>> user = await User.async_get(pk="USER#123", sk="PROFILE")
+            >>> await user.async_update(name="Jane", age=31)
+        """
+        skip = self._should_skip_hooks(skip_hooks)
+
+        if not skip:
+            self._run_hooks(HookType.BEFORE_UPDATE)
+
+        client = self._get_client()
+        table = self._get_table()
+        key = self._get_key()
+
+        if atomic:
+            update_expr, names, values = serialize_atomic(atomic)
+            attr_names = {v: k for k, v in names.items()}
+
+            cond_expr = None
+            if condition is not None:
+                cond_names: dict[str, str] = dict(names)
+                cond_expr = condition.serialize(cond_names, values)
+                cond_attr_names = {v: k for k, v in cond_names.items()}
+                attr_names = {**attr_names, **cond_attr_names}
+
+            await client.async_update_item(
+                table,
+                key,
+                update_expression=update_expr,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names if attr_names else None,
+                expression_attribute_values=values if values else None,
+            )
+        elif kwargs:
+            for attr_name, value in kwargs.items():
+                if attr_name not in self._attributes:
+                    raise ValueError(f"Unknown attribute: {attr_name}")
+                setattr(self, attr_name, value)
+
+            if condition is not None:
+                kwargs_cond_names: dict[str, str] = {}
+                kwargs_cond_values: dict[str, Any] = {}
+                cond_expr = condition.serialize(kwargs_cond_names, kwargs_cond_values)
+                attr_names = {v: k for k, v in kwargs_cond_names.items()}
+                await client.async_update_item(
+                    table,
+                    key,
+                    updates=kwargs,
+                    condition_expression=cond_expr,
+                    expression_attribute_names=attr_names,
+                    expression_attribute_values=kwargs_cond_values,
+                )
+            else:
+                await client.async_update_item(table, key, updates=kwargs)
+
+        if not skip:
+            self._run_hooks(HookType.AFTER_UPDATE)

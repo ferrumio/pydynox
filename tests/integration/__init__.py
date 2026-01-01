@@ -1,1 +1,1 @@
-# Integration tests with moto/localstack
+# Integration tests with DynamoDB Local

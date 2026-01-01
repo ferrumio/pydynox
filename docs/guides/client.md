@@ -129,20 +129,22 @@ print(f"Using region: {region}")
 
 ### Low-level operations
 
-The client also has methods for direct DynamoDB operations:
+The client has methods for direct DynamoDB operations. Each sync method has an async version with `async_` prefix:
 
-| Method | Description |
-|--------|-------------|
-| `put_item(table, item)` | Save an item |
-| `get_item(table, key)` | Get an item by key |
-| `delete_item(table, key)` | Delete an item |
-| `update_item(table, key, updates)` | Update an item |
-| `query(table, key_condition, ...)` | Query items |
-| `batch_write(table, put_items, delete_keys)` | Batch write |
-| `batch_get(table, keys)` | Batch get |
-| `transact_write(operations)` | Transaction |
+| Sync | Async | Description |
+|------|-------|-------------|
+| `put_item(table, item)` | `async_put_item(table, item)` | Save an item |
+| `get_item(table, key)` | `async_get_item(table, key)` | Get an item by key |
+| `delete_item(table, key)` | `async_delete_item(table, key)` | Delete an item |
+| `update_item(table, key, updates)` | `async_update_item(table, key, updates)` | Update an item |
+| `query(table, key_condition, ...)` | `async_query(table, key_condition, ...)` | Query items |
+| `batch_write(table, put_items, delete_keys)` | - | Batch write |
+| `batch_get(table, keys)` | - | Batch get |
+| `transact_write(operations)` | - | Transaction |
 
 All operations return metrics (duration, RCU/WCU consumed). See [observability](observability.md) for details.
+
+See [async support](async.md) for more details on async operations.
 
 Most of the time you'll use the Model ORM instead of these methods directly.
 

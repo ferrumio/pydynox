@@ -31,13 +31,13 @@ pub struct GsiDefinition {
 
 /// Parse GSI definitions from Python list.
 pub fn parse_gsi_definitions(
-    py: Python<'_>,
+    _py: Python<'_>,
     gsis: &Bound<'_, PyList>,
 ) -> PyResult<Vec<GsiDefinition>> {
     let mut result = Vec::new();
 
     for item in gsis.iter() {
-        let dict = item.downcast::<pyo3::types::PyDict>()?;
+        let dict = item.cast::<pyo3::types::PyDict>()?;
 
         let index_name: String = dict
             .get_item("index_name")?
@@ -333,16 +333,14 @@ pub fn table_exists(client: &Client, runtime: &Arc<Runtime>, table_name: &str) -
         match client.describe_table().table_name(&table_name).send().await {
             Ok(_) => Ok(true),
             Err(e) => {
-                let service_error = e.into_service_error();
-                if service_error.is_resource_not_found_exception() {
-                    Ok(false)
-                } else {
-                    // Re-wrap as SdkError for map_sdk_error
-                    Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                        "Failed to check table '{}': {}",
-                        table_name, service_error
-                    )))
+                // Check if it's a service error (ResourceNotFoundException)
+                if let Some(service_error) = e.as_service_error() {
+                    if service_error.is_resource_not_found_exception() {
+                        return Ok(false);
+                    }
                 }
+                // For any other error, use map_sdk_error
+                Err(map_sdk_error(e, Some(&table_name)))
             }
         }
     })
@@ -414,12 +412,13 @@ pub fn wait_for_table_active(
                     }
                 }
                 Err(e) => {
-                    let service_error = e.into_service_error();
-                    if !service_error.is_resource_not_found_exception() {
-                        return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                            "Failed to describe table '{}': {}",
-                            table_name, service_error
-                        )));
+                    // Check if it's ResourceNotFoundException (table still being created)
+                    if let Some(service_error) = e.as_service_error() {
+                        if !service_error.is_resource_not_found_exception() {
+                            return Err(map_sdk_error(e, Some(&table_name)));
+                        }
+                    } else {
+                        return Err(map_sdk_error(e, Some(&table_name)));
                     }
                 }
             }

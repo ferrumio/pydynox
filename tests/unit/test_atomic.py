@@ -1,6 +1,5 @@
 """Unit tests for atomic update operations."""
 
-
 from pydynox import Model, ModelConfig
 from pydynox._internal._atomic import serialize_atomic
 from pydynox.attributes import ListAttribute, NumberAttribute, StringAttribute

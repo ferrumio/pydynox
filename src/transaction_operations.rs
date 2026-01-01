@@ -10,7 +10,7 @@ use pyo3::types::{PyDict, PyList};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use crate::basic_operations::py_dict_to_attribute_values;
+use crate::conversions::py_dict_to_attribute_values;
 use crate::errors::map_sdk_error;
 
 /// Maximum items per transaction (DynamoDB limit).

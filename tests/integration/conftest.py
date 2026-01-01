@@ -1,110 +1,97 @@
-"""Shared fixtures for integration tests."""
+"""Shared fixtures for integration tests.
 
-import os
-import signal
-import socket
-import subprocess
+Uses DynamoDB Local (amazon/dynamodb-local) via testcontainers.
+Docker must be running to execute integration tests.
+"""
+
 import time
 
-import boto3
 import pytest
 from pydynox import DynamoDBClient
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
 
-MOTO_PORT = 5556
-MOTO_ENDPOINT = f"http://127.0.0.1:{MOTO_PORT}"
-
-
-def _is_port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(("127.0.0.1", port)) == 0
+DYNAMODB_PORT = 8000
 
 
 @pytest.fixture(scope="session")
-def moto_server():
-    """Start moto server for the test session."""
-    import sys
+def dynamodb_container():
+    """Start DynamoDB Local container for the test session."""
+    print("\n🐳 Starting DynamoDB Local container...")
 
-    if os.name == "nt":
-        # Windows: use CREATE_NEW_PROCESS_GROUP for proper cleanup
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "moto.server", "-p", str(MOTO_PORT)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-        )
-    else:
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "moto.server", "-p", str(MOTO_PORT)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            preexec_fn=os.setsid,
-        )
+    container = DockerContainer("amazon/dynamodb-local:latest")
+    container.with_exposed_ports(DYNAMODB_PORT)
+    container.with_command("-jar DynamoDBLocal.jar -inMemory -sharedDb")
 
-    max_wait = 10
-    waited = 0
-    while not _is_port_in_use(MOTO_PORT) and waited < max_wait:
-        time.sleep(0.5)
-        waited += 0.5
+    container.start()
 
-    if not _is_port_in_use(MOTO_PORT):
-        proc.terminate()
-        pytest.fail("Moto server failed to start")
+    # Wait for DynamoDB to be ready
+    wait_for_logs(container, "Initializing DynamoDB Local", timeout=30)
 
-    yield proc
+    # Give it a moment to fully initialize
+    time.sleep(0.5)
 
-    if os.name == "nt":
-        # Windows: kill the process tree
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-            capture_output=True,
-        )
-    else:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-    proc.wait(timeout=5)
+    host = container.get_container_host_ip()
+    port = container.get_exposed_port(DYNAMODB_PORT)
+    print(f"✅ DynamoDB Local ready at http://{host}:{port}")
+
+    yield container
+
+    print("\n🛑 Stopping DynamoDB Local container...")
+    container.stop()
 
 
-@pytest.fixture
-def boto_client(moto_server):
-    """Create a boto3 DynamoDB client."""
-    return boto3.client(
-        "dynamodb",
-        region_name="us-east-1",
-        endpoint_url=MOTO_ENDPOINT,
-        aws_access_key_id="testing",
-        aws_secret_access_key="testing",
+@pytest.fixture(scope="session")
+def dynamodb_endpoint(dynamodb_container):
+    """Get the DynamoDB Local endpoint URL."""
+    host = dynamodb_container.get_container_host_ip()
+    port = dynamodb_container.get_exposed_port(DYNAMODB_PORT)
+    return f"http://{host}:{port}"
+
+
+@pytest.fixture(scope="session")
+def _session_client(dynamodb_endpoint):
+    """Internal client for session-scoped table creation."""
+    return DynamoDBClient(
+        region="us-east-1",
+        endpoint_url=dynamodb_endpoint,
+        access_key="testing",
+        secret_key="testing",
     )
 
 
-@pytest.fixture
-def table(boto_client):
-    """Create a DynamoDB table for testing."""
-    try:
-        boto_client.delete_table(TableName="test_table")
-        time.sleep(0.1)
-    except boto_client.exceptions.ResourceNotFoundException:
-        pass
+@pytest.fixture(scope="session")
+def _create_table(_session_client):
+    """Create the test table once per session."""
+    table_name = "test_table"
 
-    boto_client.create_table(
-        TableName="test_table",
-        KeySchema=[
-            {"AttributeName": "pk", "KeyType": "HASH"},
-            {"AttributeName": "sk", "KeyType": "RANGE"},
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "pk", "AttributeType": "S"},
-            {"AttributeName": "sk", "AttributeType": "S"},
-        ],
-        BillingMode="PAY_PER_REQUEST",
+    if not _session_client.table_exists(table_name):
+        _session_client.create_table(
+            table_name,
+            hash_key=("pk", "S"),
+            range_key=("sk", "S"),
+            wait=True,
+        )
+
+    return _session_client
+
+
+@pytest.fixture
+def table(_create_table, dynamodb_endpoint):
+    """Provide a client with the test table ready.
+
+    Note: Tests should use unique keys to avoid conflicts.
+    Use uuid or test-specific prefixes in pk/sk values.
+    """
+    return DynamoDBClient(
+        region="us-east-1",
+        endpoint_url=dynamodb_endpoint,
+        access_key="testing",
+        secret_key="testing",
     )
-    return boto_client
 
 
 @pytest.fixture
 def dynamo(table):
-    """Create a pydynox DynamoDBClient."""
-    return DynamoDBClient(
-        region="us-east-1",
-        endpoint_url=MOTO_ENDPOINT,
-        access_key="testing",
-        secret_key="testing",
-    )
+    """Alias for table fixture - provides a pydynox DynamoDBClient."""
+    return table

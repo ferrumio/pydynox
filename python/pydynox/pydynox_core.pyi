@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Coroutine
 from typing import Any
 
 # Metrics
@@ -104,6 +105,51 @@ class DynamoDBClient:
         table_name: str,
         timeout_seconds: int | None = None,
     ) -> None: ...
+
+    # Async methods
+    def async_get_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    def async_put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> Coroutine[Any, Any, OperationMetrics]: ...
+    def async_delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> Coroutine[Any, Any, OperationMetrics]: ...
+    def async_update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> Coroutine[Any, Any, OperationMetrics]: ...
+    def async_query_page(
+        self,
+        table: str,
+        key_condition_expression: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+        scan_index_forward: bool | None = None,
+        index_name: str | None = None,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
 
 # Rate limiting
 class FixedRate:

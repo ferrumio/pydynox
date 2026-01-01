@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydynox._internal._logging import _log_operation, _log_warning
 from pydynox._internal._metrics import DictWithMetrics, OperationMetrics
-from pydynox.query import QueryResult
+from pydynox.query import AsyncQueryResult, QueryResult
 
 if TYPE_CHECKING:
     from pydynox.rate_limit import AdaptiveRate, FixedRate
@@ -580,3 +580,194 @@ class DynamoDBClient:
             >>> client.wait_for_table_active("users", timeout_seconds=30)
         """
         self._client.wait_for_table_active(table_name, timeout_seconds=timeout_seconds)
+
+    # ========== ASYNC METHODS ==========
+
+    async def async_get_item(self, table: str, key: dict[str, Any]) -> DictWithMetrics | None:
+        """Async version of get_item.
+
+        Args:
+            table: The name of the DynamoDB table.
+            key: A dict with the key attributes.
+
+        Returns:
+            The item as a DictWithMetrics if found, None if not found.
+
+        Example:
+            >>> item = await client.async_get_item("users", {"pk": "USER#123"})
+            >>> if item:
+            ...     print(item["name"])
+        """
+        self._acquire_rcu(1.0)
+        result = await self._client.async_get_item(table, key)
+        metrics = result["metrics"]
+        _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("get_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        if result["item"] is None:
+            return None
+        return DictWithMetrics(result["item"], metrics)
+
+    async def async_put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> OperationMetrics:
+        """Async version of put_item.
+
+        Args:
+            table: The name of the DynamoDB table.
+            item: A dict representing the item to save.
+            condition_expression: Optional condition expression.
+            expression_attribute_names: Optional name placeholders.
+            expression_attribute_values: Optional value placeholders.
+
+        Returns:
+            OperationMetrics with timing and capacity info.
+
+        Example:
+            >>> metrics = await client.async_put_item("users", {"pk": "USER#123", "name": "John"})
+        """
+        self._acquire_wcu(1.0)
+        metrics = await self._client.async_put_item(
+            table,
+            item,
+            condition_expression=condition_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+        )
+        _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        return metrics
+
+    async def async_delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> OperationMetrics:
+        """Async version of delete_item.
+
+        Args:
+            table: The name of the DynamoDB table.
+            key: A dict with the key attributes.
+            condition_expression: Optional condition expression.
+            expression_attribute_names: Optional name placeholders.
+            expression_attribute_values: Optional value placeholders.
+
+        Returns:
+            OperationMetrics with timing and capacity info.
+
+        Example:
+            >>> metrics = await client.async_delete_item("users", {"pk": "USER#123"})
+        """
+        self._acquire_wcu(1.0)
+        metrics = await self._client.async_delete_item(
+            table,
+            key,
+            condition_expression=condition_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+        )
+        _log_operation("delete_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("delete_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        return metrics
+
+    async def async_update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> OperationMetrics:
+        """Async version of update_item.
+
+        Args:
+            table: The name of the DynamoDB table.
+            key: A dict with the key attributes.
+            updates: Optional dict of field:value pairs for simple SET updates.
+            update_expression: Optional full update expression string.
+            condition_expression: Optional condition expression.
+            expression_attribute_names: Optional name placeholders.
+            expression_attribute_values: Optional value placeholders.
+
+        Returns:
+            OperationMetrics with timing and capacity info.
+
+        Example:
+            >>> metrics = await client.async_update_item(
+            ...     "users", {"pk": "USER#123"}, updates={"name": "John"}
+            ... )
+        """
+        self._acquire_wcu(1.0)
+        metrics = await self._client.async_update_item(
+            table,
+            key,
+            updates=updates,
+            update_expression=update_expression,
+            condition_expression=condition_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+        )
+        _log_operation("update_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("update_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        return metrics
+
+    def async_query(
+        self,
+        table: str,
+        key_condition_expression: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool | None = None,
+        index_name: str | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+    ) -> "AsyncQueryResult":
+        """Async query items from a DynamoDB table.
+
+        Returns an async iterable result with automatic pagination.
+
+        Args:
+            table: The name of the DynamoDB table.
+            key_condition_expression: Key condition (e.g., "pk = :pk").
+            filter_expression: Optional filter for non-key attributes.
+            expression_attribute_names: Name placeholders.
+            expression_attribute_values: Value placeholders.
+            limit: Optional max items per page.
+            scan_index_forward: Sort order (True = ascending).
+            index_name: Optional GSI or LSI name.
+            last_evaluated_key: Start key for pagination.
+
+        Returns:
+            An AsyncQueryResult that can be async iterated.
+
+        Example:
+            >>> async for item in client.async_query("users", ...):
+            ...     print(item["name"])
+        """
+        return AsyncQueryResult(
+            self._client,
+            table,
+            key_condition_expression,
+            filter_expression=filter_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+            limit=limit,
+            scan_index_forward=scan_index_forward,
+            index_name=index_name,
+            last_evaluated_key=last_evaluated_key,
+            acquire_rcu=self._acquire_rcu,
+        )

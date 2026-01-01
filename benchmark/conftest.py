@@ -1,9 +1,8 @@
-"""Shared fixtures for benchmarks."""
+"""Shared fixtures for benchmarks.
 
-import os
-import signal
-import socket
-import subprocess
+Uses DynamoDB Local (amazon/dynamodb-local) via testcontainers.
+"""
+
 import time
 
 import boto3
@@ -11,115 +10,117 @@ import pytest
 from pydynox import DynamoDBClient
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute
 from pynamodb.models import Model
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
 
-MOTO_PORT = 5557
-MOTO_ENDPOINT = f"http://127.0.0.1:{MOTO_PORT}"
-
-
-def _is_port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(("127.0.0.1", port)) == 0
+DYNAMODB_PORT = 8000
 
 
 @pytest.fixture(scope="session")
-def moto_server():
-    """Start moto server for benchmarks."""
-    proc = subprocess.Popen(
-        ["uv", "run", "moto_server", "-p", str(MOTO_PORT)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        preexec_fn=os.setsid,
-    )
+def dynamodb_container():
+    """Start DynamoDB Local container for benchmarks."""
+    print("\n🐳 Starting DynamoDB Local container...")
 
-    max_wait = 10
-    waited = 0
-    while not _is_port_in_use(MOTO_PORT) and waited < max_wait:
-        time.sleep(0.5)
-        waited += 0.5
+    container = DockerContainer("amazon/dynamodb-local:latest")
+    container.with_exposed_ports(DYNAMODB_PORT)
+    container.with_command("-jar DynamoDBLocal.jar -inMemory -sharedDb")
 
-    if not _is_port_in_use(MOTO_PORT):
-        proc.terminate()
-        pytest.fail("Moto server failed to start")
-
-    yield proc
-
-    try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        proc.wait()
-    except (ProcessLookupError, OSError):
-        pass  # Process already terminated
-
-
-@pytest.fixture(scope="session")
-def boto_client(moto_server):
-    """Create a boto3 DynamoDB client."""
-    return boto3.client(
-        "dynamodb",
-        region_name="us-east-1",
-        endpoint_url=MOTO_ENDPOINT,
-        aws_access_key_id="testing",
-        aws_secret_access_key="testing",
-    )
-
-
-@pytest.fixture(scope="session")
-def bench_table(boto_client):
-    """Create a DynamoDB table for benchmarks."""
-    try:
-        boto_client.delete_table(TableName="bench_table")
-        time.sleep(0.5)
-    except boto_client.exceptions.ResourceNotFoundException:
-        pass
-
-    boto_client.create_table(
-        TableName="bench_table",
-        KeySchema=[
-            {"AttributeName": "pk", "KeyType": "HASH"},
-            {"AttributeName": "sk", "KeyType": "RANGE"},
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "pk", "AttributeType": "S"},
-            {"AttributeName": "sk", "AttributeType": "S"},
-        ],
-        BillingMode="PAY_PER_REQUEST",
-    )
+    container.start()
+    wait_for_logs(container, "Initializing DynamoDB Local", timeout=30)
     time.sleep(0.5)
-    return boto_client
+
+    host = container.get_container_host_ip()
+    port = container.get_exposed_port(DYNAMODB_PORT)
+    print(f"✅ DynamoDB Local ready at http://{host}:{port}")
+
+    yield container
+
+    print("\n🛑 Stopping DynamoDB Local container...")
+    container.stop()
 
 
 @pytest.fixture(scope="session")
-def pydynox_client(bench_table):
+def dynamodb_endpoint(dynamodb_container):
+    """Get the DynamoDB Local endpoint URL."""
+    host = dynamodb_container.get_container_host_ip()
+    port = dynamodb_container.get_exposed_port(DYNAMODB_PORT)
+    return f"http://{host}:{port}"
+
+
+@pytest.fixture(scope="session")
+def bench_table(dynamodb_endpoint):
+    """Create a DynamoDB table for benchmarks."""
+    client = DynamoDBClient(
+        region="us-east-1",
+        endpoint_url=dynamodb_endpoint,
+        access_key="testing",
+        secret_key="testing",
+    )
+
+    table_name = "bench_table"
+
+    # Delete if exists
+    if client.table_exists(table_name):
+        client.delete_table(table_name)
+        time.sleep(0.5)
+
+    # Create table and wait for it to be active
+    client.create_table(
+        table_name,
+        hash_key=("pk", "S"),
+        range_key=("sk", "S"),
+        wait=True,
+    )
+
+    return client
+
+
+@pytest.fixture(scope="session")
+def pydynox_client(bench_table, dynamodb_endpoint):
     """Create a pydynox DynamoDBClient."""
     return DynamoDBClient(
         region="us-east-1",
-        endpoint_url=MOTO_ENDPOINT,
+        endpoint_url=dynamodb_endpoint,
         access_key="testing",
         secret_key="testing",
     )
 
 
-class BenchModel(Model):
-    """PynamoDB model for benchmarks."""
-
-    class Meta:
-        table_name = "bench_table"
-        region = "us-east-1"
-        host = MOTO_ENDPOINT
-        aws_access_key_id = "testing"
-        aws_secret_access_key = "testing"
-
-    pk = UnicodeAttribute(hash_key=True)
-    sk = UnicodeAttribute(range_key=True)
-    name = UnicodeAttribute(null=True)
-    age = NumberAttribute(null=True)
-    email = UnicodeAttribute(null=True)
-    status = UnicodeAttribute(null=True)
-
-
 @pytest.fixture(scope="session")
-def pynamodb_model(bench_table):
-    """Return the PynamoDB model class."""
+def pynamodb_model(bench_table, dynamodb_endpoint):
+    """Return the PynamoDB model class configured for the test endpoint."""
+
+    class BenchModel(Model):
+        """PynamoDB model for benchmarks."""
+
+        class Meta:
+            table_name = "bench_table"
+            region = "us-east-1"
+            host = dynamodb_endpoint
+            aws_access_key_id = "testing"
+            aws_secret_access_key = "testing"
+
+        pk = UnicodeAttribute(hash_key=True)
+        sk = UnicodeAttribute(range_key=True)
+        name = UnicodeAttribute(null=True)
+        age = NumberAttribute(null=True)
+        email = UnicodeAttribute(null=True)
+        status = UnicodeAttribute(null=True)
+
     # Force PynamoDB to describe the table and cache metadata
     if not BenchModel.exists():
         raise RuntimeError("Table should exist")
+
     return BenchModel
+
+
+@pytest.fixture(scope="session")
+def boto_client(dynamodb_endpoint):
+    """Create a boto3 DynamoDB client for comparison benchmarks."""
+    return boto3.client(
+        "dynamodb",
+        region_name="us-east-1",
+        endpoint_url=dynamodb_endpoint,
+        aws_access_key_id="testing",
+        aws_secret_access_key="testing",
+    )

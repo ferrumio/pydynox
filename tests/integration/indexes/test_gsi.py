@@ -4,15 +4,13 @@ import pytest
 from pydynox import DynamoDBClient, GlobalSecondaryIndex, Model, ModelConfig, set_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 
-from ..conftest import MOTO_ENDPOINT
-
 
 @pytest.fixture
-def gsi_client(moto_server):
+def gsi_client(dynamodb_endpoint):
     """Create a pydynox client and table with GSIs for testing."""
     client = DynamoDBClient(
         region="us-east-1",
-        endpoint_url=MOTO_ENDPOINT,
+        endpoint_url=dynamodb_endpoint,
         access_key="testing",
         secret_key="testing",
     )

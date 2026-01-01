@@ -714,6 +714,173 @@ impl DynamoDBClient {
             timeout_seconds,
         )
     }
+
+    // ========== ASYNC METHODS ==========
+
+    /// Async version of get_item. Returns a Python awaitable.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// async def main():
+    ///     client = DynamoDBClient()
+    ///     result = await client.async_get_item("users", {"pk": "USER#123"})
+    ///     if result["item"]:
+    ///         print(result["item"]["name"])
+    /// ```
+    pub fn async_get_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key: &Bound<'_, PyDict>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_get_item(py, self.client.clone(), table.to_string(), key)
+    }
+
+    /// Async version of put_item. Returns a Python awaitable.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// async def main():
+    ///     client = DynamoDBClient()
+    ///     metrics = await client.async_put_item("users", {"pk": "USER#123", "name": "John"})
+    /// ```
+    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    pub fn async_put_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        item: &Bound<'_, PyDict>,
+        condition_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_put_item(
+            py,
+            self.client.clone(),
+            table,
+            item,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+    }
+
+    /// Async version of delete_item. Returns a Python awaitable.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// async def main():
+    ///     client = DynamoDBClient()
+    ///     metrics = await client.async_delete_item("users", {"pk": "USER#123"})
+    /// ```
+    #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    pub fn async_delete_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key: &Bound<'_, PyDict>,
+        condition_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_delete_item(
+            py,
+            self.client.clone(),
+            table,
+            key,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+    }
+
+    /// Async version of update_item. Returns a Python awaitable.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// async def main():
+    ///     client = DynamoDBClient()
+    ///     metrics = await client.async_update_item(
+    ///         "users",
+    ///         {"pk": "USER#123"},
+    ///         updates={"name": "John", "age": 31}
+    ///     )
+    /// ```
+    #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn async_update_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key: &Bound<'_, PyDict>,
+        updates: Option<&Bound<'_, PyDict>>,
+        update_expression: Option<String>,
+        condition_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_update_item(
+            py,
+            self.client.clone(),
+            table,
+            key,
+            updates,
+            update_expression,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+    }
+
+    /// Async version of query_page. Returns a Python awaitable.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// async def main():
+    ///     client = DynamoDBClient()
+    ///     result = await client.async_query_page(
+    ///         "users",
+    ///         "#pk = :pk",
+    ///         expression_attribute_names={"#pk": "pk"},
+    ///         expression_attribute_values={":pk": "USER#123"}
+    ///     )
+    ///     for item in result["items"]:
+    ///         print(item)
+    /// ```
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn async_query_page<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key_condition_expression: &str,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        limit: Option<i32>,
+        exclusive_start_key: Option<&Bound<'_, PyDict>>,
+        scan_index_forward: Option<bool>,
+        index_name: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_query(
+            py,
+            self.client.clone(),
+            table,
+            key_condition_expression,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            exclusive_start_key,
+            scan_index_forward,
+            index_name,
+        )
+    }
 }
 
 /// Build the AWS SDK DynamoDB client with the given configuration.

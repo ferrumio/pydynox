@@ -10,11 +10,11 @@ from pydynox.exceptions import (
 
 
 @pytest.fixture
-def client(moto_server):
+def client(dynamodb_endpoint):
     """Create a pydynox client without pre-created table."""
     return DynamoDBClient(
         region="us-east-1",
-        endpoint_url="http://127.0.0.1:5556",
+        endpoint_url=dynamodb_endpoint,
         access_key="testing",
         secret_key="testing",
     )

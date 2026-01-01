@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use crate::basic_operations::{attribute_values_to_py_dict, py_dict_to_attribute_values};
+use crate::conversions::{attribute_values_to_py_dict, py_dict_to_attribute_values};
 use crate::errors::map_sdk_error;
 
 /// Maximum items per batch write request (DynamoDB limit).

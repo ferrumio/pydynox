@@ -62,43 +62,33 @@ jobs:
           args: --release --out dist
           sccache: true
 
-      - name: Install wheel and dependencies (Unix)
-        if: runner.os != 'Windows'
+      - name: Install wheel and dependencies
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio hypothesis "moto[dynamodb,server]" boto3 pydantic mypy
+          pip install pytest pytest-asyncio hypothesis pydantic mypy
 
-      - name: Install wheel and dependencies (Windows)
-        if: runner.os == 'Windows'
+      - name: Install integration test dependencies
+        if: runner.os == 'Linux'
         run: |
-          .venv\Scripts\activate
-          pip install (Get-ChildItem dist\*.whl)
-          pip install pytest pytest-asyncio hypothesis "moto[dynamodb,server]" boto3 pydantic mypy
+          source .venv/bin/activate
+          pip install testcontainers boto3
 
-      - name: Mypy (Unix)
-        if: runner.os != 'Windows'
+      - name: Mypy
         run: |
           source .venv/bin/activate
           mypy python/pydynox/
 
-      - name: Mypy (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          .venv\Scripts\activate
-          mypy python/pydynox/
-
-      - name: Run tests (Unix)
-        if: runner.os != 'Windows'
+      - name: Run unit tests
         run: |
           source .venv/bin/activate
-          pytest tests/ -v --ignore=tests/benchmark
+          pytest tests/unit/ -v
 
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
+      - name: Run integration tests
+        if: runner.os == 'Linux'
         run: |
-          .venv\Scripts\activate
-          pytest tests/ -v --ignore=tests/benchmark
+          source .venv/bin/activate
+          pytest tests/integration/ -v
 
   coverage:
     name: Coverage
@@ -125,7 +115,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio pytest-cov hypothesis "moto[dynamodb,server]" boto3 pydantic
+          pip install pytest pytest-asyncio pytest-cov hypothesis testcontainers boto3 pydantic
 
       - name: Run tests with coverage
         run: |

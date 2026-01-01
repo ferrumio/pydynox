@@ -15,6 +15,7 @@ mod basic_operations;
 mod batch_operations;
 mod client;
 mod compression;
+mod conversions;
 mod encryption;
 mod errors;
 mod metrics;

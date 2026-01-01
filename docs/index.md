@@ -74,6 +74,7 @@ Now that you have the basics, explore these guides:
 
 | Guide | Description |
 |-------|-------------|
+| [Async support](guides/async.md) | Async/await for high-concurrency apps |
 | [Batch operations](guides/batch.md) | Work with multiple items at once |
 | [Transactions](guides/transactions.md) | All-or-nothing operations |
 | [Tables](guides/tables.md) | Create and manage tables |
