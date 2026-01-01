@@ -40,15 +40,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-15-intel]
+        os: [ubuntu-latest, macos-latest]
         python: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Docker (macOS)
-        if: runner.os == 'macOS'
-        uses: douglascamata/setup-docker-macos-action@v1-alpha
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,17 +66,29 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio hypothesis testcontainers boto3 pydantic mypy
+          pip install pytest pytest-asyncio hypothesis pydantic mypy
+
+      - name: Install integration test dependencies
+        if: runner.os == 'Linux'
+        run: |
+          source .venv/bin/activate
+          pip install testcontainers boto3
 
       - name: Mypy
         run: |
           source .venv/bin/activate
           mypy python/pydynox/
 
-      - name: Run all tests
+      - name: Run unit tests
         run: |
           source .venv/bin/activate
-          pytest tests/ -v --ignore=tests/benchmark
+          pytest tests/unit/ -v
+
+      - name: Run integration tests
+        if: runner.os == 'Linux'
+        run: |
+          source .venv/bin/activate
+          pytest tests/integration/ -v
 
   coverage:
     name: Coverage
