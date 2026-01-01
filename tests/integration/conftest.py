@@ -7,10 +7,9 @@ Docker must be running to execute integration tests.
 import time
 
 import pytest
+from pydynox import DynamoDBClient
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
-
-from pydynox import DynamoDBClient
 
 DYNAMODB_PORT = 8000
 
