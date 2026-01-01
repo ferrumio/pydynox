@@ -144,6 +144,17 @@ The client has methods for direct DynamoDB operations. Each sync method has an a
 
 All operations return metrics (duration, RCU/WCU consumed). See [observability](observability.md) for details.
 
+### Consistent reads
+
+`get_item` and `query` support strongly consistent reads:
+
+=== "consistent_read.py"
+    ```python
+    --8<-- "docs/examples/client/consistent_read.py"
+    ```
+
+By default, reads are eventually consistent. Pass `consistent_read=True` when you need the latest data.
+
 See [async support](async.md) for more details on async operations.
 
 Most of the time you'll use the Model ORM instead of these methods directly.

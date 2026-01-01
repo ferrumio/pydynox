@@ -38,6 +38,7 @@ pub struct PreparedQuery {
     pub exclusive_start_key: Option<HashMap<String, AttributeValue>>,
     pub scan_index_forward: Option<bool>,
     pub index_name: Option<String>,
+    pub consistent_read: bool,
 }
 
 /// Prepare query by converting Python data to Rust.
@@ -53,6 +54,7 @@ pub fn prepare_query(
     exclusive_start_key: Option<&Bound<'_, PyDict>>,
     scan_index_forward: Option<bool>,
     index_name: Option<String>,
+    consistent_read: bool,
 ) -> PyResult<PreparedQuery> {
     let names = match expression_attribute_names {
         Some(dict) => {
@@ -85,6 +87,7 @@ pub fn prepare_query(
         exclusive_start_key: start_key,
         scan_index_forward,
         index_name,
+        consistent_read,
     })
 }
 
@@ -135,6 +138,10 @@ pub async fn execute_query(
 
     if let Some(idx) = prepared.index_name {
         request = request.index_name(idx);
+    }
+
+    if prepared.consistent_read {
+        request = request.consistent_read(true);
     }
 
     let start = Instant::now();
@@ -201,6 +208,7 @@ pub fn query(
     exclusive_start_key: Option<&Bound<'_, PyDict>>,
     scan_index_forward: Option<bool>,
     index_name: Option<String>,
+    consistent_read: bool,
 ) -> PyResult<QueryResult> {
     let prepared = prepare_query(
         py,
@@ -213,6 +221,7 @@ pub fn query(
         exclusive_start_key,
         scan_index_forward,
         index_name,
+        consistent_read,
     )?;
 
     let result = runtime.block_on(execute_query(client.clone(), prepared));
@@ -237,6 +246,7 @@ pub fn async_query<'py>(
     exclusive_start_key: Option<&Bound<'_, PyDict>>,
     scan_index_forward: Option<bool>,
     index_name: Option<String>,
+    consistent_read: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_query(
         py,
@@ -249,6 +259,7 @@ pub fn async_query<'py>(
         exclusive_start_key,
         scan_index_forward,
         index_name,
+        consistent_read,
     )?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {

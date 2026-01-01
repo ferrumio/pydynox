@@ -140,12 +140,16 @@ class DynamoDBClient:
             _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
         return metrics
 
-    def get_item(self, table: str, key: dict[str, Any]) -> DictWithMetrics | None:
+    def get_item(
+        self, table: str, key: dict[str, Any], consistent_read: bool = False
+    ) -> DictWithMetrics | None:
         """Get an item from a DynamoDB table by its key.
 
         Args:
             table: The name of the DynamoDB table.
             key: A dict with the key attributes (hash key and optional range key).
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
+                Default is False (eventually consistent).
 
         Returns:
             The item as a DictWithMetrics if found (with .metrics), None if not found.
@@ -155,9 +159,12 @@ class DynamoDBClient:
             >>> if item:
             ...     print(item["name"])
             ...     print(item.metrics.duration_ms)
+            >>>
+            >>> # Strongly consistent read
+            >>> item = client.get_item("users", {"pk": "USER#123"}, consistent_read=True)
         """
         self._acquire_rcu(1.0)
-        result, metrics = self._client.get_item(table, key)
+        result, metrics = self._client.get_item(table, key, consistent_read=consistent_read)
         _log_operation(
             "get_item",
             table,
@@ -271,6 +278,7 @@ class DynamoDBClient:
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
+        consistent_read: bool = False,
     ) -> QueryResult:
         """Query items from a DynamoDB table.
 
@@ -287,6 +295,8 @@ class DynamoDBClient:
             scan_index_forward: Sort order (True = ascending, False = descending).
             index_name: Optional GSI or LSI name.
             last_evaluated_key: Start key for pagination (from previous query).
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
+                Default is False (eventually consistent).
 
         Returns:
             A QueryResult that can be iterated and has `last_evaluated_key`.
@@ -302,6 +312,10 @@ class DynamoDBClient:
             ...     process(item)
             >>> if results.last_evaluated_key:
             ...     next_page = client.query(..., last_evaluated_key=results.last_evaluated_key)
+
+            >>> # Strongly consistent read
+            >>> for item in client.query("users", ..., consistent_read=True):
+            ...     print(item["name"])
         """
         return QueryResult(
             self._client,
@@ -315,6 +329,7 @@ class DynamoDBClient:
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
             acquire_rcu=self._acquire_rcu,
+            consistent_read=consistent_read,
         )
 
     def batch_write(
@@ -583,12 +598,15 @@ class DynamoDBClient:
 
     # ========== ASYNC METHODS ==========
 
-    async def async_get_item(self, table: str, key: dict[str, Any]) -> DictWithMetrics | None:
+    async def async_get_item(
+        self, table: str, key: dict[str, Any], consistent_read: bool = False
+    ) -> DictWithMetrics | None:
         """Async version of get_item.
 
         Args:
             table: The name of the DynamoDB table.
             key: A dict with the key attributes.
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
 
         Returns:
             The item as a DictWithMetrics if found, None if not found.
@@ -597,9 +615,14 @@ class DynamoDBClient:
             >>> item = await client.async_get_item("users", {"pk": "USER#123"})
             >>> if item:
             ...     print(item["name"])
+            >>>
+            >>> # Strongly consistent read
+            >>> item = await client.async_get_item(
+            ...     "users", {"pk": "USER#123"}, consistent_read=True
+            ... )
         """
         self._acquire_rcu(1.0)
-        result = await self._client.async_get_item(table, key)
+        result = await self._client.async_get_item(table, key, consistent_read=consistent_read)
         metrics = result["metrics"]
         _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
@@ -735,6 +758,7 @@ class DynamoDBClient:
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
+        consistent_read: bool = False,
     ) -> "AsyncQueryResult":
         """Async query items from a DynamoDB table.
 
@@ -750,12 +774,17 @@ class DynamoDBClient:
             scan_index_forward: Sort order (True = ascending).
             index_name: Optional GSI or LSI name.
             last_evaluated_key: Start key for pagination.
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
 
         Returns:
             An AsyncQueryResult that can be async iterated.
 
         Example:
             >>> async for item in client.async_query("users", ...):
+            ...     print(item["name"])
+            >>>
+            >>> # Strongly consistent read
+            >>> async for item in client.async_query("users", ..., consistent_read=True):
             ...     print(item["name"])
         """
         return AsyncQueryResult(
@@ -770,4 +799,5 @@ class DynamoDBClient:
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
             acquire_rcu=self._acquire_rcu,
+            consistent_read=consistent_read,
         )

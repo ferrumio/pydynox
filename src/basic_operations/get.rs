@@ -25,6 +25,7 @@ pub async fn execute_get_item(
     client: Client,
     table: String,
     key: HashMap<String, AttributeValue>,
+    consistent_read: bool,
 ) -> Result<
     RawGetItemResult,
     (
@@ -37,6 +38,7 @@ pub async fn execute_get_item(
         .get_item()
         .table_name(&table)
         .set_key(Some(key))
+        .consistent_read(consistent_read)
         .return_consumed_capacity(ReturnConsumedCapacity::Total)
         .send()
         .await;
@@ -62,6 +64,7 @@ pub fn get_item(
     runtime: &Arc<Runtime>,
     table: &str,
     key: &Bound<'_, PyDict>,
+    consistent_read: bool,
 ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
     // Convert Python -> Rust (needs GIL)
     let dynamo_key = py_dict_to_attribute_values(py, key)?;
@@ -71,6 +74,7 @@ pub fn get_item(
         client.clone(),
         table.to_string(),
         dynamo_key,
+        consistent_read,
     ));
 
     // Convert result back to Python (needs GIL)
@@ -93,13 +97,14 @@ pub fn async_get_item<'py>(
     client: Client,
     table: String,
     key: &Bound<'_, PyDict>,
+    consistent_read: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     // Convert Python -> Rust (needs GIL, done before async)
     let dynamo_key = py_dict_to_attribute_values(py, key)?;
 
     // Return a Python awaitable
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_get_item(client, table, dynamo_key).await;
+        let result = execute_get_item(client, table, dynamo_key, consistent_read).await;
 
         // Convert result back to Python (needs GIL)
         #[allow(deprecated)]

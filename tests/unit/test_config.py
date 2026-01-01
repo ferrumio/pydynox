@@ -98,7 +98,7 @@ def test_model_uses_config_client():
 
     User.get(pk="USER#1")
 
-    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1"})
+    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1"}, consistent_read=False)
 
 
 def test_model_uses_default_client_when_no_config_client():
@@ -116,7 +116,7 @@ def test_model_uses_default_client_when_no_config_client():
 
     User.get(pk="USER#1")
 
-    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1"})
+    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1"}, consistent_read=False)
 
 
 def test_model_config_client_takes_priority_over_default():

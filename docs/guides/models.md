@@ -90,6 +90,31 @@ If your table has only a hash key (no range key), you only need to pass the hash
 user = User.get(pk="USER#123")
 ```
 
+#### Consistent reads
+
+By default, `get()` uses eventually consistent reads. For strongly consistent reads, use `consistent_read=True`:
+
+=== "consistent_read.py"
+    ```python
+    --8<-- "docs/examples/models/consistent_read.py"
+    ```
+
+**When to use strongly consistent reads:**
+
+- You need to read data right after writing it
+- Your app can't tolerate stale data (even for a second)
+- You're building a financial or inventory system
+
+**Trade-offs:**
+
+| | Eventually consistent | Strongly consistent |
+|---|---|---|
+| Latency | Lower | Higher |
+| Cost | 0.5 RCU per 4KB | 1 RCU per 4KB |
+| Availability | Higher | Lower during outages |
+
+Most apps work fine with eventually consistent reads. Use strongly consistent only when you need it.
+
 ### Update
 
 There are two ways to update an item:
@@ -135,6 +160,7 @@ After deletion, the object still exists in Python, but the item is gone from Dyn
 | `client` | DynamoDBClient | None | Client to use (uses default if None) |
 | `skip_hooks` | bool | False | Skip lifecycle hooks |
 | `max_size` | int | None | Max item size in bytes |
+| `consistent_read` | bool | False | Use strongly consistent reads by default |
 
 ### Setting a default client
 

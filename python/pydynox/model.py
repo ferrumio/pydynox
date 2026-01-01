@@ -206,10 +206,12 @@ class Model(metaclass=ModelMeta):
             hook(self)
 
     @classmethod
-    def get(cls: type[M], **keys: Any) -> M | None:
+    def get(cls: type[M], consistent_read: bool | None = None, **keys: Any) -> M | None:
         """Get an item from DynamoDB by its key.
 
         Args:
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
+                If None, uses model_config.consistent_read (default: False).
             **keys: The key attributes (hash_key and optional range_key).
 
         Returns:
@@ -219,11 +221,19 @@ class Model(metaclass=ModelMeta):
             >>> user = User.get(pk="USER#123", sk="PROFILE")
             >>> if user:
             ...     print(user.name)
+            >>>
+            >>> # Strongly consistent read
+            >>> user = User.get(pk="USER#123", sk="PROFILE", consistent_read=True)
         """
         client = cls._get_client()
         table = cls._get_table()
 
-        item = client.get_item(table, keys)
+        # Determine consistent_read: param > model_config > False
+        use_consistent = consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(cls.model_config, "consistent_read", False)
+
+        item = client.get_item(table, keys, consistent_read=use_consistent)
         if item is None:
             return None
 
@@ -612,10 +622,12 @@ class Model(metaclass=ModelMeta):
     # ========== ASYNC METHODS ==========
 
     @classmethod
-    async def async_get(cls: type[M], **keys: Any) -> M | None:
+    async def async_get(cls: type[M], consistent_read: bool | None = None, **keys: Any) -> M | None:
         """Async version of get.
 
         Args:
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
+                If None, uses model_config.consistent_read (default: False).
             **keys: The key attributes (hash_key and optional range_key).
 
         Returns:
@@ -623,11 +635,19 @@ class Model(metaclass=ModelMeta):
 
         Example:
             >>> user = await User.async_get(pk="USER#123", sk="PROFILE")
+            >>>
+            >>> # Strongly consistent read
+            >>> user = await User.async_get(pk="USER#123", sk="PROFILE", consistent_read=True)
         """
         client = cls._get_client()
         table = cls._get_table()
 
-        item = await client.async_get_item(table, keys)
+        # Determine consistent_read: param > model_config > False
+        use_consistent = consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(cls.model_config, "consistent_read", False)
+
+        item = await client.async_get_item(table, keys, consistent_read=use_consistent)
         if item is None:
             return None
 

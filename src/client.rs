@@ -190,6 +190,7 @@ impl DynamoDBClient {
     ///
     /// * `table` - The name of the DynamoDB table
     /// * `key` - A Python dict with the key attributes (hash key and optional range key)
+    /// * `consistent_read` - If true, use strongly consistent read (2x RCU cost)
     ///
     /// # Returns
     ///
@@ -202,14 +203,19 @@ impl DynamoDBClient {
     /// item = client.get_item("users", {"pk": "USER#123"})
     /// if item:
     ///     print(item["name"])  # "John"
+    ///
+    /// # Strongly consistent read
+    /// item = client.get_item("users", {"pk": "USER#123"}, consistent_read=True)
     /// ```
+    #[pyo3(signature = (table, key, consistent_read=false))]
     pub fn get_item(
         &self,
         py: Python<'_>,
         table: &str,
         key: &Bound<'_, PyDict>,
+        consistent_read: bool,
     ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
-        basic_operations::get_item(py, &self.client, &self.runtime, table, key)
+        basic_operations::get_item(py, &self.client, &self.runtime, table, key, consistent_read)
     }
 
     /// Delete an item from a DynamoDB table.
@@ -354,13 +360,14 @@ impl DynamoDBClient {
     /// * `exclusive_start_key` - Optional key to start from (for pagination)
     /// * `scan_index_forward` - Sort order (True = ascending, False = descending)
     /// * `index_name` - Optional GSI or LSI name to query
+    /// * `consistent_read` - If true, use strongly consistent read (2x RCU cost)
     ///
     /// # Returns
     ///
     /// A tuple of (items, last_evaluated_key). Items is a list of dicts.
     /// last_evaluated_key is None if there are no more items, or a dict to pass
     /// as exclusive_start_key for the next page.
-    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None))]
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
     pub fn query_page(
@@ -375,6 +382,7 @@ impl DynamoDBClient {
         exclusive_start_key: Option<&Bound<'_, PyDict>>,
         scan_index_forward: Option<bool>,
         index_name: Option<String>,
+        consistent_read: bool,
     ) -> PyResult<(Vec<Py<PyAny>>, Option<Py<PyAny>>, OperationMetrics)> {
         let result = basic_operations::query(
             py,
@@ -389,6 +397,7 @@ impl DynamoDBClient {
             exclusive_start_key,
             scan_index_forward,
             index_name,
+            consistent_read,
         )?;
         Ok((result.items, result.last_evaluated_key, result.metrics))
     }
@@ -727,14 +736,25 @@ impl DynamoDBClient {
     ///     result = await client.async_get_item("users", {"pk": "USER#123"})
     ///     if result["item"]:
     ///         print(result["item"]["name"])
+    ///
+    ///     # Strongly consistent read
+    ///     result = await client.async_get_item("users", {"pk": "USER#123"}, consistent_read=True)
     /// ```
+    #[pyo3(signature = (table, key, consistent_read=false))]
     pub fn async_get_item<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         key: &Bound<'_, PyDict>,
+        consistent_read: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_get_item(py, self.client.clone(), table.to_string(), key)
+        basic_operations::async_get_item(
+            py,
+            self.client.clone(),
+            table.to_string(),
+            key,
+            consistent_read,
+        )
     }
 
     /// Async version of put_item. Returns a Python awaitable.
@@ -852,7 +872,7 @@ impl DynamoDBClient {
     ///     for item in result["items"]:
     ///         print(item)
     /// ```
-    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None))]
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn async_query_page<'py>(
         &self,
@@ -866,6 +886,7 @@ impl DynamoDBClient {
         exclusive_start_key: Option<&Bound<'_, PyDict>>,
         scan_index_forward: Option<bool>,
         index_name: Option<String>,
+        consistent_read: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::async_query(
             py,
@@ -879,6 +900,7 @@ impl DynamoDBClient {
             exclusive_start_key,
             scan_index_forward,
             index_name,
+            consistent_read,
         )
     }
 }

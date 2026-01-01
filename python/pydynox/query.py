@@ -44,6 +44,7 @@ class QueryResult:
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         acquire_rcu: Callable[[float], None] | None = None,
+        consistent_read: bool = False,
     ):
         self._client = client
         self._table = table
@@ -56,6 +57,7 @@ class QueryResult:
         self._index_name = index_name
         self._start_key = last_evaluated_key
         self._acquire_rcu = acquire_rcu
+        self._consistent_read = consistent_read
 
         self._current_page: list[dict[str, Any]] = []
         self._page_index = 0
@@ -133,6 +135,7 @@ class QueryResult:
             exclusive_start_key=start_key,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
+            consistent_read=self._consistent_read,
         )
 
         self._current_page = items
@@ -177,6 +180,7 @@ class AsyncQueryResult:
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         acquire_rcu: Callable[[float], None] | None = None,
+        consistent_read: bool = False,
     ):
         self._client = client
         self._table = table
@@ -189,6 +193,7 @@ class AsyncQueryResult:
         self._index_name = index_name
         self._start_key = last_evaluated_key
         self._acquire_rcu = acquire_rcu
+        self._consistent_read = consistent_read
 
         self._current_page: list[dict[str, Any]] = []
         self._page_index = 0
@@ -258,6 +263,7 @@ class AsyncQueryResult:
             exclusive_start_key=start_key,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
+            consistent_read=self._consistent_read,
         )
 
         self._current_page = result["items"]

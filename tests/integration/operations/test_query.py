@@ -218,3 +218,76 @@ def test_query_manual_pagination(large_table):
         all_items.append(item)
 
     assert len(all_items) == 15
+
+
+def test_query_eventually_consistent(populated_table):
+    """Test query with eventually consistent read (default)."""
+    dynamo = populated_table
+
+    count = 0
+    for item in dynamo.query(
+        "test_table",
+        key_condition_expression="#pk = :pk",
+        expression_attribute_names={"#pk": "pk"},
+        expression_attribute_values={":pk": "USER#1"},
+    ):
+        assert item["pk"] == "USER#1"
+        count += 1
+
+    assert count == 4
+
+
+def test_query_strongly_consistent(populated_table):
+    """Test query with strongly consistent read."""
+    dynamo = populated_table
+
+    count = 0
+    for item in dynamo.query(
+        "test_table",
+        key_condition_expression="#pk = :pk",
+        expression_attribute_names={"#pk": "pk"},
+        expression_attribute_values={":pk": "USER#1"},
+        consistent_read=True,
+    ):
+        assert item["pk"] == "USER#1"
+        count += 1
+
+    assert count == 4
+
+
+def test_query_consistent_read_empty_result(populated_table):
+    """Test query with consistent_read returns empty for non-existent partition."""
+    dynamo = populated_table
+
+    results = dynamo.query(
+        "test_table",
+        key_condition_expression="#pk = :pk",
+        expression_attribute_names={"#pk": "pk"},
+        expression_attribute_values={":pk": "NONEXISTENT"},
+        consistent_read=True,
+    )
+
+    count = 0
+    for _ in results:
+        count += 1
+
+    assert count == 0
+
+
+def test_query_consistent_read_with_filter(populated_table):
+    """Test query with consistent_read and filter expression."""
+    dynamo = populated_table
+
+    count = 0
+    for item in dynamo.query(
+        "test_table",
+        key_condition_expression="#pk = :pk",
+        filter_expression="#status = :status",
+        expression_attribute_names={"#pk": "pk", "#status": "status"},
+        expression_attribute_values={":pk": "USER#1", ":status": "shipped"},
+        consistent_read=True,
+    ):
+        assert item["status"] == "shipped"
+        count += 1
+
+    assert count == 2

@@ -66,6 +66,8 @@ class ModelConfig:
         client: DynamoDBClient to use. If None, uses the default client.
         skip_hooks: Skip lifecycle hooks by default (default: False).
         max_size: Max item size in bytes. If set, validates before save.
+        consistent_read: Use strongly consistent reads by default (default: False).
+            Strongly consistent reads cost 2x RCU but always return latest data.
 
     Example:
         >>> from pydynox import DynamoDBClient, Model, ModelConfig
@@ -80,9 +82,18 @@ class ModelConfig:
         ...     )
         ...     pk = StringAttribute(hash_key=True)
         ...     name = StringAttribute()
+        >>>
+        >>> # Model with consistent reads enabled by default
+        >>> class CriticalData(Model):
+        ...     model_config = ModelConfig(
+        ...         table="critical",
+        ...         consistent_read=True,  # Always use strongly consistent reads
+        ...     )
+        ...     pk = StringAttribute(hash_key=True)
     """
 
     table: str
     client: DynamoDBClient | None = field(default=None)
     skip_hooks: bool = field(default=False)
     max_size: int | None = field(default=None)
+    consistent_read: bool = field(default=False)

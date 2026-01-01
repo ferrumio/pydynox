@@ -144,7 +144,9 @@ def test_model_get(user_model, mock_client):
     assert user is not None
     assert user.pk == "USER#1"
     assert user.name == "John"
-    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
+    mock_client.get_item.assert_called_once_with(
+        "users", {"pk": "USER#1", "sk": "PROFILE"}, consistent_read=False
+    )
 
 
 def test_model_get_not_found(user_model, mock_client):

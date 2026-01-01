@@ -56,3 +56,42 @@ def test_get_item_with_partial_key(dynamo):
 
     assert result is not None
     assert result["data"] == "first"
+
+
+def test_get_item_eventually_consistent(dynamo):
+    """Test get_item with eventually consistent read (default)."""
+    dynamo.put_item("test_table", {"pk": "CONSISTENT#1", "sk": "TEST", "data": "value"})
+
+    # Default is eventually consistent
+    result = dynamo.get_item(
+        "test_table",
+        {"pk": "CONSISTENT#1", "sk": "TEST"},
+    )
+
+    assert result is not None
+    assert result["data"] == "value"
+
+
+def test_get_item_strongly_consistent(dynamo):
+    """Test get_item with strongly consistent read."""
+    dynamo.put_item("test_table", {"pk": "CONSISTENT#2", "sk": "TEST", "data": "value"})
+
+    # Strongly consistent read
+    result = dynamo.get_item(
+        "test_table",
+        {"pk": "CONSISTENT#2", "sk": "TEST"},
+        consistent_read=True,
+    )
+
+    assert result is not None
+    assert result["data"] == "value"
+
+
+def test_get_item_consistent_read_not_found(dynamo):
+    """Test get_item with consistent_read returns None for non-existent items."""
+    result = dynamo.get_item(
+        "test_table",
+        {"pk": "NONEXISTENT", "sk": "NONE"},
+        consistent_read=True,
+    )
+    assert result is None

@@ -41,6 +41,7 @@ class DynamoDBClient:
         self,
         table: str,
         key: dict[str, Any],
+        consistent_read: bool = False,
     ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
     def delete_item(
         self,
@@ -71,6 +72,7 @@ class DynamoDBClient:
         exclusive_start_key: dict[str, Any] | None = None,
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
+        consistent_read: bool = False,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, OperationMetrics]: ...
     def batch_write(
         self,
@@ -111,6 +113,7 @@ class DynamoDBClient:
         self,
         table: str,
         key: dict[str, Any],
+        consistent_read: bool = False,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
     def async_put_item(
         self,
@@ -149,6 +152,7 @@ class DynamoDBClient:
         exclusive_start_key: dict[str, Any] | None = None,
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
+        consistent_read: bool = False,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
 
 # Rate limiting
