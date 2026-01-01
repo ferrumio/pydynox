@@ -40,7 +40,8 @@ def moto_server():
             preexec_fn=os.setsid,
         )
 
-    max_wait = 10
+    # Wait longer for CI environments (can be slow)
+    max_wait = 30
     waited = 0
     while not _is_port_in_use(MOTO_PORT) and waited < max_wait:
         time.sleep(0.5)
@@ -48,7 +49,7 @@ def moto_server():
 
     if not _is_port_in_use(MOTO_PORT):
         proc.terminate()
-        pytest.fail("Moto server failed to start")
+        pytest.fail(f"Moto server failed to start after {max_wait}s")
 
     yield proc
 

@@ -4,16 +4,8 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydynox import Model, ModelConfig, clear_default_client
+from pydynox import Model, ModelConfig
 from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
-
-
-@pytest.fixture(autouse=True)
-def reset_state():
-    """Reset default client before and after each test."""
-    clear_default_client()
-    yield
-    clear_default_client()
 
 
 @pytest.fixture
