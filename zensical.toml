@@ -44,6 +44,7 @@ nav = [
 [theme]
 name = "material"
 features = ["navigation.sections", "content.code.copy", "content.code.annotate"]
+custom_dir = "docs/overrides"
 
 [[theme.palette]]
 scheme = "default"
