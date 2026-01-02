@@ -33,6 +33,7 @@ nav = [
     ] },
     { "Integrations" = [
         "guides/pydantic.md",
+        "guides/dataclass.md",
     ] },
     { "Troubleshooting" = [
         "guides/exceptions.md",

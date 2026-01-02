@@ -25,15 +25,16 @@ Use the `@dynamodb_model` decorator on a Pydantic model:
 
 === "basic_pydantic.py"
     ```python
-    --8<-- "docs/examples/pydantic/basic_pydantic.py"
+    --8<-- "docs/examples/integrations/basic_pydantic.py"
     ```
 
-The decorator adds all pydynox methods to your model:
+The decorator adds these methods to your model:
 
 - `save()` - Save to DynamoDB
 - `get()` - Get by key
 - `delete()` - Delete from DynamoDB
 - `update()` - Update specific fields
+- `_set_client()` - Set client after creation
 
 Your Pydantic model works exactly as before - validation, serialization, and all other Pydantic features still work.
 
@@ -42,7 +43,7 @@ Your Pydantic model works exactly as before - validation, serialization, and all
 Add a range key for composite keys:
 
 ```python
-@dynamodb_model(table="users", hash_key="pk", range_key="sk")
+@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
 class User(BaseModel):
     pk: str
     sk: str
@@ -56,7 +57,7 @@ All Pydantic validation works. Invalid data raises `ValidationError` before anyt
 ```python
 from pydantic import BaseModel, EmailStr, Field
 
-@dynamodb_model(table="users", hash_key="pk")
+@dynamodb_model(table="users", hash_key="pk", client=client)
 class User(BaseModel):
     pk: str
     name: str = Field(min_length=1, max_length=100)
@@ -71,33 +72,34 @@ user = User(pk="USER#1", name="", email="not-an-email", age=-1)
 
 ### Configuration options
 
-Pass extra options to the decorator:
-
-```python
-@dynamodb_model(
-    table="users",
-    hash_key="pk",
-    range_key="sk",
-    region="us-east-1",
-    endpoint_url="http://localhost:8000",  # For local dev
-)
-class User(BaseModel):
-    pk: str
-    sk: str
-    name: str
-```
-
 | Option | Type | Description |
 |--------|------|-------------|
 | `table` | str | DynamoDB table name (required) |
 | `hash_key` | str | Field name for partition key (required) |
 | `range_key` | str | Field name for sort key (optional) |
-| `region` | str | AWS region (optional) |
-| `endpoint_url` | str | Custom endpoint (optional) |
+| `client` | DynamoDBClient | Client instance (optional, can set later) |
+
+### Setting client later
+
+You can set the client after defining the model:
+
+```python
+@dynamodb_model(table="users", hash_key="pk")
+class User(BaseModel):
+    pk: str
+    name: str
+
+# Later, when you have the client
+client = DynamoDBClient(region="us-east-1")
+User._set_client(client)
+
+# Now you can use it
+user = User.get(pk="USER#1")
+```
 
 ### Alternative: from_pydantic function
 
-If you prefer not to use decorators, use `from_pydantic`:
+If you prefer not to use decorators:
 
 ```python
 from pydynox.integrations.pydantic import from_pydantic
@@ -107,7 +109,7 @@ class User(BaseModel):
     sk: str
     name: str
 
-UserDB = from_pydantic(User, table="users", hash_key="pk", range_key="sk")
+UserDB = from_pydantic(User, table="users", hash_key="pk", range_key="sk", client=client)
 user = UserDB(pk="USER#1", sk="PROFILE", name="John")
 user.save()
 ```
@@ -129,7 +131,7 @@ Use Pydantic's `@field_validator` and `@model_validator` for validation:
 ```python
 from pydantic import BaseModel, field_validator, model_validator
 
-@dynamodb_model(table="users", hash_key="pk")
+@dynamodb_model(table="users", hash_key="pk", client=client)
 class User(BaseModel):
     pk: str
     email: str
@@ -149,6 +151,20 @@ class User(BaseModel):
         return data
 ```
 
+### Pydantic vs dataclass
+
+Choose Pydantic when:
+
+- You need validation
+- You want type coercion
+- You're already using Pydantic in your app
+
+Choose dataclass when:
+
+- You want zero dependencies
+- You don't need validation
+- Simple data structures are enough
+
 ### TTL with Pydantic
 
 For TTL, use a datetime field:
@@ -156,7 +172,7 @@ For TTL, use a datetime field:
 ```python
 from datetime import datetime, timedelta, timezone
 
-@dynamodb_model(table="sessions", hash_key="pk")
+@dynamodb_model(table="sessions", hash_key="pk", client=client)
 class Session(BaseModel):
     pk: str
     user_id: str

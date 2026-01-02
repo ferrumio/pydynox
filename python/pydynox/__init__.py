@@ -63,11 +63,12 @@ from pydynox.config import (
 )
 from pydynox.generators import AutoGenerate
 from pydynox.indexes import GlobalSecondaryIndex
+from pydynox.integrations.functions import dynamodb_model
 from pydynox.model import Model
 from pydynox.query import QueryResult
 from pydynox.transaction import Transaction
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 __all__ = [
     # Client
@@ -90,6 +91,8 @@ __all__ = [
     "set_default_client",
     "get_default_client",
     "clear_default_client",
+    # Integrations
+    "dynamodb_model",
     # Version
     "__version__",
 ]
