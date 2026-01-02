@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint:
-    name: Lint
+  rust-lint:
+    name: Rust lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,18 +21,6 @@ jobs:
 
       - name: Rust clippy
         run: cargo clippy --all-targets -- -D warnings
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Ruff check
-        run: |
-          uv venv
-          uv pip install ruff
-          uv run ruff check python/ tests/
 
   test:
     name: Test (${{ matrix.os }} / py${{ matrix.python }})
@@ -66,13 +54,19 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio hypothesis pydantic mypy
+          pip install pytest pytest-asyncio hypothesis pydantic mypy ruff
 
       - name: Install integration test dependencies
         if: runner.os == 'Linux'
         run: |
           source .venv/bin/activate
           pip install testcontainers boto3
+
+      - name: Ruff check
+        run: |
+          source .venv/bin/activate
+          ruff check python/ tests/
+          ruff format --check python/ tests/
 
       - name: Mypy
         run: |
@@ -93,6 +87,7 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - uses: actions/checkout@v4
 

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 
