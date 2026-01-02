@@ -63,9 +63,9 @@ from pydynox.config import (
 )
 from pydynox.generators import AutoGenerate
 from pydynox.indexes import GlobalSecondaryIndex
+from pydynox.integrations.functions import dynamodb_model
 from pydynox.model import Model
 from pydynox.query import QueryResult
-from pydynox.integrations.functions import dynamodb_model
 from pydynox.transaction import Transaction
 
 __version__ = "0.10.0"
