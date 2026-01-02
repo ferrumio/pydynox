@@ -40,6 +40,9 @@ jobs:
       - name: Set up Python
         run: uv python install ${{ matrix.python }}
 
+      - name: Create venv and sync deps
+        run: uv sync --all-extras
+
       - name: Build and install
         uses: PyO3/maturin-action@v1
         with:
@@ -74,6 +77,9 @@ jobs:
 
       - name: Set up Python
         run: uv python install 3.12
+
+      - name: Create venv and sync deps
+        run: uv sync --all-extras
 
       - name: Build and install
         uses: PyO3/maturin-action@v1
