@@ -61,6 +61,7 @@ from pydynox.config import (
     get_default_client,
     set_default_client,
 )
+from pydynox.generators import AutoGenerate
 from pydynox.indexes import GlobalSecondaryIndex
 from pydynox.model import Model
 from pydynox.query import QueryResult
@@ -75,6 +76,7 @@ __all__ = [
     "QueryResult",
     "Transaction",
     # Model ORM
+    "AutoGenerate",
     "Condition",
     "GlobalSecondaryIndex",
     "Model",

@@ -29,8 +29,11 @@ All attributes share these parameters:
 |-----------|------|---------|-------------|
 | `hash_key` | bool | False | Is this the partition key |
 | `range_key` | bool | False | Is this the sort key |
-| `default` | Any | None | Default value |
+| `default` | Any | None | Default value or `AutoGenerate` strategy |
 | `null` | bool | True | Allow None values |
+
+!!! tip
+    Use `AutoGenerate` strategies for automatic ID and timestamp generation. See [Auto-generate strategies](auto-generate.md).
 
 ## Basic types
 

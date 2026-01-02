@@ -18,6 +18,7 @@ mod compression;
 mod conversions;
 mod encryption;
 mod errors;
+mod generators;
 mod metrics;
 pub mod rate_limiter;
 mod serialization;
@@ -62,6 +63,9 @@ fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register tracing functions
     tracing::register_tracing(m)?;
+
+    // Register generator functions
+    generators::register_generators(m)?;
 
     Ok(())
 }

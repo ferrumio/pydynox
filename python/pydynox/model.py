@@ -10,6 +10,7 @@ from pydynox.attributes import Attribute, TTLAttribute
 from pydynox.client import DynamoDBClient
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.exceptions import ItemTooLargeError
+from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
 from pydynox.indexes import GlobalSecondaryIndex
 from pydynox.size import ItemSize, calculate_item_size
@@ -149,11 +150,28 @@ class Model(metaclass=ModelMeta):
             if attr_name in kwargs:
                 setattr(self, attr_name, kwargs[attr_name])
             elif attr.default is not None:
-                setattr(self, attr_name, attr.default)
+                # Don't apply AutoGenerate defaults here - wait for save()
+                if is_auto_generate(attr.default):
+                    setattr(self, attr_name, None)
+                else:
+                    setattr(self, attr_name, attr.default)
             elif not attr.null:
                 raise ValueError(f"Attribute '{attr_name}' is required")
             else:
                 setattr(self, attr_name, None)
+
+    def _apply_auto_generate(self) -> None:
+        """Apply auto-generate strategies to None attributes.
+
+        Called before save() to generate values for attributes
+        that have AutoGenerate defaults and are currently None.
+        """
+        for attr_name, attr in self._attributes.items():
+            if attr.default is not None and is_auto_generate(attr.default):
+                current_value = getattr(self, attr_name, None)
+                if current_value is None:
+                    generated = generate_value(attr.default)
+                    setattr(self, attr_name, generated)
 
     @classmethod
     def _get_client(cls) -> DynamoDBClient:
@@ -247,6 +265,7 @@ class Model(metaclass=ModelMeta):
         """Save the model to DynamoDB.
 
         Creates a new item or replaces an existing one.
+        Auto-generates values for attributes with AutoGenerate defaults.
 
         Args:
             condition: Optional condition that must be true for the write.
@@ -262,11 +281,21 @@ class Model(metaclass=ModelMeta):
 
             >>> # Only save if item doesn't exist
             >>> user.save(condition=User.pk.does_not_exist())
+
+            >>> # With auto-generated ID
+            >>> from pydynox.generators import AutoGenerate
+            >>> class Order(Model):
+            ...     pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
+            >>> order = Order()
+            >>> order.save()  # pk is auto-generated
         """
         skip = self._should_skip_hooks(skip_hooks)
 
         if not skip:
             self._run_hooks(HookType.BEFORE_SAVE)
+
+        # Apply auto-generate strategies before saving
+        self._apply_auto_generate()
 
         # Check size if max_size is set
         max_size = (
@@ -674,6 +703,9 @@ class Model(metaclass=ModelMeta):
 
         if not skip:
             self._run_hooks(HookType.BEFORE_SAVE)
+
+        # Apply auto-generate strategies before saving
+        self._apply_auto_generate()
 
         # Check size if max_size is set
         max_size = (

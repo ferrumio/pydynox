@@ -34,6 +34,13 @@ lz4_flex = "0.11"
 flate2 = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.11", features = ["v4"] }
+ulid = "1.1"
+svix-ksuid = "0.8"
+chrono = { version = "0.4", default-features = false, features = [
+    "std",
+    "clock",
+] }
 
 [dev-dependencies]
 pyo3 = { version = "0.27", features = ["auto-initialize"] }
