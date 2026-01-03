@@ -99,14 +99,22 @@ def test_execute_statement_returns_metrics(populated_table):
 
 
 def test_execute_statement_without_parameters(populated_table):
-    """Test PartiQL without parameters (full scan)."""
+    """Test PartiQL without parameters - query specific partition."""
     dynamo = populated_table
 
-    result = dynamo.execute_statement(
-        "SELECT * FROM test_table",
+    # Query USER#1 partition (3 items) and USER#2 partition (1 item) separately
+    # to avoid full table scan which would include items from other tests
+    result1 = dynamo.execute_statement(
+        "SELECT * FROM test_table WHERE pk = ?",
+        parameters=["USER#1"],
+    )
+    result2 = dynamo.execute_statement(
+        "SELECT * FROM test_table WHERE pk = ?",
+        parameters=["USER#2"],
     )
 
-    assert len(result) == 4
+    assert len(result1) == 3
+    assert len(result2) == 1
 
 
 def test_execute_statement_iterate(populated_table):
