@@ -16,22 +16,20 @@ A fast DynamoDB ORM for Python with a Rust core.
 
 ## GenAI Contributions 🤖
 
-This project welcomes GenAI-assisted contributions! Parts of the code and docstrings were written with AI help.
+I believe GenAI is transforming how we build software. It's a powerful tool that accelerates development when used by developers who understand what they're doing.
 
-If you're using AI tools to contribute, check the `.ai/` folder. It has all the guidelines:
+To support both humans and AI agents, I created:
 
-- `.ai/README.md` - Quick start for AI agents
-- `.ai/project-context.md` - What is pydynox, tech stack
-- `.ai/coding-guidelines.md` - Code style, Python vs Rust decisions
-- `.ai/testing-guidelines.md` - How to write tests
-- `.ai/common-mistakes.md` - Things that break the build
+- `.ai/` folder - Guidelines for agentic IDEs (Cursor, Windsurf, Kiro, etc.)
+- `ADR/` folder - Architecture Decision Records for humans to understand the "why" behind decisions
 
-**Rules for AI-assisted contributions:**
+**If you're contributing with AI help:**
 
-- Follow the project's coding style and patterns
-- Make sure the code makes sense and is tested
-- Don't submit random or low-quality generated code
-- Review and understand what the AI generated before submitting
+- Understand what the AI generated before submitting
+- Make sure the code follows the project patterns
+- Test your changes
+
+I reserve the right to reject low-quality PRs where project patterns are not followed and it's clear that GenAI was driving instead of the developer.
 
 ## Features
 
