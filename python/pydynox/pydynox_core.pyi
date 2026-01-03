@@ -155,6 +155,22 @@ class DynamoDBClient:
         consistent_read: bool = False,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
 
+    # PartiQL methods
+    def execute_statement(
+        self,
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+        next_token: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None, OperationMetrics]: ...
+    def async_execute_statement(
+        self,
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+        next_token: str | None = None,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+
 # Rate limiting
 class FixedRate:
     def __init__(

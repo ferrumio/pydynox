@@ -654,6 +654,70 @@ class Model(metaclass=ModelMeta):
             last_evaluated_key=last_evaluated_key,
         )
 
+    @classmethod
+    def execute_statement(
+        cls: type[M],
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+    ) -> list[M]:
+        """Execute a PartiQL statement and return typed model instances.
+
+        Args:
+            statement: The PartiQL statement to execute.
+            parameters: Optional list of parameter values for ? placeholders.
+            consistent_read: If True, use strongly consistent read.
+
+        Returns:
+            List of model instances.
+
+        Example:
+            >>> users = User.execute_statement(
+            ...     "SELECT * FROM users WHERE pk = ?",
+            ...     parameters=["USER#123"],
+            ... )
+            >>> for user in users:
+            ...     print(user.name)
+        """
+        client = cls._get_client()
+        result = client.execute_statement(
+            statement,
+            parameters=parameters,
+            consistent_read=consistent_read,
+        )
+        return [cls.from_dict(item) for item in result]
+
+    @classmethod
+    async def async_execute_statement(
+        cls: type[M],
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+    ) -> list[M]:
+        """Async version of execute_statement.
+
+        Args:
+            statement: The PartiQL statement to execute.
+            parameters: Optional list of parameter values for ? placeholders.
+            consistent_read: If True, use strongly consistent read.
+
+        Returns:
+            List of model instances.
+
+        Example:
+            >>> users = await User.async_execute_statement(
+            ...     "SELECT * FROM users WHERE pk = ?",
+            ...     parameters=["USER#123"],
+            ... )
+        """
+        client = cls._get_client()
+        result = await client.async_execute_statement(
+            statement,
+            parameters=parameters,
+            consistent_read=consistent_read,
+        )
+        return [cls.from_dict(item) for item in result]
+
     def save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
         """Save the model to DynamoDB.
 

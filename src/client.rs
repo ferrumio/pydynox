@@ -903,6 +903,93 @@ impl DynamoDBClient {
             consistent_read,
         )
     }
+
+    // ========== PARTIQL OPERATIONS ==========
+
+    /// Execute a PartiQL statement.
+    ///
+    /// PartiQL is a SQL-compatible query language for DynamoDB.
+    ///
+    /// # Arguments
+    ///
+    /// * `statement` - The PartiQL statement to execute
+    /// * `parameters` - Optional list of parameter values for ? placeholders
+    /// * `consistent_read` - If true, use strongly consistent read
+    /// * `next_token` - Optional token for pagination
+    ///
+    /// # Returns
+    ///
+    /// A tuple of (items, next_token, metrics).
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// client = DynamoDBClient()
+    ///
+    /// # Simple select
+    /// items, _, metrics = client.execute_statement(
+    ///     "SELECT * FROM users WHERE pk = ?",
+    ///     parameters=["USER#123"]
+    /// )
+    ///
+    /// # With multiple parameters
+    /// items, _, metrics = client.execute_statement(
+    ///     "SELECT * FROM users WHERE pk = ? AND age > ?",
+    ///     parameters=["USER#123", 18]
+    /// )
+    /// ```
+    #[pyo3(signature = (statement, parameters=None, consistent_read=false, next_token=None))]
+    pub fn execute_statement(
+        &self,
+        py: Python<'_>,
+        statement: &str,
+        parameters: Option<&Bound<'_, pyo3::types::PyList>>,
+        consistent_read: bool,
+        next_token: Option<String>,
+    ) -> PyResult<(Vec<Py<PyAny>>, Option<String>, OperationMetrics)> {
+        basic_operations::execute_statement(
+            py,
+            &self.client,
+            &self.runtime,
+            statement,
+            parameters,
+            consistent_read,
+            next_token,
+        )
+    }
+
+    /// Async version of execute_statement. Returns a Python awaitable.
+    ///
+    /// # Examples
+    ///
+    /// ```python
+    /// async def main():
+    ///     client = DynamoDBClient()
+    ///     result = await client.async_execute_statement(
+    ///         "SELECT * FROM users WHERE pk = ?",
+    ///         parameters=["USER#123"]
+    ///     )
+    ///     for item in result["items"]:
+    ///         print(item)
+    /// ```
+    #[pyo3(signature = (statement, parameters=None, consistent_read=false, next_token=None))]
+    pub fn async_execute_statement<'py>(
+        &self,
+        py: Python<'py>,
+        statement: &str,
+        parameters: Option<&Bound<'_, pyo3::types::PyList>>,
+        consistent_read: bool,
+        next_token: Option<String>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_execute_statement(
+            py,
+            self.client.clone(),
+            statement.to_string(),
+            parameters,
+            consistent_read,
+            next_token,
+        )
+    }
 }
 
 /// Build the AWS SDK DynamoDB client with the given configuration.

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pydynox._internal._logging import _log_operation, _log_warning
-from pydynox._internal._metrics import DictWithMetrics, OperationMetrics
+from pydynox._internal._metrics import DictWithMetrics, ListWithMetrics, OperationMetrics
 from pydynox.query import AsyncQueryResult, QueryResult
 
 if TYPE_CHECKING:
@@ -801,3 +801,98 @@ class DynamoDBClient:
             acquire_rcu=self._acquire_rcu,
             consistent_read=consistent_read,
         )
+
+    # ========== PARTIQL OPERATIONS ==========
+
+    def execute_statement(
+        self,
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+        next_token: str | None = None,
+    ) -> ListWithMetrics:
+        """Execute a PartiQL statement.
+
+        PartiQL is a SQL-compatible query language for DynamoDB.
+
+        Args:
+            statement: The PartiQL statement to execute.
+            parameters: Optional list of parameter values for ? placeholders.
+            consistent_read: If True, use strongly consistent read.
+            next_token: Optional token for pagination.
+
+        Returns:
+            A list of items with .metrics and .next_token attributes.
+
+        Example:
+            >>> result = client.execute_statement(
+            ...     "SELECT * FROM users WHERE pk = ?",
+            ...     parameters=["USER#123"],
+            ... )
+            >>> for item in result:
+            ...     print(item["name"])
+            >>> print(result.metrics.duration_ms)
+            >>> if result.next_token:
+            ...     # fetch next page
+            ...     next_result = client.execute_statement(..., next_token=result.next_token)
+        """
+        self._acquire_rcu(1.0)
+        items, next_token_out, metrics = self._client.execute_statement(
+            statement,
+            parameters=parameters,
+            consistent_read=consistent_read,
+            next_token=next_token,
+        )
+        _log_operation(
+            "execute_statement",
+            statement[:50],
+            metrics.duration_ms,
+            consumed_rcu=metrics.consumed_rcu,
+        )
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("execute_statement", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        return ListWithMetrics(items, metrics, next_token_out)
+
+    async def async_execute_statement(
+        self,
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+        next_token: str | None = None,
+    ) -> ListWithMetrics:
+        """Async version of execute_statement.
+
+        Args:
+            statement: The PartiQL statement to execute.
+            parameters: Optional list of parameter values for ? placeholders.
+            consistent_read: If True, use strongly consistent read.
+            next_token: Optional token for pagination.
+
+        Returns:
+            A list of items with .metrics and .next_token attributes.
+
+        Example:
+            >>> result = await client.async_execute_statement(
+            ...     "SELECT * FROM users WHERE pk = ?",
+            ...     parameters=["USER#123"],
+            ... )
+            >>> for item in result:
+            ...     print(item["name"])
+        """
+        self._acquire_rcu(1.0)
+        result = await self._client.async_execute_statement(
+            statement,
+            parameters=parameters,
+            consistent_read=consistent_read,
+            next_token=next_token,
+        )
+        metrics = result["metrics"]
+        _log_operation(
+            "execute_statement",
+            statement[:50],
+            metrics.duration_ms,
+            consumed_rcu=metrics.consumed_rcu,
+        )
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("execute_statement", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        return ListWithMetrics(result["items"], metrics, result["next_token"])
