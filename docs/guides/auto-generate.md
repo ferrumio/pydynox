@@ -185,3 +185,10 @@ class Session(Model):
 session = Session(sk="SESSION#DATA", expires_at=ExpiresIn.hours(24))
 session.save()
 ```
+
+
+## Next steps
+
+- [Rate limiting](rate-limiting.md) - Control throughput
+- [Hooks](hooks.md) - Run code before/after operations
+- [Attributes](attributes.md) - All attribute types

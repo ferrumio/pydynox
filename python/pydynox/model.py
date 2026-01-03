@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
 
 from pydynox._internal._atomic import AtomicOp, serialize_atomic
+from pydynox._internal._metrics import OperationMetrics
 from pydynox.attributes import Attribute, TTLAttribute
 from pydynox.client import DynamoDBClient
 from pydynox.config import ModelConfig, get_default_client
@@ -19,6 +20,320 @@ if TYPE_CHECKING:
     from pydynox.conditions import Condition
 
 M = TypeVar("M", bound="Model")
+
+
+class ModelQueryResult(Generic[M]):
+    """Result of a Model.query() with automatic pagination.
+
+    Iterate over results to get typed model instances.
+    Access `last_evaluated_key` for manual pagination.
+    Access `metrics` for timing and capacity info.
+
+    Example:
+        >>> for user in User.query(pk="USER#123"):
+        ...     print(user.name)  # user is typed as User
+        >>>
+        >>> # Check metrics
+        >>> results = User.query(pk="USER#123")
+        >>> for user in results:
+        ...     pass
+        >>> print(results.metrics.duration_ms)
+    """
+
+    def __init__(
+        self,
+        model_class: type[M],
+        hash_key_value: Any,
+        range_key_condition: Condition | None = None,
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+    ) -> None:
+        self._model_class = model_class
+        self._hash_key_value = hash_key_value
+        self._range_key_condition = range_key_condition
+        self._filter_condition = filter_condition
+        self._limit = limit
+        self._scan_index_forward = scan_index_forward
+        self._consistent_read = consistent_read
+        self._start_key = last_evaluated_key
+
+        # Iteration state
+        self._query_result: Any = None
+        self._items_iter: Any = None
+        self._initialized = False
+
+    @property
+    def last_evaluated_key(self) -> dict[str, Any] | None:
+        """The last evaluated key for pagination.
+
+        Returns None if all results have been fetched.
+        """
+        if self._query_result is None:
+            return None
+        result: dict[str, Any] | None = self._query_result.last_evaluated_key
+        return result
+
+    @property
+    def metrics(self) -> OperationMetrics | None:
+        """Metrics from the last page fetch.
+
+        Returns None if no pages have been fetched yet.
+        """
+        if self._query_result is None:
+            return None
+        metrics: OperationMetrics | None = self._query_result.metrics
+        return metrics
+
+    def _build_query(self) -> Any:
+        """Build the underlying QueryResult."""
+        from pydynox.query import QueryResult
+
+        client = self._model_class._get_client()
+        table = self._model_class._get_table()
+        hash_key_name = self._model_class._hash_key
+
+        if hash_key_name is None:
+            raise ValueError(f"Model {self._model_class.__name__} has no hash key defined")
+
+        # Build key condition expression
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        # Hash key condition: #pk = :pkv
+        hk_name_placeholder = "#pk"
+        hk_value_placeholder = ":pkv"
+        names[hash_key_name] = hk_name_placeholder
+        values[hk_value_placeholder] = self._hash_key_value
+
+        key_condition = f"{hk_name_placeholder} = {hk_value_placeholder}"
+
+        # Add range key condition if provided
+        if self._range_key_condition is not None:
+            rk_expr = self._range_key_condition.serialize(names, values)
+            key_condition = f"{key_condition} AND {rk_expr}"
+
+        # Build filter expression if provided
+        filter_expr = None
+        if self._filter_condition is not None:
+            filter_expr = self._filter_condition.serialize(names, values)
+
+        # Convert names to DynamoDB format: {placeholder: attr_name}
+        attr_names = {placeholder: attr_name for attr_name, placeholder in names.items()}
+
+        # Determine consistent_read: param > model_config > False
+        use_consistent = self._consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(self._model_class.model_config, "consistent_read", False)
+
+        return QueryResult(
+            client._client,
+            table,
+            key_condition,
+            filter_expression=filter_expr,
+            expression_attribute_names=attr_names if attr_names else None,
+            expression_attribute_values=values if values else None,
+            limit=self._limit,
+            scan_index_forward=self._scan_index_forward,
+            last_evaluated_key=self._start_key,
+            acquire_rcu=client._acquire_rcu,
+            consistent_read=use_consistent,
+        )
+
+    def __iter__(self) -> ModelQueryResult[M]:
+        return self
+
+    def __next__(self) -> M:
+        # Initialize on first iteration
+        if not self._initialized:
+            self._query_result = self._build_query()
+            self._items_iter = iter(self._query_result)
+            self._initialized = True
+
+        # Get next item from underlying query
+        item = next(self._items_iter)
+
+        # Convert to model instance
+        instance = self._model_class.from_dict(item)
+
+        # Run after_load hooks
+        skip = (
+            self._model_class.model_config.skip_hooks
+            if hasattr(self._model_class, "model_config")
+            else False
+        )
+        if not skip:
+            instance._run_hooks(HookType.AFTER_LOAD)
+
+        return instance
+
+    def first(self) -> M | None:
+        """Get the first result or None.
+
+        Example:
+            >>> user = User.query(pk="USER#123").first()
+            >>> if user:
+            ...     print(user.name)
+        """
+        try:
+            return next(iter(self))
+        except StopIteration:
+            return None
+
+
+class AsyncModelQueryResult(Generic[M]):
+    """Async result of a Model.query() with automatic pagination.
+
+    Use `async for` to iterate over results.
+    Access `last_evaluated_key` for manual pagination.
+    Access `metrics` for timing and capacity info.
+
+    Example:
+        >>> async for user in User.async_query(hash_key="USER#123"):
+        ...     print(user.name)
+        >>>
+        >>> # Get first result
+        >>> user = await User.async_query(hash_key="USER#123").first()
+    """
+
+    def __init__(
+        self,
+        model_class: type[M],
+        hash_key_value: Any,
+        range_key_condition: Condition | None = None,
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+    ) -> None:
+        self._model_class = model_class
+        self._hash_key_value = hash_key_value
+        self._range_key_condition = range_key_condition
+        self._filter_condition = filter_condition
+        self._limit = limit
+        self._scan_index_forward = scan_index_forward
+        self._consistent_read = consistent_read
+        self._start_key = last_evaluated_key
+
+        # Iteration state
+        self._query_result: Any = None
+        self._initialized = False
+        self._current_page: list[dict[str, Any]] = []
+        self._page_index = 0
+
+    @property
+    def last_evaluated_key(self) -> dict[str, Any] | None:
+        """The last evaluated key for pagination."""
+        if self._query_result is None:
+            return None
+        result: dict[str, Any] | None = self._query_result.last_evaluated_key
+        return result
+
+    @property
+    def metrics(self) -> OperationMetrics | None:
+        """Metrics from the last page fetch."""
+        if self._query_result is None:
+            return None
+        metrics: OperationMetrics | None = self._query_result.metrics
+        return metrics
+
+    def _build_query(self) -> Any:
+        """Build the underlying AsyncQueryResult."""
+        from pydynox.query import AsyncQueryResult
+
+        client = self._model_class._get_client()
+        table = self._model_class._get_table()
+        hash_key_name = self._model_class._hash_key
+
+        if hash_key_name is None:
+            raise ValueError(f"Model {self._model_class.__name__} has no hash key defined")
+
+        # Build key condition expression
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        # Hash key condition
+        hk_name_placeholder = "#pk"
+        hk_value_placeholder = ":pkv"
+        names[hash_key_name] = hk_name_placeholder
+        values[hk_value_placeholder] = self._hash_key_value
+
+        key_condition = f"{hk_name_placeholder} = {hk_value_placeholder}"
+
+        # Add range key condition if provided
+        if self._range_key_condition is not None:
+            rk_expr = self._range_key_condition.serialize(names, values)
+            key_condition = f"{key_condition} AND {rk_expr}"
+
+        # Build filter expression if provided
+        filter_expr = None
+        if self._filter_condition is not None:
+            filter_expr = self._filter_condition.serialize(names, values)
+
+        # Convert names to DynamoDB format
+        attr_names = {placeholder: attr_name for attr_name, placeholder in names.items()}
+
+        # Determine consistent_read
+        use_consistent = self._consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(self._model_class.model_config, "consistent_read", False)
+
+        return AsyncQueryResult(
+            client._client,
+            table,
+            key_condition,
+            filter_expression=filter_expr,
+            expression_attribute_names=attr_names if attr_names else None,
+            expression_attribute_values=values if values else None,
+            limit=self._limit,
+            scan_index_forward=self._scan_index_forward,
+            last_evaluated_key=self._start_key,
+            acquire_rcu=client._acquire_rcu,
+            consistent_read=use_consistent,
+        )
+
+    def __aiter__(self) -> AsyncModelQueryResult[M]:
+        return self
+
+    async def __anext__(self) -> M:
+        # Initialize on first iteration
+        if not self._initialized:
+            self._query_result = self._build_query()
+            self._initialized = True
+
+        # Get next item from underlying query
+        try:
+            item = await self._query_result.__anext__()
+        except StopAsyncIteration:
+            raise
+
+        # Convert to model instance
+        instance = self._model_class.from_dict(item)
+
+        # Run after_load hooks
+        skip = (
+            self._model_class.model_config.skip_hooks
+            if hasattr(self._model_class, "model_config")
+            else False
+        )
+        if not skip:
+            instance._run_hooks(HookType.AFTER_LOAD)
+
+        return instance
+
+    async def first(self) -> M | None:
+        """Get the first result or None.
+
+        Example:
+            >>> user = await User.async_query(hash_key="USER#123").first()
+        """
+        try:
+            return await self.__anext__()
+        except StopAsyncIteration:
+            return None
 
 
 class ModelMeta(type):
@@ -260,6 +575,84 @@ class Model(metaclass=ModelMeta):
         if not skip:
             instance._run_hooks(HookType.AFTER_LOAD)
         return instance
+
+    @classmethod
+    def query(
+        cls: type[M],
+        hash_key: Any,
+        range_key_condition: Condition | None = None,
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+    ) -> ModelQueryResult[M]:
+        """Query items by hash key with optional conditions.
+
+        Args:
+            hash_key: The hash key value to query.
+            range_key_condition: Optional condition on the range key.
+                Use attribute methods like `begins_with`, `between`, `>`, `<`, etc.
+            filter_condition: Optional filter on non-key attributes.
+                Applied after the query, still consumes RCU for filtered items.
+            limit: Max items per page (not total).
+            scan_index_forward: Sort order. True = ascending (default), False = descending.
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
+                If None, uses model_config.consistent_read (default: False).
+            last_evaluated_key: Start key for pagination (from previous query).
+
+        Returns:
+            ModelQueryResult that yields typed model instances.
+
+        Example:
+            >>> # Simple query by hash key
+            >>> for user in User.query(hash_key="USER#123"):
+            ...     print(user.name)
+            >>>
+            >>> # With range key condition
+            >>> for order in Order.query(
+            ...     hash_key="USER#123",
+            ...     range_key_condition=Order.sk.begins_with("ORDER#"),
+            ... ):
+            ...     print(order.total)
+            >>>
+            >>> # With filter
+            >>> for user in User.query(
+            ...     hash_key="TENANT#1",
+            ...     filter_condition=User.age >= 18,
+            ... ):
+            ...     print(user.name)
+            >>>
+            >>> # Descending order with limit
+            >>> recent = list(User.query(
+            ...     hash_key="USER#123",
+            ...     limit=10,
+            ...     scan_index_forward=False,
+            ... ))
+            >>>
+            >>> # Get first result
+            >>> user = User.query(hash_key="USER#123").first()
+            >>>
+            >>> # Manual pagination
+            >>> results = User.query(hash_key="USER#123", limit=10)
+            >>> for user in results:
+            ...     process(user)
+            >>> if results.last_evaluated_key:
+            ...     next_page = User.query(
+            ...         hash_key="USER#123",
+            ...         last_evaluated_key=results.last_evaluated_key,
+            ...     )
+        """
+        return ModelQueryResult(
+            model_class=cls,
+            hash_key_value=hash_key,
+            range_key_condition=range_key_condition,
+            filter_condition=filter_condition,
+            limit=limit,
+            scan_index_forward=scan_index_forward,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+        )
 
     def save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
         """Save the model to DynamoDB.
@@ -685,6 +1078,49 @@ class Model(metaclass=ModelMeta):
         if not skip:
             instance._run_hooks(HookType.AFTER_LOAD)
         return instance
+
+    @classmethod
+    def async_query(
+        cls: type[M],
+        hash_key: Any,
+        range_key_condition: Condition | None = None,
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+    ) -> AsyncModelQueryResult[M]:
+        """Async version of query.
+
+        Args:
+            hash_key: The hash key value to query.
+            range_key_condition: Optional condition on the range key.
+            filter_condition: Optional filter on non-key attributes.
+            limit: Max items per page (not total).
+            scan_index_forward: Sort order. True = ascending, False = descending.
+            consistent_read: If True, use strongly consistent read (2x RCU cost).
+            last_evaluated_key: Start key for pagination.
+
+        Returns:
+            AsyncModelQueryResult that yields typed model instances.
+
+        Example:
+            >>> async for user in User.async_query(hash_key="USER#123"):
+            ...     print(user.name)
+            >>>
+            >>> # Get first result
+            >>> user = await User.async_query(hash_key="USER#123").first()
+        """
+        return AsyncModelQueryResult(
+            model_class=cls,
+            hash_key_value=hash_key,
+            range_key_condition=range_key_condition,
+            filter_condition=filter_condition,
+            limit=limit,
+            scan_index_forward=scan_index_forward,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+        )
 
     async def async_save(
         self, condition: Condition | None = None, skip_hooks: bool | None = None

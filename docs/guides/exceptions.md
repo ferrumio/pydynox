@@ -167,3 +167,10 @@ Common causes:
 4. **Check credentials early** - Call `client.ping()` at startup to catch credential issues
 
 5. **Handle connection errors gracefully** - Especially in Lambda where cold starts can cause timeouts
+
+
+## Next steps
+
+- [IAM permissions](iam-permissions.md) - Required AWS permissions
+- [Rate limiting](rate-limiting.md) - Avoid throttling errors
+- [Observability](observability.md) - Logging and metrics

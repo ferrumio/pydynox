@@ -132,3 +132,10 @@ Common errors:
 | Access denied | Missing IAM permissions |
 | Cannot encrypt in ReadOnly mode | Wrong mode for operation |
 | Cannot decrypt in WriteOnly mode | Wrong mode for operation |
+
+
+## Next steps
+
+- [Size calculator](size-calculator.md) - Check item sizes
+- [IAM permissions](iam-permissions.md) - KMS permissions
+- [Attributes](attributes.md) - All attribute types

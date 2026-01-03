@@ -269,6 +269,7 @@ except ThrottlingError:
 
 ## Next steps
 
+- [Query](query.md) - Query items by hash key with conditions
 - [Attribute types](attributes.md) - All available attribute types
 - [Indexes](indexes.md) - Query by non-key attributes with GSIs
 - [Conditions](conditions.md) - Conditional writes

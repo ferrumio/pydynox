@@ -176,3 +176,10 @@ Control which attributes are copied to the index:
 - GSIs are read-only. To update data, update the main table.
 - GSI queries are eventually consistent by default.
 - Each table can have up to 20 GSIs.
+
+
+## Next steps
+
+- [Conditions](conditions.md) - Filter and conditional writes
+- [Query](query.md) - Query items by hash key with conditions
+- [Tables](tables.md) - Create tables with GSIs

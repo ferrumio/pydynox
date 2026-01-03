@@ -165,3 +165,10 @@ Use regular `update()` with kwargs when:
 - You're the only writer
 - You need to set values based on other fields
 - You're doing a simple field update
+
+
+## Next steps
+
+- [Observability](observability.md) - Track metrics on every operation
+- [Conditions](conditions.md) - Add conditions to atomic updates
+- [Transactions](transactions.md) - Combine atomic updates in transactions

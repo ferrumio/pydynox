@@ -193,3 +193,10 @@ class Session(BaseModel):
 
 !!! note
     Remember to enable TTL on your DynamoDB table and set the attribute name to `expires_at`.
+
+
+## Next steps
+
+- [Dataclass](dataclass.md) - Use dataclasses with DynamoDB
+- [Models](models.md) - Native pydynox models
+- [Hooks](hooks.md) - Lifecycle hooks for validation

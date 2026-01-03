@@ -130,3 +130,10 @@ The error includes:
 - **Debugging size issues** - Find which fields are too big
 - **Setting limits** - Enforce smaller limits than 400KB for your app
 - **Monitoring** - Track item sizes over time
+
+
+## Next steps
+
+- [Pydantic](pydantic.md) - Use Pydantic models with DynamoDB
+- [Attributes](attributes.md) - All attribute types
+- [Batch operations](batch.md) - Work with multiple items

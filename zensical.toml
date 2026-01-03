@@ -15,6 +15,7 @@ nav = [
         "guides/attributes.md",
         "guides/indexes.md",
         "guides/conditions.md",
+        "guides/query.md",
         "guides/atomic-updates.md",
         "guides/observability.md",
     ] },

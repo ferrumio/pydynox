@@ -110,3 +110,10 @@ class User(Model):
 Hooks run for each item in a transaction. If you're saving 10 items in a transaction, `before_save` runs 10 times.
 
 If a hook raises an exception, the entire transaction fails and nothing is saved.
+
+
+## Next steps
+
+- [Auto-generate](auto-generate.md) - Generate IDs and timestamps
+- [Models](models.md) - Model CRUD operations
+- [Conditions](conditions.md) - Conditional writes

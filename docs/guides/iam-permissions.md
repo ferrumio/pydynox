@@ -174,3 +174,10 @@ A service that does CRUD, batch operations, and field encryption:
 - **Separate read and write** - Use different roles for read-only and write services
 - **Use KMS key aliases** - Easier to manage than key IDs in policies
 - **Test permissions** - Use IAM Policy Simulator to verify your policies
+
+
+## Next steps
+
+- [Client](client.md) - Configure the DynamoDB client
+- [Encryption](encryption.md) - KMS permissions for encryption
+- [Tables](tables.md) - Table management permissions

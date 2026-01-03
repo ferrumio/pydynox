@@ -144,3 +144,10 @@ class User:
 
 !!! note
     The `@dynamodb_model` decorator must come before `@dataclass` in the decorator order.
+
+
+## Next steps
+
+- [Exceptions](exceptions.md) - Error handling
+- [Models](models.md) - Native pydynox models
+- [Pydantic](pydantic.md) - Use Pydantic for validation

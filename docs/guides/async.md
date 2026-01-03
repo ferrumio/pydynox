@@ -99,3 +99,10 @@ Fetch user and their orders at the same time:
 - No extra dependencies needed
 - Works with any asyncio event loop
 - Hooks still run synchronously (before/after save, etc.)
+
+
+## Next steps
+
+- [Batch operations](batch.md) - Work with multiple items at once
+- [Transactions](transactions.md) - All-or-nothing operations
+- [Query](query.md) - Query items with async support

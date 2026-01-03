@@ -121,3 +121,10 @@ with BatchWriter(client, "users") as batch:
 
 !!! tip
     When doing bulk writes, combine rate limiting with batch operations. This gives you both efficiency (fewer API calls) and control (predictable throughput).
+
+
+## Next steps
+
+- [Encryption](encryption.md) - Field-level encryption with KMS
+- [Batch operations](batch.md) - Combine rate limiting with batch writes
+- [Observability](observability.md) - Track rate limit metrics

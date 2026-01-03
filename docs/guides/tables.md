@@ -122,3 +122,10 @@ client.wait_for_table_active("users", timeout_seconds=30)
 | `encryption` | str | `"AWS_OWNED"` | Encryption type |
 | `kms_key_id` | str | None | KMS key ARN |
 | `wait` | bool | False | Wait for table to be active |
+
+
+## Next steps
+
+- [Indexes](indexes.md) - Add GSIs to your tables
+- [IAM permissions](iam-permissions.md) - Required permissions for table operations
+- [Models](models.md) - Define models for your tables

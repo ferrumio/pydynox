@@ -64,7 +64,7 @@ from pydynox.config import (
 from pydynox.generators import AutoGenerate
 from pydynox.indexes import GlobalSecondaryIndex
 from pydynox.integrations.functions import dynamodb_model
-from pydynox.model import Model
+from pydynox.model import AsyncModelQueryResult, Model, ModelQueryResult
 from pydynox.query import QueryResult
 from pydynox.transaction import Transaction
 
@@ -77,11 +77,13 @@ __all__ = [
     "QueryResult",
     "Transaction",
     # Model ORM
+    "AsyncModelQueryResult",
     "AutoGenerate",
     "Condition",
     "GlobalSecondaryIndex",
     "Model",
     "ModelConfig",
+    "ModelQueryResult",
     # Metrics (public class for type hints)
     "OperationMetrics",
     # Logging

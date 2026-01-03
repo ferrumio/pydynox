@@ -318,3 +318,10 @@ Modes:
 | Unique values | `StringSetAttribute` / `NumberSetAttribute` |
 | Large text | `CompressedAttribute` |
 | Sensitive data | `EncryptedAttribute` |
+
+
+## Next steps
+
+- [Indexes](indexes.md) - Query by non-key attributes with GSIs
+- [Auto-generate](auto-generate.md) - Generate IDs and timestamps
+- [Encryption](encryption.md) - Field-level encryption with KMS
