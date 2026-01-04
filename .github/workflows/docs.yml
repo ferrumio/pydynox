@@ -6,6 +6,7 @@ on:
       - "docs/**"
       - "zensical.toml"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -36,14 +37,18 @@ jobs:
       - name: Build docs
         run: uv run zensical build
 
+      - name: Setup Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
       - name: Upload artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
-  # Only deploy on push to main, not on PRs
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
