@@ -205,6 +205,15 @@ session.save()
 | `ExpiresIn.days(n)` | n days from now |
 | `ExpiresIn.weeks(n)` | n weeks from now |
 
+Models with `TTLAttribute` also get:
+
+- `is_expired` - check if item expired
+- `expires_in` - get time remaining as timedelta
+- `extend_ttl()` - extend expiration and save
+
+!!! tip
+    See [TTL guide](ttl.md) for full documentation on expiration checking, extending TTL, and best practices.
+
 !!! warning
     TTL must be enabled on the DynamoDB table. The attribute name must match exactly.
 

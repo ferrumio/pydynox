@@ -23,9 +23,11 @@ nav = [
         "guides/async.md",
         "guides/batch.md",
         "guides/transactions.md",
+        "guides/partiql.md",
         "guides/tables.md",
     ] },
     { "Features" = [
+        "guides/ttl.md",
         "guides/hooks.md",
         "guides/auto-generate.md",
         "guides/rate-limiting.md",

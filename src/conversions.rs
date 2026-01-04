@@ -7,6 +7,14 @@ use std::collections::HashMap;
 
 use crate::serialization::{dynamo_to_py, py_to_dynamo};
 
+/// Convert a Python value to a DynamoDB AttributeValue.
+///
+/// This handles simple Python types (str, int, float, bool, None, list, dict).
+pub fn py_to_attribute_value(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<AttributeValue> {
+    let dynamo_dict = py_to_dynamo(py, value)?;
+    py_dict_to_attribute_value(py, dynamo_dict.bind(py))
+}
+
 /// Convert a Python dict to a HashMap of DynamoDB AttributeValues.
 pub fn py_dict_to_attribute_values(
     py: Python<'_>,
