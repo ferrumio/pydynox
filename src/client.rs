@@ -3,14 +3,17 @@
 //! Provides a flexible DynamoDB client that supports multiple credential sources:
 //! - Environment variables
 //! - Hardcoded credentials
-//! - AWS profiles
+//! - AWS profiles (including SSO)
+//! - AssumeRole (cross-account)
+//! - Default chain (instance profile, container, EKS IRSA, GitHub OIDC, etc.)
+//!
+//! Also supports client configuration:
+//! - Connect/read timeouts
+//! - Max retries
+//! - Proxy
 //!
 //! The main struct is [`DynamoDBClient`], which wraps the AWS SDK client.
 
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::profile::ProfileFileCredentialsProvider;
-use aws_config::BehaviorVersion;
-use aws_sdk_dynamodb::config::Credentials;
 use aws_sdk_dynamodb::Client;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
@@ -20,6 +23,7 @@ use tokio::runtime::Runtime;
 
 use crate::basic_operations;
 use crate::batch_operations;
+use crate::client_internal::{build_client, ClientConfig};
 use crate::metrics::OperationMetrics;
 use crate::table_operations;
 use crate::transaction_operations;
@@ -35,14 +39,21 @@ static RUNTIME: Lazy<Arc<Runtime>> =
 ///
 /// Supports multiple credential sources in order of priority:
 /// 1. Hardcoded credentials (access_key, secret_key, session_token)
-/// 2. AWS profile from ~/.aws/credentials
-/// 3. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-/// 4. Default credential chain (instance profile, etc.)
+/// 2. AssumeRole (cross-account access)
+/// 3. AWS profile from ~/.aws/credentials (supports SSO)
+/// 4. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+/// 5. Default credential chain (instance profile, container, EKS IRSA, GitHub OIDC, etc.)
+///
+/// Also supports client configuration:
+/// - connect_timeout: Connection timeout in seconds
+/// - read_timeout: Read timeout in seconds
+/// - max_retries: Maximum number of retries
+/// - proxy_url: HTTP/HTTPS proxy
 ///
 /// # Examples
 ///
 /// ```python
-/// # Use environment variables
+/// # Use environment variables or default chain
 /// client = DynamoDBClient()
 ///
 /// # Use hardcoded credentials
@@ -52,11 +63,24 @@ static RUNTIME: Lazy<Arc<Runtime>> =
 ///     region="us-east-1"
 /// )
 ///
-/// # Use AWS profile
+/// # Use AWS profile (supports SSO)
 /// client = DynamoDBClient(profile="my-profile")
 ///
 /// # Use local endpoint (localstack, moto)
 /// client = DynamoDBClient(endpoint_url="http://localhost:4566")
+///
+/// # AssumeRole for cross-account access
+/// client = DynamoDBClient(
+///     role_arn="arn:aws:iam::123456789012:role/MyRole",
+///     role_session_name="my-session"
+/// )
+///
+/// # With timeouts and retries
+/// client = DynamoDBClient(
+///     connect_timeout=5.0,
+///     read_timeout=30.0,
+///     max_retries=3
+/// )
 /// ```
 #[pyclass]
 pub struct DynamoDBClient {
@@ -75,14 +99,47 @@ impl DynamoDBClient {
     /// * `access_key` - AWS access key ID (optional)
     /// * `secret_key` - AWS secret access key (optional)
     /// * `session_token` - AWS session token for temporary credentials (optional)
-    /// * `profile` - AWS profile name from ~/.aws/credentials (optional)
+    /// * `profile` - AWS profile name from ~/.aws/credentials (supports SSO profiles)
     /// * `endpoint_url` - Custom endpoint URL for local testing (optional)
+    /// * `role_arn` - IAM role ARN for AssumeRole (optional)
+    /// * `role_session_name` - Session name for AssumeRole (optional, default: "pydynox-session")
+    /// * `external_id` - External ID for AssumeRole (optional)
+    /// * `connect_timeout` - Connection timeout in seconds (optional)
+    /// * `read_timeout` - Read timeout in seconds (optional)
+    /// * `max_retries` - Maximum number of retries (optional, default: 3)
+    /// * `proxy_url` - HTTP/HTTPS proxy URL (optional, e.g., "http://proxy:8080")
     ///
     /// # Returns
     ///
     /// A new DynamoDBClient instance.
+    ///
+    /// # Credential Resolution
+    ///
+    /// Credentials are resolved in this order:
+    /// 1. Hardcoded (access_key + secret_key)
+    /// 2. AssumeRole (if role_arn is set)
+    /// 3. Profile (if profile is set, supports SSO)
+    /// 4. Default chain (env vars, instance profile, container, WebIdentity, SSO)
+    ///
+    /// For EKS IRSA or GitHub Actions OIDC, just use `DynamoDBClient()` - the
+    /// default chain handles WebIdentity automatically via env vars.
     #[new]
-    #[pyo3(signature = (region=None, access_key=None, secret_key=None, session_token=None, profile=None, endpoint_url=None))]
+    #[pyo3(signature = (
+        region=None,
+        access_key=None,
+        secret_key=None,
+        session_token=None,
+        profile=None,
+        endpoint_url=None,
+        role_arn=None,
+        role_session_name=None,
+        external_id=None,
+        connect_timeout=None,
+        read_timeout=None,
+        max_retries=None,
+        proxy_url=None
+    ))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         region: Option<String>,
         access_key: Option<String>,
@@ -90,33 +147,44 @@ impl DynamoDBClient {
         session_token: Option<String>,
         profile: Option<String>,
         endpoint_url: Option<String>,
+        role_arn: Option<String>,
+        role_session_name: Option<String>,
+        external_id: Option<String>,
+        connect_timeout: Option<f64>,
+        read_timeout: Option<f64>,
+        max_retries: Option<u32>,
+        proxy_url: Option<String>,
     ) -> PyResult<Self> {
+        // Set proxy env var if provided (AWS SDK reads from env)
+        if let Some(ref proxy) = proxy_url {
+            std::env::set_var("HTTPS_PROXY", proxy);
+        }
+
+        let config = ClientConfig {
+            region: region.clone(),
+            access_key,
+            secret_key,
+            session_token,
+            profile,
+            endpoint_url,
+            role_arn,
+            role_session_name,
+            external_id,
+            connect_timeout,
+            read_timeout,
+            max_retries,
+            proxy_url,
+        };
+
         let runtime = RUNTIME.clone();
+        let final_region = config.effective_region();
 
-        let client = runtime
-            .block_on(async {
-                build_client(
-                    region.clone(),
-                    access_key,
-                    secret_key,
-                    session_token,
-                    profile,
-                    endpoint_url,
-                )
-                .await
-            })
-            .map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                    "Failed to create DynamoDB client: {}",
-                    e
-                ))
-            })?;
-
-        let final_region = region.unwrap_or_else(|| {
-            std::env::var("AWS_REGION")
-                .or_else(|_| std::env::var("AWS_DEFAULT_REGION"))
-                .unwrap_or_else(|_| "us-east-1".to_string())
-        });
+        let client = runtime.block_on(build_client(config)).map_err(|e| {
+            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                "Failed to create DynamoDB client: {}",
+                e
+            ))
+        })?;
 
         Ok(DynamoDBClient {
             client,
@@ -147,21 +215,6 @@ impl DynamoDBClient {
     }
 
     /// Put an item into a DynamoDB table.
-    ///
-    /// # Arguments
-    ///
-    /// * `table` - The name of the DynamoDB table
-    /// * `item` - A Python dict representing the item to save
-    /// * `condition_expression` - Optional condition expression
-    /// * `expression_attribute_names` - Optional name placeholders
-    /// * `expression_attribute_values` - Optional value placeholders
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    /// client.put_item("users", {"pk": "USER#123", "name": "John", "age": 30})
-    /// ```
     #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
     pub fn put_item(
         &self,
@@ -185,28 +238,6 @@ impl DynamoDBClient {
     }
 
     /// Get an item from a DynamoDB table by its key.
-    ///
-    /// # Arguments
-    ///
-    /// * `table` - The name of the DynamoDB table
-    /// * `key` - A Python dict with the key attributes (hash key and optional range key)
-    /// * `consistent_read` - If true, use strongly consistent read (2x RCU cost)
-    ///
-    /// # Returns
-    ///
-    /// The item as a Python dict if found, None if not found.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    /// item = client.get_item("users", {"pk": "USER#123"})
-    /// if item:
-    ///     print(item["name"])  # "John"
-    ///
-    /// # Strongly consistent read
-    /// item = client.get_item("users", {"pk": "USER#123"}, consistent_read=True)
-    /// ```
     #[pyo3(signature = (table, key, consistent_read=false))]
     pub fn get_item(
         &self,
@@ -219,35 +250,6 @@ impl DynamoDBClient {
     }
 
     /// Delete an item from a DynamoDB table.
-    ///
-    /// # Arguments
-    ///
-    /// * `table` - The name of the DynamoDB table
-    /// * `key` - A Python dict with the key attributes (hash key and optional range key)
-    /// * `condition_expression` - Optional condition expression string
-    /// * `expression_attribute_names` - Optional dict mapping name placeholders to attribute names
-    /// * `expression_attribute_values` - Optional dict mapping value placeholders to values
-    ///
-    /// # Returns
-    ///
-    /// None on success. Raises an exception if the condition fails or other errors occur.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// # Simple delete
-    /// client.delete_item("users", {"pk": "USER#123"})
-    ///
-    /// # Delete with condition
-    /// client.delete_item(
-    ///     "users",
-    ///     {"pk": "USER#123"},
-    ///     condition_expression="attribute_exists(#pk)",
-    ///     expression_attribute_names={"#pk": "pk"}
-    /// )
-    /// ```
     #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
     pub fn delete_item(
         &self,
@@ -271,51 +273,6 @@ impl DynamoDBClient {
     }
 
     /// Update an item in a DynamoDB table.
-    ///
-    /// Supports two modes:
-    /// 1. Simple updates via `updates` dict - sets field values directly
-    /// 2. Complex updates via `update_expression` - full DynamoDB update expression
-    ///
-    /// # Arguments
-    ///
-    /// * `table` - The name of the DynamoDB table
-    /// * `key` - A Python dict with the key attributes (hash key and optional range key)
-    /// * `updates` - Optional dict of field:value pairs for simple SET updates
-    /// * `update_expression` - Optional full update expression string
-    /// * `condition_expression` - Optional condition expression string
-    /// * `expression_attribute_names` - Optional dict mapping name placeholders to attribute names
-    /// * `expression_attribute_values` - Optional dict mapping value placeholders to values
-    ///
-    /// # Returns
-    ///
-    /// None on success. Raises an exception if the condition fails or other errors occur.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// # Simple update - set fields
-    /// client.update_item("users", {"pk": "USER#123"}, updates={"name": "John", "age": 31})
-    ///
-    /// # Atomic increment
-    /// client.update_item(
-    ///     "users",
-    ///     {"pk": "USER#123"},
-    ///     update_expression="SET #c = #c + :val",
-    ///     expression_attribute_names={"#c": "counter"},
-    ///     expression_attribute_values={":val": 1}
-    /// )
-    ///
-    /// # Update with condition
-    /// client.update_item(
-    ///     "users",
-    ///     {"pk": "USER#123"},
-    ///     updates={"status": "active"},
-    ///     condition_expression="attribute_exists(#pk)",
-    ///     expression_attribute_names={"#pk": "pk"}
-    /// )
-    /// ```
     #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn update_item(
@@ -344,29 +301,6 @@ impl DynamoDBClient {
     }
 
     /// Query a single page of items from a DynamoDB table.
-    ///
-    /// This is the internal method that returns a single page of results.
-    /// For automatic pagination, use the `query()` method from Python which
-    /// returns an iterator.
-    ///
-    /// # Arguments
-    ///
-    /// * `table` - The name of the DynamoDB table
-    /// * `key_condition_expression` - Key condition expression (e.g., "#pk = :pk")
-    /// * `filter_expression` - Optional filter expression for non-key attributes
-    /// * `expression_attribute_names` - Dict mapping name placeholders to attribute names
-    /// * `expression_attribute_values` - Dict mapping value placeholders to values
-    /// * `limit` - Optional max number of items to return
-    /// * `exclusive_start_key` - Optional key to start from (for pagination)
-    /// * `scan_index_forward` - Sort order (True = ascending, False = descending)
-    /// * `index_name` - Optional GSI or LSI name to query
-    /// * `consistent_read` - If true, use strongly consistent read (2x RCU cost)
-    ///
-    /// # Returns
-    ///
-    /// A tuple of (items, last_evaluated_key). Items is a list of dicts.
-    /// last_evaluated_key is None if there are no more items, or a dict to pass
-    /// as exclusive_start_key for the next page.
     #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
@@ -403,49 +337,6 @@ impl DynamoDBClient {
     }
 
     /// Batch write items to a DynamoDB table.
-    ///
-    /// Writes multiple items in a single request. Handles:
-    /// - Splitting requests to respect the 25-item limit per batch
-    /// - Retrying unprocessed items with exponential backoff
-    ///
-    /// # Arguments
-    ///
-    /// * `table` - The name of the DynamoDB table
-    /// * `put_items` - List of items to put (as dicts)
-    /// * `delete_keys` - List of keys to delete (as dicts)
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// # Batch put items
-    /// client.batch_write(
-    ///     "users",
-    ///     put_items=[
-    ///         {"pk": "USER#1", "sk": "PROFILE", "name": "Alice"},
-    ///         {"pk": "USER#2", "sk": "PROFILE", "name": "Bob"},
-    ///     ],
-    ///     delete_keys=[]
-    /// )
-    ///
-    /// # Batch delete items
-    /// client.batch_write(
-    ///     "users",
-    ///     put_items=[],
-    ///     delete_keys=[
-    ///         {"pk": "USER#3", "sk": "PROFILE"},
-    ///         {"pk": "USER#4", "sk": "PROFILE"},
-    ///     ]
-    /// )
-    ///
-    /// # Mixed put and delete
-    /// client.batch_write(
-    ///     "users",
-    ///     put_items=[{"pk": "USER#1", "sk": "PROFILE", "name": "Alice"}],
-    ///     delete_keys=[{"pk": "USER#2", "sk": "PROFILE"}]
-    /// )
-    /// ```
     pub fn batch_write(
         &self,
         py: Python<'_>,
@@ -464,35 +355,6 @@ impl DynamoDBClient {
     }
 
     /// Batch get items from a DynamoDB table.
-    ///
-    /// Gets multiple items in a single request. Handles:
-    /// - Splitting requests to respect the 100-item limit per batch
-    /// - Retrying unprocessed keys with exponential backoff
-    /// - Combining results from multiple requests
-    ///
-    /// # Arguments
-    ///
-    /// * `table` - The name of the DynamoDB table
-    /// * `keys` - List of keys to get (as dicts)
-    ///
-    /// # Returns
-    ///
-    /// A list of items (as dicts) that were found.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// # Batch get items
-    /// keys = [
-    ///     {"pk": "USER#1", "sk": "PROFILE"},
-    ///     {"pk": "USER#2", "sk": "PROFILE"},
-    /// ]
-    /// items = client.batch_get("users", keys)
-    /// for item in items:
-    ///     print(item["name"])
-    /// ```
     pub fn batch_get(
         &self,
         py: Python<'_>,
@@ -503,48 +365,6 @@ impl DynamoDBClient {
     }
 
     /// Execute a transactional write operation.
-    ///
-    /// All operations run atomically. Either all succeed or all fail.
-    /// Use this when you need data consistency across multiple items.
-    ///
-    /// # Arguments
-    ///
-    /// * `operations` - List of operation dicts, each with:
-    ///   - `type`: "put", "delete", "update", or "condition_check"
-    ///   - `table`: Table name
-    ///   - `item`: Item to put (for "put" type)
-    ///   - `key`: Key dict (for "delete", "update", "condition_check")
-    ///   - `update_expression`: Update expression (for "update" type)
-    ///   - `condition_expression`: Optional condition expression
-    ///   - `expression_attribute_names`: Optional name placeholders
-    ///   - `expression_attribute_values`: Optional value placeholders
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// # Transfer money between accounts atomically
-    /// client.transact_write([
-    ///     {
-    ///         "type": "update",
-    ///         "table": "accounts",
-    ///         "key": {"pk": "ACC#1", "sk": "BALANCE"},
-    ///         "update_expression": "SET #b = #b - :amt",
-    ///         "condition_expression": "#b >= :amt",
-    ///         "expression_attribute_names": {"#b": "balance"},
-    ///         "expression_attribute_values": {":amt": 100}
-    ///     },
-    ///     {
-    ///         "type": "update",
-    ///         "table": "accounts",
-    ///         "key": {"pk": "ACC#2", "sk": "BALANCE"},
-    ///         "update_expression": "SET #b = #b + :amt",
-    ///         "expression_attribute_names": {"#b": "balance"},
-    ///         "expression_attribute_values": {":amt": 100}
-    ///     }
-    /// ])
-    /// ```
     pub fn transact_write(
         &self,
         py: Python<'_>,
@@ -554,56 +374,6 @@ impl DynamoDBClient {
     }
 
     /// Create a new DynamoDB table.
-    ///
-    /// # Arguments
-    ///
-    /// * `table_name` - Name of the table to create
-    /// * `hash_key` - Tuple of (attribute_name, attribute_type) for the hash key
-    /// * `range_key` - Optional tuple of (attribute_name, attribute_type) for the range key
-    /// * `billing_mode` - "PAY_PER_REQUEST" (default) or "PROVISIONED"
-    /// * `read_capacity` - Read capacity units (only for PROVISIONED, default: 5)
-    /// * `write_capacity` - Write capacity units (only for PROVISIONED, default: 5)
-    /// * `table_class` - "STANDARD" (default) or "STANDARD_INFREQUENT_ACCESS"
-    /// * `encryption` - "AWS_OWNED" (default), "AWS_MANAGED", or "CUSTOMER_MANAGED"
-    /// * `kms_key_id` - KMS key ARN (required when encryption is "CUSTOMER_MANAGED")
-    /// * `global_secondary_indexes` - Optional list of GSI definitions
-    /// * `wait` - If true, wait for table to become ACTIVE (default: false)
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// # Create table with on-demand billing
-    /// client.create_table(
-    ///     "users",
-    ///     hash_key=("pk", "S"),
-    ///     range_key=("sk", "S")
-    /// )
-    ///
-    /// # Create table with GSI
-    /// client.create_table(
-    ///     "users",
-    ///     hash_key=("pk", "S"),
-    ///     range_key=("sk", "S"),
-    ///     global_secondary_indexes=[
-    ///         {
-    ///             "index_name": "email-index",
-    ///             "hash_key": ("email", "S"),
-    ///             "projection": "ALL",
-    ///         }
-    ///     ]
-    /// )
-    ///
-    /// # Create table with customer managed KMS encryption
-    /// client.create_table(
-    ///     "orders",
-    ///     hash_key=("pk", "S"),
-    ///     encryption="CUSTOMER_MANAGED",
-    ///     kms_key_id="arn:aws:kms:us-east-1:123456789:key/abc-123",
-    ///     wait=True
-    /// )
-    /// ```
     #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, wait=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn create_table(
@@ -626,7 +396,6 @@ impl DynamoDBClient {
             None => (None, None),
         };
 
-        // Parse GSI definitions if provided
         let gsis = match global_secondary_indexes {
             Some(list) => Some(table_operations::parse_gsi_definitions(py, list)?),
             None => None,
@@ -657,59 +426,16 @@ impl DynamoDBClient {
     }
 
     /// Check if a table exists.
-    ///
-    /// # Arguments
-    ///
-    /// * `table_name` - Name of the table to check
-    ///
-    /// # Returns
-    ///
-    /// True if the table exists, false otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// if not client.table_exists("users"):
-    ///     client.create_table("users", hash_key=("pk", "S"))
-    /// ```
     pub fn table_exists(&self, table_name: &str) -> PyResult<bool> {
         table_operations::table_exists(&self.client, &self.runtime, table_name)
     }
 
     /// Delete a table.
-    ///
-    /// # Arguments
-    ///
-    /// * `table_name` - Name of the table to delete
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    /// client.delete_table("users")
-    /// ```
     pub fn delete_table(&self, table_name: &str) -> PyResult<()> {
         table_operations::delete_table(&self.client, &self.runtime, table_name)
     }
 
     /// Wait for a table to become active.
-    ///
-    /// Polls the table status until it becomes ACTIVE or times out.
-    ///
-    /// # Arguments
-    ///
-    /// * `table_name` - Name of the table to wait for
-    /// * `timeout_seconds` - Maximum time to wait (default: 60)
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    /// client.create_table("users", hash_key=("pk", "S"))
-    /// client.wait_for_table_active("users", timeout_seconds=30)
-    /// ```
     #[pyo3(signature = (table_name, timeout_seconds=None))]
     pub fn wait_for_table_active(
         &self,
@@ -726,20 +452,7 @@ impl DynamoDBClient {
 
     // ========== ASYNC METHODS ==========
 
-    /// Async version of get_item. Returns a Python awaitable.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// async def main():
-    ///     client = DynamoDBClient()
-    ///     result = await client.async_get_item("users", {"pk": "USER#123"})
-    ///     if result["item"]:
-    ///         print(result["item"]["name"])
-    ///
-    ///     # Strongly consistent read
-    ///     result = await client.async_get_item("users", {"pk": "USER#123"}, consistent_read=True)
-    /// ```
+    /// Async version of get_item.
     #[pyo3(signature = (table, key, consistent_read=false))]
     pub fn async_get_item<'py>(
         &self,
@@ -757,15 +470,7 @@ impl DynamoDBClient {
         )
     }
 
-    /// Async version of put_item. Returns a Python awaitable.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// async def main():
-    ///     client = DynamoDBClient()
-    ///     metrics = await client.async_put_item("users", {"pk": "USER#123", "name": "John"})
-    /// ```
+    /// Async version of put_item.
     #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
     pub fn async_put_item<'py>(
         &self,
@@ -787,15 +492,7 @@ impl DynamoDBClient {
         )
     }
 
-    /// Async version of delete_item. Returns a Python awaitable.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// async def main():
-    ///     client = DynamoDBClient()
-    ///     metrics = await client.async_delete_item("users", {"pk": "USER#123"})
-    /// ```
+    /// Async version of delete_item.
     #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
     pub fn async_delete_item<'py>(
         &self,
@@ -817,19 +514,7 @@ impl DynamoDBClient {
         )
     }
 
-    /// Async version of update_item. Returns a Python awaitable.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// async def main():
-    ///     client = DynamoDBClient()
-    ///     metrics = await client.async_update_item(
-    ///         "users",
-    ///         {"pk": "USER#123"},
-    ///         updates={"name": "John", "age": 31}
-    ///     )
-    /// ```
+    /// Async version of update_item.
     #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn async_update_item<'py>(
@@ -856,22 +541,7 @@ impl DynamoDBClient {
         )
     }
 
-    /// Async version of query_page. Returns a Python awaitable.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// async def main():
-    ///     client = DynamoDBClient()
-    ///     result = await client.async_query_page(
-    ///         "users",
-    ///         "#pk = :pk",
-    ///         expression_attribute_names={"#pk": "pk"},
-    ///         expression_attribute_values={":pk": "USER#123"}
-    ///     )
-    ///     for item in result["items"]:
-    ///         print(item)
-    /// ```
+    /// Async version of query_page.
     #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn async_query_page<'py>(
@@ -907,37 +577,6 @@ impl DynamoDBClient {
     // ========== PARTIQL OPERATIONS ==========
 
     /// Execute a PartiQL statement.
-    ///
-    /// PartiQL is a SQL-compatible query language for DynamoDB.
-    ///
-    /// # Arguments
-    ///
-    /// * `statement` - The PartiQL statement to execute
-    /// * `parameters` - Optional list of parameter values for ? placeholders
-    /// * `consistent_read` - If true, use strongly consistent read
-    /// * `next_token` - Optional token for pagination
-    ///
-    /// # Returns
-    ///
-    /// A tuple of (items, next_token, metrics).
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// client = DynamoDBClient()
-    ///
-    /// # Simple select
-    /// items, _, metrics = client.execute_statement(
-    ///     "SELECT * FROM users WHERE pk = ?",
-    ///     parameters=["USER#123"]
-    /// )
-    ///
-    /// # With multiple parameters
-    /// items, _, metrics = client.execute_statement(
-    ///     "SELECT * FROM users WHERE pk = ? AND age > ?",
-    ///     parameters=["USER#123", 18]
-    /// )
-    /// ```
     #[pyo3(signature = (statement, parameters=None, consistent_read=false, next_token=None))]
     pub fn execute_statement(
         &self,
@@ -958,20 +597,7 @@ impl DynamoDBClient {
         )
     }
 
-    /// Async version of execute_statement. Returns a Python awaitable.
-    ///
-    /// # Examples
-    ///
-    /// ```python
-    /// async def main():
-    ///     client = DynamoDBClient()
-    ///     result = await client.async_execute_statement(
-    ///         "SELECT * FROM users WHERE pk = ?",
-    ///         parameters=["USER#123"]
-    ///     )
-    ///     for item in result["items"]:
-    ///         print(item)
-    /// ```
+    /// Async version of execute_statement.
     #[pyo3(signature = (statement, parameters=None, consistent_read=false, next_token=None))]
     pub fn async_execute_statement<'py>(
         &self,
@@ -990,42 +616,4 @@ impl DynamoDBClient {
             next_token,
         )
     }
-}
-
-/// Build the AWS SDK DynamoDB client with the given configuration.
-async fn build_client(
-    region: Option<String>,
-    access_key: Option<String>,
-    secret_key: Option<String>,
-    session_token: Option<String>,
-    profile: Option<String>,
-    endpoint_url: Option<String>,
-) -> Result<Client, String> {
-    let region_provider =
-        RegionProviderChain::first_try(region.map(aws_sdk_dynamodb::config::Region::new))
-            .or_default_provider()
-            .or_else("us-east-1");
-
-    let mut config_loader = aws_config::defaults(BehaviorVersion::latest()).region(region_provider);
-
-    // Credentials priority: hardcoded > profile > env/default chain
-    if let (Some(ak), Some(sk)) = (access_key, secret_key) {
-        let creds = Credentials::new(ak, sk, session_token, None, "pydynox-hardcoded");
-        config_loader = config_loader.credentials_provider(creds);
-    } else if let Some(profile_name) = profile {
-        let profile_provider = ProfileFileCredentialsProvider::builder()
-            .profile_name(&profile_name)
-            .build();
-        config_loader = config_loader.credentials_provider(profile_provider);
-    }
-
-    let sdk_config = config_loader.load().await;
-
-    let mut dynamo_config = aws_sdk_dynamodb::config::Builder::from(&sdk_config);
-
-    if let Some(url) = endpoint_url {
-        dynamo_config = dynamo_config.endpoint_url(url);
-    }
-
-    Ok(Client::from_conf(dynamo_config.build()))
 }

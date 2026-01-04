@@ -1452,6 +1452,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
  "aws-sdk-kms",
+ "aws-sdk-sts",
  "base64",
  "chrono",
  "flate2",

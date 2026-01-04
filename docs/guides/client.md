@@ -1,37 +1,63 @@
 # DynamoDBClient
 
-The DynamoDBClient is your connection to AWS. Configure it once, use it everywhere.
+The DynamoDBClient is the connection between your code and DynamoDB. It handles authentication, network calls, retries, and timeouts.
+
+## Why use it?
+
+pydynox Models need a client to talk to DynamoDB. You can either:
+
+1. Set a default client once at app startup (recommended)
+2. Pass a client to each model's config
+
+The client wraps the AWS SDK and adds features like rate limiting. It's built in Rust for speed.
 
 ## Key features
 
-- Multiple credential sources (profile, env vars, explicit)
+- Multiple credential sources (env vars, profile, SSO, AssumeRole)
+- Timeout and retry configuration
 - Rate limiting built-in
-- Local development support (DynamoDB Local, LocalStack)
-- Set a default client for all models
+- Local development support
 
-## Getting started
-
-### Basic setup
+## Basic usage
 
 === "basic_client.py"
     ```python
     --8<-- "docs/examples/client/basic_client.py"
     ```
 
-By default, the client uses the standard AWS credential chain:
+By default, the client uses the AWS credential chain: env vars, profile, instance profile, EKS IRSA, etc.
 
-1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
-2. Shared credentials file (`~/.aws/credentials`)
-3. Instance profile (EC2, ECS, Lambda)
+## Credentials
 
-### Using a profile
+pydynox supports multiple ways to authenticate. Pick the one that fits your environment.
+
+### Environment variables
+
+Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The client picks them up automatically. Good for local dev and CI/CD.
+
+### Profile (including SSO)
+
+Use a named profile from `~/.aws/credentials` or `~/.aws/config`. Works with SSO profiles too. Good for local dev with multiple AWS accounts.
 
 === "client_with_profile.py"
     ```python
     --8<-- "docs/examples/client/client_with_profile.py"
     ```
 
+For SSO profiles, run `aws sso login --profile my-profile` first.
+
+### AssumeRole
+
+Assume an IAM role in another account. Good for cross-account access or when you need temporary elevated permissions.
+
+=== "client_assume_role.py"
+    ```python
+    --8<-- "docs/examples/client/client_assume_role.py"
+    ```
+
 ### Explicit credentials
+
+Pass credentials directly. Good for testing or when credentials come from a secrets manager. Avoid hardcoding in production.
 
 === "client_with_credentials.py"
     ```python
@@ -39,7 +65,25 @@ By default, the client uses the standard AWS credential chain:
     ```
 
 !!! warning
-    Don't hardcode credentials in your code. Use environment variables or profiles instead.
+    Don't hardcode credentials. Use env vars or profiles instead.
+
+### EKS IRSA / GitHub Actions OIDC
+
+These work automatically via the default credential chain. The env vars are injected by EKS or GitHub Actions. Just use `DynamoDBClient()` with no config. Good for Kubernetes and CI/CD pipelines.
+
+## Configuration
+
+### Timeouts and retries
+
+=== "client_timeouts.py"
+    ```python
+    --8<-- "docs/examples/client/client_timeouts.py"
+    ```
+
+=== "client_retries.py"
+    ```python
+    --8<-- "docs/examples/client/client_retries.py"
+    ```
 
 ### Local development
 
@@ -48,178 +92,94 @@ By default, the client uses the standard AWS credential chain:
     --8<-- "docs/examples/client/client_local.py"
     ```
 
+### Proxy
+
+=== "client_proxy.py"
+    ```python
+    --8<-- "docs/examples/client/client_proxy.py"
+    ```
+
 ## Default client
 
-Instead of passing a client to each model, set a default client once:
+Set a default client once instead of passing it to each model:
 
 === "default_client.py"
     ```python
     --8<-- "docs/examples/client/default_client.py"
     ```
 
-### How it works
-
-When a model needs a client, it looks in this order:
-
-1. `model_config.client` - if you passed one explicitly
-2. Default client - set via `set_default_client()`
-3. Error - if neither is set
-
-### Override per model
-
-You can still use a different client for specific models:
+Override per model if needed:
 
 ```python
-# Default for most models
 set_default_client(prod_client)
 
 # Different client for audit logs
-audit_client = DynamoDBClient(region="eu-west-1")
-
 class AuditLog(Model):
-    model_config = ModelConfig(
-        table="audit_logs",
-        client=audit_client,  # Uses this instead of default
-    )
+    model_config = ModelConfig(table="audit_logs", client=audit_client)
     pk = StringAttribute(hash_key=True)
 ```
 
 ## Rate limiting
-
-Control how fast you hit DynamoDB. Useful to avoid throttling or stay within budget.
 
 === "client_with_rate_limit.py"
     ```python
     --8<-- "docs/examples/client/client_with_rate_limit.py"
     ```
 
-See the [rate limiting guide](06-rate-limiting.md) for more details.
+See [rate limiting](rate-limiting.md) for details.
 
-## Constructor options
+## Constructor reference
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `region` | str | None | AWS region (e.g., "us-east-1") |
-| `profile` | str | None | AWS profile name from ~/.aws/credentials |
-| `access_key` | str | None | AWS access key ID |
-| `secret_key` | str | None | AWS secret access key |
-| `session_token` | str | None | AWS session token (for temporary credentials) |
-| `endpoint_url` | str | None | Custom endpoint (for local development) |
-| `rate_limit` | FixedRate or AdaptiveRate | None | Rate limiter |
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `region` | str | AWS region |
+| `profile` | str | AWS profile name (supports SSO) |
+| `access_key` | str | AWS access key ID |
+| `secret_key` | str | AWS secret access key |
+| `session_token` | str | Session token for temporary credentials |
+| `endpoint_url` | str | Custom endpoint for local dev |
+| `role_arn` | str | IAM role ARN for AssumeRole |
+| `role_session_name` | str | Session name for AssumeRole |
+| `external_id` | str | External ID for AssumeRole |
+| `connect_timeout` | float | Connection timeout (seconds) |
+| `read_timeout` | float | Read timeout (seconds) |
+| `max_retries` | int | Max retry attempts |
+| `proxy_url` | str | HTTP/HTTPS proxy URL |
+| `rate_limit` | FixedRate/AdaptiveRate | Rate limiter |
 
 ## Methods
 
-### ping()
+Most of the time you'll use Models instead of these methods directly. But they're useful for quick operations or when you need more control.
 
-Check if the client can connect to DynamoDB.
+### Sync methods
 
-```python
-if client.ping():
-    print("Connected!")
-```
+| Method | Description |
+|--------|-------------|
+| `ping()` | Check if the client can connect to DynamoDB. Returns `True` or `False`. |
+| `get_region()` | Get the AWS region this client is configured for. |
+| `put_item(table, item)` | Save an item to a table. Overwrites if the key exists. |
+| `get_item(table, key)` | Get a single item by its primary key. Returns `None` if not found. |
+| `delete_item(table, key)` | Delete an item by its primary key. |
+| `update_item(table, key, updates)` | Update specific attributes without replacing the whole item. |
+| `query(table, key_condition, ...)` | Find items by partition key. Supports filtering and pagination. |
+| `batch_write(table, put_items, delete_keys)` | Write up to 25 items in one request. Faster than individual puts. |
+| `batch_get(table, keys)` | Get up to 100 items in one request. Faster than individual gets. |
+| `transact_write(operations)` | Write multiple items atomically. All succeed or all fail. |
 
-### get_region()
+### Async methods
 
-Get the configured region.
+| Method | Description |
+|--------|-------------|
+| `async_put_item(table, item)` | Async version of put_item. |
+| `async_get_item(table, key)` | Async version of get_item. |
+| `async_delete_item(table, key)` | Async version of delete_item. |
+| `async_update_item(table, key, updates)` | Async version of update_item. |
+| `async_query(table, key_condition, ...)` | Async version of query. |
 
-```python
-region = client.get_region()
-print(f"Using region: {region}")
-```
-
-### Low-level operations
-
-The client has methods for direct DynamoDB operations. Each sync method has an async version with `async_` prefix:
-
-| Sync | Async | Description |
-|------|-------|-------------|
-| `put_item(table, item)` | `async_put_item(table, item)` | Save an item |
-| `get_item(table, key)` | `async_get_item(table, key)` | Get an item by key |
-| `delete_item(table, key)` | `async_delete_item(table, key)` | Delete an item |
-| `update_item(table, key, updates)` | `async_update_item(table, key, updates)` | Update an item |
-| `query(table, key_condition, ...)` | `async_query(table, key_condition, ...)` | Query items |
-| `batch_write(table, put_items, delete_keys)` | - | Batch write |
-| `batch_get(table, keys)` | - | Batch get |
-| `transact_write(operations)` | - | Transaction |
-
-All operations return metrics (duration, RCU/WCU consumed). See [observability](observability.md) for details.
-
-### Consistent reads
-
-`get_item` and `query` support strongly consistent reads:
-
-=== "consistent_read.py"
-    ```python
-    --8<-- "docs/examples/client/consistent_read.py"
-    ```
-
-By default, reads are eventually consistent. Pass `consistent_read=True` when you need the latest data.
-
-See [async support](async.md) for more details on async operations.
-
-Most of the time you'll use the Model ORM instead of these methods directly.
-
-## Credential priority
-
-When multiple credential sources are available, the client uses this order:
-
-1. Explicit credentials (`access_key`, `secret_key`)
-2. Profile (`profile`)
-3. Environment variables
-4. Default credential chain (instance profile, etc.)
-
-## Tips
-
-- Set `set_default_client()` once at app startup
-- Use profiles for local development
-- Use instance profiles in production (no credentials in code)
-- Add rate limiting if you're doing bulk operations
-
-## boto3 vs pydynox
-
-### What we support today
-
-| Feature | boto3 | pydynox |
-|---------|-------|---------|
-| Environment variables | ✅ | ✅ |
-| AWS profiles | ✅ | ✅ |
-| Explicit credentials | ✅ | ✅ |
-| Session token | ✅ | ✅ |
-| Custom endpoint | ✅ | ✅ |
-| Region config | ✅ | ✅ |
-| Rate limiting | ❌ | ✅ |
-
-### What's coming
-
-| Feature | boto3 | pydynox | Coming soon |
-|---------|-------|---------|-------------|
-| Session object | ✅ | ❌ | 🚧 |
-| Assume role | ✅ | ❌ | 🚧 |
-| STS credentials | ✅ | ❌ | 🚧 |
-| Custom retry config | ✅ | ❌ | 🚧 |
-| Request/response hooks | ✅ | ❌ | 🚧 |
-
-### Workaround for now
-
-If you need assume role or STS, get temporary credentials outside pydynox and pass them directly:
-
-```python
-# Get credentials from STS (using boto3 or AWS CLI)
-# Then pass them to pydynox
-client = DynamoDBClient(
-    access_key=temp_credentials["AccessKeyId"],
-    secret_key=temp_credentials["SecretAccessKey"],
-    session_token=temp_credentials["SessionToken"],
-)
-```
-
-### Missing something?
-
-Open a [feature request](https://github.com/leandrodamascena/pydynox/issues/new?template=feature_request.md) on GitHub. We prioritize based on community feedback.
-
+See [async operations](async.md) for examples and best practices.
 
 ## Next steps
 
 - [Models](models.md) - Define models with typed attributes
 - [Rate limiting](rate-limiting.md) - Control throughput
-- [Observability](observability.md) - Logging and metrics
+- [Async](async.md) - Async operations

@@ -26,6 +26,13 @@ class DynamoDBClient:
         session_token: str | None = None,
         profile: str | None = None,
         endpoint_url: str | None = None,
+        role_arn: str | None = None,
+        role_session_name: str | None = None,
+        external_id: str | None = None,
+        connect_timeout: float | None = None,
+        read_timeout: float | None = None,
+        max_retries: int | None = None,
+        proxy_url: str | None = None,
     ) -> None: ...
     def get_region(self) -> str: ...
     def ping(self) -> bool: ...
