@@ -20,12 +20,13 @@ class DynamoDBClient:
 
     Supports multiple credential sources in order of priority:
     1. Hardcoded credentials (access_key, secret_key, session_token)
-    2. AWS profile from ~/.aws/credentials
-    3. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
-    4. Default credential chain (instance profile, etc.)
+    2. AssumeRole (cross-account access)
+    3. AWS profile from ~/.aws/credentials (supports SSO)
+    4. Environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    5. Default credential chain (instance profile, container, EKS IRSA, GitHub OIDC)
 
     Example:
-        >>> # Use environment variables
+        >>> # Use environment variables or default chain
         >>> client = DynamoDBClient()
 
         >>> # Use hardcoded credentials
@@ -35,16 +36,28 @@ class DynamoDBClient:
         ...     region="us-east-1"
         ... )
 
-        >>> # Use AWS profile
-        >>> client = DynamoDBClient(profile="my-profile")
+        >>> # Use AWS profile (supports SSO)
+        >>> client = DynamoDBClient(profile="my-sso-profile")
 
         >>> # Use local endpoint (localstack, moto)
         >>> client = DynamoDBClient(endpoint_url="http://localhost:4566")
 
+        >>> # AssumeRole for cross-account access
+        >>> client = DynamoDBClient(
+        ...     role_arn="arn:aws:iam::123456789012:role/MyRole",
+        ...     role_session_name="my-session"
+        ... )
+
+        >>> # With timeouts and retries
+        >>> client = DynamoDBClient(
+        ...     connect_timeout=5.0,
+        ...     read_timeout=30.0,
+        ...     max_retries=3
+        ... )
+
         >>> # With rate limiting
         >>> from pydynox import FixedRate, AdaptiveRate
         >>> client = DynamoDBClient(rate_limit=FixedRate(rcu=50))
-        >>> client = DynamoDBClient(rate_limit=AdaptiveRate(max_rcu=100))
     """
 
     def __init__(
@@ -55,6 +68,13 @@ class DynamoDBClient:
         session_token: str | None = None,
         profile: str | None = None,
         endpoint_url: str | None = None,
+        role_arn: str | None = None,
+        role_session_name: str | None = None,
+        external_id: str | None = None,
+        connect_timeout: float | None = None,
+        read_timeout: float | None = None,
+        max_retries: int | None = None,
+        proxy_url: str | None = None,
         rate_limit: FixedRate | AdaptiveRate | None = None,
     ):
         from pydynox import pydynox_core
@@ -66,6 +86,13 @@ class DynamoDBClient:
             session_token=session_token,
             profile=profile,
             endpoint_url=endpoint_url,
+            role_arn=role_arn,
+            role_session_name=role_session_name,
+            external_id=external_id,
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+            max_retries=max_retries,
+            proxy_url=proxy_url,
         )
         self._rate_limit = rate_limit
 
