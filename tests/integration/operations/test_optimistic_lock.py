@@ -219,30 +219,39 @@ async def test_async_delete_with_version_check(versioned_model):
 
 
 async def test_high_concurrency_only_one_wins(versioned_model):
-    """High concurrency: Only one concurrent save succeeds."""
+    """High concurrency: Only one concurrent save succeeds per version."""
     # Create initial document
     doc = versioned_model(pk="CONCURRENT#1", sk="DOC#1", content="Original")
     await doc.async_save()
 
     num_concurrent = 10
+
+    # Load all documents FIRST, then save concurrently
+    # This ensures all workers have the same version
+    loaded_docs = []
+    for i in range(num_concurrent):
+        loaded = await versioned_model.async_get(pk="CONCURRENT#1", sk="DOC#1")
+        assert loaded is not None
+        loaded.content = f"Updated by worker {i}"
+        loaded_docs.append(loaded)
+
+    # All should have version 1
+    for d in loaded_docs:
+        assert d.version == 1
+
     success_count = 0
     failure_count = 0
 
-    async def try_update(worker_id: int):
+    async def try_save(doc_to_save):
         nonlocal success_count, failure_count
-        loaded = await versioned_model.async_get(pk="CONCURRENT#1", sk="DOC#1")
-        if loaded is None:
-            return
-
-        loaded.content = f"Updated by worker {worker_id}"
         try:
-            await loaded.async_save()
+            await doc_to_save.async_save()
             success_count += 1
         except ConditionCheckFailedError:
             failure_count += 1
 
-    # Run all updates concurrently
-    await asyncio.gather(*[try_update(i) for i in range(num_concurrent)])
+    # Run all saves concurrently
+    await asyncio.gather(*[try_save(d) for d in loaded_docs])
 
     # Only one should succeed
     assert success_count == 1
