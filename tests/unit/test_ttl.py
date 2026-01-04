@@ -31,7 +31,7 @@ def test_expires_in_methods(method, kwargs, expected_delta):
     """ExpiresIn methods return correct datetime offset."""
     now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-    with patch("pydynox.attributes.datetime") as mock_dt:
+    with patch("pydynox.attributes.ttl.datetime") as mock_dt:
         mock_dt.now.return_value = now
         mock_dt.fromtimestamp = datetime.fromtimestamp
 

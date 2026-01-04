@@ -81,7 +81,7 @@ def test_encrypted_attribute_none_value():
     assert attr.deserialize(None) is None
 
 
-@patch("pydynox.attributes.KmsEncryptor")
+@patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
     """serialize calls encryptor.encrypt."""
     mock_encryptor = MagicMock()
@@ -95,7 +95,7 @@ def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
     assert result == "ENC:encrypted_data"
 
 
-@patch("pydynox.attributes.KmsEncryptor")
+@patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_deserialize_calls_decrypt(mock_kms_class):
     """deserialize calls encryptor.decrypt for encrypted values."""
     mock_encryptor = MagicMock()
@@ -119,7 +119,7 @@ def test_encrypted_attribute_deserialize_plain_value():
     assert result == "plain text"
 
 
-@patch("pydynox.attributes.KmsEncryptor")
+@patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_lazy_loads_encryptor(mock_kms_class):
     """Encryptor is created on first use, not on init."""
     attr = EncryptedAttribute(
@@ -156,7 +156,7 @@ def test_encrypted_attribute_readonly_skips_encrypt():
     assert result == "secret"
 
 
-@patch("pydynox.attributes.KmsEncryptor")
+@patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_writeonly_skips_decrypt(mock_kms_class):
     """WriteOnly mode returns encrypted value as-is on deserialize."""
     mock_kms_class.is_encrypted.return_value = True
@@ -169,7 +169,7 @@ def test_encrypted_attribute_writeonly_skips_decrypt(mock_kms_class):
     assert result == "ENC:encrypted_data"
 
 
-@patch("pydynox.attributes.KmsEncryptor")
+@patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_readwrite_can_do_both(mock_kms_class):
     """ReadWrite mode allows both encrypt and decrypt."""
     mock_encryptor = MagicMock()
