@@ -68,7 +68,7 @@ from pydynox.model import AsyncModelQueryResult, Model, ModelQueryResult
 from pydynox.query import QueryResult
 from pydynox.transaction import Transaction
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 
 __all__ = [
     # Client
