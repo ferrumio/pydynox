@@ -13,7 +13,9 @@ from pydynox._internal._results import (
     ModelQueryResult,
     ModelScanResult,
 )
+from pydynox._internal._s3 import S3File, S3Value
 from pydynox.attributes import Attribute
+from pydynox.attributes.s3 import S3Attribute
 from pydynox.attributes.ttl import TTLAttribute
 from pydynox.attributes.version import VersionAttribute
 from pydynox.client import DynamoDBClient
@@ -372,6 +374,9 @@ class Model(metaclass=ModelMeta):
 
         self._apply_auto_generate()
 
+        # Upload S3 files before serialization
+        self._upload_s3_files()
+
         version_attr = self._get_version_attr_name()
         version_condition, new_version = self._build_version_condition()
 
@@ -459,6 +464,9 @@ class Model(metaclass=ModelMeta):
             )
         else:
             client.delete_item(table, key)
+
+        # Delete S3 files after DynamoDB delete succeeds
+        self._delete_s3_files()
 
         if not skip:
             self._run_hooks(HookType.AFTER_DELETE)
@@ -590,6 +598,44 @@ class Model(metaclass=ModelMeta):
             return path.does_not_exist(), 1
         else:
             return path == current_version, current_version + 1
+
+    def _upload_s3_files(self) -> None:
+        """Upload S3File values to S3 and replace with S3Value."""
+        client = self._get_client()
+        for attr_name, attr in self._attributes.items():
+            if isinstance(attr, S3Attribute):
+                value = getattr(self, attr_name, None)
+                if isinstance(value, S3File):
+                    s3_value = attr.upload_to_s3(value, self, client)
+                    setattr(self, attr_name, s3_value)
+
+    async def _async_upload_s3_files(self) -> None:
+        """Async upload S3File values to S3 and replace with S3Value."""
+        client = self._get_client()
+        for attr_name, attr in self._attributes.items():
+            if isinstance(attr, S3Attribute):
+                value = getattr(self, attr_name, None)
+                if isinstance(value, S3File):
+                    s3_value = await attr.async_upload_to_s3(value, self, client)
+                    setattr(self, attr_name, s3_value)
+
+    def _delete_s3_files(self) -> None:
+        """Delete S3 files associated with this model."""
+        client = self._get_client()
+        for attr_name, attr in self._attributes.items():
+            if isinstance(attr, S3Attribute):
+                value = getattr(self, attr_name, None)
+                if isinstance(value, S3Value):
+                    attr.delete_from_s3(value, client)
+
+    async def _async_delete_s3_files(self) -> None:
+        """Async delete S3 files associated with this model."""
+        client = self._get_client()
+        for attr_name, attr in self._attributes.items():
+            if isinstance(attr, S3Attribute):
+                value = getattr(self, attr_name, None)
+                if isinstance(value, S3Value):
+                    await attr.async_delete_from_s3(value, client)
 
     @property
     def is_expired(self) -> bool:
@@ -743,6 +789,9 @@ class Model(metaclass=ModelMeta):
 
         self._apply_auto_generate()
 
+        # Upload S3 files before serialization
+        await self._async_upload_s3_files()
+
         version_attr = self._get_version_attr_name()
         version_condition, new_version = self._build_version_condition()
 
@@ -832,6 +881,9 @@ class Model(metaclass=ModelMeta):
             )
         else:
             await client.async_delete_item(table, key)
+
+        # Delete S3 files after DynamoDB delete succeeds
+        await self._async_delete_s3_files()
 
         if not skip:
             self._run_hooks(HookType.AFTER_DELETE)

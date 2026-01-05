@@ -17,11 +17,12 @@ mod client;
 mod client_internal;
 mod compression;
 mod conversions;
-mod encryption;
 mod errors;
 mod generators;
+mod kms;
 mod metrics;
 pub mod rate_limiter;
+mod s3;
 mod serialization;
 mod table_operations;
 mod tracing;
@@ -56,8 +57,8 @@ fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Register compression functions
     compression::register_compression(m)?;
 
-    // Register encryption classes
-    encryption::register_encryption(m)?;
+    // Register KMS encryption classes
+    kms::register_kms(m)?;
 
     // Register metrics class
     metrics::register_metrics(m)?;
@@ -67,6 +68,9 @@ fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register generator functions
     generators::register_generators(m)?;
+
+    // Register S3 operations
+    s3::register_s3(m)?;
 
     Ok(())
 }

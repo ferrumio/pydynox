@@ -40,6 +40,16 @@ I reserve the right to reject low-quality PRs where project patterns are not fol
 - Global Secondary Indexes
 - Async support
 - Pydantic integration
+- TTL (auto-expiring items)
+- Lifecycle hooks
+- Auto-generate IDs and timestamps
+- Optimistic locking
+- Rate limiting
+- Field encryption (KMS)
+- Compression (zstd, lz4, gzip)
+- S3 attribute for large files
+- PartiQL support
+- Observability (logging, metrics)
 
 ## Installation
 
@@ -234,6 +244,39 @@ class User(BaseModel):
 # All pydynox methods available
 user = User(pk="USER#123", sk="PROFILE", name="John", email="john@test.com")
 user.save()
+```
+
+### S3 Attribute (Large Files)
+
+DynamoDB has a 400KB item limit. `S3Attribute` stores files in S3 and keeps metadata in DynamoDB. Upload on save, download on demand, delete when the item is deleted.
+
+```python
+from pydynox.attributes import S3Attribute
+from pydynox._internal._s3 import S3File
+
+class Document(Model):
+    model_config = ModelConfig(table="documents")
+    
+    pk = StringAttribute(hash_key=True)
+    content = S3Attribute(bucket="my-bucket", prefix="docs/")
+
+# Upload
+doc = Document(pk="DOC#1")
+doc.content = S3File(b"...", name="report.pdf", content_type="application/pdf")
+doc.save()
+
+# Download
+doc = Document.get(pk="DOC#1")
+data = doc.content.get_bytes()           # Load to memory
+doc.content.save_to("/path/to/file.pdf") # Stream to file
+url = doc.content.presigned_url(3600)    # Share via URL
+
+# Metadata (no S3 call)
+print(doc.content.size)
+print(doc.content.content_type)
+
+# Delete - removes from both DynamoDB and S3
+doc.delete()
 ```
 
 ## Table Management

@@ -3,6 +3,7 @@
 # Re-export compression/encryption enums for convenience
 from pydynox._internal._compression import CompressionAlgorithm
 from pydynox._internal._encryption import EncryptionMode
+from pydynox._internal._s3 import S3File
 from pydynox.attributes.base import Attribute
 from pydynox.attributes.compressed import CompressedAttribute
 from pydynox.attributes.encrypted import EncryptedAttribute
@@ -14,6 +15,7 @@ from pydynox.attributes.primitives import (
     NumberAttribute,
     StringAttribute,
 )
+from pydynox.attributes.s3 import S3Attribute
 from pydynox.attributes.sets import NumberSetAttribute, StringSetAttribute
 from pydynox.attributes.special import (
     DatetimeAttribute,
@@ -49,6 +51,9 @@ __all__ = [
     # Encrypted
     "EncryptedAttribute",
     "EncryptionMode",
+    # S3
+    "S3Attribute",
+    "S3File",
     # Version
     "VersionAttribute",
 ]

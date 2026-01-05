@@ -20,6 +20,7 @@ Attributes define the fields in your model. Each attribute maps to a DynamoDB ty
 | `NumberSetAttribute` | NS | set[int\|float] | Unique numbers |
 | `CompressedAttribute` | S | str | Large text |
 | `EncryptedAttribute` | S | str | Sensitive data |
+| `S3Attribute` | M | S3Value | Large files in S3 |
 
 ## Common parameters
 
@@ -312,6 +313,45 @@ Modes:
 | `WriteOnly` | ✓ | ✗ | Ingest service |
 | `ReadOnly` | ✗ | ✓ | Report service |
 
+### S3Attribute
+
+Store large files in S3 with metadata in DynamoDB. Use when files exceed DynamoDB's 400KB limit.
+
+=== "basic_upload.py"
+    ```python
+    --8<-- "docs/examples/s3/basic_upload.py"
+    ```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `bucket` | str | Required | S3 bucket name |
+| `prefix` | str | "" | Key prefix for files |
+| `region` | str | None | S3 region (inherits from client) |
+
+After upload, access file metadata:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `bucket` | str | S3 bucket name |
+| `key` | str | S3 object key |
+| `size` | int | File size in bytes |
+| `etag` | str | S3 ETag |
+| `content_type` | str | MIME type |
+| `last_modified` | str | Last modified timestamp |
+| `version_id` | str | S3 version ID |
+| `metadata` | dict | User-defined metadata |
+
+Download methods:
+
+| Method | Description |
+|--------|-------------|
+| `get_bytes()` | Download to memory |
+| `save_to(path)` | Stream to file |
+| `presigned_url(expires)` | Get presigned URL |
+
+!!! tip
+    See [S3 attribute guide](s3-attribute.md) for full documentation.
+
 ## Choosing the right type
 
 | Need | Use |
@@ -327,6 +367,7 @@ Modes:
 | Unique values | `StringSetAttribute` / `NumberSetAttribute` |
 | Large text | `CompressedAttribute` |
 | Sensitive data | `EncryptedAttribute` |
+| Large files | `S3Attribute` |
 
 
 ## Next steps
@@ -334,3 +375,4 @@ Modes:
 - [Indexes](indexes.md) - Query by non-key attributes with GSIs
 - [Auto-generate](auto-generate.md) - Generate IDs and timestamps
 - [Encryption](encryption.md) - Field-level encryption with KMS
+- [S3 attribute](s3-attribute.md) - Store large files in S3

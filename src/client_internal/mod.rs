@@ -11,5 +11,6 @@ mod auth;
 mod builder;
 mod config;
 
+pub use auth::{build_credential_provider, CredentialProvider};
 pub use builder::build_client;
 pub use config::ClientConfig;

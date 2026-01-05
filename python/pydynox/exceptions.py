@@ -66,6 +66,7 @@ CredentialsError = pydynox_core.CredentialsError
 SerializationError = pydynox_core.SerializationError
 ConnectionError = pydynox_core.ConnectionError
 EncryptionError = pydynox_core.EncryptionError
+S3AttributeError = pydynox_core.S3AttributeError
 
 __all__ = [
     "PydynoxError",
@@ -80,5 +81,6 @@ __all__ = [
     "SerializationError",
     "ConnectionError",
     "EncryptionError",
+    "S3AttributeError",
     "ItemTooLargeError",
 ]
