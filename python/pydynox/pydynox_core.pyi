@@ -81,6 +81,28 @@ class DynamoDBClient:
         index_name: str | None = None,
         consistent_read: bool = False,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, OperationMetrics]: ...
+    def scan_page(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+        segment: int | None = None,
+        total_segments: int | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, OperationMetrics]: ...
+    def count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[int, OperationMetrics]: ...
     def batch_write(
         self,
         table: str,
@@ -158,6 +180,28 @@ class DynamoDBClient:
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
         scan_index_forward: bool | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    def async_scan_page(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+        segment: int | None = None,
+        total_segments: int | None = None,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    def async_count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
         index_name: str | None = None,
         consistent_read: bool = False,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...

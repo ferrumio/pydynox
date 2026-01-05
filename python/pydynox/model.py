@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from pydynox._internal._atomic import AtomicOp, serialize_atomic
-from pydynox._internal._metrics import OperationMetrics
+from pydynox._internal._conditions import ConditionPath
+from pydynox._internal._results import (
+    AsyncModelQueryResult,
+    AsyncModelScanResult,
+    ModelQueryResult,
+    ModelScanResult,
+)
 from pydynox.attributes import Attribute
 from pydynox.attributes.ttl import TTLAttribute
 from pydynox.attributes.version import VersionAttribute
@@ -19,323 +25,18 @@ from pydynox.indexes import GlobalSecondaryIndex
 from pydynox.size import ItemSize, calculate_item_size
 
 if TYPE_CHECKING:
+    from pydynox._internal._metrics import OperationMetrics
     from pydynox.conditions import Condition
 
+__all__ = [
+    "Model",
+    "ModelQueryResult",
+    "AsyncModelQueryResult",
+    "ModelScanResult",
+    "AsyncModelScanResult",
+]
+
 M = TypeVar("M", bound="Model")
-
-
-class ModelQueryResult(Generic[M]):
-    """Result of a Model.query() with automatic pagination.
-
-    Iterate over results to get typed model instances.
-    Access `last_evaluated_key` for manual pagination.
-    Access `metrics` for timing and capacity info.
-
-    Example:
-        >>> for user in User.query(pk="USER#123"):
-        ...     print(user.name)  # user is typed as User
-        >>>
-        >>> # Check metrics
-        >>> results = User.query(pk="USER#123")
-        >>> for user in results:
-        ...     pass
-        >>> print(results.metrics.duration_ms)
-    """
-
-    def __init__(
-        self,
-        model_class: type[M],
-        hash_key_value: Any,
-        range_key_condition: Condition | None = None,
-        filter_condition: Condition | None = None,
-        limit: int | None = None,
-        scan_index_forward: bool = True,
-        consistent_read: bool | None = None,
-        last_evaluated_key: dict[str, Any] | None = None,
-    ) -> None:
-        self._model_class = model_class
-        self._hash_key_value = hash_key_value
-        self._range_key_condition = range_key_condition
-        self._filter_condition = filter_condition
-        self._limit = limit
-        self._scan_index_forward = scan_index_forward
-        self._consistent_read = consistent_read
-        self._start_key = last_evaluated_key
-
-        # Iteration state
-        self._query_result: Any = None
-        self._items_iter: Any = None
-        self._initialized = False
-
-    @property
-    def last_evaluated_key(self) -> dict[str, Any] | None:
-        """The last evaluated key for pagination.
-
-        Returns None if all results have been fetched.
-        """
-        if self._query_result is None:
-            return None
-        result: dict[str, Any] | None = self._query_result.last_evaluated_key
-        return result
-
-    @property
-    def metrics(self) -> OperationMetrics | None:
-        """Metrics from the last page fetch.
-
-        Returns None if no pages have been fetched yet.
-        """
-        if self._query_result is None:
-            return None
-        metrics: OperationMetrics | None = self._query_result.metrics
-        return metrics
-
-    def _build_query(self) -> Any:
-        """Build the underlying QueryResult."""
-        from pydynox.query import QueryResult
-
-        client = self._model_class._get_client()
-        table = self._model_class._get_table()
-        hash_key_name = self._model_class._hash_key
-
-        if hash_key_name is None:
-            raise ValueError(f"Model {self._model_class.__name__} has no hash key defined")
-
-        # Build key condition expression
-        names: dict[str, str] = {}
-        values: dict[str, Any] = {}
-
-        # Hash key condition: #pk = :pkv
-        hk_name_placeholder = "#pk"
-        hk_value_placeholder = ":pkv"
-        names[hash_key_name] = hk_name_placeholder
-        values[hk_value_placeholder] = self._hash_key_value
-
-        key_condition = f"{hk_name_placeholder} = {hk_value_placeholder}"
-
-        # Add range key condition if provided
-        if self._range_key_condition is not None:
-            rk_expr = self._range_key_condition.serialize(names, values)
-            key_condition = f"{key_condition} AND {rk_expr}"
-
-        # Build filter expression if provided
-        filter_expr = None
-        if self._filter_condition is not None:
-            filter_expr = self._filter_condition.serialize(names, values)
-
-        # Convert names to DynamoDB format: {placeholder: attr_name}
-        attr_names = {placeholder: attr_name for attr_name, placeholder in names.items()}
-
-        # Determine consistent_read: param > model_config > False
-        use_consistent = self._consistent_read
-        if use_consistent is None:
-            use_consistent = getattr(self._model_class.model_config, "consistent_read", False)
-
-        return QueryResult(
-            client._client,
-            table,
-            key_condition,
-            filter_expression=filter_expr,
-            expression_attribute_names=attr_names if attr_names else None,
-            expression_attribute_values=values if values else None,
-            limit=self._limit,
-            scan_index_forward=self._scan_index_forward,
-            last_evaluated_key=self._start_key,
-            acquire_rcu=client._acquire_rcu,
-            consistent_read=use_consistent,
-        )
-
-    def __iter__(self) -> ModelQueryResult[M]:
-        return self
-
-    def __next__(self) -> M:
-        # Initialize on first iteration
-        if not self._initialized:
-            self._query_result = self._build_query()
-            self._items_iter = iter(self._query_result)
-            self._initialized = True
-
-        # Get next item from underlying query
-        item = next(self._items_iter)
-
-        # Convert to model instance
-        instance = self._model_class.from_dict(item)
-
-        # Run after_load hooks
-        skip = (
-            self._model_class.model_config.skip_hooks
-            if hasattr(self._model_class, "model_config")
-            else False
-        )
-        if not skip:
-            instance._run_hooks(HookType.AFTER_LOAD)
-
-        return instance
-
-    def first(self) -> M | None:
-        """Get the first result or None.
-
-        Example:
-            >>> user = User.query(pk="USER#123").first()
-            >>> if user:
-            ...     print(user.name)
-        """
-        try:
-            return next(iter(self))
-        except StopIteration:
-            return None
-
-
-class AsyncModelQueryResult(Generic[M]):
-    """Async result of a Model.query() with automatic pagination.
-
-    Use `async for` to iterate over results.
-    Access `last_evaluated_key` for manual pagination.
-    Access `metrics` for timing and capacity info.
-
-    Example:
-        >>> async for user in User.async_query(hash_key="USER#123"):
-        ...     print(user.name)
-        >>>
-        >>> # Get first result
-        >>> user = await User.async_query(hash_key="USER#123").first()
-    """
-
-    def __init__(
-        self,
-        model_class: type[M],
-        hash_key_value: Any,
-        range_key_condition: Condition | None = None,
-        filter_condition: Condition | None = None,
-        limit: int | None = None,
-        scan_index_forward: bool = True,
-        consistent_read: bool | None = None,
-        last_evaluated_key: dict[str, Any] | None = None,
-    ) -> None:
-        self._model_class = model_class
-        self._hash_key_value = hash_key_value
-        self._range_key_condition = range_key_condition
-        self._filter_condition = filter_condition
-        self._limit = limit
-        self._scan_index_forward = scan_index_forward
-        self._consistent_read = consistent_read
-        self._start_key = last_evaluated_key
-
-        # Iteration state
-        self._query_result: Any = None
-        self._initialized = False
-        self._current_page: list[dict[str, Any]] = []
-        self._page_index = 0
-
-    @property
-    def last_evaluated_key(self) -> dict[str, Any] | None:
-        """The last evaluated key for pagination."""
-        if self._query_result is None:
-            return None
-        result: dict[str, Any] | None = self._query_result.last_evaluated_key
-        return result
-
-    @property
-    def metrics(self) -> OperationMetrics | None:
-        """Metrics from the last page fetch."""
-        if self._query_result is None:
-            return None
-        metrics: OperationMetrics | None = self._query_result.metrics
-        return metrics
-
-    def _build_query(self) -> Any:
-        """Build the underlying AsyncQueryResult."""
-        from pydynox.query import AsyncQueryResult
-
-        client = self._model_class._get_client()
-        table = self._model_class._get_table()
-        hash_key_name = self._model_class._hash_key
-
-        if hash_key_name is None:
-            raise ValueError(f"Model {self._model_class.__name__} has no hash key defined")
-
-        # Build key condition expression
-        names: dict[str, str] = {}
-        values: dict[str, Any] = {}
-
-        # Hash key condition
-        hk_name_placeholder = "#pk"
-        hk_value_placeholder = ":pkv"
-        names[hash_key_name] = hk_name_placeholder
-        values[hk_value_placeholder] = self._hash_key_value
-
-        key_condition = f"{hk_name_placeholder} = {hk_value_placeholder}"
-
-        # Add range key condition if provided
-        if self._range_key_condition is not None:
-            rk_expr = self._range_key_condition.serialize(names, values)
-            key_condition = f"{key_condition} AND {rk_expr}"
-
-        # Build filter expression if provided
-        filter_expr = None
-        if self._filter_condition is not None:
-            filter_expr = self._filter_condition.serialize(names, values)
-
-        # Convert names to DynamoDB format
-        attr_names = {placeholder: attr_name for attr_name, placeholder in names.items()}
-
-        # Determine consistent_read
-        use_consistent = self._consistent_read
-        if use_consistent is None:
-            use_consistent = getattr(self._model_class.model_config, "consistent_read", False)
-
-        return AsyncQueryResult(
-            client._client,
-            table,
-            key_condition,
-            filter_expression=filter_expr,
-            expression_attribute_names=attr_names if attr_names else None,
-            expression_attribute_values=values if values else None,
-            limit=self._limit,
-            scan_index_forward=self._scan_index_forward,
-            last_evaluated_key=self._start_key,
-            acquire_rcu=client._acquire_rcu,
-            consistent_read=use_consistent,
-        )
-
-    def __aiter__(self) -> AsyncModelQueryResult[M]:
-        return self
-
-    async def __anext__(self) -> M:
-        # Initialize on first iteration
-        if not self._initialized:
-            self._query_result = self._build_query()
-            self._initialized = True
-
-        # Get next item from underlying query
-        try:
-            item = await self._query_result.__anext__()
-        except StopAsyncIteration:
-            raise
-
-        # Convert to model instance
-        instance = self._model_class.from_dict(item)
-
-        # Run after_load hooks
-        skip = (
-            self._model_class.model_config.skip_hooks
-            if hasattr(self._model_class, "model_config")
-            else False
-        )
-        if not skip:
-            instance._run_hooks(HookType.AFTER_LOAD)
-
-        return instance
-
-    async def first(self) -> M | None:
-        """Get the first result or None.
-
-        Example:
-            >>> user = await User.async_query(hash_key="USER#123").first()
-        """
-        try:
-            return await self.__anext__()
-        except StopAsyncIteration:
-            return None
 
 
 class ModelMeta(type):
@@ -348,7 +49,6 @@ class ModelMeta(type):
     _indexes: dict[str, GlobalSecondaryIndex[Any]]
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> ModelMeta:
-        # Collect attributes from parent classes
         attributes: dict[str, Attribute[Any]] = {}
         hash_key: str | None = None
         range_key: str | None = None
@@ -368,7 +68,6 @@ class ModelMeta(type):
             if hasattr(base, "_indexes"):
                 indexes.update(base._indexes)
 
-        # Collect attributes, hooks, and indexes from this class
         for attr_name, attr_value in namespace.items():
             if isinstance(attr_value, Attribute):
                 attr_value.attr_name = attr_name
@@ -379,25 +78,20 @@ class ModelMeta(type):
                 if attr_value.range_key:
                     range_key = attr_name
 
-            # Collect hooks
             if callable(attr_value) and hasattr(attr_value, "_hook_type"):
                 hooks[getattr(attr_value, "_hook_type")].append(attr_value)
 
-            # Collect GSIs
             if isinstance(attr_value, GlobalSecondaryIndex):
                 indexes[attr_name] = attr_value
 
-        # Create the class
         cls = super().__new__(mcs, name, bases, namespace)
 
-        # Store metadata
         cls._attributes = attributes
         cls._hash_key = hash_key
         cls._range_key = range_key
         cls._hooks = hooks
         cls._indexes = indexes
 
-        # Bind indexes to this model class
         for idx in indexes.values():
             idx._bind_to_model(cls)
 
@@ -407,45 +101,12 @@ class ModelMeta(type):
 class Model(metaclass=ModelMeta):
     """Base class for DynamoDB models with ORM-style CRUD.
 
-    Define your model by subclassing and adding attributes:
-
     Example:
-        >>> from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
-        >>> from pydynox.attributes import StringAttribute, NumberAttribute
-        >>>
-        >>> # Option 1: Set a default client for all models
-        >>> client = DynamoDBClient(region="us-east-1")
-        >>> set_default_client(client)
-        >>>
         >>> class User(Model):
         ...     model_config = ModelConfig(table="users")
         ...     pk = StringAttribute(hash_key=True)
         ...     sk = StringAttribute(range_key=True)
         ...     name = StringAttribute()
-        ...     age = NumberAttribute()
-        >>>
-        >>> # Option 2: Pass client to ModelConfig
-        >>> class Order(Model):
-        ...     model_config = ModelConfig(
-        ...         table="orders",
-        ...         client=DynamoDBClient(region="eu-west-1"),
-        ...     )
-        ...     pk = StringAttribute(hash_key=True)
-        >>>
-        >>> # Create and save
-        >>> user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
-        >>> user.save()
-        >>>
-        >>> # Get by key
-        >>> user = User.get(pk="USER#123", sk="PROFILE")
-        >>> print(user.name)
-        >>>
-        >>> # Update
-        >>> user.name = "Jane"
-        >>> user.save()
-        >>>
-        >>> # Delete
-        >>> user.delete()
     """
 
     _attributes: ClassVar[dict[str, Attribute[Any]]]
@@ -458,16 +119,10 @@ class Model(metaclass=ModelMeta):
     model_config: ClassVar[ModelConfig]
 
     def __init__(self, **kwargs: Any):
-        """Create a model instance.
-
-        Args:
-            **kwargs: Attribute values.
-        """
         for attr_name, attr in self._attributes.items():
             if attr_name in kwargs:
                 setattr(self, attr_name, kwargs[attr_name])
             elif attr.default is not None:
-                # Don't apply AutoGenerate defaults here - wait for save()
                 if is_auto_generate(attr.default):
                     setattr(self, attr_name, None)
                 else:
@@ -478,11 +133,7 @@ class Model(metaclass=ModelMeta):
                 setattr(self, attr_name, None)
 
     def _apply_auto_generate(self) -> None:
-        """Apply auto-generate strategies to None attributes.
-
-        Called before save() to generate values for attributes
-        that have AutoGenerate defaults and are currently None.
-        """
+        """Apply auto-generate strategies to None attributes."""
         for attr_name, attr in self._attributes.items():
             if attr.default is not None and is_auto_generate(attr.default):
                 current_value = getattr(self, attr_name, None)
@@ -492,29 +143,19 @@ class Model(metaclass=ModelMeta):
 
     @classmethod
     def _get_client(cls) -> DynamoDBClient:
-        """Get the DynamoDB client for this model.
-
-        Priority:
-        1. Client from model_config.client
-        2. Global default client (set via set_default_client)
-        3. Error if neither is set
-        """
-        # Check if we have a cached client instance
+        """Get the DynamoDB client for this model."""
         if cls._client_instance is not None:
             return cls._client_instance
 
-        # Check model_config.client first
         if hasattr(cls, "model_config") and cls.model_config.client is not None:
             cls._client_instance = cls.model_config.client
             return cls._client_instance
 
-        # Check global default
         default = get_default_client()
         if default is not None:
             cls._client_instance = default
             return cls._client_instance
 
-        # No client configured
         raise ValueError(
             f"No client configured for {cls.__name__}. "
             "Either pass client to ModelConfig or call pydynox.set_default_client()"
@@ -528,7 +169,6 @@ class Model(metaclass=ModelMeta):
         return cls.model_config.table
 
     def _should_skip_hooks(self, skip_hooks: bool | None) -> bool:
-        """Check if hooks should be skipped."""
         if skip_hooks is not None:
             return skip_hooks
         if hasattr(self, "model_config"):
@@ -536,7 +176,6 @@ class Model(metaclass=ModelMeta):
         return False
 
     def _run_hooks(self, hook_type: HookType) -> None:
-        """Run all hooks of the given type."""
         for hook in self._hooks.get(hook_type, []):
             hook(self)
 
@@ -545,25 +184,15 @@ class Model(metaclass=ModelMeta):
         """Get an item from DynamoDB by its key.
 
         Args:
-            consistent_read: If True, use strongly consistent read (2x RCU cost).
-                If None, uses model_config.consistent_read (default: False).
-            **keys: The key attributes (hash_key and optional range_key).
+            consistent_read: If True, use strongly consistent read.
+            **keys: The key attributes.
 
         Returns:
             The model instance if found, None otherwise.
-
-        Example:
-            >>> user = User.get(pk="USER#123", sk="PROFILE")
-            >>> if user:
-            ...     print(user.name)
-            >>>
-            >>> # Strongly consistent read
-            >>> user = User.get(pk="USER#123", sk="PROFILE", consistent_read=True)
         """
         client = cls._get_client()
         table = cls._get_table()
 
-        # Determine consistent_read: param > model_config > False
         use_consistent = consistent_read
         if use_consistent is None:
             use_consistent = getattr(cls.model_config, "consistent_read", False)
@@ -594,56 +223,14 @@ class Model(metaclass=ModelMeta):
         Args:
             hash_key: The hash key value to query.
             range_key_condition: Optional condition on the range key.
-                Use attribute methods like `begins_with`, `between`, `>`, `<`, etc.
             filter_condition: Optional filter on non-key attributes.
-                Applied after the query, still consumes RCU for filtered items.
-            limit: Max items per page (not total).
-            scan_index_forward: Sort order. True = ascending (default), False = descending.
-            consistent_read: If True, use strongly consistent read (2x RCU cost).
-                If None, uses model_config.consistent_read (default: False).
-            last_evaluated_key: Start key for pagination (from previous query).
+            limit: Max items per page.
+            scan_index_forward: Sort order. True = ascending, False = descending.
+            consistent_read: If True, use strongly consistent read.
+            last_evaluated_key: Start key for pagination.
 
         Returns:
             ModelQueryResult that yields typed model instances.
-
-        Example:
-            >>> # Simple query by hash key
-            >>> for user in User.query(hash_key="USER#123"):
-            ...     print(user.name)
-            >>>
-            >>> # With range key condition
-            >>> for order in Order.query(
-            ...     hash_key="USER#123",
-            ...     range_key_condition=Order.sk.begins_with("ORDER#"),
-            ... ):
-            ...     print(order.total)
-            >>>
-            >>> # With filter
-            >>> for user in User.query(
-            ...     hash_key="TENANT#1",
-            ...     filter_condition=User.age >= 18,
-            ... ):
-            ...     print(user.name)
-            >>>
-            >>> # Descending order with limit
-            >>> recent = list(User.query(
-            ...     hash_key="USER#123",
-            ...     limit=10,
-            ...     scan_index_forward=False,
-            ... ))
-            >>>
-            >>> # Get first result
-            >>> user = User.query(hash_key="USER#123").first()
-            >>>
-            >>> # Manual pagination
-            >>> results = User.query(hash_key="USER#123", limit=10)
-            >>> for user in results:
-            ...     process(user)
-            >>> if results.last_evaluated_key:
-            ...     next_page = User.query(
-            ...         hash_key="USER#123",
-            ...         last_evaluated_key=results.last_evaluated_key,
-            ...     )
         """
         return ModelQueryResult(
             model_class=cls,
@@ -657,30 +244,101 @@ class Model(metaclass=ModelMeta):
         )
 
     @classmethod
+    def scan(
+        cls: type[M],
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+        segment: int | None = None,
+        total_segments: int | None = None,
+    ) -> ModelScanResult[M]:
+        """Scan all items in the table.
+
+        Warning: Scan reads every item in the table. Use query() when possible.
+
+        Args:
+            filter_condition: Optional filter on attributes.
+            limit: Max items per page.
+            consistent_read: If True, use strongly consistent read.
+            last_evaluated_key: Start key for pagination.
+            segment: Segment number for parallel scan (0 to total_segments-1).
+            total_segments: Total number of segments for parallel scan.
+
+        Returns:
+            ModelScanResult that yields typed model instances.
+
+        Example:
+            >>> for user in User.scan():
+            ...     print(user.name)
+            >>>
+            >>> # With filter
+            >>> for user in User.scan(filter_condition=User.age >= 18):
+            ...     print(user.name)
+        """
+        return ModelScanResult(
+            model_class=cls,
+            filter_condition=filter_condition,
+            limit=limit,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            segment=segment,
+            total_segments=total_segments,
+        )
+
+    @classmethod
+    def count(
+        cls: type[M],
+        filter_condition: Condition | None = None,
+        consistent_read: bool | None = None,
+    ) -> tuple[int, OperationMetrics]:
+        """Count items in the table.
+
+        Warning: Count scans the entire table. Use sparingly.
+
+        Args:
+            filter_condition: Optional filter on attributes.
+            consistent_read: If True, use strongly consistent read.
+
+        Returns:
+            Tuple of (count, metrics).
+
+        Example:
+            >>> count, metrics = User.count()
+            >>> print(f"Total users: {count}")
+        """
+        client = cls._get_client()
+        table = cls._get_table()
+
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        filter_expr = None
+        if filter_condition is not None:
+            filter_expr = filter_condition.serialize(names, values)
+
+        attr_names = {v: k for k, v in names.items()}
+
+        use_consistent = consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(cls.model_config, "consistent_read", False)
+
+        return client.count(
+            table,
+            filter_expression=filter_expr,
+            expression_attribute_names=attr_names if attr_names else None,
+            expression_attribute_values=values if values else None,
+            consistent_read=use_consistent,
+        )
+
+    @classmethod
     def execute_statement(
         cls: type[M],
         statement: str,
         parameters: list[Any] | None = None,
         consistent_read: bool = False,
     ) -> list[M]:
-        """Execute a PartiQL statement and return typed model instances.
-
-        Args:
-            statement: The PartiQL statement to execute.
-            parameters: Optional list of parameter values for ? placeholders.
-            consistent_read: If True, use strongly consistent read.
-
-        Returns:
-            List of model instances.
-
-        Example:
-            >>> users = User.execute_statement(
-            ...     "SELECT * FROM users WHERE pk = ?",
-            ...     parameters=["USER#123"],
-            ... )
-            >>> for user in users:
-            ...     print(user.name)
-        """
+        """Execute a PartiQL statement and return typed model instances."""
         client = cls._get_client()
         result = client.execute_statement(
             statement,
@@ -696,22 +354,7 @@ class Model(metaclass=ModelMeta):
         parameters: list[Any] | None = None,
         consistent_read: bool = False,
     ) -> list[M]:
-        """Async version of execute_statement.
-
-        Args:
-            statement: The PartiQL statement to execute.
-            parameters: Optional list of parameter values for ? placeholders.
-            consistent_read: If True, use strongly consistent read.
-
-        Returns:
-            List of model instances.
-
-        Example:
-            >>> users = await User.async_execute_statement(
-            ...     "SELECT * FROM users WHERE pk = ?",
-            ...     parameters=["USER#123"],
-            ... )
-        """
+        """Async version of execute_statement."""
         client = cls._get_client()
         result = await client.async_execute_statement(
             statement,
@@ -721,49 +364,17 @@ class Model(metaclass=ModelMeta):
         return [cls.from_dict(item) for item in result]
 
     def save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
-        """Save the model to DynamoDB.
-
-        Creates a new item or replaces an existing one.
-        Auto-generates values for attributes with AutoGenerate defaults.
-        If the model has a VersionAttribute, it auto-increments and adds
-        a condition to prevent concurrent overwrites.
-
-        Args:
-            condition: Optional condition that must be true for the write.
-            skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
-
-        Raises:
-            ItemTooLargeError: If max_size is set and item exceeds it.
-            ConditionCheckFailedError: If the condition is not met, or if
-                optimistic locking fails (version mismatch).
-
-        Example:
-            >>> user = User(pk="USER#123", sk="PROFILE", name="John")
-            >>> user.save()
-
-            >>> # Only save if item doesn't exist
-            >>> user.save(condition=User.pk.does_not_exist())
-
-            >>> # With auto-generated ID
-            >>> from pydynox.generators import AutoGenerate
-            >>> class Order(Model):
-            ...     pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-            >>> order = Order()
-            >>> order.save()  # pk is auto-generated
-        """
+        """Save the model to DynamoDB."""
         skip = self._should_skip_hooks(skip_hooks)
 
         if not skip:
             self._run_hooks(HookType.BEFORE_SAVE)
 
-        # Apply auto-generate strategies before saving
         self._apply_auto_generate()
 
-        # Handle optimistic locking
         version_attr = self._get_version_attr_name()
         version_condition, new_version = self._build_version_condition()
 
-        # Combine user condition with version condition
         final_condition = condition
         if version_condition is not None:
             if final_condition is not None:
@@ -771,11 +382,9 @@ class Model(metaclass=ModelMeta):
             else:
                 final_condition = version_condition
 
-        # Set new version before saving
         if version_attr is not None:
             setattr(self, version_attr, new_version)
 
-        # Check size if max_size is set
         max_size = (
             getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
         )
@@ -792,12 +401,10 @@ class Model(metaclass=ModelMeta):
         table = self._get_table()
         item = self.to_dict()
 
-        # Serialize condition if provided
         if final_condition is not None:
             names: dict[str, str] = {}
             values: dict[str, Any] = {}
             expr = final_condition.serialize(names, values)
-            # Invert names dict for DynamoDB format
             attr_names = {v: k for k, v in names.items()}
             client.put_item(
                 table,
@@ -813,43 +420,20 @@ class Model(metaclass=ModelMeta):
             self._run_hooks(HookType.AFTER_SAVE)
 
     def delete(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
-        """Delete the model from DynamoDB.
-
-        If the model has a VersionAttribute, it adds a condition to ensure
-        the version matches before deleting.
-
-        Args:
-            condition: Optional condition that must be true for the delete.
-            skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
-
-        Raises:
-            ConditionCheckFailedError: If the condition is not met, or if
-                optimistic locking fails (version mismatch).
-
-        Example:
-            >>> user = User.get(pk="USER#123", sk="PROFILE")
-            >>> user.delete()
-
-            >>> # Only delete if version matches (automatic with VersionAttribute)
-            >>> user.delete()
-        """
+        """Delete the model from DynamoDB."""
         skip = self._should_skip_hooks(skip_hooks)
 
         if not skip:
             self._run_hooks(HookType.BEFORE_DELETE)
 
-        # Handle optimistic locking for delete
         version_attr = self._get_version_attr_name()
         version_condition: Condition | None = None
         if version_attr is not None:
             current_version: int | None = getattr(self, version_attr, None)
             if current_version is not None:
-                from pydynox._internal._conditions import ConditionPath
-
                 path = ConditionPath(path=[version_attr])
                 version_condition = path == current_version
 
-        # Combine user condition with version condition
         final_condition = condition
         if version_condition is not None:
             if final_condition is not None:
@@ -861,7 +445,6 @@ class Model(metaclass=ModelMeta):
         table = self._get_table()
         key = self._get_key()
 
-        # Serialize condition if provided
         if final_condition is not None:
             names: dict[str, str] = {}
             values: dict[str, Any] = {}
@@ -887,37 +470,7 @@ class Model(metaclass=ModelMeta):
         skip_hooks: bool | None = None,
         **kwargs: Any,
     ) -> None:
-        """Update specific attributes on the model.
-
-        Updates both the local instance and DynamoDB.
-
-        Args:
-            atomic: List of atomic operations (add, append, remove, etc.).
-            condition: Optional condition that must be true for the update.
-            skip_hooks: Skip hooks for this operation. If None, uses model_config.skip_hooks.
-            **kwargs: Attribute values to update (simple SET operations).
-
-        Example:
-            >>> user = User.get(pk="USER#123", sk="PROFILE")
-            >>> user.update(name="Jane", age=31)
-
-            >>> # Atomic operations
-            >>> user.update(atomic=[User.login_count.add(1)])
-            >>> user.update(atomic=[User.tags.append(["premium"])])
-
-            >>> # Multiple atomic operations
-            >>> user.update(atomic=[
-            ...     User.login_count.add(1),
-            ...     User.tags.append(["verified"]),
-            ...     User.temp_token.remove(),
-            ... ])
-
-            >>> # With condition
-            >>> user.update(
-            ...     atomic=[User.balance.add(-100)],
-            ...     condition=User.balance >= 100,
-            ... )
-        """
+        """Update specific attributes on the model."""
         skip = self._should_skip_hooks(skip_hooks)
 
         if not skip:
@@ -927,20 +480,14 @@ class Model(metaclass=ModelMeta):
         table = self._get_table()
         key = self._get_key()
 
-        # Handle atomic operations
         if atomic:
             update_expr, names, values = serialize_atomic(atomic)
-
-            # Invert names dict for DynamoDB format: {placeholder: attr_name}
             attr_names = {v: k for k, v in names.items()}
 
-            # Serialize condition if provided
             cond_expr = None
             if condition is not None:
-                # Pass existing names/values to avoid placeholder collisions
-                cond_names: dict[str, str] = dict(names)  # Copy existing names
+                cond_names: dict[str, str] = dict(names)
                 cond_expr = condition.serialize(cond_names, values)
-                # Merge names (condition names also need inversion)
                 cond_attr_names = {v: k for k, v in cond_names.items()}
                 attr_names = {**attr_names, **cond_attr_names}
 
@@ -953,13 +500,11 @@ class Model(metaclass=ModelMeta):
                 expression_attribute_values=values if values else None,
             )
         elif kwargs:
-            # Simple key=value updates
             for attr_name, value in kwargs.items():
                 if attr_name not in self._attributes:
                     raise ValueError(f"Unknown attribute: {attr_name}")
                 setattr(self, attr_name, value)
 
-            # Serialize condition if provided
             if condition is not None:
                 kwargs_cond_names: dict[str, str] = {}
                 kwargs_cond_values: dict[str, Any] = {}
@@ -980,7 +525,6 @@ class Model(metaclass=ModelMeta):
             self._run_hooks(HookType.AFTER_UPDATE)
 
     def _get_key(self) -> dict[str, Any]:
-        """Get the key dict for this instance."""
         key = {}
         if self._hash_key:
             key[self._hash_key] = getattr(self, self._hash_key)
@@ -989,16 +533,7 @@ class Model(metaclass=ModelMeta):
         return key
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a dict.
-
-        Returns:
-            Dict with all attribute values.
-
-        Example:
-            >>> user = User(pk="USER#123", sk="PROFILE", name="John")
-            >>> user.to_dict()
-            {'pk': 'USER#123', 'sk': 'PROFILE', 'name': 'John'}
-        """
+        """Convert the model to a dict."""
         result = {}
         for attr_name, attr in self._attributes.items():
             value = getattr(self, attr_name, None)
@@ -1007,44 +542,13 @@ class Model(metaclass=ModelMeta):
         return result
 
     def calculate_size(self, detailed: bool = False) -> ItemSize:
-        """Calculate the size of this item in bytes.
-
-        DynamoDB has a 400KB item size limit. Use this to check
-        before saving.
-
-        Args:
-            detailed: If True, include per-field size breakdown.
-
-        Returns:
-            ItemSize with bytes, kb, percent, and is_over_limit.
-
-        Example:
-            >>> user = User(pk="USER#123", name="John", bio="..." * 10000)
-            >>> size = user.calculate_size()
-            >>> print(f"{size.bytes} bytes ({size.percent:.1f}% of limit)")
-            >>>
-            >>> # Get field breakdown
-            >>> size = user.calculate_size(detailed=True)
-            >>> for field, bytes in size.fields.items():
-            ...     print(f"{field}: {bytes} bytes")
-        """
+        """Calculate the size of this item in bytes."""
         item = self.to_dict()
         return calculate_item_size(item, detailed=detailed)
 
     @classmethod
     def from_dict(cls: type[M], data: dict[str, Any]) -> M:
-        """Create a model instance from a dict.
-
-        Args:
-            data: Dict with attribute values.
-
-        Returns:
-            A new model instance.
-
-        Example:
-            >>> data = {'pk': 'USER#123', 'sk': 'PROFILE', 'name': 'John'}
-            >>> user = User.from_dict(data)
-        """
+        """Create a model instance from a dict."""
         deserialized = {}
         for attr_name, value in data.items():
             if attr_name in cls._attributes:
@@ -1054,39 +558,27 @@ class Model(metaclass=ModelMeta):
         return cls(**deserialized)
 
     def __repr__(self) -> str:
-        """Return a string representation of the model."""
         attrs = ", ".join(f"{k}={v!r}" for k, v in self.to_dict().items())
         return f"{self.__class__.__name__}({attrs})"
 
     def __eq__(self, other: object) -> bool:
-        """Check equality based on key attributes."""
         if not isinstance(other, self.__class__):
             return False
         return self._get_key() == other._get_key()
 
     def _get_ttl_attr_name(self) -> str | None:
-        """Find the TTLAttribute field name if one exists."""
         for attr_name, attr in self._attributes.items():
             if isinstance(attr, TTLAttribute):
                 return attr_name
         return None
 
     def _get_version_attr_name(self) -> str | None:
-        """Find the VersionAttribute field name if one exists."""
         for attr_name, attr in self._attributes.items():
             if isinstance(attr, VersionAttribute):
                 return attr_name
         return None
 
     def _build_version_condition(self) -> tuple[Condition | None, int]:
-        """Build version condition for optimistic locking.
-
-        Returns:
-            Tuple of (condition, new_version).
-            condition is None for new items (version will be 1).
-        """
-        from pydynox._internal._conditions import ConditionPath
-
         version_attr = self._get_version_attr_name()
         if version_attr is None:
             return None, 0
@@ -1095,24 +587,13 @@ class Model(metaclass=ModelMeta):
         path = ConditionPath(path=[version_attr])
 
         if current_version is None:
-            # New item: version = 1, condition = attribute_not_exists
             return path.does_not_exist(), 1
         else:
-            # Existing item: version + 1, condition = version == current
             return path == current_version, current_version + 1
 
     @property
     def is_expired(self) -> bool:
-        """Check if the TTL has passed.
-
-        Returns:
-            True if expired, False otherwise. Returns False if no TTL attribute.
-
-        Example:
-            >>> session = Session.get(pk="SESSION#123")
-            >>> if session.is_expired:
-            ...     print("Session expired")
-        """
+        """Check if the TTL has passed."""
         ttl_attr = self._get_ttl_attr_name()
         if ttl_attr is None:
             return False
@@ -1125,17 +606,7 @@ class Model(metaclass=ModelMeta):
 
     @property
     def expires_in(self) -> timedelta | None:
-        """Get time remaining until expiration.
-
-        Returns:
-            timedelta until expiration, or None if no TTL or already expired.
-
-        Example:
-            >>> session = Session.get(pk="SESSION#123")
-            >>> remaining = session.expires_in
-            >>> if remaining:
-            ...     print(f"Expires in {remaining.total_seconds()} seconds")
-        """
+        """Get time remaining until expiration."""
         ttl_attr = self._get_ttl_attr_name()
         if ttl_attr is None:
             return None
@@ -1151,29 +622,13 @@ class Model(metaclass=ModelMeta):
         return remaining
 
     def extend_ttl(self, new_expiration: datetime) -> None:
-        """Extend the TTL to a new expiration time.
-
-        Updates both the local instance and DynamoDB.
-
-        Args:
-            new_expiration: New expiration datetime. Use ExpiresIn helper.
-
-        Raises:
-            ValueError: If model has no TTLAttribute.
-
-        Example:
-            >>> from pydynox.attributes import ExpiresIn
-            >>> session = Session.get(pk="SESSION#123")
-            >>> session.extend_ttl(ExpiresIn.hours(1))  # extend by 1 hour
-        """
+        """Extend the TTL to a new expiration time."""
         ttl_attr = self._get_ttl_attr_name()
         if ttl_attr is None:
             raise ValueError(f"Model {self.__class__.__name__} has no TTLAttribute")
 
-        # Update local instance
         setattr(self, ttl_attr, new_expiration)
 
-        # Update in DynamoDB
         client = self._get_client()
         table = self._get_table()
         key = self._get_key()
@@ -1183,26 +638,10 @@ class Model(metaclass=ModelMeta):
 
     @classmethod
     async def async_get(cls: type[M], consistent_read: bool | None = None, **keys: Any) -> M | None:
-        """Async version of get.
-
-        Args:
-            consistent_read: If True, use strongly consistent read (2x RCU cost).
-                If None, uses model_config.consistent_read (default: False).
-            **keys: The key attributes (hash_key and optional range_key).
-
-        Returns:
-            The model instance if found, None otherwise.
-
-        Example:
-            >>> user = await User.async_get(pk="USER#123", sk="PROFILE")
-            >>>
-            >>> # Strongly consistent read
-            >>> user = await User.async_get(pk="USER#123", sk="PROFILE", consistent_read=True)
-        """
+        """Async version of get."""
         client = cls._get_client()
         table = cls._get_table()
 
-        # Determine consistent_read: param > model_config > False
         use_consistent = consistent_read
         if use_consistent is None:
             use_consistent = getattr(cls.model_config, "consistent_read", False)
@@ -1228,27 +667,7 @@ class Model(metaclass=ModelMeta):
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
     ) -> AsyncModelQueryResult[M]:
-        """Async version of query.
-
-        Args:
-            hash_key: The hash key value to query.
-            range_key_condition: Optional condition on the range key.
-            filter_condition: Optional filter on non-key attributes.
-            limit: Max items per page (not total).
-            scan_index_forward: Sort order. True = ascending, False = descending.
-            consistent_read: If True, use strongly consistent read (2x RCU cost).
-            last_evaluated_key: Start key for pagination.
-
-        Returns:
-            AsyncModelQueryResult that yields typed model instances.
-
-        Example:
-            >>> async for user in User.async_query(hash_key="USER#123"):
-            ...     print(user.name)
-            >>>
-            >>> # Get first result
-            >>> user = await User.async_query(hash_key="USER#123").first()
-        """
+        """Async version of query."""
         return AsyncModelQueryResult(
             model_class=cls,
             hash_key_value=hash_key,
@@ -1260,32 +679,73 @@ class Model(metaclass=ModelMeta):
             last_evaluated_key=last_evaluated_key,
         )
 
+    @classmethod
+    def async_scan(
+        cls: type[M],
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+        segment: int | None = None,
+        total_segments: int | None = None,
+    ) -> AsyncModelScanResult[M]:
+        """Async version of scan."""
+        return AsyncModelScanResult(
+            model_class=cls,
+            filter_condition=filter_condition,
+            limit=limit,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            segment=segment,
+            total_segments=total_segments,
+        )
+
+    @classmethod
+    async def async_count(
+        cls: type[M],
+        filter_condition: Condition | None = None,
+        consistent_read: bool | None = None,
+    ) -> tuple[int, OperationMetrics]:
+        """Async version of count."""
+        client = cls._get_client()
+        table = cls._get_table()
+
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        filter_expr = None
+        if filter_condition is not None:
+            filter_expr = filter_condition.serialize(names, values)
+
+        attr_names = {v: k for k, v in names.items()}
+
+        use_consistent = consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(cls.model_config, "consistent_read", False)
+
+        result = await client.async_count(
+            table,
+            filter_expression=filter_expr,
+            expression_attribute_names=attr_names if attr_names else None,
+            expression_attribute_values=values if values else None,
+            consistent_read=use_consistent,
+        )
+        return result
+
     async def async_save(
         self, condition: Condition | None = None, skip_hooks: bool | None = None
     ) -> None:
-        """Async version of save.
-
-        Args:
-            condition: Optional condition that must be true for the write.
-            skip_hooks: Skip hooks for this operation.
-
-        Example:
-            >>> user = User(pk="USER#123", sk="PROFILE", name="John")
-            >>> await user.async_save()
-        """
+        """Async version of save."""
         skip = self._should_skip_hooks(skip_hooks)
 
         if not skip:
             self._run_hooks(HookType.BEFORE_SAVE)
 
-        # Apply auto-generate strategies before saving
         self._apply_auto_generate()
 
-        # Handle optimistic locking
         version_attr = self._get_version_attr_name()
         version_condition, new_version = self._build_version_condition()
 
-        # Combine user condition with version condition
         final_condition = condition
         if version_condition is not None:
             if final_condition is not None:
@@ -1293,11 +753,9 @@ class Model(metaclass=ModelMeta):
             else:
                 final_condition = version_condition
 
-        # Set new version before saving
         if version_attr is not None:
             setattr(self, version_attr, new_version)
 
-        # Check size if max_size is set
         max_size = (
             getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
         )
@@ -1335,33 +793,20 @@ class Model(metaclass=ModelMeta):
     async def async_delete(
         self, condition: Condition | None = None, skip_hooks: bool | None = None
     ) -> None:
-        """Async version of delete.
-
-        Args:
-            condition: Optional condition that must be true for the delete.
-            skip_hooks: Skip hooks for this operation.
-
-        Example:
-            >>> user = await User.async_get(pk="USER#123", sk="PROFILE")
-            >>> await user.async_delete()
-        """
+        """Async version of delete."""
         skip = self._should_skip_hooks(skip_hooks)
 
         if not skip:
             self._run_hooks(HookType.BEFORE_DELETE)
 
-        # Handle optimistic locking for delete
         version_attr = self._get_version_attr_name()
         version_condition: Condition | None = None
         if version_attr is not None:
             current_version: int | None = getattr(self, version_attr, None)
             if current_version is not None:
-                from pydynox._internal._conditions import ConditionPath
-
                 path = ConditionPath(path=[version_attr])
                 version_condition = path == current_version
 
-        # Combine user condition with version condition
         final_condition = condition
         if version_condition is not None:
             if final_condition is not None:
@@ -1398,18 +843,7 @@ class Model(metaclass=ModelMeta):
         skip_hooks: bool | None = None,
         **kwargs: Any,
     ) -> None:
-        """Async version of update.
-
-        Args:
-            atomic: List of atomic operations.
-            condition: Optional condition that must be true.
-            skip_hooks: Skip hooks for this operation.
-            **kwargs: Attribute values to update.
-
-        Example:
-            >>> user = await User.async_get(pk="USER#123", sk="PROFILE")
-            >>> await user.async_update(name="Jane", age=31)
-        """
+        """Async version of update."""
         skip = self._should_skip_hooks(skip_hooks)
 
         if not skip:

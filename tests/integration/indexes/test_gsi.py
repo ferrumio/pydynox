@@ -1,8 +1,9 @@
 """Integration tests for GlobalSecondaryIndex queries."""
 
 import pytest
-from pydynox import DynamoDBClient, GlobalSecondaryIndex, Model, ModelConfig, set_default_client
+from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.indexes import GlobalSecondaryIndex
 
 
 @pytest.fixture

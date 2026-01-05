@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from pydynox import GlobalSecondaryIndex, Model, ModelConfig
+from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.indexes import GlobalSecondaryIndex
 
 
 class User(Model):

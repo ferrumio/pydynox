@@ -100,7 +100,7 @@ def test_query_with_pagination(user_model):
 
 def test_model_query_result_first_returns_none_when_empty(user_model):
     """ModelQueryResult.first() returns None when no results."""
-    with patch.object(ModelQueryResult, "_build_query") as mock_build:
+    with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         mock_query_result.__iter__ = MagicMock(return_value=iter([]))
         mock_build.return_value = mock_query_result
@@ -113,7 +113,7 @@ def test_model_query_result_first_returns_none_when_empty(user_model):
 
 def test_model_query_result_list(user_model):
     """list(ModelQueryResult) collects all results."""
-    with patch.object(ModelQueryResult, "_build_query") as mock_build:
+    with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         items = [
             {"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1"},
@@ -132,7 +132,7 @@ def test_model_query_result_list(user_model):
 
 def test_model_query_result_iteration(user_model):
     """ModelQueryResult can be iterated."""
-    with patch.object(ModelQueryResult, "_build_query") as mock_build:
+    with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         items = [
             {"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1"},

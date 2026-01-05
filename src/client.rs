@@ -336,6 +336,68 @@ impl DynamoDBClient {
         Ok((result.items, result.last_evaluated_key, result.metrics))
     }
 
+    /// Scan a single page of items from a DynamoDB table.
+    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::type_complexity)]
+    pub fn scan_page(
+        &self,
+        py: Python<'_>,
+        table: &str,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        limit: Option<i32>,
+        exclusive_start_key: Option<&Bound<'_, PyDict>>,
+        index_name: Option<String>,
+        consistent_read: bool,
+        segment: Option<i32>,
+        total_segments: Option<i32>,
+    ) -> PyResult<(Vec<Py<PyAny>>, Option<Py<PyAny>>, OperationMetrics)> {
+        let result = basic_operations::scan(
+            py,
+            &self.client,
+            &self.runtime,
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            exclusive_start_key,
+            index_name,
+            consistent_read,
+            segment,
+            total_segments,
+        )?;
+        Ok((result.items, result.last_evaluated_key, result.metrics))
+    }
+
+    /// Count items in a DynamoDB table.
+    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, index_name=None, consistent_read=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn count(
+        &self,
+        py: Python<'_>,
+        table: &str,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        index_name: Option<String>,
+        consistent_read: bool,
+    ) -> PyResult<(i64, OperationMetrics)> {
+        basic_operations::count(
+            py,
+            &self.client,
+            &self.runtime,
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            index_name,
+            consistent_read,
+        )
+    }
+
     /// Batch write items to a DynamoDB table.
     pub fn batch_write(
         &self,
@@ -569,6 +631,64 @@ impl DynamoDBClient {
             limit,
             exclusive_start_key,
             scan_index_forward,
+            index_name,
+            consistent_read,
+        )
+    }
+
+    /// Async version of scan_page.
+    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn async_scan_page<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        limit: Option<i32>,
+        exclusive_start_key: Option<&Bound<'_, PyDict>>,
+        index_name: Option<String>,
+        consistent_read: bool,
+        segment: Option<i32>,
+        total_segments: Option<i32>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_scan(
+            py,
+            self.client.clone(),
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            exclusive_start_key,
+            index_name,
+            consistent_read,
+            segment,
+            total_segments,
+        )
+    }
+
+    /// Async version of count.
+    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, index_name=None, consistent_read=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn async_count<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        index_name: Option<String>,
+        consistent_read: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_count(
+            py,
+            self.client.clone(),
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
             index_name,
             consistent_read,
         )
