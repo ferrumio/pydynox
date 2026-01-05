@@ -3,6 +3,9 @@
 GSIs allow querying by non-key attributes. Define them on your model
 and query using the index's partition key.
 
+Supports multi-attribute composite keys (up to 4 attributes per key).
+See: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GSI.DesignPattern.MultiAttributeKeys.html
+
 Example:
     >>> from pydynox import Model, ModelConfig
     >>> from pydynox.attributes import StringAttribute
@@ -15,25 +18,27 @@ Example:
     ...     email = StringAttribute()
     ...     status = StringAttribute()
     ...
-    ...     # Define GSIs
+    ...     # Single-attribute GSI (classic)
     ...     email_index = GlobalSecondaryIndex(
     ...         index_name="email-index",
     ...         hash_key="email",
     ...     )
-    ...     status_index = GlobalSecondaryIndex(
-    ...         index_name="status-index",
-    ...         hash_key="status",
-    ...         range_key="pk",
+    ...
+    ...     # Multi-attribute GSI (new in Nov 2025)
+    ...     location_index = GlobalSecondaryIndex(
+    ...         index_name="location-index",
+    ...         hash_key=["tenant_id", "region"],
+    ...         range_key=["created_at", "id"],
     ...     )
     >>>
-    >>> # Query by email
+    >>> # Query single-attribute GSI
     >>> for user in User.email_index.query(email="john@example.com"):
     ...     print(user.pk)
     >>>
-    >>> # Query by status with sort key condition
-    >>> for user in User.status_index.query(
-    ...     status="active",
-    ...     range_key_condition=User.pk.begins_with("USER#"),
+    >>> # Query multi-attribute GSI (all hash key attrs required)
+    >>> for user in User.location_index.query(
+    ...     tenant_id="ACME",
+    ...     region="us-east-1",
     ... ):
     ...     print(user.email)
 """
@@ -57,10 +62,14 @@ class GlobalSecondaryIndex(Generic[M]):
     GSIs let you query by attributes other than the table's primary key.
     Define them as class attributes on your Model.
 
+    Supports multi-attribute composite keys (up to 4 attributes per key).
+
     Args:
         index_name: Name of the GSI in DynamoDB.
-        hash_key: Attribute name to use as the GSI partition key.
-        range_key: Optional attribute name for the GSI sort key.
+        hash_key: Attribute name(s) for the GSI partition key.
+            Can be a single string or list of up to 4 strings.
+        range_key: Optional attribute name(s) for the GSI sort key.
+            Can be a single string or list of up to 4 strings.
         projection: Attributes to project. Options:
             - "ALL" (default): All attributes
             - "KEYS_ONLY": Only key attributes
@@ -71,35 +80,79 @@ class GlobalSecondaryIndex(Generic[M]):
         ...     model_config = ModelConfig(table="users")
         ...     pk = StringAttribute(hash_key=True)
         ...     email = StringAttribute()
+        ...     tenant_id = StringAttribute()
+        ...     region = StringAttribute()
         ...
+        ...     # Single-attribute key
         ...     email_index = GlobalSecondaryIndex(
         ...         index_name="email-index",
         ...         hash_key="email",
         ...     )
+        ...
+        ...     # Multi-attribute key
+        ...     location_index = GlobalSecondaryIndex(
+        ...         index_name="location-index",
+        ...         hash_key=["tenant_id", "region"],
+        ...     )
         >>>
-        >>> # Query the index
+        >>> # Query single-attribute
         >>> users = User.email_index.query(email="john@example.com")
+        >>>
+        >>> # Query multi-attribute (all hash key attrs required)
+        >>> users = User.location_index.query(tenant_id="ACME", region="us-east-1")
     """
 
     def __init__(
         self,
         index_name: str,
-        hash_key: str,
-        range_key: str | None = None,
+        hash_key: str | list[str],
+        range_key: str | list[str] | None = None,
         projection: str | list[str] = "ALL",
     ) -> None:
         """Create a GSI definition.
 
         Args:
             index_name: Name of the GSI in DynamoDB.
-            hash_key: Attribute name for the GSI partition key.
-            range_key: Optional attribute name for the GSI sort key.
+            hash_key: Attribute name(s) for the GSI partition key.
+                Single string or list of up to 4 strings.
+            range_key: Optional attribute name(s) for the GSI sort key.
+                Single string or list of up to 4 strings.
             projection: Projection type or list of attributes.
+
+        Raises:
+            ValueError: If hash_key or range_key has more than 4 attributes.
         """
         self.index_name = index_name
-        self.hash_key = hash_key
-        self.range_key = range_key
+
+        # Normalize to list
+        self.hash_keys = [hash_key] if isinstance(hash_key, str) else list(hash_key)
+        self.range_keys = (
+            []
+            if range_key is None
+            else [range_key]
+            if isinstance(range_key, str)
+            else list(range_key)
+        )
+
+        # Validate max 4 attributes per key
+        if len(self.hash_keys) > 4:
+            raise ValueError(
+                f"GSI '{index_name}': hash_key can have at most 4 attributes, "
+                f"got {len(self.hash_keys)}"
+            )
+        if len(self.range_keys) > 4:
+            raise ValueError(
+                f"GSI '{index_name}': range_key can have at most 4 attributes, "
+                f"got {len(self.range_keys)}"
+            )
+        if not self.hash_keys:
+            raise ValueError(f"GSI '{index_name}': hash_key is required")
+
         self.projection = projection
+
+        # For backward compatibility
+        self.hash_key = self.hash_keys[0]
+        self.range_key = self.range_keys[0] if self.range_keys else None
 
         # Set by Model metaclass
         self._model_class: type[M] | None = None
@@ -132,6 +185,10 @@ class GlobalSecondaryIndex(Generic[M]):
     ) -> GSIQueryResult[M]:
         """Query the GSI.
 
+        For multi-attribute keys:
+        - All hash key attributes are required
+        - Sort key attributes are optional (left-to-right prefix)
+
         Args:
             range_key_condition: Optional condition on the GSI range key.
                 Use attribute comparison methods like `begins_with`, `between`, etc.
@@ -139,15 +196,22 @@ class GlobalSecondaryIndex(Generic[M]):
                 Applied after the query, still consumes RCU for filtered items.
             limit: Max items per page (not total).
             scan_index_forward: Sort order. True = ascending (default), False = descending.
-            **key_values: The GSI hash key value. Must include the hash_key attribute.
+            **key_values: The GSI key values. Must include all hash_key attributes.
 
         Returns:
             GSIQueryResult that can be iterated.
 
         Example:
-            >>> # Simple query by hash key
+            >>> # Single-attribute GSI
             >>> for user in User.email_index.query(email="john@example.com"):
             ...     print(user.name)
+            >>>
+            >>> # Multi-attribute GSI (all hash key attrs required)
+            >>> for user in User.location_index.query(
+            ...     tenant_id="ACME",
+            ...     region="us-east-1",
+            ... ):
+            ...     print(user.email)
             >>>
             >>> # With range key condition
             >>> for user in User.status_index.query(
@@ -155,37 +219,23 @@ class GlobalSecondaryIndex(Generic[M]):
             ...     range_key_condition=User.created_at > "2024-01-01",
             ... ):
             ...     print(user.email)
-            >>>
-            >>> # With filter
-            >>> for user in User.email_index.query(
-            ...     email="john@example.com",
-            ...     filter_condition=User.age >= 18,
-            ... ):
-            ...     print(user.name)
-            >>>
-            >>> # Descending order with limit
-            >>> for user in User.status_index.query(
-            ...     status="active",
-            ...     limit=10,
-            ...     scan_index_forward=False,
-            ... ):
-            ...     print(user.email)
         """
         model_class = self._get_model_class()
 
-        # Validate hash key is provided
-        if self.hash_key not in key_values:
+        # Validate all hash key attributes are provided
+        missing_hash_keys = [k for k in self.hash_keys if k not in key_values]
+        if missing_hash_keys:
             raise ValueError(
-                f"GSI query requires '{self.hash_key}' (the hash key). "
-                f"Got: {list(key_values.keys())}"
+                f"GSI query requires all hash key attributes: {self.hash_keys}. "
+                f"Missing: {missing_hash_keys}"
             )
 
         return GSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
-            hash_key=self.hash_key,
-            hash_key_value=key_values[self.hash_key],
-            range_key=self.range_key,
+            hash_keys=self.hash_keys,
+            hash_key_values={k: key_values[k] for k in self.hash_keys},
+            range_keys=self.range_keys,
             range_key_condition=range_key_condition,
             filter_condition=filter_condition,
             limit=limit,
@@ -196,13 +246,21 @@ class GlobalSecondaryIndex(Generic[M]):
         """Convert to DynamoDB GSI definition format.
 
         Used when creating tables with GSIs.
+        Supports multi-attribute composite keys.
 
         Returns:
             Dict in DynamoDB CreateTable GSI format.
         """
-        key_schema = [{"AttributeName": self.hash_key, "KeyType": "HASH"}]
-        if self.range_key:
-            key_schema.append({"AttributeName": self.range_key, "KeyType": "RANGE"})
+        # Build key schema with multiple HASH/RANGE entries for multi-attribute keys
+        key_schema: list[dict[str, str]] = []
+
+        # Add all hash key attributes (all with KeyType: HASH)
+        for attr_name in self.hash_keys:
+            key_schema.append({"AttributeName": attr_name, "KeyType": "HASH"})
+
+        # Add all range key attributes (all with KeyType: RANGE)
+        for attr_name in self.range_keys:
+            key_schema.append({"AttributeName": attr_name, "KeyType": "RANGE"})
 
         # Build projection
         projection: dict[str, Any]
@@ -246,9 +304,9 @@ class GSIQueryResult(Generic[M]):
         self,
         model_class: type[M],
         index_name: str,
-        hash_key: str,
-        hash_key_value: Any,
-        range_key: str | None = None,
+        hash_keys: list[str],
+        hash_key_values: dict[str, Any],
+        range_keys: list[str] | None = None,
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
@@ -257,9 +315,9 @@ class GSIQueryResult(Generic[M]):
     ) -> None:
         self._model_class = model_class
         self._index_name = index_name
-        self._hash_key = hash_key
-        self._hash_key_value = hash_key_value
-        self._range_key = range_key
+        self._hash_keys = hash_keys
+        self._hash_key_values = hash_key_values
+        self._range_keys = range_keys or []
         self._range_key_condition = range_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
@@ -305,13 +363,16 @@ class GSIQueryResult(Generic[M]):
         names: dict[str, str] = {}
         values: dict[str, Any] = {}
 
-        # Hash key condition: #gsi_hk = :gsi_hkv
-        hk_name_placeholder = "#gsi_hk"
-        hk_value_placeholder = ":gsi_hkv"
-        names[self._hash_key] = hk_name_placeholder
-        values[hk_value_placeholder] = self._hash_key_value
+        # Build hash key conditions (all required)
+        key_conditions: list[str] = []
+        for i, attr_name in enumerate(self._hash_keys):
+            name_placeholder = f"#gsi_hk{i}"
+            value_placeholder = f":gsi_hkv{i}"
+            names[attr_name] = name_placeholder
+            values[value_placeholder] = self._hash_key_values[attr_name]
+            key_conditions.append(f"{name_placeholder} = {value_placeholder}")
 
-        key_condition = f"{hk_name_placeholder} = {hk_value_placeholder}"
+        key_condition = " AND ".join(key_conditions)
 
         # Add range key condition if provided
         if self._range_key_condition is not None:

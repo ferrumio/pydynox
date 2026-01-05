@@ -478,13 +478,8 @@ impl DynamoDBClient {
             encryption,
             kms_key_id,
             gsis,
-        )?;
-
-        if wait {
-            table_operations::wait_for_table_active(&self.client, &self.runtime, table_name, None)?;
-        }
-
-        Ok(())
+            wait,
+        )
     }
 
     /// Check if a table exists.

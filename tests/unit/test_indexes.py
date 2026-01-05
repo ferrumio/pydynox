@@ -20,6 +20,10 @@ class User(Model):
     email = StringAttribute()
     status = StringAttribute()
     age = NumberAttribute()
+    tenant_id = StringAttribute()
+    region = StringAttribute()
+    created_at = StringAttribute()
+    item_id = StringAttribute()
 
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
@@ -42,6 +46,13 @@ class User(Model):
         index_name="keys-only-index",
         hash_key="email",
         projection="KEYS_ONLY",
+    )
+
+    # Multi-attribute GSI (new in Nov 2025)
+    location_index = GlobalSecondaryIndex(
+        index_name="location-index",
+        hash_key=["tenant_id", "region"],
+        range_key=["created_at", "item_id"],
     )
 
 
@@ -113,7 +124,7 @@ def test_gsi_to_dynamodb_definition_keys_only() -> None:
 
 def test_gsi_query_requires_hash_key() -> None:
     """Test GSI query raises error if hash key not provided."""
-    with pytest.raises(ValueError, match="requires 'email'"):
+    with pytest.raises(ValueError, match="requires all hash key attributes"):
         User.email_index.query(status="active")  # type: ignore[call-arg]
 
 
@@ -137,3 +148,83 @@ def test_gsi_inheritance() -> None:
     assert "email_index" in AdminUser._indexes
     assert "status_index" in AdminUser._indexes
     assert AdminUser.email_index._model_class is AdminUser
+
+
+# ============ Multi-attribute GSI tests ============
+
+
+def test_multi_attr_gsi_definition() -> None:
+    """Test multi-attribute GSI is defined correctly."""
+    assert User.location_index.index_name == "location-index"
+    assert User.location_index.hash_keys == ["tenant_id", "region"]
+    assert User.location_index.range_keys == ["created_at", "item_id"]
+    # Backward compat: first attribute accessible via hash_key/range_key
+    assert User.location_index.hash_key == "tenant_id"
+    assert User.location_index.range_key == "created_at"
+
+
+def test_multi_attr_gsi_to_dynamodb_definition() -> None:
+    """Test multi-attribute GSI converts to DynamoDB format."""
+    definition = User.location_index.to_dynamodb_definition()
+
+    assert definition["IndexName"] == "location-index"
+    assert definition["KeySchema"] == [
+        {"AttributeName": "tenant_id", "KeyType": "HASH"},
+        {"AttributeName": "region", "KeyType": "HASH"},
+        {"AttributeName": "created_at", "KeyType": "RANGE"},
+        {"AttributeName": "item_id", "KeyType": "RANGE"},
+    ]
+
+
+def test_multi_attr_gsi_query_requires_all_hash_keys() -> None:
+    """Test multi-attribute GSI query requires all hash key attributes."""
+    # Missing region
+    with pytest.raises(ValueError, match="Missing: \\['region'\\]"):
+        User.location_index.query(tenant_id="ACME")
+
+    # Missing tenant_id
+    with pytest.raises(ValueError, match="Missing: \\['tenant_id'\\]"):
+        User.location_index.query(region="us-east-1")
+
+
+def test_multi_attr_gsi_validation_max_4_hash_keys() -> None:
+    """Test GSI rejects more than 4 hash key attributes."""
+    with pytest.raises(ValueError, match="at most 4 attributes"):
+        GlobalSecondaryIndex(
+            index_name="too-many-hash",
+            hash_key=["a", "b", "c", "d", "e"],  # 5 attributes
+        )
+
+
+def test_multi_attr_gsi_validation_max_4_range_keys() -> None:
+    """Test GSI rejects more than 4 range key attributes."""
+    with pytest.raises(ValueError, match="at most 4 attributes"):
+        GlobalSecondaryIndex(
+            index_name="too-many-range",
+            hash_key="pk",
+            range_key=["a", "b", "c", "d", "e"],  # 5 attributes
+        )
+
+
+def test_multi_attr_gsi_validation_empty_hash_key() -> None:
+    """Test GSI rejects empty hash key."""
+    with pytest.raises(ValueError, match="hash_key is required"):
+        GlobalSecondaryIndex(
+            index_name="empty-hash",
+            hash_key=[],  # type: ignore[arg-type]
+        )
+
+
+def test_single_attr_gsi_backward_compat() -> None:
+    """Test single-attribute GSI still works (backward compat)."""
+    gsi = GlobalSecondaryIndex(
+        index_name="test",
+        hash_key="email",
+        range_key="created_at",
+    )
+    # Should be normalized to lists internally
+    assert gsi.hash_keys == ["email"]
+    assert gsi.range_keys == ["created_at"]
+    # But still accessible via old properties
+    assert gsi.hash_key == "email"
+    assert gsi.range_key == "created_at"
