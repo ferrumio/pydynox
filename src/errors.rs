@@ -21,6 +21,7 @@ create_exception!(pydynox, CredentialsError, PydynoxError);
 create_exception!(pydynox, SerializationError, PydynoxError);
 create_exception!(pydynox, ConnectionError, PydynoxError);
 create_exception!(pydynox, EncryptionError, PydynoxError);
+create_exception!(pydynox, S3AttributeError, PydynoxError);
 
 /// Register exception classes with the Python module.
 pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -51,6 +52,7 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.add("ConnectionError", m.py().get_type::<ConnectionError>())?;
     m.add("EncryptionError", m.py().get_type::<EncryptionError>())?;
+    m.add("S3AttributeError", m.py().get_type::<S3AttributeError>())?;
     Ok(())
 }
 

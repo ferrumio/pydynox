@@ -22,9 +22,16 @@ pyo3 = { version = "0.27", features = ["extension-module"] }
 pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }
 aws-sdk-dynamodb = "1.54"
 aws-sdk-kms = "1.54"
+aws-sdk-s3 = "1.54"
 aws-sdk-sts = "1.54"
 aws-config = { version = "1.5", features = ["behavior-version-latest"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "sync",
+    "time",
+    "io-util",
+    "fs",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"

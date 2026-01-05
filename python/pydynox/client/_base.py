@@ -14,6 +14,7 @@ class BaseClient:
 
     _client: pydynox_core.DynamoDBClient
     _rate_limit: FixedRate | AdaptiveRate | None
+    _config: dict[str, str | float | int | None]
 
     def __init__(
         self,
@@ -51,6 +52,23 @@ class BaseClient:
         )
         self._rate_limit = rate_limit
 
+        # Store config for S3/KMS to inherit
+        self._config = {
+            "region": region,
+            "access_key": access_key,
+            "secret_key": secret_key,
+            "session_token": session_token,
+            "profile": profile,
+            "endpoint_url": endpoint_url,
+            "role_arn": role_arn,
+            "role_session_name": role_session_name,
+            "external_id": external_id,
+            "connect_timeout": connect_timeout,
+            "read_timeout": read_timeout,
+            "max_retries": max_retries,
+            "proxy_url": proxy_url,
+        }
+
     @property
     def rate_limit(self) -> FixedRate | AdaptiveRate | None:
         """Get the rate limiter for this client."""
@@ -78,3 +96,10 @@ class BaseClient:
     def ping(self) -> bool:
         """Check if the client can connect to DynamoDB."""
         return self._client.ping()
+
+    def _get_client_config(self) -> dict[str, str | float | int | None]:
+        """Get client config for S3/KMS to inherit credentials.
+
+        Internal method used by S3Attribute and EncryptedAttribute.
+        """
+        return self._config
