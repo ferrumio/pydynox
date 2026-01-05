@@ -4,20 +4,52 @@
 [![PyPI version](https://img.shields.io/pypi/v/pydynox.svg)](https://pypi.org/project/pydynox/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pydynox.svg)](https://pypi.org/project/pydynox/)
 [![License](https://img.shields.io/pypi/l/pydynox.svg)](https://github.com/leandrodamascena/pydynox/blob/main/LICENSE)
+[![Downloads](https://static.pepy.tech/badge/pydynox/month)](https://pepy.tech/project/pydynox)
 
 A fast DynamoDB ORM for Python with a Rust core.
 
-> **Pre-release**: Core features are working and tested. We're polishing the API and testing edge cases before v1.0.
+> **Pre-release**: The core features are working and tested. We're adding features, polishing the API, receiving ideas, and testing performance and edge cases before v1.0. Feel free to try it out and share feedback!
 
-## Why pydynox?
+## Why "pydynox"?
 
 **Py**(thon) + **Dyn**(amoDB) + **Ox**(ide/Rust)
 
-- **Fast** - Rust handles serialization, compression, and encryption
-- **Simple** - Class-based API like PynamoDB
-- **Async first** - All operations have async versions
-- **Type-safe** - Full type hints and mypy support
-- **Zero dependencies** - Just the wheel, nothing else
+## GenAI Contributions 🤖
+
+I believe GenAI is transforming how we build software. It's a powerful tool that accelerates development when used by developers who understand what they're doing.
+
+To support both humans and AI agents, I created:
+
+- `.ai/` folder - Guidelines for agentic IDEs (Cursor, Windsurf, Kiro, etc.)
+- `ADR/` folder - Architecture Decision Records for humans to understand the "why" behind decisions
+
+**If you're contributing with AI help:**
+
+- Understand what the AI generated before submitting
+- Make sure the code follows the project patterns
+- Test your changes
+
+I reserve the right to reject low-quality PRs where project patterns are not followed and it's clear that GenAI was driving instead of the developer.
+
+## Features
+
+- Simple class-based API like PynamoDB
+- Fast serialization with Rust
+- Batch operations with auto-splitting
+- Transactions
+- Global Secondary Indexes
+- Async support
+- Pydantic integration
+- TTL (auto-expiring items)
+- Lifecycle hooks
+- Auto-generate IDs and timestamps
+- Optimistic locking
+- Rate limiting
+- Field encryption (KMS)
+- Compression (zstd, lz4, gzip)
+- S3 attribute for large files
+- PartiQL support
+- Observability (logging, metrics)
 
 ## Installation
 
@@ -25,24 +57,36 @@ A fast DynamoDB ORM for Python with a Rust core.
 pip install pydynox
 ```
 
-## Quick start
+For Pydantic support:
+
+```bash
+pip install pydynox[pydantic]
+```
+
+## Quick Start
+
+### Define a Model
 
 ```python
-from pydynox import Model, ModelConfig, DynamoDBClient
-from pydynox.attributes import StringAttribute, NumberAttribute
-
-client = DynamoDBClient(region="us-east-1")
+from pydynox import Model, ModelConfig, String, Number, Boolean, List
 
 class User(Model):
-    model_config = ModelConfig(table="users", client=client)
+    model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
-    name = StringAttribute()
-    age = NumberAttribute(default=0)
+    pk = String(hash_key=True)
+    sk = String(range_key=True)
+    name = String()
+    email = String()
+    age = Number(default=0)
+    active = Boolean(default=True)
+    tags = List(String)
+```
 
+### CRUD Operations
+
+```python
 # Create
-user = User(pk="USER#123", sk="PROFILE", name="John")
+user = User(pk="USER#123", sk="PROFILE", name="John", email="john@test.com")
 user.save()
 
 # Read
@@ -56,53 +100,111 @@ user.save()
 user.delete()
 ```
 
-## Features
-
-### Query and scan
+### Query
 
 ```python
-# Query by hash key
-for user in User.query(hash_key="USER#123"):
-    print(user.name)
+from pydynox import Condition
 
-# With range key condition
-for user in User.query(hash_key="USER#123", range_key_condition=User.sk.begins_with("ORDER#")):
-    print(user.name)
+# Simple query
+users = User.query(pk="USER#123")
 
-# Scan with filter
-for user in User.scan(filter_condition=User.age >= 18):
+# With filters
+users = User.query(pk="USER#123") \
+    .where(Condition.begins_with("sk", "ORDER#")) \
+    .where(Condition.gt("age", 18)) \
+    .exec()
+
+# Iterate (auto pagination)
+for user in users:
     print(user.name)
 ```
 
 ### Conditions
 
 ```python
-# Save only if item doesn't exist
-user.save(condition=User.pk.does_not_exist())
+from pydynox import Condition
+
+# Save with condition
+user.save(condition=Condition.not_exists("pk"))
 
 # Delete with condition
-user.delete(condition=User.version == 5)
+user.delete(condition=Condition.eq("version", 5))
+
+# Combine conditions
+user.save(
+    condition=Condition.not_exists("pk") | Condition.eq("version", 1)
+)
 ```
 
-### Atomic updates
+Available conditions:
+- `Condition.eq(field, value)` - equals
+- `Condition.ne(field, value)` - not equals
+- `Condition.gt(field, value)` - greater than
+- `Condition.gte(field, value)` - greater than or equal
+- `Condition.lt(field, value)` - less than
+- `Condition.lte(field, value)` - less than or equal
+- `Condition.exists(field)` - attribute exists
+- `Condition.not_exists(field)` - attribute does not exist
+- `Condition.begins_with(field, prefix)` - string starts with
+- `Condition.contains(field, value)` - string or list contains
+- `Condition.between(field, low, high)` - value in range
+
+### Atomic Updates
 
 ```python
-from pydynox._internal._atomic import increment, append
+from pydynox import Action
+
+# Simple set
+user.update(name="New Name", email="new@test.com")
 
 # Increment a number
-user.update(atomic=[increment(User.age, 1)])
+user.update(Action.increment("age", 1))
 
 # Append to list
-user.update(atomic=[append(User.tags, ["verified"])])
+user.update(Action.append("tags", ["verified"]))
+
+# Remove field
+user.update(Action.remove("temp_field"))
+
+# Combine with condition
+user.update(
+    Action.increment("age", 1),
+    condition=Condition.eq("status", "active")
+)
 ```
 
-### Batch operations
+### Batch Operations
 
 ```python
+# Batch write
 with User.batch_write() as batch:
     batch.save(user1)
     batch.save(user2)
     batch.delete(user3)
+
+# Batch get
+users = User.batch_get([
+    ("USER#1", "PROFILE"),
+    ("USER#2", "PROFILE"),
+])
+```
+
+### Global Secondary Index
+
+```python
+from pydynox import GlobalIndex, ModelConfig
+
+class User(Model):
+    model_config = ModelConfig(table="users")
+    
+    pk = String(hash_key=True)
+    sk = String(range_key=True)
+    email = String()
+    
+    email_index = GlobalIndex(hash_key="email")
+
+# Query on index
+users = User.email_index.query(email="john@test.com")
 ```
 
 ### Transactions
@@ -111,272 +213,140 @@ with User.batch_write() as batch:
 with User.transaction() as tx:
     tx.save(user1)
     tx.delete(user2)
+    tx.update(user3, Action.increment("age", 1))
 ```
 
-### Global secondary indexes
+### Async Support
 
 ```python
-from pydynox.indexes import GlobalSecondaryIndex
+# All methods work with await
+user = await User.get(pk="USER#123", sk="PROFILE")
+await user.save()
 
-class User(Model):
-    model_config = ModelConfig(table="users", client=client)
-    
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
-    email = StringAttribute()
-    
-    email_index = GlobalSecondaryIndex(hash_key="email")
-
-# Query on index
-for user in User.email_index.query(hash_key="john@test.com"):
+async for user in User.query(pk="USER#123"):
     print(user.name)
 ```
 
-### Async support ⚡
-
-All operations have async versions. No extra dependencies needed.
+### Pydantic Integration
 
 ```python
-# CRUD
-user = await User.async_get(pk="USER#123", sk="PROFILE")
-await user.async_save()
-await user.async_delete()
+from pydynox import dynamodb_model
+from pydantic import BaseModel, EmailStr
 
-# Query and scan
-async for user in User.async_query(hash_key="USER#123"):
-    print(user.name)
+@dynamodb_model(table="users", hash_key="pk", range_key="sk")
+class User(BaseModel):
+    pk: str
+    sk: str
+    name: str
+    email: EmailStr
+    age: int = 0
 
-async for user in User.async_scan(filter_condition=User.age >= 18):
-    print(user.name)
-
-# Batch and transactions work too
-async with User.async_batch_write() as batch:
-    await batch.save(user1)
-    await batch.save(user2)
+# All pydynox methods available
+user = User(pk="USER#123", sk="PROFILE", name="John", email="john@test.com")
+user.save()
 ```
 
-### TTL (auto-expiring items)
+### S3 Attribute (Large Files)
 
-```python
-from pydynox.attributes import TTLAttribute, ExpiresIn
-
-class Session(Model):
-    model_config = ModelConfig(table="sessions", client=client)
-    
-    pk = StringAttribute(hash_key=True)
-    expires_at = TTLAttribute()
-
-session = Session(pk="SESSION#123", expires_at=ExpiresIn.hours(1))
-session.save()
-
-# Check expiration
-print(session.is_expired)
-print(session.expires_in)
-```
-
-### Lifecycle hooks
-
-```python
-from pydynox.hooks import before_save, after_save
-
-class User(Model):
-    model_config = ModelConfig(table="users", client=client)
-    
-    pk = StringAttribute(hash_key=True)
-    name = StringAttribute()
-    
-    @before_save
-    def validate(self):
-        if not self.name:
-            raise ValueError("Name is required")
-    
-    @after_save
-    def log_save(self):
-        print(f"Saved {self.pk}")
-```
-
-### Auto-generate IDs and timestamps
-
-```python
-from pydynox import AutoGenerate
-from pydynox.attributes import StringAttribute, DatetimeAttribute
-
-class User(Model):
-    model_config = ModelConfig(table="users", client=client)
-    
-    pk = StringAttribute(hash_key=True, default=AutoGenerate.uuid4())
-    created_at = DatetimeAttribute(default=AutoGenerate.utc_now())
-```
-
-### Optimistic locking
-
-```python
-from pydynox.attributes import VersionAttribute
-
-class User(Model):
-    model_config = ModelConfig(table="users", client=client)
-    
-    pk = StringAttribute(hash_key=True)
-    name = StringAttribute()
-    version = VersionAttribute()
-
-# Version is auto-incremented on save
-# Raises ConditionCheckFailedError if version mismatch
-```
-
-### Rate limiting
-
-```python
-from pydynox import ModelConfig
-from pydynox.rate_limit import RateLimitConfig
-
-config = ModelConfig(
-    table="users",
-    client=client,
-    rate_limit=RateLimitConfig(rcu=100, wcu=50),
-)
-```
-
-### Field encryption (KMS)
-
-```python
-from pydynox.attributes import EncryptedAttribute
-
-class User(Model):
-    model_config = ModelConfig(table="users", client=client)
-    
-    pk = StringAttribute(hash_key=True)
-    ssn = EncryptedAttribute(key_id="alias/my-key")
-```
-
-### Compression
-
-```python
-from pydynox.attributes import CompressedAttribute
-
-class Document(Model):
-    model_config = ModelConfig(table="documents", client=client)
-    
-    pk = StringAttribute(hash_key=True)
-    body = CompressedAttribute()  # Uses zstd by default
-```
-
-### S3 attribute (large files)
-
-DynamoDB has a 400KB item limit. A common pattern is to store files in S3 and keep metadata in DynamoDB. `S3Attribute` handles this automatically: upload on save, download on demand, delete when the item is deleted.
+DynamoDB has a 400KB item limit. `S3Attribute` stores files in S3 and keeps metadata in DynamoDB. Upload on save, download on demand, delete when the item is deleted.
 
 ```python
 from pydynox.attributes import S3Attribute
 from pydynox._internal._s3 import S3File
 
 class Document(Model):
-    model_config = ModelConfig(table="documents", client=client)
+    model_config = ModelConfig(table="documents")
     
     pk = StringAttribute(hash_key=True)
-    name = StringAttribute()
     content = S3Attribute(bucket="my-bucket", prefix="docs/")
 
-# Upload - file goes to S3, metadata to DynamoDB
-doc = Document(pk="DOC#1", name="report.pdf")
+# Upload
+doc = Document(pk="DOC#1")
 doc.content = S3File(b"...", name="report.pdf", content_type="application/pdf")
 doc.save()
 
 # Download
 doc = Document.get(pk="DOC#1")
 data = doc.content.get_bytes()           # Load to memory
-doc.content.save_to("/path/to/file.pdf") # Stream to file (large files)
+doc.content.save_to("/path/to/file.pdf") # Stream to file
 url = doc.content.presigned_url(3600)    # Share via URL
 
-# Metadata always available (no S3 call)
-print(doc.content.size)          # File size in bytes
-print(doc.content.content_type)  # MIME type
+# Metadata (no S3 call)
+print(doc.content.size)
+print(doc.content.content_type)
 
 # Delete - removes from both DynamoDB and S3
 doc.delete()
 ```
 
-### PartiQL support
+## Table Management
 
 ```python
-users = User.execute_statement(
-    "SELECT * FROM users WHERE pk = ?",
-    parameters=["USER#123"]
-)
-```
+# Create table
+User.create_table()
 
-### Observability
+# Create with custom capacity
+User.create_table(read_capacity=10, write_capacity=5)
 
-```python
-from pydynox import set_logger
-import logging
+# Create with on-demand billing
+User.create_table(billing_mode="PAY_PER_REQUEST")
 
-# Enable logging
-set_logger(logging.getLogger("pydynox"))
+# Check if table exists
+if not User.table_exists():
+    User.create_table()
 
-# Get operation metrics
-user.save()
-metrics = User.get_last_metrics()
-print(f"Duration: {metrics.duration_ms}ms")
-print(f"Consumed WCU: {metrics.consumed_wcu}")
-```
-
-### Pydantic integration
-
-```bash
-pip install pydynox[pydantic]
-```
-
-```python
-from pydynox import dynamodb_model
-from pydantic import BaseModel
-
-@dynamodb_model(table="users", hash_key="pk")
-class User(BaseModel):
-    pk: str
-    name: str
-    age: int = 0
-
-user = User(pk="USER#123", name="John")
-user.save()
+# Delete table
+User.delete_table()
 ```
 
 ## Documentation
 
-Full docs: [https://leandrodamascena.github.io/pydynox](https://leandrodamascena.github.io/pydynox)
+Full documentation: [https://leandrodamascena.github.io/pydynox](https://leandrodamascena.github.io/pydynox)
 
-## GenAI contributions 🤖
+## License
 
-I believe GenAI is changing how we build software. To support both humans and AI agents:
+MIT License
 
-- `.ai/` folder - Guidelines for agentic IDEs (Cursor, Windsurf, Kiro, etc.)
-- `ADR/` folder - Architecture Decision Records
+## Inspirations
 
-If you're contributing with AI help, understand what the AI generated before submitting. I reserve the right to reject PRs where project patterns are not followed.
+This project was inspired by:
 
-## Building from source
+- [PynamoDB](https://github.com/pynamodb/PynamoDB) - The ORM-style API and model design
+- [Pydantic](https://github.com/pydantic/pydantic) - Data validation patterns and integration approach
+- [dynarust](https://github.com/Anexen/dynarust) - Rust DynamoDB client patterns
+- [dyntastic](https://github.com/nayaverdier/dyntastic) - Pydantic + DynamoDB integration ideas
+
+## Building from Source
+
+### Requirements
+
+- Python 3.11+
+- Rust 1.70+
+- maturin
+
+### Setup
 
 ```bash
-# Clone
+# Clone the repo
 git clone https://github.com/leandrodamascena/pydynox.git
 cd pydynox
 
-# Build with maturin (required for PyO3)
+# Install maturin
 pip install maturin
+
+# Build and install locally
 maturin develop
 
 # Or with uv
 uv run maturin develop
-
-# Run tests
-uv run pytest
 ```
 
-## License
+### Running Tests
 
-Apache 2.0
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
 
-## Inspirations
-
-- [PynamoDB](https://github.com/pynamodb/PynamoDB) - ORM-style API
-- [Pydantic](https://github.com/pydantic/pydantic) - Data validation patterns
-- [dynarust](https://github.com/Anexen/dynarust) - Rust DynamoDB patterns
+# Run tests
+pytest
+```
