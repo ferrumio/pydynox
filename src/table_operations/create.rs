@@ -1,87 +1,18 @@
-//! Table management operations for DynamoDB.
-//!
-//! Provides functions to create, delete, and check table status.
-//! Useful for local development and testing with moto/localstack.
+//! Table creation operation.
 
 use aws_sdk_dynamodb::types::{
     AttributeDefinition, BillingMode, GlobalSecondaryIndex, KeySchemaElement, KeyType, Projection,
-    ProjectionType, ScalarAttributeType, SseSpecification, SseType, TableClass, TableStatus,
+    ProjectionType, ScalarAttributeType, SseSpecification, SseType, TableClass,
 };
 use aws_sdk_dynamodb::Client;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::runtime::Runtime;
 
+use super::gsi::GsiDefinition;
+use super::wait::wait_for_table_active;
 use crate::errors::{map_sdk_error, ValidationError};
-
-/// GSI definition from Python.
-#[derive(Debug)]
-pub struct GsiDefinition {
-    pub index_name: String,
-    pub hash_key_name: String,
-    pub hash_key_type: String,
-    pub range_key_name: Option<String>,
-    pub range_key_type: Option<String>,
-    pub projection: String,
-    pub non_key_attributes: Option<Vec<String>>,
-}
-
-/// Parse GSI definitions from Python list.
-pub fn parse_gsi_definitions(
-    _py: Python<'_>,
-    gsis: &Bound<'_, PyList>,
-) -> PyResult<Vec<GsiDefinition>> {
-    let mut result = Vec::new();
-
-    for item in gsis.iter() {
-        let dict = item.cast::<pyo3::types::PyDict>()?;
-
-        let index_name: String = dict
-            .get_item("index_name")?
-            .ok_or_else(|| ValidationError::new_err("GSI missing 'index_name'"))?
-            .extract()?;
-
-        // hash_key is a tuple (name, type)
-        let hash_key: (String, String) = dict
-            .get_item("hash_key")?
-            .ok_or_else(|| ValidationError::new_err("GSI missing 'hash_key'"))?
-            .extract()?;
-
-        // range_key is optional tuple (name, type)
-        let range_key: Option<(String, String)> = dict
-            .get_item("range_key")?
-            .map(|v| v.extract())
-            .transpose()?;
-
-        // projection defaults to "ALL"
-        let projection: String = dict
-            .get_item("projection")?
-            .map(|v| v.extract())
-            .transpose()?
-            .unwrap_or_else(|| "ALL".to_string());
-
-        // non_key_attributes for INCLUDE projection
-        let non_key_attributes: Option<Vec<String>> = dict
-            .get_item("non_key_attributes")?
-            .map(|v| v.extract())
-            .transpose()?;
-
-        result.push(GsiDefinition {
-            index_name,
-            hash_key_name: hash_key.0,
-            hash_key_type: hash_key.1,
-            range_key_name: range_key.as_ref().map(|(n, _)| n.clone()),
-            range_key_type: range_key.map(|(_, t)| t),
-            projection,
-            non_key_attributes,
-        });
-    }
-
-    Ok(result)
-}
 
 /// Create a new DynamoDB table.
 ///
@@ -101,6 +32,7 @@ pub fn parse_gsi_definitions(
 /// * `encryption` - "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED"
 /// * `kms_key_id` - KMS key ARN (required when encryption is "CUSTOMER_MANAGED")
 /// * `gsis` - Optional list of GSI definitions
+/// * `wait` - Wait for table to become active
 #[allow(clippy::too_many_arguments)]
 pub fn create_table(
     client: &Client,
@@ -117,6 +49,7 @@ pub fn create_table(
     encryption: Option<&str>,
     kms_key_id: Option<&str>,
     gsis: Option<Vec<GsiDefinition>>,
+    wait: bool,
 ) -> PyResult<()> {
     let hash_attr_type = parse_attribute_type(hash_key_type)?;
 
@@ -166,47 +99,58 @@ pub fn create_table(
     let mut gsi_list: Vec<GlobalSecondaryIndex> = Vec::new();
     if let Some(gsi_defs) = gsis {
         for gsi in gsi_defs {
-            // Add GSI hash key attribute if not already defined
-            if !defined_attrs.contains(&gsi.hash_key_name) {
-                let gsi_hash_type = parse_attribute_type(&gsi.hash_key_type)?;
-                attribute_definitions.push(
-                    AttributeDefinition::builder()
-                        .attribute_name(&gsi.hash_key_name)
-                        .attribute_type(gsi_hash_type)
-                        .build()
-                        .map_err(|e| {
-                            ValidationError::new_err(format!("Invalid GSI attribute: {}", e))
-                        })?,
-                );
-                defined_attrs.insert(gsi.hash_key_name.clone());
-            }
+            let mut gsi_key_schema: Vec<KeySchemaElement> = Vec::new();
 
-            // Build GSI key schema
-            let mut gsi_key_schema = vec![KeySchemaElement::builder()
-                .attribute_name(&gsi.hash_key_name)
-                .key_type(KeyType::Hash)
-                .build()
-                .map_err(|e| ValidationError::new_err(format!("Invalid GSI key schema: {}", e)))?];
-
-            // Add GSI range key if provided
-            if let (Some(rk_name), Some(rk_type)) = (&gsi.range_key_name, &gsi.range_key_type) {
-                if !defined_attrs.contains(rk_name) {
-                    let gsi_range_type = parse_attribute_type(rk_type)?;
+            // Add all hash key attributes
+            for key_attr in &gsi.hash_keys {
+                // Add attribute definition if not already defined
+                if !defined_attrs.contains(&key_attr.name) {
+                    let attr_type = parse_attribute_type(&key_attr.attr_type)?;
                     attribute_definitions.push(
                         AttributeDefinition::builder()
-                            .attribute_name(rk_name)
-                            .attribute_type(gsi_range_type)
+                            .attribute_name(&key_attr.name)
+                            .attribute_type(attr_type)
                             .build()
                             .map_err(|e| {
                                 ValidationError::new_err(format!("Invalid GSI attribute: {}", e))
                             })?,
                     );
-                    defined_attrs.insert(rk_name.clone());
+                    defined_attrs.insert(key_attr.name.clone());
                 }
 
+                // Add to key schema
                 gsi_key_schema.push(
                     KeySchemaElement::builder()
-                        .attribute_name(rk_name)
+                        .attribute_name(&key_attr.name)
+                        .key_type(KeyType::Hash)
+                        .build()
+                        .map_err(|e| {
+                            ValidationError::new_err(format!("Invalid GSI key schema: {}", e))
+                        })?,
+                );
+            }
+
+            // Add all range key attributes
+            for key_attr in &gsi.range_keys {
+                // Add attribute definition if not already defined
+                if !defined_attrs.contains(&key_attr.name) {
+                    let attr_type = parse_attribute_type(&key_attr.attr_type)?;
+                    attribute_definitions.push(
+                        AttributeDefinition::builder()
+                            .attribute_name(&key_attr.name)
+                            .attribute_type(attr_type)
+                            .build()
+                            .map_err(|e| {
+                                ValidationError::new_err(format!("Invalid GSI attribute: {}", e))
+                            })?,
+                    );
+                    defined_attrs.insert(key_attr.name.clone());
+                }
+
+                // Add to key schema
+                gsi_key_schema.push(
+                    KeySchemaElement::builder()
+                        .attribute_name(&key_attr.name)
                         .key_type(KeyType::Range)
                         .build()
                         .map_err(|e| {
@@ -233,13 +177,13 @@ pub fn create_table(
     // Parse billing mode
     let billing = parse_billing_mode(billing_mode)?;
 
-    let client = client.clone();
-    let table_name = table_name.to_string();
+    let client_clone = client.clone();
+    let table_name_owned = table_name.to_string();
 
     runtime.block_on(async {
-        let mut request = client
+        let mut request = client_clone
             .create_table()
-            .table_name(&table_name)
+            .table_name(&table_name_owned)
             .set_attribute_definitions(Some(attribute_definitions))
             .set_key_schema(Some(key_schema))
             .billing_mode(billing.clone());
@@ -280,10 +224,17 @@ pub fn create_table(
         request
             .send()
             .await
-            .map_err(|e| map_sdk_error(e, Some(&table_name)))?;
+            .map_err(|e| map_sdk_error(e, Some(&table_name_owned)))?;
 
-        Ok(())
-    })
+        Ok::<(), PyErr>(())
+    })?;
+
+    // Wait for table to become active if requested
+    if wait {
+        wait_for_table_active(client, runtime, table_name, None)?;
+    }
+
+    Ok(())
 }
 
 /// Build projection for GSI.
@@ -312,120 +263,6 @@ fn build_projection(
             projection_type
         ))),
     }
-}
-
-/// Check if a table exists.
-///
-/// # Arguments
-///
-/// * `client` - The DynamoDB client
-/// * `runtime` - The Tokio runtime
-/// * `table_name` - Name of the table to check
-///
-/// # Returns
-///
-/// True if the table exists, false otherwise.
-pub fn table_exists(client: &Client, runtime: &Arc<Runtime>, table_name: &str) -> PyResult<bool> {
-    let client = client.clone();
-    let table_name = table_name.to_string();
-
-    runtime.block_on(async {
-        match client.describe_table().table_name(&table_name).send().await {
-            Ok(_) => Ok(true),
-            Err(e) => {
-                // Check if it's a service error (ResourceNotFoundException)
-                if let Some(service_error) = e.as_service_error() {
-                    if service_error.is_resource_not_found_exception() {
-                        return Ok(false);
-                    }
-                }
-                // For any other error, use map_sdk_error
-                Err(map_sdk_error(e, Some(&table_name)))
-            }
-        }
-    })
-}
-
-/// Delete a table.
-///
-/// # Arguments
-///
-/// * `client` - The DynamoDB client
-/// * `runtime` - The Tokio runtime
-/// * `table_name` - Name of the table to delete
-pub fn delete_table(client: &Client, runtime: &Arc<Runtime>, table_name: &str) -> PyResult<()> {
-    let client = client.clone();
-    let table_name = table_name.to_string();
-
-    runtime.block_on(async {
-        client
-            .delete_table()
-            .table_name(&table_name)
-            .send()
-            .await
-            .map_err(|e| map_sdk_error(e, Some(&table_name)))?;
-
-        Ok(())
-    })
-}
-
-/// Wait for a table to become active.
-///
-/// Polls the table status until it becomes ACTIVE or times out.
-///
-/// # Arguments
-///
-/// * `client` - The DynamoDB client
-/// * `runtime` - The Tokio runtime
-/// * `table_name` - Name of the table to wait for
-/// * `timeout_seconds` - Maximum time to wait (default: 60)
-pub fn wait_for_table_active(
-    client: &Client,
-    runtime: &Arc<Runtime>,
-    table_name: &str,
-    timeout_seconds: Option<u64>,
-) -> PyResult<()> {
-    let client = client.clone();
-    let table_name = table_name.to_string();
-    let timeout = timeout_seconds.unwrap_or(60);
-
-    runtime.block_on(async {
-        let start = std::time::Instant::now();
-        let poll_interval = Duration::from_millis(500);
-
-        loop {
-            if start.elapsed().as_secs() > timeout {
-                return Err(PyErr::new::<pyo3::exceptions::PyTimeoutError, _>(format!(
-                    "Timeout waiting for table '{}' to become active",
-                    table_name
-                )));
-            }
-
-            let result = client.describe_table().table_name(&table_name).send().await;
-
-            match result {
-                Ok(response) => {
-                    if let Some(table) = response.table() {
-                        if table.table_status() == Some(&TableStatus::Active) {
-                            return Ok(());
-                        }
-                    }
-                }
-                Err(e) => {
-                    // Check if it's ResourceNotFoundException (table still being created)
-                    if let Some(service_error) = e.as_service_error() {
-                        if !service_error.is_resource_not_found_exception() {
-                            return Err(map_sdk_error(e, Some(&table_name)));
-                        }
-                    } else {
-                        return Err(map_sdk_error(e, Some(&table_name)));
-                    }
-                }
-            }
-
-            tokio::time::sleep(poll_interval).await;
-        }
-    })
 }
 
 /// Parse a string attribute type to ScalarAttributeType.
@@ -466,11 +303,6 @@ fn parse_table_class(class_str: &str) -> PyResult<TableClass> {
 }
 
 /// Build SSE specification from encryption type and optional KMS key.
-///
-/// Accepts:
-/// - "AWS_OWNED" - Default encryption with AWS owned keys (no extra cost)
-/// - "AWS_MANAGED" - Encryption with AWS managed KMS key (KMS charges apply)
-/// - "CUSTOMER_MANAGED" - Encryption with customer KMS key (requires kms_key_id)
 fn build_sse_specification(
     encryption: &str,
     kms_key_id: Option<&str>,

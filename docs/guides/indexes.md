@@ -1,83 +1,50 @@
-# Global Secondary Indexes
+# Global secondary indexes
 
 GSIs let you query by attributes other than the table's primary key. Define them as class attributes on your Model.
 
+## Key features
+
+- Query by any attribute, not just the primary key
+- Single or multi-attribute composite keys (up to 4 per key)
+- Range key conditions for efficient filtering
+- Automatic pagination with metrics
+
 ## Define a GSI
 
-```python
-from pydynox import Model, ModelConfig, GlobalSecondaryIndex
-from pydynox.attributes import StringAttribute, NumberAttribute
-
-class User(Model):
-    model_config = ModelConfig(table="users")
-    
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
-    email = StringAttribute()
-    status = StringAttribute()
-    age = NumberAttribute()
-    
-    # GSI with hash key only
-    email_index = GlobalSecondaryIndex(
-        index_name="email-index",
-        hash_key="email",
-    )
-    
-    # GSI with hash and range key
-    status_index = GlobalSecondaryIndex(
-        index_name="status-index",
-        hash_key="status",
-        range_key="pk",
-    )
-```
+=== "basic_gsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/basic_gsi.py"
+    ```
 
 ## Query a GSI
 
 Use the index attribute to query:
 
-```python
-# Query by email
-users = User.email_index.query(email="john@example.com")
-for user in users:
-    print(user.name)
-
-# Query by status
-active_users = User.status_index.query(status="active")
-for user in active_users:
-    print(user.email)
-```
+=== "query_gsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/query_gsi.py"
+    ```
 
 ## Range key conditions
 
 When your GSI has a range key, you can add conditions:
 
-```python
-# Query active users with pk starting with "USER#"
-users = User.status_index.query(
-    status="active",
-    range_key_condition=User.pk.begins_with("USER#"),
-)
-
-# Query with comparison
-users = User.status_index.query(
-    status="active",
-    range_key_condition=User.pk >= "USER#100",
-)
-```
+=== "range_key_condition.py"
+    ```python
+    --8<-- "docs/examples/indexes/range_key_condition.py"
+    ```
 
 ## Filter conditions
 
 Filter non-key attributes after the query:
 
-```python
-# Query active users over 30
-users = User.status_index.query(
-    status="active",
-    filter_condition=User.age >= 30,
-)
-```
+=== "filter_condition.py"
+    ```python
+    --8<-- "docs/examples/indexes/filter_condition.py"
+    ```
 
-Note: Filters run after the query. You still pay for RCU on filtered items.
+!!! warning
+    Filters run after the query. You still pay for RCU on filtered items.
 
 ## Sort order
 
@@ -96,7 +63,6 @@ users = User.status_index.query(status="active", scan_index_forward=False)
 Use `limit` to control page size:
 
 ```python
-# Get results in pages of 10
 result = User.status_index.query(status="active", limit=10)
 
 for user in result:
@@ -119,40 +85,63 @@ print(f"Duration: {result.metrics.duration_ms}ms")
 print(f"RCU consumed: {result.metrics.consumed_rcu}")
 ```
 
+## Multi-attribute composite keys
+
+DynamoDB supports up to 4 attributes per partition key and 4 per sort key in GSIs. This is useful for multi-tenant apps or complex access patterns.
+
+=== "multi_attr_gsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/multi_attr_gsi.py"
+    ```
+
+### Query multi-attribute GSI
+
+All partition key attributes are required. Sort key attributes are optional.
+
+=== "query_multi_attr.py"
+    ```python
+    --8<-- "docs/examples/indexes/query_multi_attr.py"
+    ```
+
+### When to use multi-attribute keys
+
+| Use case | Example |
+|----------|---------|
+| Multi-tenant apps | `hash_key=["tenant_id", "entity_type"]` |
+| Hierarchical data | `hash_key=["country", "state"]` |
+| Time-series | `range_key=["year", "month", "day"]` |
+| Composite sorting | `range_key=["priority", "created_at"]` |
+
+!!! tip
+    Multi-attribute keys avoid the need to create synthetic composite keys like `tenant_id#region`. DynamoDB handles the composition for you.
+
 ## Create table with GSI
 
 When creating tables programmatically, include GSI definitions:
 
-```python
-client = DynamoDBClient()
+=== "create_table_gsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/create_table_gsi.py"
+    ```
 
-client.create_table(
-    "users",
-    hash_key=("pk", "S"),
-    range_key=("sk", "S"),
-    global_secondary_indexes=[
-        {
-            "index_name": "email-index",
-            "hash_key": ("email", "S"),
-            "projection": "ALL",
-        },
-        {
-            "index_name": "status-index",
-            "hash_key": ("status", "S"),
-            "range_key": ("pk", "S"),
-            "projection": "ALL",
-        },
-    ],
-)
-```
+### Multi-attribute GSI in create_table
+
+Use `hash_keys` and `range_keys` (plural) for multi-attribute keys:
+
+=== "create_table_multi_attr.py"
+    ```python
+    --8<-- "docs/examples/indexes/create_table_multi_attr.py"
+    ```
 
 ## Projection types
 
 Control which attributes are copied to the index:
 
-- `"ALL"` - All attributes (default)
-- `"KEYS_ONLY"` - Only key attributes
-- `"INCLUDE"` - Specific attributes (use `non_key_attributes`)
+| Projection | Description | Use when |
+|------------|-------------|----------|
+| `"ALL"` | All attributes (default) | You need all data from the index |
+| `"KEYS_ONLY"` | Only key attributes | You just need to check existence |
+| `"INCLUDE"` | Specific attributes | You need some attributes, not all |
 
 ```python
 # Keys only - smallest index, lowest cost
@@ -176,7 +165,7 @@ Control which attributes are copied to the index:
 - GSIs are read-only. To update data, update the main table.
 - GSI queries are eventually consistent by default.
 - Each table can have up to 20 GSIs.
-
+- Multi-attribute keys: max 4 attributes per partition key, 4 per sort key.
 
 ## Next steps
 

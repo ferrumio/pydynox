@@ -1,7 +1,7 @@
 """Upload with custom metadata."""
 
-from pydynox import Model, ModelConfig, DynamoDBClient, set_default_client
-from pydynox.attributes import StringAttribute, S3Attribute, S3File
+from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
+from pydynox.attributes import S3Attribute, S3File, StringAttribute
 
 # Setup client
 client = DynamoDBClient(region="us-east-1")
