@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from pydynox import OperationMetrics
+from pydynox import pydynox_core
 from pydynox._internal._metrics import DictWithMetrics
+
+OperationMetrics = pydynox_core.OperationMetrics
 
 
 def test_operation_metrics_default():

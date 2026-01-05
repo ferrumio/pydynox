@@ -40,7 +40,7 @@ async def main():
 
     # Run 10 concurrent increments
     tasks = [increment_with_retry("COUNTER#1") for _ in range(10)]
-    results = await asyncio.gather(*tasks)
+    await asyncio.gather(*tasks)
 
     # Final value should be 10
     final = await Counter.async_get(pk="COUNTER#1")

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydynox import OperationMetrics
+from pydynox import pydynox_core
+
+OperationMetrics = pydynox_core.OperationMetrics
 
 
 def test_put_item_returns_metrics(dynamo):
