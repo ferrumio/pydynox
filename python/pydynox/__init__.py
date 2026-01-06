@@ -33,7 +33,7 @@ from pydynox.integrations.functions import dynamodb_model
 from pydynox.model import Model
 from pydynox.transaction import Transaction
 
-__version__ = "0.12.0"
+__version__ = "0.13.0"
 
 __all__ = [
     # Core

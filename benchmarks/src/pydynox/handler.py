@@ -113,23 +113,18 @@ def run_basic_benchmarks() -> None:
         "get_item", lambda: BenchmarkItem.get(pk=f"{PK_PREFIX}#basic", sk="ITEM#0050")
     )
 
-    # update_item
+    # update_item (using update_by_key - single call, no fetch)
     def do_update():
-        item = BenchmarkItem.get(pk=f"{PK_PREFIX}#basic", sk="ITEM#0050")
-        if item:
-            item.data = "updated"
-            item.save()
+        BenchmarkItem.update_by_key(pk=f"{PK_PREFIX}#basic", sk="ITEM#0050", data="updated")
 
     measure_and_publish("update_item", do_update)
 
-    # delete_item
+    # delete_item (using delete_by_key - single call, no fetch)
     counter[0] = 0
 
     def do_delete():
         counter[0] += 1
-        item = BenchmarkItem.get(pk=f"{PK_PREFIX}#put", sk=f"ITEM#{counter[0]:04d}")
-        if item:
-            item.delete()
+        BenchmarkItem.delete_by_key(pk=f"{PK_PREFIX}#put", sk=f"ITEM#{counter[0]:04d}")
 
     measure_and_publish("delete_item", do_delete)
 

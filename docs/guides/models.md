@@ -150,6 +150,42 @@ user.delete()
 
 After deletion, the object still exists in Python, but the item is gone from DynamoDB.
 
+### Update and delete by key
+
+Sometimes you want to update or delete an item without fetching it first. The traditional approach requires two DynamoDB calls:
+
+```python
+user = User.get(pk="USER#123", sk="PROFILE")  # Call 1
+user.update(name="Jane")                       # Call 2
+```
+
+Use `update_by_key()` and `delete_by_key()` to do it in one call:
+
+=== "key_operations.py"
+    ```python
+    --8<-- "docs/examples/models/key_operations.py"
+    ```
+
+This is about 2x faster because you skip the read operation.
+
+**When to use:**
+
+- Bulk updates where you know the keys
+- Background jobs that process many items
+- Any case where you don't need the current item data
+
+**Trade-offs:**
+
+| Method | DynamoDB calls | Returns item? | Runs hooks? |
+|--------|----------------|---------------|-------------|
+| `get()` + `update()` | 2 | Yes | Yes |
+| `update_by_key()` | 1 | No | No |
+| `get()` + `delete()` | 2 | Yes | Yes |
+| `delete_by_key()` | 1 | No | No |
+
+!!! note
+    These methods don't run lifecycle hooks. If you need hooks, use the traditional `get()` + `update()`/`delete()` approach.
+
 ## Advanced
 
 ### ModelConfig options
