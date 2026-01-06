@@ -80,12 +80,15 @@ def test_update_by_key_with_condition_success(user_model):
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
+    # Build condition separately to avoid any parsing issues
+    age_condition = user_model.age == 30
+
     # Update with condition
     user_model.update_by_key(
         pk=pk,
         sk="PROFILE",
         name="Jane",
-        condition=user_model.age == 30,
+        condition=age_condition,
     )
 
     result = user_model.get(pk=pk, sk="PROFILE")
@@ -100,12 +103,15 @@ def test_update_by_key_with_condition_fails(user_model):
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
+    # Build condition separately
+    age_condition = user_model.age == 99  # Wrong age
+
     with pytest.raises(ConditionCheckFailedError):
         user_model.update_by_key(
             pk=pk,
             sk="PROFILE",
             name="Jane",
-            condition=user_model.age == 99,  # Wrong age
+            condition=age_condition,
         )
 
     # Item unchanged
@@ -146,10 +152,13 @@ def test_delete_by_key_with_condition_success(user_model):
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
+    # Build condition separately
+    name_condition = user_model.name == "John"
+
     user_model.delete_by_key(
         pk=pk,
         sk="PROFILE",
-        condition=user_model.name == "John",
+        condition=name_condition,
     )
 
     result = user_model.get(pk=pk, sk="PROFILE")
@@ -164,11 +173,14 @@ def test_delete_by_key_with_condition_fails(user_model):
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
+    # Build condition separately
+    name_condition = user_model.name == "Jane"  # Wrong name
+
     with pytest.raises(ConditionCheckFailedError):
         user_model.delete_by_key(
             pk=pk,
             sk="PROFILE",
-            condition=user_model.name == "Jane",  # Wrong name
+            condition=name_condition,
         )
 
     # Item still exists
