@@ -1,0 +1,3 @@
+pynamodb>=6.0
+aws-lambda-powertools>=3.0.0
+zstandard
