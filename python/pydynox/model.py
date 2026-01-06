@@ -1028,13 +1028,21 @@ class Model(metaclass=ModelMeta):
             values: dict[str, Any] = {}
             cond_expr = condition.serialize(names, values)
             attr_names = {v: k for k, v in names.items()}
+            # Rename value placeholders to avoid collision with update placeholders
+            # Rust uses :v0, :v1 for updates, so we use :cond0, :cond1 for conditions
+            renamed_values: dict[str, Any] = {}
+            renamed_expr = cond_expr
+            for old_key, val in values.items():
+                new_key = old_key.replace(":v", ":cond")
+                renamed_values[new_key] = val
+                renamed_expr = renamed_expr.replace(old_key, new_key)
             client.update_item(
                 table,
                 key,
                 updates=updates,
-                condition_expression=cond_expr,
+                condition_expression=renamed_expr,
                 expression_attribute_names=attr_names if attr_names else None,
-                expression_attribute_values=values if values else None,
+                expression_attribute_values=renamed_values if renamed_values else None,
             )
         else:
             client.update_item(table, key, updates=updates)
@@ -1119,13 +1127,20 @@ class Model(metaclass=ModelMeta):
             values: dict[str, Any] = {}
             cond_expr = condition.serialize(names, values)
             attr_names = {v: k for k, v in names.items()}
+            # Rename value placeholders to avoid collision with update placeholders
+            renamed_values: dict[str, Any] = {}
+            renamed_expr = cond_expr
+            for old_key, val in values.items():
+                new_key = old_key.replace(":v", ":cond")
+                renamed_values[new_key] = val
+                renamed_expr = renamed_expr.replace(old_key, new_key)
             await client.async_update_item(
                 table,
                 key,
                 updates=updates,
-                condition_expression=cond_expr,
+                condition_expression=renamed_expr,
                 expression_attribute_names=attr_names if attr_names else None,
-                expression_attribute_values=values if values else None,
+                expression_attribute_values=renamed_values if renamed_values else None,
             )
         else:
             await client.async_update_item(table, key, updates=updates)
