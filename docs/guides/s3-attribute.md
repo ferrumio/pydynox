@@ -23,6 +23,14 @@ When you delete a model:
 1. The item is deleted from DynamoDB
 2. The file is deleted from S3
 
+!!! warning "Partial failure and orphan objects"
+    The write order is S3 first, then DynamoDB. If S3 upload succeeds but DynamoDB write fails, an orphan object is left in S3. This is a known limitation that we may address in a future release.
+
+    - S3 success + DynamoDB fail = orphan S3 object
+    - S3 fail = no DynamoDB write attempted (clean)
+
+    Orphans are harmless (just storage cost). To clean them up, set up an [S3 lifecycle rule](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html) to delete objects older than a certain age, or use S3 Inventory to find and remove orphans.
+
 ## Basic usage
 
 === "basic_upload.py"
