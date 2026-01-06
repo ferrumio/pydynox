@@ -41,6 +41,12 @@ nav = [
         "guides/pydantic.md",
         "guides/dataclass.md",
     ] },
+    { "Agentic" = [
+        "guides/agentic/index.md",
+        "guides/agentic/strands.md",
+        "guides/agentic/pydantic-ai.md",
+        "guides/agentic/smolagents.md",
+    ] },
     { "Troubleshooting" = [
         "guides/exceptions.md",
         "guides/iam-permissions.md",
