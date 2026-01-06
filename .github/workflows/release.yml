@@ -21,10 +21,10 @@ jobs:
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Build wheels
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           target: x86_64
           args: --release --out dist -i python${{ matrix.python }}
@@ -32,7 +32,7 @@ jobs:
           sccache: true
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-manylinux-x86_64
           path: dist/*.whl
@@ -44,10 +44,10 @@ jobs:
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Build wheels
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           target: aarch64
           args: --release --out dist -i python${{ matrix.python }}
@@ -55,7 +55,7 @@ jobs:
           sccache: true
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-manylinux-aarch64
           path: dist/*.whl
@@ -68,17 +68,17 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14"]
         target: [x86_64-apple-darwin, aarch64-apple-darwin]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Build wheels
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           target: ${{ matrix.target }}
           args: --release --out dist -i python${{ matrix.python }}
           sccache: true
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-macos-${{ matrix.target }}
           path: dist/*.whl
@@ -87,16 +87,16 @@ jobs:
     name: Build sdist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Build sdist
-        uses: PyO3/maturin-action@v1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1
         with:
           command: sdist
           args: --out dist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pydynox-${{ inputs.version }}-sdist
           path: dist/*.tar.gz
@@ -110,7 +110,7 @@ jobs:
       url: https://pypi.org/p/pydynox
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: pydynox-${{ inputs.version }}-*
           path: dist
@@ -120,34 +120,9 @@ jobs:
         run: ls -la dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
 
   docs:
     name: Deploy Documentation
     needs: publish
     uses: ./.github/workflows/docs.yml
-
-  # github-release:
-  #   name: Create GitHub Release
-  #   needs: [build-linux, build-musllinux, build-macos, build-sdist]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-
-  #     - name: Download all artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         pattern: wheels-*
-  #         path: dist
-  #         merge-multiple: true
-
-  #     - name: List artifacts
-  #       run: ls -la dist/
-
-  #     - name: Create Release
-  #       uses: softprops/action-gh-release@v2
-  #       with:
-  #         tag_name: v${{ inputs.version }}
-  #         name: Release v${{ inputs.version }}
-  #         files: dist/*
-  #         generate_release_notes: true
