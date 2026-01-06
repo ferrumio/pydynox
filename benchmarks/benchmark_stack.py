@@ -25,11 +25,31 @@ class BenchmarkStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # DynamoDB table
-        table = dynamodb.Table(
+        # DynamoDB tables - one per library to avoid conflicts
+        pydynox_table = dynamodb.Table(
             self,
-            "BenchmarkTable",
-            table_name="pydynox-benchmark",
+            "PydynoxTable",
+            table_name="pydynox-benchmark-pydynox",
+            partition_key=dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        boto3_table = dynamodb.Table(
+            self,
+            "Boto3Table",
+            table_name="pydynox-benchmark-boto3",
+            partition_key=dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY,
+        )
+
+        pynamodb_table = dynamodb.Table(
+            self,
+            "PynamodbTable",
+            table_name="pydynox-benchmark-pynamodb",
             partition_key=dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
             sort_key=dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -62,7 +82,7 @@ class BenchmarkStack(Stack):
             128,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -72,7 +92,7 @@ class BenchmarkStack(Stack):
             256,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -82,7 +102,7 @@ class BenchmarkStack(Stack):
             512,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -92,7 +112,7 @@ class BenchmarkStack(Stack):
             1024,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -102,7 +122,7 @@ class BenchmarkStack(Stack):
             2048,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -116,7 +136,7 @@ class BenchmarkStack(Stack):
             128,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -126,7 +146,7 @@ class BenchmarkStack(Stack):
             256,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -136,7 +156,7 @@ class BenchmarkStack(Stack):
             512,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -146,7 +166,7 @@ class BenchmarkStack(Stack):
             1024,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -156,7 +176,7 @@ class BenchmarkStack(Stack):
             2048,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pydynox_table,
             bucket,
             kms_key,
         )
@@ -170,7 +190,7 @@ class BenchmarkStack(Stack):
             128,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -180,7 +200,7 @@ class BenchmarkStack(Stack):
             256,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -190,7 +210,7 @@ class BenchmarkStack(Stack):
             512,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -200,7 +220,7 @@ class BenchmarkStack(Stack):
             1024,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -210,7 +230,7 @@ class BenchmarkStack(Stack):
             2048,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -224,7 +244,7 @@ class BenchmarkStack(Stack):
             128,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -234,7 +254,7 @@ class BenchmarkStack(Stack):
             256,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -244,7 +264,7 @@ class BenchmarkStack(Stack):
             512,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -254,7 +274,7 @@ class BenchmarkStack(Stack):
             1024,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -264,7 +284,7 @@ class BenchmarkStack(Stack):
             2048,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            boto3_table,
             bucket,
             kms_key,
         )
@@ -278,7 +298,7 @@ class BenchmarkStack(Stack):
             128,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -288,7 +308,7 @@ class BenchmarkStack(Stack):
             256,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -298,7 +318,7 @@ class BenchmarkStack(Stack):
             512,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -308,7 +328,7 @@ class BenchmarkStack(Stack):
             1024,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -318,7 +338,7 @@ class BenchmarkStack(Stack):
             2048,
             lambda_.Architecture.ARM_64,
             "arm64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -332,7 +352,7 @@ class BenchmarkStack(Stack):
             128,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -342,7 +362,7 @@ class BenchmarkStack(Stack):
             256,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -352,7 +372,7 @@ class BenchmarkStack(Stack):
             512,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -362,7 +382,7 @@ class BenchmarkStack(Stack):
             1024,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
@@ -372,7 +392,7 @@ class BenchmarkStack(Stack):
             2048,
             lambda_.Architecture.X86_64,
             "x86_64",
-            table,
+            pynamodb_table,
             bucket,
             kms_key,
         )
