@@ -63,8 +63,8 @@ jobs:
       - name: Ruff check
         run: |
           source .venv/bin/activate
-          ruff check python/ tests/
-          ruff format --check python/ tests/
+          ruff check python/ tests/ benchmarks/
+          ruff format --check python/ tests/ benchmarks/
 
       - name: Mypy
         run: |
