@@ -14,7 +14,6 @@ from pydynox import (
     DynamoDBClient,
     Model,
     ModelConfig,
-    Transaction,
     set_default_client,
 )
 from pydynox.attributes import (
