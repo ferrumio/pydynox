@@ -948,3 +948,219 @@ class Model(metaclass=ModelMeta):
 
         if not skip:
             self._run_hooks(HookType.AFTER_UPDATE)
+
+    # ========== STATIC KEY-BASED METHODS ==========
+
+    @classmethod
+    def _extract_key_from_kwargs(
+        cls, kwargs: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Split kwargs into key attributes and updates.
+
+        Returns:
+            Tuple of (key_dict, updates_dict).
+
+        Raises:
+            ValueError: If hash_key is missing or range_key is missing when required.
+        """
+        if cls._hash_key is None:
+            raise ValueError(f"Model {cls.__name__} has no hash_key defined")
+
+        key: dict[str, Any] = {}
+        updates: dict[str, Any] = {}
+
+        for attr_name, value in kwargs.items():
+            if attr_name == cls._hash_key:
+                key[attr_name] = value
+            elif attr_name == cls._range_key:
+                key[attr_name] = value
+            else:
+                updates[attr_name] = value
+
+        if cls._hash_key not in key:
+            raise ValueError(f"Missing required hash_key: {cls._hash_key}")
+
+        if cls._range_key is not None and cls._range_key not in key:
+            raise ValueError(f"Missing required range_key: {cls._range_key}")
+
+        return key, updates
+
+    @classmethod
+    def update_by_key(
+        cls: type[M],
+        condition: Condition | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Update an item by key without fetching it first.
+
+        This is faster than get() + update() because it makes only one
+        DynamoDB call instead of two.
+
+        Note: This method does NOT run lifecycle hooks. If you need hooks,
+        use the traditional get() + update() approach.
+
+        Args:
+            condition: Optional condition for the update.
+            **kwargs: Must include hash_key (and range_key if defined).
+                      Other kwargs are the attributes to update.
+
+        Raises:
+            ValueError: If hash_key or range_key is missing.
+            ConditionCheckFailedError: If condition is not met.
+
+        Example:
+            >>> User.update_by_key(pk="USER#1", sk="PROFILE", name="Jane", age=31)
+        """
+        key, updates = cls._extract_key_from_kwargs(kwargs)
+
+        if not updates:
+            return  # Nothing to update
+
+        for attr_name in updates:
+            if attr_name not in cls._attributes:
+                raise ValueError(f"Unknown attribute: {attr_name}")
+
+        client = cls._get_client()
+        table = cls._get_table()
+
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            cond_expr = condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            client.update_item(
+                table,
+                key,
+                updates=updates,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names if attr_names else None,
+                expression_attribute_values=values if values else None,
+            )
+        else:
+            client.update_item(table, key, updates=updates)
+
+    @classmethod
+    def delete_by_key(
+        cls: type[M],
+        condition: Condition | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Delete an item by key without fetching it first.
+
+        This is faster than get() + delete() because it makes only one
+        DynamoDB call instead of two.
+
+        Note: This method does NOT run lifecycle hooks. If you need hooks,
+        use the traditional get() + delete() approach.
+
+        Args:
+            condition: Optional condition for the delete.
+            **kwargs: Must include hash_key (and range_key if defined).
+
+        Raises:
+            ValueError: If hash_key or range_key is missing.
+            ConditionCheckFailedError: If condition is not met.
+
+        Example:
+            >>> User.delete_by_key(pk="USER#1", sk="PROFILE")
+        """
+        key, _ = cls._extract_key_from_kwargs(kwargs)
+
+        client = cls._get_client()
+        table = cls._get_table()
+
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            cond_expr = condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            client.delete_item(
+                table,
+                key,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=values,
+            )
+        else:
+            client.delete_item(table, key)
+
+    @classmethod
+    async def async_update_by_key(
+        cls: type[M],
+        condition: Condition | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Async version of update_by_key.
+
+        Note: This method does NOT run lifecycle hooks.
+
+        Args:
+            condition: Optional condition for the update.
+            **kwargs: Must include hash_key (and range_key if defined).
+                      Other kwargs are the attributes to update.
+
+        Example:
+            >>> await User.async_update_by_key(pk="USER#1", sk="PROFILE", name="Jane")
+        """
+        key, updates = cls._extract_key_from_kwargs(kwargs)
+
+        if not updates:
+            return  # Nothing to update
+
+        for attr_name in updates:
+            if attr_name not in cls._attributes:
+                raise ValueError(f"Unknown attribute: {attr_name}")
+
+        client = cls._get_client()
+        table = cls._get_table()
+
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            cond_expr = condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            await client.async_update_item(
+                table,
+                key,
+                updates=updates,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names if attr_names else None,
+                expression_attribute_values=values if values else None,
+            )
+        else:
+            await client.async_update_item(table, key, updates=updates)
+
+    @classmethod
+    async def async_delete_by_key(
+        cls: type[M],
+        condition: Condition | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Async version of delete_by_key.
+
+        Args:
+            condition: Optional condition for the delete.
+            **kwargs: Must include hash_key (and range_key if defined).
+
+        Example:
+            >>> await User.async_delete_by_key(pk="USER#1", sk="PROFILE")
+        """
+        key, _ = cls._extract_key_from_kwargs(kwargs)
+
+        client = cls._get_client()
+        table = cls._get_table()
+
+        if condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            cond_expr = condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            await client.async_delete_item(
+                table,
+                key,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=values,
+            )
+        else:
+            await client.async_delete_item(table, key)

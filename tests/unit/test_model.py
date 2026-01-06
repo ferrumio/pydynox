@@ -216,3 +216,93 @@ def test_model_with_default_client(mock_client):
     assert user is not None
     assert user.name == "John"
     mock_client.get_item.assert_called_once()
+
+
+# ========== update_by_key / delete_by_key tests ==========
+
+
+def test_update_by_key(user_model, mock_client):
+    """update_by_key updates item without fetching it first."""
+    user_model.update_by_key(pk="USER#1", sk="PROFILE", name="Jane", age=31)
+
+    mock_client.update_item.assert_called_once_with(
+        "users",
+        {"pk": "USER#1", "sk": "PROFILE"},
+        updates={"name": "Jane", "age": 31},
+    )
+
+
+def test_update_by_key_missing_hash_key(user_model):
+    """update_by_key raises error when hash_key is missing."""
+    with pytest.raises(ValueError, match="Missing required hash_key"):
+        user_model.update_by_key(sk="PROFILE", name="Jane")
+
+
+def test_update_by_key_missing_range_key(user_model):
+    """update_by_key raises error when range_key is missing."""
+    with pytest.raises(ValueError, match="Missing required range_key"):
+        user_model.update_by_key(pk="USER#1", name="Jane")
+
+
+def test_update_by_key_unknown_attribute(user_model):
+    """update_by_key raises error for unknown attributes."""
+    with pytest.raises(ValueError, match="Unknown attribute"):
+        user_model.update_by_key(pk="USER#1", sk="PROFILE", unknown_field="value")
+
+
+def test_update_by_key_no_updates(user_model, mock_client):
+    """update_by_key does nothing when no updates provided."""
+    user_model.update_by_key(pk="USER#1", sk="PROFILE")
+
+    mock_client.update_item.assert_not_called()
+
+
+def test_delete_by_key(user_model, mock_client):
+    """delete_by_key deletes item without fetching it first."""
+    user_model.delete_by_key(pk="USER#1", sk="PROFILE")
+
+    mock_client.delete_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
+
+
+def test_delete_by_key_missing_hash_key(user_model):
+    """delete_by_key raises error when hash_key is missing."""
+    with pytest.raises(ValueError, match="Missing required hash_key"):
+        user_model.delete_by_key(sk="PROFILE")
+
+
+def test_delete_by_key_missing_range_key(user_model):
+    """delete_by_key raises error when range_key is missing."""
+    with pytest.raises(ValueError, match="Missing required range_key"):
+        user_model.delete_by_key(pk="USER#1")
+
+
+@pytest.mark.asyncio
+async def test_async_update_by_key(user_model, mock_client):
+    """async_update_by_key updates item without fetching it first."""
+    import asyncio
+
+    mock_client.async_update_item.return_value = asyncio.Future()
+    mock_client.async_update_item.return_value.set_result(None)
+
+    await user_model.async_update_by_key(pk="USER#1", sk="PROFILE", name="Jane")
+
+    mock_client.async_update_item.assert_called_once_with(
+        "users",
+        {"pk": "USER#1", "sk": "PROFILE"},
+        updates={"name": "Jane"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_delete_by_key(user_model, mock_client):
+    """async_delete_by_key deletes item without fetching it first."""
+    import asyncio
+
+    mock_client.async_delete_item.return_value = asyncio.Future()
+    mock_client.async_delete_item.return_value.set_result(None)
+
+    await user_model.async_delete_by_key(pk="USER#1", sk="PROFILE")
+
+    mock_client.async_delete_item.assert_called_once_with(
+        "users", {"pk": "USER#1", "sk": "PROFILE"}
+    )
