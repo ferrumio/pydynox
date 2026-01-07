@@ -304,7 +304,7 @@ def compress_string(
 ) -> str: ...
 def decompress_string(value: str) -> str: ...
 
-# Encryption
+# Encryption (uses envelope encryption with GenerateDataKey + local AES-256-GCM)
 class KmsEncryptor:
     key_id: str
 
@@ -313,9 +313,23 @@ class KmsEncryptor:
         key_id: str,
         region: str | None = None,
         context: dict[str, str] | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
+        session_token: str | None = None,
+        profile: str | None = None,
+        role_arn: str | None = None,
+        role_session_name: str | None = None,
+        external_id: str | None = None,
+        endpoint_url: str | None = None,
+        connect_timeout: float | None = None,
+        read_timeout: float | None = None,
+        max_retries: int | None = None,
+        proxy_url: str | None = None,
     ) -> None: ...
     def encrypt(self, plaintext: str) -> str: ...
     def decrypt(self, ciphertext: str) -> str: ...
+    def async_encrypt(self, plaintext: str) -> Coroutine[Any, Any, str]: ...
+    def async_decrypt(self, ciphertext: str) -> Coroutine[Any, Any, str]: ...
     @staticmethod
     def is_encrypted(value: str) -> bool: ...
 

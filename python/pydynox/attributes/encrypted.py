@@ -11,8 +11,8 @@ from pydynox.attributes.base import Attribute
 class EncryptedAttribute(Attribute[str]):
     """Attribute that encrypts values using AWS KMS.
 
-    Encrypts sensitive data like SSN or credit cards at the field level.
-    Encryption happens on save, decryption on load.
+    Uses envelope encryption: GenerateDataKey + local AES-256-GCM.
+    This removes the 4KB KMS limit and reduces API calls.
 
     Args:
         key_id: KMS key ID, ARN, or alias (e.g., "alias/my-key").

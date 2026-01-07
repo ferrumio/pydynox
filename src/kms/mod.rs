@@ -1,7 +1,14 @@
-//! KMS encryption module for field-level encryption.
+//! KMS envelope encryption module for field-level encryption.
 //!
-//! Provides per-field encryption using AWS KMS. The KMS client inherits
-//! all config from the DynamoDB client, only allowing region override.
+//! Uses envelope encryption pattern:
+//! 1. GenerateDataKey gets a plaintext + encrypted data key
+//! 2. Plaintext key encrypts data locally with AES-256-GCM
+//! 3. Encrypted key is stored alongside the encrypted data
+//!
+//! Benefits over direct KMS Encrypt/Decrypt:
+//! - No 4KB size limit (DynamoDB fields can be 400KB)
+//! - Fewer KMS calls (one per operation, not one per field)
+//! - Faster (AES in Rust is much faster than KMS API calls)
 
 mod client;
 mod operations;

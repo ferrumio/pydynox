@@ -4,7 +4,8 @@ Encrypt sensitive fields like SSN or credit cards using AWS KMS.
 
 ## Key features
 
-- Per-field encryption with KMS
+- Per-field encryption with KMS envelope encryption
+- No size limit (works with fields up to 400KB)
 - Three modes: ReadWrite, WriteOnly, ReadOnly
 - Encryption context for extra security
 - Automatic encrypt on save, decrypt on load
@@ -69,21 +70,39 @@ This is useful for:
 
 ### How it works
 
-1. On save, the attribute calls KMS `Encrypt` with your plaintext
-2. KMS returns ciphertext encrypted with your key
-3. The ciphertext is base64-encoded and stored with `ENC:` prefix
-4. On read, the attribute detects the prefix and calls KMS `Decrypt`
-5. KMS returns the original plaintext
+pydynox uses envelope encryption for field-level encryption:
 
-All encryption happens in Rust for speed. The KMS client is created lazily on first use.
+**Encrypt:**
+
+1. Call `KMS:GenerateDataKey` once to get a plaintext key + encrypted key
+2. Use the plaintext key to AES-256-GCM encrypt locally (fast, in Rust)
+3. Pack the encrypted key + encrypted data together
+4. Base64 encode and add `ENC:` prefix
+
+**Decrypt:**
+
+1. Decode base64 and unpack the envelope
+2. Call `KMS:Decrypt` on the encrypted key to get plaintext key
+3. Use the plaintext key to AES-256-GCM decrypt locally
+
+This approach has two big advantages over direct KMS Encrypt/Decrypt:
+
+- **No 4KB limit** - KMS Encrypt only accepts 4KB, but DynamoDB fields can be 400KB
+- **Fewer KMS calls** - One call per operation instead of one per field
 
 ### Storage format
 
 Encrypted values are stored as:
 
 ```
-ENC:<base64-encoded-ciphertext>
+ENC:<base64-encoded-envelope>
 ```
+
+The envelope contains:
+- Version byte (for future compatibility)
+- Encrypted data key length (2 bytes)
+- Encrypted data key (from KMS)
+- Encrypted data (AES-256-GCM with random nonce)
 
 Values without the `ENC:` prefix are treated as plaintext. This means you can add encryption to existing fields - old unencrypted values still work.
 
@@ -102,14 +121,14 @@ Your service needs these KMS permissions:
 {
     "Effect": "Allow",
     "Action": [
-        "kms:Encrypt",
+        "kms:GenerateDataKey",
         "kms:Decrypt"
     ],
     "Resource": "arn:aws:kms:us-east-1:123456789:key/your-key-id"
 }
 ```
 
-For `WriteOnly` mode, you only need `kms:Encrypt`. For `ReadOnly`, only `kms:Decrypt`.
+Note: We use `kms:GenerateDataKey` instead of `kms:Encrypt`. For `ReadOnly` mode, you only need `kms:Decrypt`.
 
 ## Error handling
 
@@ -132,6 +151,7 @@ Common errors:
 | Access denied | Missing IAM permissions |
 | Cannot encrypt in ReadOnly mode | Wrong mode for operation |
 | Cannot decrypt in WriteOnly mode | Wrong mode for operation |
+| Decryption failed | Data corrupted or wrong key |
 
 
 ## Next steps
