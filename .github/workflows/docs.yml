@@ -37,7 +37,6 @@ jobs:
       - name: Build docs & API reference
         run: |
           uv run zensical build
-          uv pip install -e .
           uv run pdoc --html pydynox --skip-errors -o site/api --force
 
       - name: Setup Pages
