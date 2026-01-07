@@ -49,7 +49,7 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.0",
 ]
-docs = ["zensical"]
+docs = ["zensical", "pdoc3>=0.11.0"]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
