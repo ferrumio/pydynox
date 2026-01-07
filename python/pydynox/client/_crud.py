@@ -10,6 +10,18 @@ from pydynox._internal._metrics import DictWithMetrics, OperationMetrics
 _SLOW_QUERY_THRESHOLD_MS = 100.0
 
 
+def _extract_pk(item_or_key: dict[str, Any]) -> str | None:
+    """Extract partition key value from item or key dict.
+
+    Returns the first key's value as string, or None if empty.
+    """
+    if not item_or_key:
+        return None
+    first_key = next(iter(item_or_key))
+    value = item_or_key[first_key]
+    return str(value) if value is not None else None
+
+
 class CrudOperations:
     """CRUD operations: get, put, delete, update."""
 
@@ -25,6 +37,9 @@ class CrudOperations:
     ) -> OperationMetrics:
         """Put an item into a DynamoDB table."""
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(item)
+        if pk:
+            self._record_write(table, pk)  # type: ignore[attr-defined]
         metrics = self._client.put_item(  # type: ignore[attr-defined]
             table,
             item,
@@ -47,6 +62,9 @@ class CrudOperations:
     ) -> OperationMetrics:
         """Async version of put_item."""
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(item)
+        if pk:
+            self._record_write(table, pk)  # type: ignore[attr-defined]
         metrics = await self._client.async_put_item(  # type: ignore[attr-defined]
             table,
             item,
@@ -66,6 +84,9 @@ class CrudOperations:
     ) -> DictWithMetrics | None:
         """Get an item from a DynamoDB table by its key."""
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(key)
+        if pk:
+            self._record_read(table, pk)  # type: ignore[attr-defined]
         result, metrics = self._client.get_item(  # type: ignore[attr-defined]
             table, key, consistent_read=consistent_read
         )
@@ -81,6 +102,9 @@ class CrudOperations:
     ) -> DictWithMetrics | None:
         """Async version of get_item."""
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(key)
+        if pk:
+            self._record_read(table, pk)  # type: ignore[attr-defined]
         result = await self._client.async_get_item(  # type: ignore[attr-defined]
             table, key, consistent_read=consistent_read
         )
@@ -104,6 +128,9 @@ class CrudOperations:
     ) -> OperationMetrics:
         """Delete an item from a DynamoDB table."""
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(key)
+        if pk:
+            self._record_write(table, pk)  # type: ignore[attr-defined]
         metrics = self._client.delete_item(  # type: ignore[attr-defined]
             table,
             key,
@@ -126,6 +153,9 @@ class CrudOperations:
     ) -> OperationMetrics:
         """Async version of delete_item."""
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(key)
+        if pk:
+            self._record_write(table, pk)  # type: ignore[attr-defined]
         metrics = await self._client.async_delete_item(  # type: ignore[attr-defined]
             table,
             key,
@@ -152,6 +182,9 @@ class CrudOperations:
     ) -> OperationMetrics:
         """Update an item in a DynamoDB table."""
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(key)
+        if pk:
+            self._record_write(table, pk)  # type: ignore[attr-defined]
         metrics = self._client.update_item(  # type: ignore[attr-defined]
             table,
             key,
@@ -178,6 +211,9 @@ class CrudOperations:
     ) -> OperationMetrics:
         """Async version of update_item."""
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(key)
+        if pk:
+            self._record_write(table, pk)  # type: ignore[attr-defined]
         metrics = await self._client.async_update_item(  # type: ignore[attr-defined]
             table,
             key,

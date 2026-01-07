@@ -68,6 +68,10 @@ class ModelConfig:
         max_size: Max item size in bytes. If set, validates before save.
         consistent_read: Use strongly consistent reads by default (default: False).
             Strongly consistent reads cost 2x RCU but always return latest data.
+        hot_partition_writes: Override writes threshold for hot partition detection.
+            If set, overrides the client's detector threshold for this model.
+        hot_partition_reads: Override reads threshold for hot partition detection.
+            If set, overrides the client's detector threshold for this model.
 
     Example:
         >>> from pydynox import DynamoDBClient, Model, ModelConfig
@@ -83,11 +87,12 @@ class ModelConfig:
         ...     pk = StringAttribute(hash_key=True)
         ...     name = StringAttribute()
         >>>
-        >>> # Model with consistent reads enabled by default
-        >>> class CriticalData(Model):
+        >>> # Model with higher hot partition thresholds (high traffic expected)
+        >>> class Event(Model):
         ...     model_config = ModelConfig(
-        ...         table="critical",
-        ...         consistent_read=True,  # Always use strongly consistent reads
+        ...         table="events",
+        ...         hot_partition_writes=2000,
+        ...         hot_partition_reads=5000,
         ...     )
         ...     pk = StringAttribute(hash_key=True)
     """
@@ -97,3 +102,5 @@ class ModelConfig:
     skip_hooks: bool = field(default=False)
     max_size: int | None = field(default=None)
     consistent_read: bool = field(default=False)
+    hot_partition_writes: int | None = field(default=None)
+    hot_partition_reads: int | None = field(default=None)

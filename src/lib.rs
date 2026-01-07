@@ -17,6 +17,7 @@ mod client;
 mod client_internal;
 mod compression;
 mod conversions;
+mod diagnostics;
 mod errors;
 mod generators;
 mod kms;
@@ -77,6 +78,9 @@ fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register S3 operations
     s3::register_s3(m)?;
+
+    // Register diagnostics (hot partition tracker, etc.)
+    diagnostics::register_hot_partition(m)?;
 
     Ok(())
 }
