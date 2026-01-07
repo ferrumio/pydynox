@@ -32,10 +32,12 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install zensical
+          uv pip install zensical pdoc3
 
-      - name: Build docs
-        run: uv run zensical build
+      - name: Build docs & API reference
+        run: |
+          uv run zensical build
+          uv run pdoc --html pydynox --skip-errors -o site/api --force
 
       - name: Setup Pages
         if: github.event_name != 'pull_request'

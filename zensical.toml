@@ -9,6 +9,7 @@ nav = [
         "index.md",
         "getting-started.md",
     ] },
+    { "API Reference" = "api/pydynox/index.html" },
     { "Core" = [
         "guides/client.md",
         "guides/models.md",

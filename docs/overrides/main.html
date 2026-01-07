@@ -10,5 +10,13 @@
 
     gtag('config', 'G-NJ1FSTXF78');
 </script>
+<!-- Open API reference links in new tab -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('a[href*="/api/"]').forEach(function (link) {
+            link.setAttribute('target', '_blank');
+        });
+    });
+</script>
 {{ super() }}
 {% endblock %}

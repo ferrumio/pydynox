@@ -34,8 +34,14 @@ use serialization::{dynamo_to_py_py, item_from_dynamo, item_to_dynamo, py_to_dyn
 
 /// Python module for pydynox's Rust core.
 ///
-/// This module is imported as `pydynox_core` in Python and provides
-/// the low-level DynamoDB client implementation.
+/// **WARNING: This is an internal module. Do not import directly.**
+///
+/// Use `from pydynox import ...` instead. This module is the bridge between
+/// Python and Rust.
+///
+/// **This is NOT part of the public API.** We may introduce breaking changes
+/// to this module at any time without prior notice. If you import from
+/// `pydynox.pydynox_core` directly, your code may break on any update.
 #[pymodule]
 fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DynamoDBClient>()?;
