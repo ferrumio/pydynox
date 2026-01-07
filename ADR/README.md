@@ -20,6 +20,8 @@ An ADR is a short document that describes a decision, why it was made, and what 
 | 008 | [Examples in folder](008-examples-in-folder.md) | Accepted |
 | 009 | [Supported platforms](009-supported-platforms.md) | Accepted |
 | 010 | [GenAI in development](010-genai-in-development.md) | Accepted |
+| 011 | [Prepare/Execute pattern](011-prepare-execute-pattern.md) | Accepted |
+| 012 | [Envelope encryption with KMS](012-envelope-encryption-kms.md) | Accepted |
 
 ## Adding a new ADR
 
