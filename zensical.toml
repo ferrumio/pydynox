@@ -42,6 +42,9 @@ nav = [
         "guides/pydantic.md",
         "guides/dataclass.md",
     ] },
+    { "Diagnostics" = [
+        "guides/diagnostics/hot-partition.md",
+    ] },
     { "Agentic" = [
         "guides/agentic/index.md",
         "guides/agentic/strands.md",

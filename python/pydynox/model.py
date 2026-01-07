@@ -151,17 +151,39 @@ class Model(metaclass=ModelMeta):
 
         if hasattr(cls, "model_config") and cls.model_config.client is not None:
             cls._client_instance = cls.model_config.client
+            cls._apply_hot_partition_overrides()
             return cls._client_instance
 
         default = get_default_client()
         if default is not None:
             cls._client_instance = default
+            cls._apply_hot_partition_overrides()
             return cls._client_instance
 
         raise ValueError(
             f"No client configured for {cls.__name__}. "
             "Either pass client to ModelConfig or call pydynox.set_default_client()"
         )
+
+    @classmethod
+    def _apply_hot_partition_overrides(cls) -> None:
+        """Apply hot partition threshold overrides from ModelConfig to the client's detector."""
+        if cls._client_instance is None:
+            return
+
+        diagnostics = cls._client_instance.diagnostics
+        if diagnostics is None:
+            return
+
+        if not hasattr(cls, "model_config"):
+            return
+
+        writes = getattr(cls.model_config, "hot_partition_writes", None)
+        reads = getattr(cls.model_config, "hot_partition_reads", None)
+
+        if writes is not None or reads is not None:
+            table = cls.model_config.table
+            diagnostics.set_table_thresholds(table, writes_threshold=writes, reads_threshold=reads)
 
     @classmethod
     def _get_table(cls) -> str:

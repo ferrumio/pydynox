@@ -1,6 +1,20 @@
+# Release Pipeline
+#
+# This workflow builds and publishes pydynox to PyPI.
+# It triggers when you push a version tag or manually via workflow_dispatch.
+#
+# Usage:
+#   git tag v0.14.0
+#   git push origin v0.14.0
+#
+# Note: Changelog is generated separately by changelog.yml after release is published.
+
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       version:
@@ -14,8 +28,27 @@ permissions:
   pages: write
 
 jobs:
+  # Extract version from tag or input
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION"
+
   build-linux-x86:
     name: Build manylinux x86_64 cp${{ matrix.python }}
+    needs: prepare
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -34,11 +67,12 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-manylinux-x86_64
+          name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-manylinux-x86_64
           path: dist/*.whl
 
   build-linux-arm:
     name: Build manylinux aarch64 cp${{ matrix.python }}
+    needs: prepare
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
@@ -57,11 +91,12 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-manylinux-aarch64
+          name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-manylinux-aarch64
           path: dist/*.whl
 
   build-macos:
     name: Build macOS ${{ matrix.target }} cp${{ matrix.python }}
+    needs: prepare
     runs-on: macos-latest
     strategy:
       matrix:
@@ -80,11 +115,12 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: pydynox-${{ inputs.version }}-cp${{ matrix.python }}-macos-${{ matrix.target }}
+          name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-macos-${{ matrix.target }}
           path: dist/*.whl
 
   build-sdist:
     name: Build sdist
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -98,12 +134,12 @@ jobs:
       - name: Upload sdist
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: pydynox-${{ inputs.version }}-sdist
+          name: pydynox-${{ needs.prepare.outputs.version }}-sdist
           path: dist/*.tar.gz
 
   publish:
     name: Publish to PyPI
-    needs: [build-linux-x86, build-linux-arm, build-macos, build-sdist]
+    needs: [prepare, build-linux-x86, build-linux-arm, build-macos, build-sdist]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -112,7 +148,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: pydynox-${{ inputs.version }}-*
+          pattern: pydynox-${{ needs.prepare.outputs.version }}-*
           path: dist
           merge-multiple: true
 
@@ -121,6 +157,31 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+
+  github-release:
+    name: Create GitHub Release
+    needs: [prepare, publish]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        with:
+          name: "pydynox v${{ needs.prepare.outputs.version }}"
+          body: |
+            Release v${{ needs.prepare.outputs.version }}
+
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+
+            ## Installation
+
+            ```bash
+            pip install pydynox==${{ needs.prepare.outputs.version }}
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docs:
     name: Deploy Documentation

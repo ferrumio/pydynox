@@ -98,6 +98,12 @@ Now that you have the basics, explore these guides:
 |-------|-------------|
 | [Pydantic](guides/pydantic.md) | Use Pydantic models |
 
+### Diagnostics
+
+| Guide | Description |
+|-------|-------------|
+| [Hot partition detection](guides/diagnostics/hot-partition.md) | Detect partition key hotspots |
+
 ### Troubleshooting
 
 | Guide | Description |

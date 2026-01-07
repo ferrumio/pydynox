@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core
+    from pydynox.diagnostics import HotPartitionDetector
     from pydynox.rate_limit import AdaptiveRate, FixedRate
 
 
@@ -14,6 +15,7 @@ class BaseClient:
 
     _client: pydynox_core.DynamoDBClient
     _rate_limit: FixedRate | AdaptiveRate | None
+    _diagnostics: HotPartitionDetector | None
     _config: dict[str, str | float | int | None]
 
     def __init__(
@@ -32,6 +34,7 @@ class BaseClient:
         max_retries: int | None = None,
         proxy_url: str | None = None,
         rate_limit: FixedRate | AdaptiveRate | None = None,
+        diagnostics: HotPartitionDetector | None = None,
     ):
         from pydynox import pydynox_core
 
@@ -51,6 +54,7 @@ class BaseClient:
             proxy_url=proxy_url,
         )
         self._rate_limit = rate_limit
+        self._diagnostics = diagnostics
 
         # Store config for S3/KMS to inherit
         self._config = {
@@ -74,6 +78,11 @@ class BaseClient:
         """Get the rate limiter for this client."""
         return self._rate_limit
 
+    @property
+    def diagnostics(self) -> HotPartitionDetector | None:
+        """Get the diagnostics detector for this client."""
+        return self._diagnostics
+
     def _acquire_rcu(self, rcu: float = 1.0) -> None:
         """Acquire read capacity before an operation."""
         if self._rate_limit is not None:
@@ -88,6 +97,16 @@ class BaseClient:
         """Record a throttle event."""
         if self._rate_limit is not None:
             self._rate_limit._on_throttle()
+
+    def _record_write(self, table: str, pk: str) -> None:
+        """Record a write for hot partition detection."""
+        if self._diagnostics is not None:
+            self._diagnostics.record_write(table, pk)
+
+    def _record_read(self, table: str, pk: str) -> None:
+        """Record a read for hot partition detection."""
+        if self._diagnostics is not None:
+            self._diagnostics.record_read(table, pk)
 
     def get_region(self) -> str:
         """Get the configured AWS region."""
