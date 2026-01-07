@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Build wheels
-        uses: PyO3/maturin-action@44479ae1b6b1a57f561e03add8832e62c185eb17 # v1.48.1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: x86_64
           args: --release --out dist -i python${{ matrix.python }}
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Build wheels
-        uses: PyO3/maturin-action@44479ae1b6b1a57f561e03add8832e62c185eb17 # v1.48.1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: aarch64
           args: --release --out dist -i python${{ matrix.python }}
@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Build wheels
-        uses: PyO3/maturin-action@44479ae1b6b1a57f561e03add8832e62c185eb17 # v1.48.1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           target: ${{ matrix.target }}
           args: --release --out dist -i python${{ matrix.python }}
@@ -90,7 +90,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Build sdist
-        uses: PyO3/maturin-action@44479ae1b6b1a57f561e03add8832e62c185eb17 # v1.48.1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           command: sdist
           args: --out dist

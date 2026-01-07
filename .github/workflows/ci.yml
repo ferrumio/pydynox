@@ -49,7 +49,7 @@ jobs:
           allow-prereleases: true
 
       - name: Build wheel
-        uses: PyO3/maturin-action@44479ae1b6b1a57f561e03add8832e62c185eb17 # v1.48.1
+        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
         with:
           command: build
           args: --release --out dist
