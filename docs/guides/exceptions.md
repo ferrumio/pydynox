@@ -152,7 +152,7 @@ Common causes:
 
 - KMS key not found (wrong key ID or alias)
 - KMS key is disabled
-- Missing IAM permissions for `kms:Encrypt` or `kms:Decrypt`
+- Missing IAM permissions for `kms:GenerateDataKey` or `kms:Decrypt`
 - Wrong encryption context on decrypt
 - Invalid ciphertext (data corrupted)
 

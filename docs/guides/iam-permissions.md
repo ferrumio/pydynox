@@ -83,6 +83,8 @@ For creating and managing tables:
 
 ## KMS permissions (for encryption)
 
+pydynox uses envelope encryption with `kms:GenerateDataKey` instead of `kms:Encrypt`. This removes the 4KB size limit and reduces KMS API calls.
+
 ### Full access (ReadWrite mode)
 
 For services that encrypt and decrypt:
@@ -94,7 +96,7 @@ For services that encrypt and decrypt:
         {
             "Effect": "Allow",
             "Action": [
-                "kms:Encrypt",
+                "kms:GenerateDataKey",
                 "kms:Decrypt"
             ],
             "Resource": "arn:aws:kms:REGION:ACCOUNT:key/KEY_ID"
@@ -111,7 +113,7 @@ For services that only write encrypted data:
 {
     "Effect": "Allow",
     "Action": [
-        "kms:Encrypt"
+        "kms:GenerateDataKey"
     ],
     "Resource": "arn:aws:kms:REGION:ACCOUNT:key/KEY_ID"
 }
@@ -158,7 +160,7 @@ A service that does CRUD, batch operations, and field encryption:
             "Sid": "KMSAccess",
             "Effect": "Allow",
             "Action": [
-                "kms:Encrypt",
+                "kms:GenerateDataKey",
                 "kms:Decrypt"
             ],
             "Resource": "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"

@@ -1,4 +1,7 @@
-//! KMS client that inherits config from DynamoDB client.
+//! KMS client for envelope encryption.
+//!
+//! Uses GenerateDataKey + local AES instead of direct KMS Encrypt/Decrypt.
+//! This removes the 4KB limit and reduces KMS API calls.
 
 use crate::client_internal::{build_credential_provider, ClientConfig, CredentialProvider};
 use crate::errors::EncryptionError;
@@ -15,7 +18,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
-/// KMS encryptor for field-level encryption.
+/// KMS encryptor using envelope encryption.
+///
+/// Uses GenerateDataKey + local AES-256-GCM instead of direct KMS Encrypt.
+/// This removes the 4KB size limit and reduces KMS API calls.
 ///
 /// Inherits all config from DynamoDB client, only allows region override.
 #[pyclass]
@@ -106,9 +112,13 @@ impl KmsEncryptor {
 
     // ========== SYNC METHODS ==========
 
-    /// Encrypt a plaintext string.
+    /// Encrypt a plaintext string using envelope encryption.
     ///
-    /// Returns base64-encoded ciphertext with "ENC:" prefix.
+    /// 1. Calls KMS GenerateDataKey once
+    /// 2. Encrypts data locally with AES-256-GCM
+    /// 3. Returns base64-encoded envelope with "ENC:" prefix
+    ///
+    /// The envelope contains the encrypted data key + encrypted data.
     pub fn encrypt(&self, plaintext: &str) -> PyResult<String> {
         sync_encrypt(
             &self.client,
@@ -119,9 +129,13 @@ impl KmsEncryptor {
         )
     }
 
-    /// Decrypt a ciphertext string.
+    /// Decrypt a ciphertext string using envelope encryption.
     ///
-    /// Expects base64-encoded ciphertext with "ENC:" prefix.
+    /// 1. Unpacks the envelope to get encrypted DEK + encrypted data
+    /// 2. Calls KMS Decrypt to get plaintext DEK
+    /// 3. Decrypts data locally with AES-256-GCM
+    ///
+    /// Expects base64-encoded envelope with "ENC:" prefix.
     pub fn decrypt(&self, ciphertext: &str) -> PyResult<String> {
         sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)
     }

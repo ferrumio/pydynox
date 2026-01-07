@@ -1,6 +1,6 @@
 """Shared fixtures for integration tests.
 
-Uses LocalStack for DynamoDB and S3 via testcontainers.
+Uses LocalStack for DynamoDB, S3, and KMS via testcontainers.
 Docker must be running to execute integration tests.
 """
 
@@ -17,7 +17,7 @@ def localstack_container():
     print("\n🐳 Starting LocalStack container...")
 
     container = LocalStackContainer(image="localstack/localstack:latest")
-    container.with_services("dynamodb", "s3")
+    container.with_services("dynamodb", "s3", "kms")
 
     container.start()
 
@@ -113,3 +113,27 @@ def s3_bucket(localstack_endpoint):
         pass
 
     return bucket_name
+
+
+@pytest.fixture(scope="session")
+def kms_key_id(localstack_endpoint):
+    """Create a KMS key for encryption tests."""
+    import boto3
+
+    kms = boto3.client(
+        "kms",
+        endpoint_url=localstack_endpoint,
+        aws_access_key_id="testing",
+        aws_secret_access_key="testing",
+        region_name="us-east-1",
+    )
+
+    response = kms.create_key(
+        Description="Test key for pydynox integration tests",
+        KeyUsage="ENCRYPT_DECRYPT",
+    )
+
+    key_id = response["KeyMetadata"]["KeyId"]
+    print(f"✅ Created KMS key: {key_id}")
+
+    return key_id
