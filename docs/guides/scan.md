@@ -7,7 +7,7 @@ Scan reads every item in a DynamoDB table. Use it when you need all items or don
 - Scan all items in a table
 - Filter results by any attribute
 - Count items without returning them
-- Parallel scan for large tables
+- Parallel scan for large tables (4-8x faster)
 - Automatic pagination
 - Async support
 
@@ -80,14 +80,37 @@ Formula:
 
 ### Parallel scan
 
-Split the scan across multiple workers to speed up large tables:
+For large tables, split the scan across multiple segments to speed it up. Parallel scan runs all segments concurrently using tokio in Rust.
+
+**Performance**: 4 segments = ~4x faster, 8 segments = ~8x faster. RCU cost is the same (you're reading the same data).
 
 === "parallel_scan.py"
     ```python
     --8<-- "docs/examples/scan/parallel_scan.py"
     ```
 
-Parallel scan is faster but uses the same total RCU. It spreads the work across multiple threads.
+**Async version**:
+
+=== "async_parallel_scan.py"
+    ```python
+    --8<-- "docs/examples/scan/async_parallel_scan.py"
+    ```
+
+**How many segments?**
+
+- Small tables (< 100K items): 1-2 segments
+- Medium tables (100K - 1M items): 4-8 segments
+- Large tables (> 1M items): 8-16 segments
+
+Experiment to find what works best for your table size.
+
+**Important**: Parallel scan returns all items at once (not paginated). For very large tables that don't fit in memory, use regular `scan()` with segments for streaming:
+
+```python
+# Stream items one page at a time
+for user in User.scan(segment=0, total_segments=4):
+    process(user)
+```
 
 ### Async scan
 
@@ -96,6 +119,13 @@ Use `async_scan()` and `async_count()` for async code:
 === "async_scan.py"
     ```python
     --8<-- "docs/examples/scan/async_scan.py"
+    ```
+
+Async parallel scan:
+
+=== "async_parallel_scan.py"
+    ```python
+    --8<-- "docs/examples/scan/async_parallel_scan.py"
     ```
 
 ### Pagination
@@ -145,6 +175,14 @@ print(f"RCU consumed: {result.metrics.consumed_rcu}")
 | `last_evaluated_key` | dict | None | Start key for pagination |
 | `segment` | int | None | Segment number for parallel scan |
 | `total_segments` | int | None | Total segments for parallel scan |
+
+### Parallel scan parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `total_segments` | int | Required | Number of parallel segments |
+| `filter_condition` | Condition | None | Filter on any attribute |
+| `consistent_read` | bool | None | Strongly consistent read |
 
 ### Count parameters
 

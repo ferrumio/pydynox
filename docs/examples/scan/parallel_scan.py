@@ -1,33 +1,25 @@
-"""Parallel scan for large tables."""
+"""Parallel scan example - scan large tables fast."""
 
-import concurrent.futures
-
-from pydynox import DynamoDBClient, Model, ModelConfig
+from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
-
-client = DynamoDBClient()
 
 
 class User(Model):
-    model_config = ModelConfig(table="users", client=client)
+    """User model."""
+
+    model_config = ModelConfig(table="users")
     pk = StringAttribute(hash_key=True)
     name = StringAttribute()
     age = NumberAttribute()
+    status = StringAttribute()
 
 
-def scan_segment(segment: int, total: int) -> list[User]:
-    """Scan a single segment."""
-    return list(User.scan(segment=segment, total_segments=total))
+# Parallel scan with 4 segments - much faster for large tables
+users, metrics = User.parallel_scan(total_segments=4)
+print(f"Found {len(users)} users in {metrics.duration_ms:.2f}ms")
 
-
-# Parallel scan with 4 workers
-total_segments = 4
-
-with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-    futures = [executor.submit(scan_segment, i, total_segments) for i in range(total_segments)]
-
-    all_users: list[User] = []
-    for future in concurrent.futures.as_completed(futures):
-        all_users.extend(future.result())
-
-print(f"Total users found: {len(all_users)}")
+# With filter
+active_users, metrics = User.parallel_scan(
+    total_segments=4, filter_condition=User.status == "active"
+)
+print(f"Found {len(active_users)} active users")

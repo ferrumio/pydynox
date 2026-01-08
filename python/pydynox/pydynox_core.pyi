@@ -206,6 +206,26 @@ class DynamoDBClient:
         consistent_read: bool = False,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
 
+    # Parallel scan methods
+    def parallel_scan(
+        self,
+        table: str,
+        total_segments: int,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[list[dict[str, Any]], OperationMetrics]: ...
+    def async_parallel_scan(
+        self,
+        table: str,
+        total_segments: int,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        consistent_read: bool = False,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+
     # PartiQL methods
     def execute_statement(
         self,

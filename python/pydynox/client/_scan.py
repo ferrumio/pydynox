@@ -117,3 +117,91 @@ class ScanOperations:
         metrics: OperationMetrics = result["metrics"]
         _log_operation("count", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         return count, metrics
+
+    # ========== PARALLEL SCAN ==========
+
+    def parallel_scan(
+        self,
+        table: str,
+        total_segments: int,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[list[dict[str, Any]], OperationMetrics]:
+        """Parallel scan - runs multiple segment scans concurrently.
+
+        Much faster than regular scan for large tables. Each segment is
+        scanned in parallel using tokio tasks in Rust.
+
+        Args:
+            table: Table name.
+            total_segments: Number of parallel segments (1-1000000).
+            filter_expression: Optional filter expression.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            consistent_read: Use strongly consistent reads.
+
+        Returns:
+            Tuple of (items, metrics) where items is a list of all scanned items.
+
+        Example:
+            >>> items, metrics = client.parallel_scan("users", total_segments=4)
+            >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
+        """
+        items, metrics = self._client.parallel_scan(  # type: ignore[attr-defined]
+            table,
+            total_segments,
+            filter_expression=filter_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+            consistent_read=consistent_read,
+        )
+        _log_operation(
+            "parallel_scan", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu
+        )
+        return items, metrics
+
+    async def async_parallel_scan(
+        self,
+        table: str,
+        total_segments: int,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[list[dict[str, Any]], OperationMetrics]:
+        """Async parallel scan - runs multiple segment scans concurrently.
+
+        Much faster than regular scan for large tables. Each segment is
+        scanned in parallel using tokio tasks in Rust.
+
+        Args:
+            table: Table name.
+            total_segments: Number of parallel segments (1-1000000).
+            filter_expression: Optional filter expression.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            consistent_read: Use strongly consistent reads.
+
+        Returns:
+            Tuple of (items, metrics) where items is a list of all scanned items.
+
+        Example:
+            >>> items, metrics = await client.async_parallel_scan("users", total_segments=4)
+            >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
+        """
+        result = await self._client.async_parallel_scan(  # type: ignore[attr-defined]
+            table,
+            total_segments,
+            filter_expression=filter_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+            consistent_read=consistent_read,
+        )
+        items: list[dict[str, Any]] = result["items"]
+        metrics: OperationMetrics = result["metrics"]
+        _log_operation(
+            "parallel_scan", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu
+        )
+        return items, metrics

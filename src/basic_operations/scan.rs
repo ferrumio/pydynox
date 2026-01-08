@@ -495,3 +495,245 @@ pub fn async_count<'py>(
         })
     })
 }
+
+/// Parallel scan result containing all items from all segments.
+pub struct ParallelScanResult {
+    pub items: Vec<HashMap<String, AttributeValue>>,
+    pub metrics: OperationMetrics,
+}
+
+/// Prepared parallel scan data.
+pub struct PreparedParallelScan {
+    pub table: String,
+    pub total_segments: i32,
+    pub filter_expression: Option<String>,
+    pub expression_attribute_names: Option<HashMap<String, String>>,
+    pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
+    pub consistent_read: bool,
+}
+
+/// Prepare parallel scan by converting Python data to Rust.
+#[allow(clippy::too_many_arguments)]
+pub fn prepare_parallel_scan(
+    py: Python<'_>,
+    table: &str,
+    total_segments: i32,
+    filter_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
+    expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    consistent_read: bool,
+) -> PyResult<PreparedParallelScan> {
+    let names = match expression_attribute_names {
+        Some(dict) => {
+            let mut map = HashMap::new();
+            for (k, v) in dict.iter() {
+                map.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+            Some(map)
+        }
+        None => None,
+    };
+
+    let values = match expression_attribute_values {
+        Some(dict) => Some(py_dict_to_attribute_values(py, dict)?),
+        None => None,
+    };
+
+    Ok(PreparedParallelScan {
+        table: table.to_string(),
+        total_segments,
+        filter_expression,
+        expression_attribute_names: names,
+        expression_attribute_values: values,
+        consistent_read,
+    })
+}
+
+/// Execute a single segment scan with full pagination.
+#[allow(clippy::too_many_arguments)]
+async fn execute_segment_scan(
+    client: Client,
+    table: String,
+    segment: i32,
+    total_segments: i32,
+    filter_expression: Option<String>,
+    expression_attribute_names: Option<HashMap<String, String>>,
+    expression_attribute_values: Option<HashMap<String, AttributeValue>>,
+    consistent_read: bool,
+) -> Result<
+    Vec<HashMap<String, AttributeValue>>,
+    (
+        aws_sdk_dynamodb::error::SdkError<aws_sdk_dynamodb::operation::scan::ScanError>,
+        String,
+    ),
+> {
+    let mut all_items = Vec::new();
+    let mut last_key: Option<HashMap<String, AttributeValue>> = None;
+
+    loop {
+        let prepared = PreparedScan {
+            table: table.clone(),
+            filter_expression: filter_expression.clone(),
+            expression_attribute_names: expression_attribute_names.clone(),
+            expression_attribute_values: expression_attribute_values.clone(),
+            limit: None,
+            exclusive_start_key: last_key,
+            index_name: None,
+            consistent_read,
+            segment: Some(segment),
+            total_segments: Some(total_segments),
+        };
+
+        let result = execute_scan(client.clone(), prepared).await?;
+        all_items.extend(result.items);
+
+        if result.last_evaluated_key.is_none() {
+            break;
+        }
+        last_key = result.last_evaluated_key;
+    }
+
+    Ok(all_items)
+}
+
+/// Core async parallel scan - runs all segments concurrently with tokio.
+pub async fn execute_parallel_scan(
+    client: Client,
+    prepared: PreparedParallelScan,
+) -> Result<
+    ParallelScanResult,
+    (
+        aws_sdk_dynamodb::error::SdkError<aws_sdk_dynamodb::operation::scan::ScanError>,
+        String,
+    ),
+> {
+    let start = Instant::now();
+
+    let handles: Vec<_> = (0..prepared.total_segments)
+        .map(|segment| {
+            let client = client.clone();
+            let table = prepared.table.clone();
+            let filter = prepared.filter_expression.clone();
+            let names = prepared.expression_attribute_names.clone();
+            let values = prepared.expression_attribute_values.clone();
+            let consistent = prepared.consistent_read;
+            let total = prepared.total_segments;
+
+            tokio::spawn(async move {
+                execute_segment_scan(
+                    client, table, segment, total, filter, names, values, consistent,
+                )
+                .await
+            })
+        })
+        .collect();
+
+    let mut all_items = Vec::new();
+    for handle in handles {
+        let result = handle.await.map_err(|e| {
+            let sdk_err = aws_sdk_dynamodb::error::SdkError::construction_failure(
+                aws_sdk_dynamodb::error::BuildError::other(
+                    aws_sdk_dynamodb::error::BoxError::from(format!("Task join error: {}", e)),
+                ),
+            );
+            (sdk_err, prepared.table.clone())
+        })?;
+
+        match result {
+            Ok(items) => all_items.extend(items),
+            Err(e) => return Err(e),
+        }
+    }
+
+    let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+    let metrics = OperationMetrics::with_capacity(duration_ms, None, None, None)
+        .with_items_count(all_items.len())
+        .with_scanned_count(all_items.len());
+
+    Ok(ParallelScanResult {
+        items: all_items,
+        metrics,
+    })
+}
+
+/// Sync parallel scan - blocks until all segments complete.
+#[allow(clippy::too_many_arguments)]
+pub fn parallel_scan(
+    py: Python<'_>,
+    client: &Client,
+    runtime: &Arc<Runtime>,
+    table: &str,
+    total_segments: i32,
+    filter_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
+    expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    consistent_read: bool,
+) -> PyResult<(Vec<Py<PyAny>>, OperationMetrics)> {
+    let prepared = prepare_parallel_scan(
+        py,
+        table,
+        total_segments,
+        filter_expression,
+        expression_attribute_names,
+        expression_attribute_values,
+        consistent_read,
+    )?;
+
+    let result = runtime.block_on(execute_parallel_scan(client.clone(), prepared));
+
+    match result {
+        Ok(raw) => {
+            let mut items = Vec::new();
+            for item in raw.items {
+                let py_dict = attribute_values_to_py_dict(py, item)?;
+                items.push(py_dict.into_any().unbind());
+            }
+            Ok((items, raw.metrics))
+        }
+        Err((e, tbl)) => Err(map_sdk_error(e, Some(&tbl))),
+    }
+}
+
+/// Async parallel scan - returns a Python awaitable.
+#[allow(clippy::too_many_arguments)]
+pub fn async_parallel_scan<'py>(
+    py: Python<'py>,
+    client: Client,
+    table: &str,
+    total_segments: i32,
+    filter_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
+    expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    consistent_read: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let prepared = prepare_parallel_scan(
+        py,
+        table,
+        total_segments,
+        filter_expression,
+        expression_attribute_names,
+        expression_attribute_values,
+        consistent_read,
+    )?;
+
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = execute_parallel_scan(client, prepared).await;
+
+        #[allow(deprecated)]
+        Python::with_gil(|py| match result {
+            Ok(raw) => {
+                let py_result = PyDict::new(py);
+
+                let mut items = Vec::new();
+                for item in raw.items {
+                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    items.push(py_dict.into_any().unbind());
+                }
+                py_result.set_item("items", items)?;
+                py_result.set_item("metrics", raw.metrics.into_pyobject(py)?)?;
+                Ok(py_result.into_any().unbind())
+            }
+            Err((e, tbl)) => Err(map_sdk_error(e, Some(&tbl))),
+        })
+    })
+}
