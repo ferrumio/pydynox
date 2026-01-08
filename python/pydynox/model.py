@@ -58,17 +58,22 @@ class ModelMeta(type):
         indexes: dict[str, GlobalSecondaryIndex[Any]] = {}
 
         for base in bases:
-            if hasattr(base, "_attributes"):
-                attributes.update(base._attributes)
-            if hasattr(base, "_hash_key") and base._hash_key:
-                hash_key = base._hash_key
-            if hasattr(base, "_range_key") and base._range_key:
-                range_key = base._range_key
-            if hasattr(base, "_hooks"):
-                for hook_type, hook_list in base._hooks.items():
+            base_attrs = getattr(base, "_attributes", None)
+            if base_attrs is not None:
+                attributes.update(base_attrs)
+            base_hash_key = getattr(base, "_hash_key", None)
+            if base_hash_key:
+                hash_key = base_hash_key
+            base_range_key = getattr(base, "_range_key", None)
+            if base_range_key:
+                range_key = base_range_key
+            base_hooks = getattr(base, "_hooks", None)
+            if base_hooks is not None:
+                for hook_type, hook_list in base_hooks.items():
                     hooks[hook_type].extend(hook_list)
-            if hasattr(base, "_indexes"):
-                indexes.update(base._indexes)
+            base_indexes = getattr(base, "_indexes", None)
+            if base_indexes is not None:
+                indexes.update(base_indexes)
 
         for attr_name, attr_value in namespace.items():
             if isinstance(attr_value, Attribute):
