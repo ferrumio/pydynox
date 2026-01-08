@@ -550,6 +550,7 @@ pub fn prepare_parallel_scan(
 }
 
 /// Execute a single segment scan with full pagination.
+#[allow(clippy::too_many_arguments)]
 async fn execute_segment_scan(
     client: Client,
     table: String,
