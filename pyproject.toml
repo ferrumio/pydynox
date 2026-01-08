@@ -47,7 +47,7 @@ dev = [
     "pydantic>=2.0",
     "pynamodb>=6.0",
     "ruff>=0.8",
-    "mypy>=1.0",
+    "ty>=0.0.1",
 ]
 docs = ["zensical", "pdoc3>=0.11.0"]
 
@@ -67,23 +67,3 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
-
-[tool.mypy]
-python_version = "3.11"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-
-[[tool.mypy.overrides]]
-module = "pydynox.pydynox_core"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "pydantic.*"
-ignore_missing_imports = true

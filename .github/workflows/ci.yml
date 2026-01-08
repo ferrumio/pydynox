@@ -94,7 +94,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio hypothesis pydantic mypy ruff
+          pip install pytest pytest-asyncio hypothesis pydantic ruff
 
       - name: Install integration test dependencies
         if: runner.os == 'Linux'
@@ -108,10 +108,9 @@ jobs:
           ruff check python/ tests/ benchmarks/
           ruff format --check python/ tests/ benchmarks/
 
-      - name: Mypy
+      - name: Type check (ty)
         run: |
-          source .venv/bin/activate
-          mypy python/pydynox/
+          uvx ty check python/pydynox/
 
       - name: Run unit tests
         run: |

@@ -1,0 +1,83 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+## [0.14.0] - 2026-01-07
+
+
+### CI/CD
+
+- add prebuilt wheels dists (#24)
+- add memray tests + fix codspeed (#80)
+- add scorecard (#96)
+- add scorecard
+- bump actions/cache from 4.3.0 to 5.0.1 (#105)
+- bump astral-sh/setup-uv from 4.2.0 to 7.1.6 (#103)
+- bump actions/checkout from 4.3.1 to 6.0.1 (#104)
+- bump actions/setup-python from 5.6.0 to 6.1.0 (#106)
+- bump codecov/codecov-action from 4.6.0 to 5.5.2 (#107)
+- bump codecov/codecov-action from 5.4.3 to 5.5.2 (#118)
+- bump PyO3/maturin-action from 1.48.1 to 1.49.4 (#119)
+- bump ossf/scorecard-action from 2.4.1 to 2.4.3 (#117)
+- bump actions/upload-pages-artifact from 3.0.1 to 4.0.0 (#116)
+- bump pypa/gh-action-pypi-publish from 1.12.4 to 1.13.0 (#115)
+
+
+### Documentation
+
+- adding genai guidance (#46)
+- add agentic examples (#109)
+- adding api reference (#121)
+
+
+### Features
+
+- improving error messages (#19)
+- add support for ORM Model (#22)
+- add support for Pydantic integration (#23)
+- add table management methods to DynamoDBClient (#25)
+- adding TTL attribute (#29)
+- adding Rate Limit feature (#31)
+- adding lifecycle rules (#34)
+- adding lifecycle rules (#35)
+- add CompressedAttribute for automatic text compression (#37)
+- adding encryption field (#39)
+- adding item size calculator (#41)
+- add ORM-style conditions (#50)
+- add atomic operations support (#52)
+- add JSONAttribute, EnumAttribute, DatetimeAttribute, and Set types (#54)
+- add observability (#56)
+- add support for GSI index (#58)
+- add async support (#60)
+- add consistent read (#62)
+- add generators (#67)
+- add dataclass integration (#69)
+- add query class (#72)
+- add PartiQL support (#76)
+- add optimistic lock (#77)
+- add full auth chain (#82)
+- add scan (#83)
+- add s3file attribute (#84)
+- add multi-attribute GSI keys support (Nov 2025 DynamoDB feature) (#89)
+- add benchmark infra with CloudWatch dashboard (#93)
+- add update_by_key and delete_by_key static methods (#108)
+- adding hot partition support (#124)
+
+
+### Miscellaneous
+
+- rename dynamoclient (#21)
+- add analytics (#71)
+- improve CI (#111)
+
+
+### Refactoring
+
+- organize imports with namespaces (#27)
+- replace class Meta with ModelConfig (#44)
+- modernize python code (#48)
+- use data key instead of encrypt operation (#110)
+
+
+### Deps
+
+- bump the rust-dependencies group with 3 updates (#102)
