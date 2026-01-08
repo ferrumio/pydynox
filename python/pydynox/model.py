@@ -1206,3 +1206,137 @@ class Model(metaclass=ModelMeta):
             )
         else:
             await client.async_delete_item(table, key)
+
+    # ========== PARALLEL SCAN ==========
+
+    @classmethod
+    def parallel_scan(
+        cls: type[M],
+        total_segments: int,
+        filter_condition: Condition | None = None,
+        consistent_read: bool | None = None,
+    ) -> tuple[list[M], OperationMetrics]:
+        """Parallel scan - runs multiple segment scans concurrently.
+
+        Much faster than regular scan for large tables. Each segment is
+        scanned in parallel using tokio tasks in Rust.
+
+        Warning: Returns all items at once. For very large tables, consider
+        using regular scan() with segment/total_segments for streaming.
+
+        Args:
+            total_segments: Number of parallel segments (1-1000000).
+                           More segments = more parallelism, but more overhead.
+                           Good starting point: 4-8 for most tables.
+            filter_condition: Optional filter on attributes.
+            consistent_read: If True, use strongly consistent read.
+
+        Returns:
+            Tuple of (list of model instances, metrics).
+
+        Example:
+            >>> users, metrics = User.parallel_scan(total_segments=4)
+            >>> print(f"Found {len(users)} users in {metrics.duration_ms:.2f}ms")
+            >>>
+            >>> # With filter
+            >>> active, metrics = User.parallel_scan(
+            ...     total_segments=4,
+            ...     filter_condition=User.status == "active"
+            ... )
+        """
+        client = cls._get_client()
+        table = cls._get_table()
+
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        filter_expr = None
+        if filter_condition is not None:
+            filter_expr = filter_condition.serialize(names, values)
+
+        attr_names = {v: k for k, v in names.items()}
+
+        use_consistent = consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(cls.model_config, "consistent_read", False)
+
+        items, metrics = client.parallel_scan(
+            table,
+            total_segments,
+            filter_expression=filter_expr,
+            expression_attribute_names=attr_names if attr_names else None,
+            expression_attribute_values=values if values else None,
+            consistent_read=use_consistent,
+        )
+
+        instances = [cls.from_dict(item) for item in items]
+
+        skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+        if not skip:
+            for instance in instances:
+                instance._run_hooks(HookType.AFTER_LOAD)
+
+        return instances, metrics
+
+    @classmethod
+    async def async_parallel_scan(
+        cls: type[M],
+        total_segments: int,
+        filter_condition: Condition | None = None,
+        consistent_read: bool | None = None,
+    ) -> tuple[list[M], OperationMetrics]:
+        """Async parallel scan - runs multiple segment scans concurrently.
+
+        Much faster than regular scan for large tables. Each segment is
+        scanned in parallel using tokio tasks in Rust.
+
+        Warning: Returns all items at once. For very large tables, consider
+        using regular async_scan() with segment/total_segments for streaming.
+
+        Args:
+            total_segments: Number of parallel segments (1-1000000).
+                           More segments = more parallelism, but more overhead.
+                           Good starting point: 4-8 for most tables.
+            filter_condition: Optional filter on attributes.
+            consistent_read: If True, use strongly consistent read.
+
+        Returns:
+            Tuple of (list of model instances, metrics).
+
+        Example:
+            >>> users, metrics = await User.async_parallel_scan(total_segments=4)
+            >>> print(f"Found {len(users)} users in {metrics.duration_ms:.2f}ms")
+        """
+        client = cls._get_client()
+        table = cls._get_table()
+
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        filter_expr = None
+        if filter_condition is not None:
+            filter_expr = filter_condition.serialize(names, values)
+
+        attr_names = {v: k for k, v in names.items()}
+
+        use_consistent = consistent_read
+        if use_consistent is None:
+            use_consistent = getattr(cls.model_config, "consistent_read", False)
+
+        items, metrics = await client.async_parallel_scan(
+            table,
+            total_segments,
+            filter_expression=filter_expr,
+            expression_attribute_names=attr_names if attr_names else None,
+            expression_attribute_values=values if values else None,
+            consistent_read=use_consistent,
+        )
+
+        instances = [cls.from_dict(item) for item in items]
+
+        skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+        if not skip:
+            for instance in instances:
+                instance._run_hooks(HookType.AFTER_LOAD)
+
+        return instances, metrics

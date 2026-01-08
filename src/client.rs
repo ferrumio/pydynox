@@ -689,6 +689,73 @@ impl DynamoDBClient {
         )
     }
 
+    /// Parallel scan - runs multiple segment scans concurrently.
+    ///
+    /// This is much faster than regular scan for large tables.
+    /// Each segment is scanned in parallel using tokio tasks.
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - Table name
+    /// * `total_segments` - Number of parallel segments (1-1000000)
+    /// * `filter_expression` - Optional filter expression
+    /// * `expression_attribute_names` - Attribute name placeholders
+    /// * `expression_attribute_values` - Attribute value placeholders
+    /// * `consistent_read` - Use strongly consistent reads
+    ///
+    /// # Returns
+    ///
+    /// Tuple of (items, metrics) where items is a list of all scanned items.
+    #[pyo3(signature = (table, total_segments, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn parallel_scan(
+        &self,
+        py: Python<'_>,
+        table: &str,
+        total_segments: i32,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        consistent_read: bool,
+    ) -> PyResult<(Vec<Py<PyAny>>, OperationMetrics)> {
+        basic_operations::parallel_scan(
+            py,
+            &self.client,
+            &self.runtime,
+            table,
+            total_segments,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            consistent_read,
+        )
+    }
+
+    /// Async version of parallel_scan.
+    #[pyo3(signature = (table, total_segments, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn async_parallel_scan<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        total_segments: i32,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        consistent_read: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::async_parallel_scan(
+            py,
+            self.client.clone(),
+            table,
+            total_segments,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            consistent_read,
+        )
+    }
+
     // ========== PARTIQL OPERATIONS ==========
 
     /// Execute a PartiQL statement.
