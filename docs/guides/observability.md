@@ -267,6 +267,34 @@ with tracer.start_as_current_span("handle_request"):
 
 All spans share the same `trace_id`, so you can see the full request flow in your tracing backend (Jaeger, X-Ray, etc.).
 
+### Logs with trace context
+
+When tracing is enabled, pydynox logs automatically include `trace_id` and `span_id`. This helps correlate logs with spans in your tracing backend.
+
+```python
+from pydynox import enable_tracing
+
+enable_tracing()
+
+# Logs now include trace context
+user.save()
+# INFO:pydynox:put_item table=users duration_ms=8.2 wcu=1.0 trace_id=abc123... span_id=def456...
+```
+
+With a custom logger like AWS Lambda Powertools:
+
+```python
+from aws_lambda_powertools import Logger
+from pydynox import enable_tracing, set_logger
+
+logger = Logger()
+set_logger(logger)
+enable_tracing()
+
+# Powertools logs include trace_id and span_id as structured fields
+user.save()
+```
+
 ## Next steps
 
 - [Async support](async.md) - Async/await for high-concurrency apps
