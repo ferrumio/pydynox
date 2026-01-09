@@ -264,17 +264,18 @@ class GlobalSecondaryIndex(Generic[M]):
 
         # Build projection
         projection: dict[str, Any]
-        if self.projection == "ALL":
-            projection = {"ProjectionType": "ALL"}
-        elif self.projection == "KEYS_ONLY":
-            projection = {"ProjectionType": "KEYS_ONLY"}
-        elif isinstance(self.projection, list):
-            projection = {
-                "ProjectionType": "INCLUDE",
-                "NonKeyAttributes": self.projection,
-            }
-        else:
-            projection = {"ProjectionType": "ALL"}
+        match self.projection:
+            case "ALL":
+                projection = {"ProjectionType": "ALL"}
+            case "KEYS_ONLY":
+                projection = {"ProjectionType": "KEYS_ONLY"}
+            case list() as attrs:
+                projection = {
+                    "ProjectionType": "INCLUDE",
+                    "NonKeyAttributes": attrs,
+                }
+            case _:
+                projection = {"ProjectionType": "ALL"}
 
         return {
             "IndexName": self.index_name,
