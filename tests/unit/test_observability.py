@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 
-from pydynox import set_correlation_id, set_logger
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from pydynox import disable_tracing, enable_tracing, set_correlation_id, set_logger
 from pydynox._internal._logging import (
     _log_operation,
     get_correlation_id,
@@ -136,4 +138,51 @@ def test_set_logger_with_sdk_debug():
     set_logger(mock, sdk_debug=True)
 
     # Restore
+    set_logger(original)
+
+
+def test_trace_context_not_included_when_tracing_disabled():
+    """trace_id/span_id not included when tracing is disabled."""
+    disable_tracing()
+
+    original = get_logger()
+    mock = MockLogger()
+
+    set_logger(mock)
+    _log_operation("get_item", "users", 10.0)
+
+    _, _, kwargs = mock.messages[0]
+    extra = kwargs.get("extra", kwargs)
+    assert "trace_id" not in extra
+    assert "span_id" not in extra
+
+    set_logger(original)
+
+
+def test_trace_context_included_when_tracing_enabled():
+    """trace_id/span_id included in logs when tracing is enabled."""
+    # Setup OTEL
+    provider = TracerProvider()
+    trace.set_tracer_provider(provider)
+    tracer = trace.get_tracer("test")
+
+    original = get_logger()
+    mock = MockLogger()
+
+    set_logger(mock)
+    enable_tracing()
+
+    # Create a span and log inside it
+    with tracer.start_as_current_span("test_span"):
+        _log_operation("get_item", "users", 10.0)
+
+    _, _, kwargs = mock.messages[0]
+    extra = kwargs.get("extra", kwargs)
+    assert "trace_id" in extra
+    assert "span_id" in extra
+    assert len(extra["trace_id"]) == 32  # 128-bit hex
+    assert len(extra["span_id"]) == 16  # 64-bit hex
+
+    # Cleanup
+    disable_tracing()
     set_logger(original)

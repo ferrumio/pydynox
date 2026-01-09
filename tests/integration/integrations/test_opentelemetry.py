@@ -9,7 +9,8 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from pydynox import DynamoDBClient, Model, ModelConfig, disable_tracing, enable_tracing
+from pydynox import DynamoDBClient, Model, ModelConfig, disable_tracing, enable_tracing, set_logger
+from pydynox._internal._logging import get_logger
 from pydynox.attributes import StringAttribute
 
 # Module-level exporter and provider (set once)
@@ -247,3 +248,51 @@ def test_nested_spans_share_trace_id(otel_exporter: InMemorySpanExporter, user_m
     # All spans should have the same trace_id
     trace_ids = {s.context.trace_id for s in spans}
     assert len(trace_ids) == 1, "All spans should share the same trace_id"
+
+
+class MockLogger:
+    """Mock logger for capturing log messages."""
+
+    def __init__(self):
+        self.messages: list[tuple[str, str, dict]] = []
+
+    def info(self, msg: str, **kwargs):
+        self.messages.append(("info", msg, kwargs))
+
+    def debug(self, msg: str, **kwargs):
+        self.messages.append(("debug", msg, kwargs))
+
+    def warning(self, msg: str, **kwargs):
+        self.messages.append(("warning", msg, kwargs))
+
+    def error(self, msg: str, **kwargs):
+        self.messages.append(("error", msg, kwargs))
+
+
+def test_logs_include_trace_context(user_model: type[Model]):
+    """Logs should include trace_id and span_id when tracing is enabled."""
+    enable_tracing()
+
+    original_logger = get_logger()
+    mock_logger = MockLogger()
+    set_logger(mock_logger)
+
+    tracer = trace.get_tracer("test-service")
+
+    with tracer.start_as_current_span("test_request"):
+        user = user_model(pk=f"USER#{uuid.uuid4()}", sk="PROFILE", name="Log Test")
+        user.save()
+
+    # Check that logs have trace context
+    assert len(mock_logger.messages) >= 1
+
+    _, _, kwargs = mock_logger.messages[0]
+    extra = kwargs.get("extra", kwargs)
+
+    assert "trace_id" in extra
+    assert "span_id" in extra
+    assert len(extra["trace_id"]) == 32  # 128-bit hex
+    assert len(extra["span_id"]) == 16  # 64-bit hex
+
+    # Cleanup
+    set_logger(original_logger)

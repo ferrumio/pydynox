@@ -82,6 +82,34 @@ def get_correlation_id() -> str | None:
     return _correlation_id.get()
 
 
+def _get_trace_context() -> dict[str, str]:
+    """Get trace_id and span_id from current OTEL context if available."""
+    try:
+        from pydynox._internal._tracing import is_tracing_enabled
+
+        if not is_tracing_enabled():
+            return {}
+
+        from opentelemetry import trace
+
+        span = trace.get_current_span()
+        if span is None:
+            return {}
+
+        ctx = span.get_span_context()
+        if ctx is None or not ctx.is_valid:
+            return {}
+
+        return {
+            "trace_id": format(ctx.trace_id, "032x"),
+            "span_id": format(ctx.span_id, "016x"),
+        }
+    except ImportError:
+        return {}
+    except Exception:
+        return {}
+
+
 def _log_operation(
     operation: str,
     table: str,
@@ -111,6 +139,11 @@ def _log_operation(
     kwargs: dict[str, Any] = {}
     if correlation_id:
         kwargs["correlation_id"] = correlation_id
+
+    # Add trace context if tracing is enabled
+    trace_ctx = _get_trace_context()
+    kwargs.update(trace_ctx)
+
     if extra:
         kwargs.update(extra)
 
@@ -131,6 +164,10 @@ def _log_debug(operation: str, msg: str, **kwargs: Any) -> None:
     if correlation_id:
         kwargs["correlation_id"] = correlation_id
 
+    # Add trace context if tracing is enabled
+    trace_ctx = _get_trace_context()
+    kwargs.update(trace_ctx)
+
     full_msg = f"{operation} {msg}"
 
     if kwargs and hasattr(_logger, "debug"):
@@ -148,6 +185,10 @@ def _log_warning(operation: str, msg: str, **kwargs: Any) -> None:
     if correlation_id:
         kwargs["correlation_id"] = correlation_id
 
+    # Add trace context if tracing is enabled
+    trace_ctx = _get_trace_context()
+    kwargs.update(trace_ctx)
+
     full_msg = f"{operation} {msg}"
 
     if kwargs and hasattr(_logger, "warning"):
@@ -164,6 +205,10 @@ def _log_error(operation: str, msg: str, **kwargs: Any) -> None:
     correlation_id = get_correlation_id()
     if correlation_id:
         kwargs["correlation_id"] = correlation_id
+
+    # Add trace context if tracing is enabled
+    trace_ctx = _get_trace_context()
+    kwargs.update(trace_ctx)
 
     full_msg = f"{operation} {msg}"
 
