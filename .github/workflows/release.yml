@@ -65,7 +65,7 @@ jobs:
           sccache: true
 
       - name: Upload wheels
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-manylinux-x86_64
           path: dist/*.whl
@@ -89,7 +89,7 @@ jobs:
           sccache: true
 
       - name: Upload wheels
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-manylinux-aarch64
           path: dist/*.whl
@@ -113,7 +113,7 @@ jobs:
           sccache: true
 
       - name: Upload wheels
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-macos-${{ matrix.target }}
           path: dist/*.whl
@@ -132,7 +132,7 @@ jobs:
           args: --out dist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pydynox-${{ needs.prepare.outputs.version }}-sdist
           path: dist/*.tar.gz
