@@ -1,6 +1,25 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.15.0] - 2026-01-09
+
+
+### CI/CD
+
+- replace mypy with ty (#128)
+- create examples test workflow (#132)
+- bump actions/cache from 4.2.3 to 5.0.1 (#138)
+- bump CodSpeedHQ/action from 3.5.0 to 4.5.2 (#136)
+
+
+### Features
+
+- add parallel scan (#130)
+
+
+### Miscellaneous
+
+- refactor python code (#134)
 ## [0.14.0] - 2026-01-07
 
 
@@ -81,3 +100,4 @@ All notable changes to this project will be documented in this file.
 ### Deps
 
 - bump the rust-dependencies group with 3 updates (#102)
+
