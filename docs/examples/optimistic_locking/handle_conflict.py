@@ -1,12 +1,12 @@
 from pydynox import Model, ModelConfig
-from pydynox.attributes import StringAttribute, VersionAttribute
+from pydynox.attributes import NumberAttribute, StringAttribute, VersionAttribute
 from pydynox.exceptions import ConditionCheckFailedError
 
 
 class Counter(Model):
     model_config = ModelConfig(table="counters")
     pk = StringAttribute(hash_key=True)
-    count = StringAttribute()  # Stored as string for simplicity
+    count = NumberAttribute()
     version = VersionAttribute()
 
 
@@ -15,10 +15,10 @@ def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
     for attempt in range(max_retries):
         counter = Counter.get(pk=pk)
         if counter is None:
-            counter = Counter(pk=pk, count="0")
+            counter = Counter(pk=pk, count=0)
 
         # Increment
-        counter.count = str(int(counter.count) + 1)
+        counter.count = counter.count + 1
 
         try:
             counter.save()
@@ -32,5 +32,5 @@ def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
 
 
 # Usage
-counter = increment_with_retry("COUNTER#1")
+counter = increment_with_retry("COUNTER#RETRY")
 print(f"Count: {counter.count}, Version: {counter.version}")

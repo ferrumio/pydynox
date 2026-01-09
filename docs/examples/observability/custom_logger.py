@@ -7,4 +7,4 @@ set_logger(logger)
 
 # Now all pydynox logs go through Powertools
 client = DynamoDBClient()
-client.put_item("users", {"pk": "USER#1", "name": "John"})
+client.put_item("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})

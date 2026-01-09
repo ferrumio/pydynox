@@ -6,7 +6,7 @@ client = DynamoDBClient(rate_limit=rate_limit)
 
 # After some operations...
 for i in range(10):
-    client.put_item("users", {"pk": f"USER#{i}", "name": f"User {i}"})
+    client.put_item("users", {"pk": f"USER#RATE{i}", "sk": "PROFILE", "name": f"User {i}"})
 
 # Check metrics
 print(f"RCU used: {rate_limit.consumed_rcu}")

@@ -10,7 +10,7 @@ class Document(Model):
 
 
 # Create new document
-doc = Document(pk="DOC#1", content="Hello")
+doc = Document(pk="DOC#VERSION", content="Hello")
 print(doc.version)  # None
 
 doc.save()
@@ -22,5 +22,5 @@ doc.save()
 print(doc.version)  # 2
 
 # Load from DB - version is preserved
-loaded = Document.get(pk="DOC#1")
+loaded = Document.get(pk="DOC#VERSION")
 print(loaded.version)  # 2

@@ -13,10 +13,13 @@ class Account(Model):
     verified = BooleanAttribute()
 
 
+# Create account first
+account = Account(pk="ACC#123", balance=500, status="active", verified=True)
+account.save()
+
 # Only allow withdrawal if:
 # - Account is active AND verified
 # - Balance is sufficient
-account = Account.get(pk="ACC#123")
 withdrawal = 100
 
 condition = (

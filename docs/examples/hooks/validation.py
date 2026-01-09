@@ -7,6 +7,7 @@ class User(Model):
     model_config = ModelConfig(table="users")
 
     pk = StringAttribute(hash_key=True)
+    sk = StringAttribute(range_key=True)
     email = StringAttribute()
     name = StringAttribute()
 
@@ -26,7 +27,7 @@ class User(Model):
 
 
 # Hooks run automatically
-user = User(pk="USER#1", email="JOHN@TEST.COM", name="john doe")
+user = User(pk="USER#HOOK", sk="PROFILE", email="JOHN@TEST.COM", name="john doe")
 user.save()  # Validates, normalizes, then logs
 
 # Skip hooks if needed

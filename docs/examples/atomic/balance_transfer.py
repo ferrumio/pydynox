@@ -9,7 +9,6 @@ class Account(Model):
     model_config = ModelConfig(table="accounts")
 
     pk = StringAttribute(hash_key=True)  # account_id
-    sk = StringAttribute(range_key=True)  # "BALANCE"
     balance = NumberAttribute()
 
 
@@ -26,7 +25,7 @@ def withdraw(account: Account, amount: int) -> bool:
 
 
 # Usage
-account = Account(pk="ACC#123", sk="BALANCE", balance=100)
+account = Account(pk="ACC#123", balance=100)
 account.save()
 
 # This succeeds - balance goes from 100 to 50

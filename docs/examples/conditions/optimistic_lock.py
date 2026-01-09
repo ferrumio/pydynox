@@ -13,6 +13,10 @@ class Product(Model):
     version = NumberAttribute()
 
 
+# Create product first
+product = Product(pk="PROD#123", name="Widget", price=19.99, version=1)
+product.save()
+
 # Get current product
 product = Product.get(pk="PROD#123")
 current_version = product.version

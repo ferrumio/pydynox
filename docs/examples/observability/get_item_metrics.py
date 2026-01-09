@@ -3,7 +3,7 @@ from pydynox import DynamoDBClient
 client = DynamoDBClient()
 
 # get_item returns a dict with .metrics
-item = client.get_item("users", {"pk": "USER#1"})
+item = client.get_item("users", {"pk": "USER#1", "sk": "PROFILE"})
 
 if item:
     print(item["name"])  # Works like a normal dict

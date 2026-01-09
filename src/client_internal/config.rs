@@ -43,4 +43,14 @@ impl ClientConfig {
                 .unwrap_or_else(|_| "us-east-1".to_string())
         })
     }
+
+    /// Get the effective endpoint URL (from config or env).
+    /// Checks AWS_ENDPOINT_URL and AWS_ENDPOINT_URL_DYNAMODB env vars.
+    pub fn effective_endpoint_url(&self) -> Option<String> {
+        self.endpoint_url.clone().or_else(|| {
+            std::env::var("AWS_ENDPOINT_URL_DYNAMODB")
+                .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
+                .ok()
+        })
+    }
 }

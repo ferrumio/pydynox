@@ -69,18 +69,19 @@ pip install pydynox[pydantic]
 ### Define a Model
 
 ```python
-from pydynox import Model, ModelConfig, String, Number, Boolean, List
+from pydynox import Model, ModelConfig
+from pydynox.attributes import StringAttribute, NumberAttribute, BooleanAttribute, ListAttribute
 
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = String(hash_key=True)
-    sk = String(range_key=True)
-    name = String()
-    email = String()
-    age = Number(default=0)
-    active = Boolean(default=True)
-    tags = List(String)
+    pk = StringAttribute(hash_key=True)
+    sk = StringAttribute(range_key=True)
+    name = StringAttribute()
+    email = StringAttribute()
+    age = NumberAttribute(default=0)
+    active = BooleanAttribute(default=True)
+    tags = ListAttribute()
 ```
 
 ### CRUD Operations
@@ -93,9 +94,12 @@ user.save()
 # Read
 user = User.get(pk="USER#123", sk="PROFILE")
 
-# Update
+# Update - full save
 user.name = "John Doe"
 user.save()
+
+# Update - partial
+user.update(name="John Doe", age=31)
 
 # Delete
 user.delete()
@@ -104,137 +108,178 @@ user.delete()
 ### Query
 
 ```python
-from pydynox import Condition
-
-# Simple query
-users = User.query(pk="USER#123")
-
-# With filters
-users = User.query(pk="USER#123") \
-    .where(Condition.begins_with("sk", "ORDER#")) \
-    .where(Condition.gt("age", 18)) \
-    .exec()
-
-# Iterate (auto pagination)
-for user in users:
+# Query by hash key
+for user in User.query(hash_key="USER#123"):
     print(user.name)
+
+# With range key condition
+for user in User.query(
+    hash_key="USER#123",
+    range_key_condition=User.sk.begins_with("ORDER#")
+):
+    print(user.sk)
+
+# With filter
+for user in User.query(
+    hash_key="USER#123",
+    filter_condition=User.age > 18
+):
+    print(user.name)
+
+# Get first result
+first = User.query(hash_key="USER#123").first()
+
+# Collect all
+users = list(User.query(hash_key="USER#123"))
 ```
 
 ### Conditions
 
-```python
-from pydynox import Condition
+Conditions use attribute operators directly:
 
-# Save with condition
-user.save(condition=Condition.not_exists("pk"))
+```python
+# Save only if item doesn't exist
+user.save(condition=User.pk.does_not_exist())
 
 # Delete with condition
-user.delete(condition=Condition.eq("version", 5))
+user.delete(condition=User.version == 5)
 
-# Combine conditions
+# Combine conditions with & (AND) and | (OR)
 user.save(
-    condition=Condition.not_exists("pk") | Condition.eq("version", 1)
+    condition=User.pk.does_not_exist() | (User.version == 1)
 )
 ```
 
-Available conditions:
-- `Condition.eq(field, value)` - equals
-- `Condition.ne(field, value)` - not equals
-- `Condition.gt(field, value)` - greater than
-- `Condition.gte(field, value)` - greater than or equal
-- `Condition.lt(field, value)` - less than
-- `Condition.lte(field, value)` - less than or equal
-- `Condition.exists(field)` - attribute exists
-- `Condition.not_exists(field)` - attribute does not exist
-- `Condition.begins_with(field, prefix)` - string starts with
-- `Condition.contains(field, value)` - string or list contains
-- `Condition.between(field, low, high)` - value in range
+Available condition methods:
+- `User.field == value` - equals
+- `User.field != value` - not equals
+- `User.field > value` - greater than
+- `User.field >= value` - greater than or equal
+- `User.field < value` - less than
+- `User.field <= value` - less than or equal
+- `User.field.exists()` - attribute exists
+- `User.field.does_not_exist()` - attribute does not exist
+- `User.field.begins_with(prefix)` - string starts with
+- `User.field.contains(value)` - string or list contains
+- `User.field.between(low, high)` - value in range
+- `User.field.is_in(val1, val2, ...)` - value in list
 
 ### Atomic Updates
 
 ```python
-from pydynox import Action
-
-# Simple set
-user.update(name="New Name", email="new@test.com")
-
 # Increment a number
-user.update(Action.increment("age", 1))
+user.update(atomic=[User.age.add(1)])
 
 # Append to list
-user.update(Action.append("tags", ["verified"]))
+user.update(atomic=[User.tags.append(["verified"])])
 
-# Remove field
-user.update(Action.remove("temp_field"))
+# Remove from list
+user.update(atomic=[User.tags.remove([0])])  # Remove first element
 
-# Combine with condition
+# Set if not exists
+user.update(atomic=[User.views.if_not_exists(0)])
+
+# Multiple atomic operations
+user.update(atomic=[
+    User.age.add(1),
+    User.tags.append(["premium"]),
+])
+
+# With condition
 user.update(
-    Action.increment("age", 1),
-    condition=Condition.eq("status", "active")
+    atomic=[User.age.add(1)],
+    condition=User.status == "active"
 )
 ```
 
 ### Batch Operations
 
 ```python
-# Batch write
-with User.batch_write() as batch:
-    batch.save(user1)
-    batch.save(user2)
-    batch.delete(user3)
+from pydynox import BatchWriter, DynamoDBClient
 
-# Batch get
-users = User.batch_get([
-    ("USER#1", "PROFILE"),
-    ("USER#2", "PROFILE"),
-])
+client = DynamoDBClient()
+
+# Batch write - items are sent in groups of 25
+with BatchWriter(client, "users") as batch:
+    for i in range(100):
+        batch.put({"pk": f"USER#{i}", "sk": "PROFILE", "name": f"User {i}"})
+
+# Mix puts and deletes
+with BatchWriter(client, "users") as batch:
+    batch.put({"pk": "USER#1", "sk": "PROFILE", "name": "John"})
+    batch.delete({"pk": "USER#2", "sk": "PROFILE"})
 ```
 
 ### Global Secondary Index
 
 ```python
-from pydynox import GlobalIndex, ModelConfig
+from pydynox import Model, ModelConfig
+from pydynox.attributes import StringAttribute
+from pydynox.indexes import GlobalSecondaryIndex
 
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = String(hash_key=True)
-    sk = String(range_key=True)
-    email = String()
+    pk = StringAttribute(hash_key=True)
+    sk = StringAttribute(range_key=True)
+    email = StringAttribute()
+    status = StringAttribute()
     
-    email_index = GlobalIndex(hash_key="email")
+    # GSI with hash key only
+    email_index = GlobalSecondaryIndex(
+        index_name="email-index",
+        hash_key="email",
+    )
+    
+    # GSI with hash and range key
+    status_index = GlobalSecondaryIndex(
+        index_name="status-index",
+        hash_key="status",
+        range_key="pk",
+    )
 
 # Query on index
-users = User.email_index.query(email="john@test.com")
+for user in User.email_index.query(hash_key="john@test.com"):
+    print(user.name)
 ```
 
 ### Transactions
 
 ```python
-with User.transaction() as tx:
-    tx.save(user1)
-    tx.delete(user2)
-    tx.update(user3, Action.increment("age", 1))
+from pydynox import DynamoDBClient, Transaction
+
+client = DynamoDBClient()
+
+with Transaction(client) as tx:
+    tx.put("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
+    tx.put("orders", {"pk": "ORDER#1", "sk": "DETAILS", "user": "USER#1"})
+    tx.delete("temp", {"pk": "TEMP#1"})
 ```
 
 ### Async Support
 
 ```python
-# All methods work with await
-user = await User.get(pk="USER#123", sk="PROFILE")
-await user.save()
+# All methods have async versions with async_ prefix
+user = await User.async_get(pk="USER#123", sk="PROFILE")
+await user.async_save()
+await user.async_update(name="Jane")
+await user.async_delete()
 
-async for user in User.query(pk="USER#123"):
+# Async iteration
+async for user in User.async_query(hash_key="USER#123"):
     print(user.name)
 ```
 
 ### Pydantic Integration
 
 ```python
-from pydynox import dynamodb_model
 from pydantic import BaseModel, EmailStr
+from pydynox import DynamoDBClient
+from pydynox.integrations.pydantic import dynamodb_model
 
-@dynamodb_model(table="users", hash_key="pk", range_key="sk")
+client = DynamoDBClient()
+
+@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
 class User(BaseModel):
     pk: str
     sk: str
@@ -242,9 +287,12 @@ class User(BaseModel):
     email: EmailStr
     age: int = 0
 
-# All pydynox methods available
+# Pydantic validation works
 user = User(pk="USER#123", sk="PROFILE", name="John", email="john@test.com")
 user.save()
+
+# Get
+user = User.get(pk="USER#123", sk="PROFILE")
 ```
 
 ### S3 Attribute (Large Files)
@@ -252,7 +300,8 @@ user.save()
 DynamoDB has a 400KB item limit. `S3Attribute` stores files in S3 and keeps metadata in DynamoDB. Upload on save, download on demand, delete when the item is deleted.
 
 ```python
-from pydynox.attributes import S3Attribute
+from pydynox import Model, ModelConfig
+from pydynox.attributes import StringAttribute, S3Attribute
 from pydynox._internal._s3 import S3File
 
 class Document(Model):
@@ -283,21 +332,40 @@ doc.delete()
 ## Table Management
 
 ```python
+from pydynox import DynamoDBClient
+
+client = DynamoDBClient()
+
 # Create table
-User.create_table()
+client.create_table(
+    "users",
+    hash_key=("pk", "S"),
+    range_key=("sk", "S"),
+    wait=True,
+)
 
-# Create with custom capacity
-User.create_table(read_capacity=10, write_capacity=5)
+# Create with on-demand billing (default)
+client.create_table(
+    "users",
+    hash_key=("pk", "S"),
+    billing_mode="PAY_PER_REQUEST",
+)
 
-# Create with on-demand billing
-User.create_table(billing_mode="PAY_PER_REQUEST")
+# Create with provisioned capacity
+client.create_table(
+    "users",
+    hash_key=("pk", "S"),
+    billing_mode="PROVISIONED",
+    read_capacity=10,
+    write_capacity=5,
+)
 
 # Check if table exists
-if not User.table_exists():
-    User.create_table()
+if not client.table_exists("users"):
+    client.create_table("users", hash_key=("pk", "S"))
 
 # Delete table
-User.delete_table()
+client.delete_table("users")
 ```
 
 ## Documentation

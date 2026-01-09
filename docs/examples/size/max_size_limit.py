@@ -1,12 +1,10 @@
-from pydynox import Model
+from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 from pydynox.exceptions import ItemTooLargeError
 
 
 class Comment(Model):
-    class Meta:
-        table = "comments"
-        max_size = 10_000  # 10KB limit
+    model_config = ModelConfig(table="comments", max_size=10_000)  # 10KB limit
 
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)

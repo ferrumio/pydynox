@@ -91,7 +91,14 @@ impl S3Client {
                 S3AttributeError::new_err(format!("Failed to create runtime: {}", e))
             })?);
 
-        let client = runtime.block_on(build_s3_client(config, endpoint_url))?;
+        // Use endpoint_url from config or AWS_ENDPOINT_URL env var
+        let effective_endpoint = endpoint_url.or_else(|| {
+            std::env::var("AWS_ENDPOINT_URL_S3")
+                .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
+                .ok()
+        });
+
+        let client = runtime.block_on(build_s3_client(config, effective_endpoint))?;
 
         Ok(Self { client, runtime })
     }

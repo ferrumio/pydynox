@@ -62,8 +62,8 @@ pub async fn build_client(config: ClientConfig) -> Result<Client, String> {
     let sdk_config = config_loader.load().await;
     let mut dynamo_config = aws_sdk_dynamodb::config::Builder::from(&sdk_config);
 
-    // Configure endpoint override
-    if let Some(url) = config.endpoint_url {
+    // Configure endpoint override (from config or AWS_ENDPOINT_URL env var)
+    if let Some(url) = config.effective_endpoint_url() {
         dynamo_config = dynamo_config.endpoint_url(url);
     }
 

@@ -8,7 +8,6 @@ class Cart(Model):
     model_config = ModelConfig(table="carts")
 
     pk = StringAttribute(hash_key=True)  # user_id
-    sk = StringAttribute(range_key=True)  # "CART"
     items = ListAttribute()
     total = NumberAttribute()
 
@@ -32,7 +31,7 @@ def apply_discount(cart: Cart, discount: float) -> None:
 
 
 # Usage
-cart = Cart(pk="USER#123", sk="CART", items=[], total=0)
+cart = Cart(pk="USER#123", items=[], total=0)
 cart.save()
 
 # Add items

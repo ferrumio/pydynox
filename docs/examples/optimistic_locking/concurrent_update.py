@@ -11,12 +11,12 @@ class Document(Model):
 
 
 # Create document
-doc = Document(pk="DOC#1", content="Original")
+doc = Document(pk="DOC#CONCURRENT", content="Original")
 doc.save()
 
 # Two processes load the same document
-process_a = Document.get(pk="DOC#1")
-process_b = Document.get(pk="DOC#1")
+process_a = Document.get(pk="DOC#CONCURRENT")
+process_b = Document.get(pk="DOC#CONCURRENT")
 
 # Both have version 1
 print(process_a.version)  # 1

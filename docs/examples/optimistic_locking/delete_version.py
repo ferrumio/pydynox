@@ -11,14 +11,14 @@ class Document(Model):
 
 
 # Create and update document
-doc = Document(pk="DOC#1", content="Hello")
+doc = Document(pk="DOC#DELETE", content="Hello")
 doc.save()
 doc.content = "Updated"
 doc.save()
 print(f"Version: {doc.version}")  # 2
 
 # Load stale copy
-stale = Document.get(pk="DOC#1")
+stale = Document.get(pk="DOC#DELETE")
 
 # Update again
 doc.content = "Updated again"
