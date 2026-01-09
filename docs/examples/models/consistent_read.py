@@ -1,6 +1,7 @@
 """Consistent read examples."""
 
-from pydynox import DynamoDBClient, Model, ModelConfig, StringAttribute
+from pydynox import DynamoDBClient, Model, ModelConfig
+from pydynox.attributes import StringAttribute
 
 client = DynamoDBClient(region="us-east-1")
 

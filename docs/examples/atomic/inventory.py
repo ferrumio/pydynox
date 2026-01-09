@@ -9,7 +9,6 @@ class Product(Model):
     model_config = ModelConfig(table="products")
 
     pk = StringAttribute(hash_key=True)  # product_id
-    sk = StringAttribute(range_key=True)  # "STOCK"
     stock = NumberAttribute()
     reserved = NumberAttribute()
 
@@ -43,7 +42,7 @@ def release_stock(product: Product, quantity: int) -> None:
 
 
 # Usage
-product = Product(pk="SKU#ABC123", sk="STOCK", stock=10, reserved=0)
+product = Product(pk="SKU#ABC123", stock=10, reserved=0)
 product.save()
 
 # Reserve 3 units

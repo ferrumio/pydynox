@@ -705,7 +705,9 @@ class Model(metaclass=ModelMeta):
         client = self._get_client()
         table = self._get_table()
         key = self._get_key()
-        client.update_item(table, key, updates={ttl_attr: new_expiration})
+        # Serialize datetime to epoch timestamp for DynamoDB
+        ttl_timestamp = int(new_expiration.timestamp())
+        client.update_item(table, key, updates={ttl_attr: ttl_timestamp})
 
     # ========== ASYNC METHODS ==========
 

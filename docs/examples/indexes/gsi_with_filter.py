@@ -1,11 +1,11 @@
 """GSI with filter condition - query with additional filtering."""
 
-from pydynox import DynamoDBClient, GlobalSecondaryIndex, Model, ModelConfig, set_default_client
+from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.indexes import GlobalSecondaryIndex
 
-# Setup client
-client = DynamoDBClient(endpoint_url="http://localhost:8000")
-set_default_client(client)
+# Note: Assumes default client is already set (e.g., via set_default_client)
+client = get_default_client()
 
 
 class User(Model):

@@ -12,7 +12,7 @@ class Document(Model):
 
 
 # Create document
-doc = Document(pk="DOC#1", status="draft", content="Hello")
+doc = Document(pk="DOC#CONDITION", status="draft", content="Hello")
 doc.save()
 
 # Update only if status is "draft"

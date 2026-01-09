@@ -25,11 +25,13 @@ for order in Order.query(
     print(f"Order: {order.sk}")
 
 # Get the 5 most recent orders (descending)
-recent_orders = Order.query(
-    hash_key="CUSTOMER#123",
-    scan_index_forward=False,
-    limit=5,
-).to_list()
+recent_orders = list(
+    Order.query(
+        hash_key="CUSTOMER#123",
+        scan_index_forward=False,
+        limit=5,
+    )
+)
 
 for order in recent_orders:
     print(f"Recent order: {order.sk}")

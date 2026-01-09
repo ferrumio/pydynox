@@ -1,24 +1,24 @@
 """Download S3 content."""
 
-from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
-from pydynox.attributes import S3Attribute, StringAttribute
-
-# Setup client
-client = DynamoDBClient(region="us-east-1")
-set_default_client(client)
+from pydynox import Model, ModelConfig
+from pydynox.attributes import S3Attribute, S3File, StringAttribute
 
 
 class Document(Model):
     model_config = ModelConfig(table="documents")
 
     pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
     name = StringAttribute()
     content = S3Attribute(bucket="my-bucket")
 
 
+# First create a document with S3 content
+doc = Document(pk="DOC#DOWNLOAD", name="report.pdf")
+doc.content = S3File(b"PDF content here", name="report.pdf", content_type="application/pdf")
+doc.save()
+
 # Get document
-doc = Document.get(pk="DOC#1", sk="v1")
+doc = Document.get(pk="DOC#DOWNLOAD")
 
 if doc and doc.content:
     # Download to memory (careful with large files)
