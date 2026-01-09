@@ -82,7 +82,7 @@ jobs:
           allow-prereleases: true
 
       - name: Download wheel
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: wheel-${{ matrix.os }}-py${{ matrix.python }}
           path: dist
@@ -137,7 +137,7 @@ jobs:
           python-version: "3.12"
 
       - name: Download wheel
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: wheel-ubuntu-latest-py3.12
           path: dist
@@ -169,7 +169,7 @@ jobs:
           python-version: "3.12"
 
       - name: Download wheel
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: wheel-ubuntu-latest-py3.12
           path: dist
