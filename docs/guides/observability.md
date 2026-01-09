@@ -183,6 +183,118 @@ def handler(event, context):
 ```
 
 
+## OpenTelemetry tracing
+
+pydynox supports OpenTelemetry for distributed tracing. When enabled, every DynamoDB operation creates a span with useful attributes.
+
+### Installation
+
+Install the optional dependency:
+
+```bash
+pip install pydynox[opentelemetry]
+```
+
+### Basic usage
+
+=== "tracing_basic.py"
+    ```python
+    --8<-- "docs/examples/observability/tracing_basic.py"
+    ```
+
+### Span attributes
+
+Each span follows [OTEL Database Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/database/database-spans/):
+
+| Attribute | Example | Description |
+|-----------|---------|-------------|
+| `db.system.name` | `aws.dynamodb` | Database system |
+| `db.operation.name` | `PutItem` | DynamoDB operation |
+| `db.collection.name` | `users` | Table name |
+| `db.namespace` | `us-east-1` | AWS region |
+| `server.address` | `dynamodb.us-east-1.amazonaws.com` | Endpoint |
+| `aws.dynamodb.consumed_capacity.read` | `1.0` | RCU consumed |
+| `aws.dynamodb.consumed_capacity.write` | `1.0` | WCU consumed |
+| `aws.request_id` | `ABC123...` | AWS request ID |
+| `error.type` | `ConditionalCheckFailedException` | Error class (if failed) |
+
+### Custom configuration
+
+=== "tracing_custom.py"
+    ```python
+    --8<-- "docs/examples/observability/tracing_custom.py"
+    ```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tracer` | Tracer | None | Custom OTEL tracer |
+| `record_exceptions` | bool | True | Add exception events to spans |
+| `record_consumed_capacity` | bool | True | Add RCU/WCU as attributes |
+| `span_name_prefix` | str | None | Prefix for span names |
+
+### Disable tracing
+
+=== "tracing_disable.py"
+    ```python
+    --8<-- "docs/examples/observability/tracing_disable.py"
+    ```
+
+### Span naming
+
+Span names follow OTEL conventions:
+
+- Single operation: `"PutItem users"`
+- Batch operation: `"BATCH BatchWriteItem users"`
+- With prefix: `"myapp PutItem users"`
+
+### Context propagation
+
+pydynox spans automatically connect to the current active span. This means if you create a parent span in your code, all DynamoDB operations inside it become child spans.
+
+```python
+from opentelemetry import trace
+from pydynox import enable_tracing, Model
+
+enable_tracing()
+tracer = trace.get_tracer("my-service")
+
+# In a Lambda handler or HTTP request
+with tracer.start_as_current_span("handle_request"):
+    user = User.get(pk="USER#123")  # Child span: "GetItem users"
+    user.name = "Updated"
+    user.save()                      # Child span: "PutItem users"
+```
+
+All spans share the same `trace_id`, so you can see the full request flow in your tracing backend (Jaeger, X-Ray, etc.).
+
+### Logs with trace context
+
+When tracing is enabled, pydynox logs automatically include `trace_id` and `span_id`. This helps correlate logs with spans in your tracing backend.
+
+```python
+from pydynox import enable_tracing
+
+enable_tracing()
+
+# Logs now include trace context
+user.save()
+# INFO:pydynox:put_item table=users duration_ms=8.2 wcu=1.0 trace_id=abc123... span_id=def456...
+```
+
+With a custom logger like AWS Lambda Powertools:
+
+```python
+from aws_lambda_powertools import Logger
+from pydynox import enable_tracing, set_logger
+
+logger = Logger()
+set_logger(logger)
+enable_tracing()
+
+# Powertools logs include trace_id and span_id as structured fields
+user.save()
+```
+
 ## Next steps
 
 - [Async support](async.md) - Async/await for high-concurrency apps

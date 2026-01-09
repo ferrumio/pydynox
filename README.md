@@ -50,7 +50,7 @@ I reserve the right to reject low-quality PRs where project patterns are not fol
 - Compression (zstd, lz4, gzip)
 - S3 attribute for large files
 - PartiQL support
-- Observability (logging, metrics)
+- Observability (logging, metrics, OpenTelemetry tracing)
 
 ## Installation
 
@@ -62,6 +62,12 @@ For Pydantic support:
 
 ```bash
 pip install pydynox[pydantic]
+```
+
+For OpenTelemetry tracing:
+
+```bash
+pip install pydynox[opentelemetry]
 ```
 
 ## Quick Start

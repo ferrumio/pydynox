@@ -34,7 +34,7 @@ jobs:
                   python -m venv .venv
                   source .venv/bin/activate
                   pip install dist/*.whl
-                  pip install testcontainers boto3 pydantic[email] aws-lambda-powertools
+                  pip install testcontainers boto3 pydantic[email] aws-lambda-powertools opentelemetry-api opentelemetry-sdk
 
             - name: Run examples
               run: |

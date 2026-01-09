@@ -94,7 +94,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio hypothesis pydantic ty ruff
+          pip install pytest pytest-asyncio hypothesis pydantic ty ruff opentelemetry-api opentelemetry-sdk
 
       - name: Install integration test dependencies
         if: runner.os == 'Linux'
@@ -149,7 +149,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio pytest-memray testcontainers boto3
+          pip install pytest pytest-asyncio pytest-memray testcontainers boto3 opentelemetry-api opentelemetry-sdk
 
       - name: Run memory tests
         run: |
@@ -181,7 +181,7 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio pytest-cov hypothesis testcontainers boto3 pydantic
+          pip install pytest pytest-asyncio pytest-cov hypothesis testcontainers boto3 pydantic opentelemetry-api opentelemetry-sdk
 
       - name: Run tests with coverage
         run: |
