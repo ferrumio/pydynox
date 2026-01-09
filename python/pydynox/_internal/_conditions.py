@@ -11,7 +11,18 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from pydynox.attributes import Attribute
 
-__all__: list[str] = []  # Nothing exported
+
+class ConditionMixin:
+    """Mixin that adds __and__, __or__, __invert__ to condition classes."""
+
+    def __and__(self, other: Any) -> ConditionAnd:
+        return ConditionAnd(self, other)
+
+    def __or__(self, other: Any) -> ConditionOr:
+        return ConditionOr(self, other)
+
+    def __invert__(self) -> ConditionNot:
+        return ConditionNot(self)
 
 
 class ConditionPath:
@@ -107,7 +118,7 @@ class ConditionPath:
         return names[name]
 
 
-class ConditionComparison:
+class ConditionComparison(ConditionMixin):
     """Comparison condition (=, <>, <, <=, >, >=)."""
 
     def __init__(self, operator: str, path: ConditionPath, value: Any):
@@ -115,37 +126,19 @@ class ConditionComparison:
         self.path = path
         self.value = value
 
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
-
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         path_str = self.path._serialize_path(names)
         value_placeholder = _get_value_placeholder(self.value, values)
         return f"{path_str} {self.operator} {value_placeholder}"
 
 
-class ConditionBetween:
+class ConditionBetween(ConditionMixin):
     """BETWEEN condition."""
 
     def __init__(self, path: ConditionPath, lower: Any, upper: Any):
         self.path = path
         self.lower = lower
         self.upper = upper
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         path_str = self.path._serialize_path(names)
@@ -154,21 +147,12 @@ class ConditionBetween:
         return f"{path_str} BETWEEN {lower_ph} AND {upper_ph}"
 
 
-class ConditionIn:
+class ConditionIn(ConditionMixin):
     """IN condition."""
 
     def __init__(self, path: ConditionPath, *in_values: Any):
         self.path = path
         self.in_values = in_values
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         path_str = self.path._serialize_path(names)
@@ -176,61 +160,34 @@ class ConditionIn:
         return f"{path_str} IN ({', '.join(placeholders)})"
 
 
-class ConditionExists:
+class ConditionExists(ConditionMixin):
     """attribute_exists() condition."""
 
     def __init__(self, path: ConditionPath):
         self.path = path
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:  # noqa: ARG002
         path_str = self.path._serialize_path(names)
         return f"attribute_exists({path_str})"
 
 
-class ConditionNotExists:
+class ConditionNotExists(ConditionMixin):
     """attribute_not_exists() condition."""
 
     def __init__(self, path: ConditionPath):
         self.path = path
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:  # noqa: ARG002
         path_str = self.path._serialize_path(names)
         return f"attribute_not_exists({path_str})"
 
 
-class ConditionBeginsWith:
+class ConditionBeginsWith(ConditionMixin):
     """begins_with() condition."""
 
     def __init__(self, path: ConditionPath, prefix: str):
         self.path = path
         self.prefix = prefix
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         path_str = self.path._serialize_path(names)
@@ -238,21 +195,12 @@ class ConditionBeginsWith:
         return f"begins_with({path_str}, {prefix_ph})"
 
 
-class ConditionContains:
+class ConditionContains(ConditionMixin):
     """contains() condition."""
 
     def __init__(self, path: ConditionPath, value: Any):
         self.path = path
         self.value = value
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         path_str = self.path._serialize_path(names)
@@ -260,21 +208,12 @@ class ConditionContains:
         return f"contains({path_str}, {value_ph})"
 
 
-class ConditionAnd:
+class ConditionAnd(ConditionMixin):
     """AND condition."""
 
     def __init__(self, left: Any, right: Any):
         self.left = left
         self.right = right
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         left_str = self.left.serialize(names, values)
@@ -282,21 +221,12 @@ class ConditionAnd:
         return f"({left_str} AND {right_str})"
 
 
-class ConditionOr:
+class ConditionOr(ConditionMixin):
     """OR condition."""
 
     def __init__(self, left: Any, right: Any):
         self.left = left
         self.right = right
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         left_str = self.left.serialize(names, values)
@@ -304,20 +234,11 @@ class ConditionOr:
         return f"({left_str} OR {right_str})"
 
 
-class ConditionNot:
+class ConditionNot(ConditionMixin):
     """NOT condition."""
 
     def __init__(self, condition: Any):
         self.condition = condition
-
-    def __and__(self, other: Any) -> ConditionAnd:
-        return ConditionAnd(self, other)
-
-    def __or__(self, other: Any) -> ConditionOr:
-        return ConditionOr(self, other)
-
-    def __invert__(self) -> ConditionNot:
-        return ConditionNot(self)
 
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         cond_str = self.condition.serialize(names, values)

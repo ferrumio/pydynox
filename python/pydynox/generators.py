@@ -91,20 +91,21 @@ def generate_value(strategy: AutoGenerate) -> Any:
     Raises:
         ValueError: If strategy is unknown.
     """
-    if strategy == AutoGenerate.UUID4:
-        return pydynox_core.generate_uuid4()
-    elif strategy == AutoGenerate.ULID:
-        return pydynox_core.generate_ulid()
-    elif strategy == AutoGenerate.KSUID:
-        return pydynox_core.generate_ksuid()
-    elif strategy == AutoGenerate.EPOCH:
-        return pydynox_core.generate_epoch()
-    elif strategy == AutoGenerate.EPOCH_MS:
-        return pydynox_core.generate_epoch_ms()
-    elif strategy == AutoGenerate.ISO8601:
-        return pydynox_core.generate_iso8601()
-    else:
-        raise ValueError(f"Unknown auto-generate strategy: {strategy}")
+    match strategy:
+        case AutoGenerate.UUID4:
+            return pydynox_core.generate_uuid4()
+        case AutoGenerate.ULID:
+            return pydynox_core.generate_ulid()
+        case AutoGenerate.KSUID:
+            return pydynox_core.generate_ksuid()
+        case AutoGenerate.EPOCH:
+            return pydynox_core.generate_epoch()
+        case AutoGenerate.EPOCH_MS:
+            return pydynox_core.generate_epoch_ms()
+        case AutoGenerate.ISO8601:
+            return pydynox_core.generate_iso8601()
+        case _:
+            raise ValueError(f"Unknown auto-generate strategy: {strategy}")
 
 
 def is_auto_generate(value: Any) -> bool:
