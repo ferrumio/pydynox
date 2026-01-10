@@ -1,28 +1,23 @@
 """Shared fixtures for memory tests.
 
-Uses DynamoDB Local via testcontainers.
+Uses LocalStack via testcontainers.
 """
 
 import time
 
 import pytest
 from pydynox import DynamoDBClient
-from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
-
-DYNAMODB_PORT = 8000
+from testcontainers.localstack import LocalStackContainer
 
 
 @pytest.fixture(scope="session")
-def dynamodb_container():
-    """Start DynamoDB Local container for the test session."""
-    container = DockerContainer("amazon/dynamodb-local:latest")
-    container.with_exposed_ports(DYNAMODB_PORT)
-    container.with_command("-jar DynamoDBLocal.jar -inMemory -sharedDb")
+def localstack_container():
+    """Start LocalStack container for the test session."""
+    container = LocalStackContainer(image="localstack/localstack:latest")
+    container.with_services("dynamodb")
 
     container.start()
-    wait_for_logs(container, "Initializing DynamoDB Local", timeout=30)
-    time.sleep(0.5)
+    time.sleep(2)
 
     yield container
 
@@ -30,11 +25,9 @@ def dynamodb_container():
 
 
 @pytest.fixture(scope="session")
-def dynamodb_endpoint(dynamodb_container):
-    """Get the DynamoDB Local endpoint URL."""
-    host = dynamodb_container.get_container_host_ip()
-    port = dynamodb_container.get_exposed_port(DYNAMODB_PORT)
-    return f"http://{host}:{port}"
+def dynamodb_endpoint(localstack_container):
+    """Get the LocalStack endpoint URL."""
+    return localstack_container.get_url()
 
 
 @pytest.fixture(scope="session")

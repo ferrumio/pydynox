@@ -306,3 +306,96 @@ async def test_async_delete_by_key(user_model, mock_client):
     mock_client.async_delete_item.assert_called_once_with(
         "users", {"pk": "USER#1", "sk": "PROFILE"}
     )
+
+
+# ========== as_dict tests ==========
+
+
+def test_get_as_dict_true_returns_dict(user_model, mock_client):
+    """get(as_dict=True) returns plain dict."""
+    mock_client.get_item.return_value = {
+        "pk": "USER#1",
+        "sk": "PROFILE",
+        "name": "Alice",
+        "age": 30,
+    }
+
+    user = user_model.get(pk="USER#1", sk="PROFILE", as_dict=True)
+
+    assert isinstance(user, dict)
+    assert user["name"] == "Alice"
+
+
+def test_get_as_dict_false_returns_model_instance(user_model, mock_client):
+    """get(as_dict=False) returns Model instance."""
+    mock_client.get_item.return_value = {
+        "pk": "USER#1",
+        "sk": "PROFILE",
+        "name": "Alice",
+        "age": 30,
+    }
+
+    user = user_model.get(pk="USER#1", sk="PROFILE", as_dict=False)
+
+    assert isinstance(user, user_model)
+    assert user.name == "Alice"
+
+
+def test_get_as_dict_returns_none_when_not_found(user_model, mock_client):
+    """get(as_dict=True) returns None when item not found."""
+    mock_client.get_item.return_value = None
+
+    user = user_model.get(pk="USER#1", sk="PROFILE", as_dict=True)
+
+    assert user is None
+
+
+# ========== batch_get tests ==========
+
+
+def test_batch_get_returns_model_instances(user_model, mock_client):
+    """batch_get returns Model instances by default."""
+    mock_client.batch_get.return_value = [
+        {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
+        {"pk": "USER#2", "sk": "PROFILE", "name": "Bob", "age": 25},
+    ]
+
+    keys = [
+        {"pk": "USER#1", "sk": "PROFILE"},
+        {"pk": "USER#2", "sk": "PROFILE"},
+    ]
+    users = user_model.batch_get(keys)
+
+    assert len(users) == 2
+    assert isinstance(users[0], user_model)
+    assert isinstance(users[1], user_model)
+    assert users[0].name == "Alice"
+    assert users[1].name == "Bob"
+
+
+def test_batch_get_as_dict_true_returns_dicts(user_model, mock_client):
+    """batch_get(as_dict=True) returns plain dicts."""
+    mock_client.batch_get.return_value = [
+        {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
+        {"pk": "USER#2", "sk": "PROFILE", "name": "Bob", "age": 25},
+    ]
+
+    keys = [
+        {"pk": "USER#1", "sk": "PROFILE"},
+        {"pk": "USER#2", "sk": "PROFILE"},
+    ]
+    users = user_model.batch_get(keys, as_dict=True)
+
+    assert len(users) == 2
+    assert isinstance(users[0], dict)
+    assert isinstance(users[1], dict)
+    assert users[0]["name"] == "Alice"
+    assert users[1]["name"] == "Bob"
+
+
+def test_batch_get_empty_keys_returns_empty_list(user_model, mock_client):
+    """batch_get with empty keys returns empty list."""
+    users = user_model.batch_get([])
+
+    assert users == []
+    mock_client.batch_get.assert_not_called()

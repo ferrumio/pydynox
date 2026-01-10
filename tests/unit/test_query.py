@@ -196,3 +196,55 @@ def test_query_raises_error_without_hash_key(mock_client):
 
     with pytest.raises(ValueError, match="has no hash key defined"):
         result.first()
+
+
+# ========== as_dict tests ==========
+
+
+def test_query_as_dict_default_is_false(user_model):
+    """query() defaults as_dict to False."""
+    result = user_model.query(hash_key="USER#123")
+    assert result._as_dict is False
+
+
+def test_query_as_dict_stores_parameter(user_model):
+    """ModelQueryResult stores as_dict parameter."""
+    result = user_model.query(hash_key="USER#123", as_dict=True)
+    assert result._as_dict is True
+
+
+def test_query_as_dict_true_returns_dicts(user_model):
+    """query(as_dict=True) returns plain dicts."""
+    with patch.object(ModelQueryResult, "_build_result") as mock_build:
+        mock_query_result = MagicMock()
+        items = [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}]
+        mock_query_result.__iter__ = MagicMock(return_value=iter(items))
+        mock_build.return_value = mock_query_result
+
+        result = user_model.query(hash_key="USER#123", as_dict=True)
+        orders = list(result)
+
+        assert len(orders) == 1
+        assert isinstance(orders[0], dict)
+        assert orders[0]["name"] == "Order 1"
+
+
+def test_query_as_dict_false_returns_model_instances(user_model):
+    """query(as_dict=False) returns Model instances."""
+    with patch.object(ModelQueryResult, "_build_result") as mock_build:
+        mock_query_result = MagicMock()
+        items = [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}]
+        mock_query_result.__iter__ = MagicMock(return_value=iter(items))
+        mock_build.return_value = mock_query_result
+
+        result = user_model.query(hash_key="USER#123", as_dict=False)
+        orders = list(result)
+
+        assert len(orders) == 1
+        assert isinstance(orders[0], user_model)
+
+
+def test_async_query_as_dict_stores_parameter(user_model):
+    """AsyncModelQueryResult stores as_dict parameter."""
+    result = user_model.async_query(hash_key="USER#123", as_dict=True)
+    assert result._as_dict is True

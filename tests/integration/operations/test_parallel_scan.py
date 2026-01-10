@@ -168,3 +168,59 @@ async def test_async_parallel_scan_with_numeric_filter(populated_users):
     for user in users:
         assert user.age >= 25
     assert metrics.duration_ms > 0
+
+
+# ========== as_dict tests ==========
+
+
+def test_parallel_scan_as_dict_returns_dicts(populated_users):
+    """Test parallel_scan(as_dict=True) returns plain dicts."""
+    User = populated_users
+
+    users, metrics = User.parallel_scan(total_segments=2, as_dict=True)
+
+    assert len(users) == 5
+    for user in users:
+        assert isinstance(user, dict)
+        assert "pk" in user
+        assert "name" in user
+    assert metrics.duration_ms > 0
+
+
+def test_parallel_scan_as_dict_false_returns_models(populated_users):
+    """Test parallel_scan(as_dict=False) returns Model instances."""
+    User = populated_users
+
+    users, metrics = User.parallel_scan(total_segments=2, as_dict=False)
+
+    assert len(users) == 5
+    for user in users:
+        assert isinstance(user, User)
+
+
+def test_parallel_scan_as_dict_with_filter(populated_users):
+    """Test parallel_scan(as_dict=True) works with filter_condition."""
+    User = populated_users
+
+    users, metrics = User.parallel_scan(
+        total_segments=2,
+        filter_condition=User.status == "active",
+        as_dict=True,
+    )
+
+    assert len(users) == 3
+    for user in users:
+        assert isinstance(user, dict)
+        assert user["status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_async_parallel_scan_as_dict_returns_dicts(populated_users):
+    """Test async_parallel_scan(as_dict=True) returns plain dicts."""
+    User = populated_users
+
+    users, metrics = await User.async_parallel_scan(total_segments=2, as_dict=True)
+
+    assert len(users) == 5
+    for user in users:
+        assert isinstance(user, dict)

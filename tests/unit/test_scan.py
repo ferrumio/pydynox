@@ -206,3 +206,89 @@ def test_count_with_consistent_read(user_model, mock_client):
 
     call_kwargs = mock_client.count.call_args[1]
     assert call_kwargs["consistent_read"] is True
+
+
+# ========== as_dict tests ==========
+
+
+def test_scan_as_dict_default_is_false(user_model):
+    """scan() defaults as_dict to False."""
+    result = user_model.scan()
+    assert result._as_dict is False
+
+
+def test_scan_as_dict_stores_parameter(user_model):
+    """ModelScanResult stores as_dict parameter."""
+    result = user_model.scan(as_dict=True)
+    assert result._as_dict is True
+
+
+def test_scan_as_dict_true_returns_dicts(user_model):
+    """scan(as_dict=True) returns plain dicts."""
+    with patch.object(ModelScanResult, "_build_result") as mock_build:
+        mock_scan_result = MagicMock()
+        items = [{"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30}]
+        mock_scan_result.__iter__ = MagicMock(return_value=iter(items))
+        mock_build.return_value = mock_scan_result
+
+        result = user_model.scan(as_dict=True)
+        users = list(result)
+
+        assert len(users) == 1
+        assert isinstance(users[0], dict)
+        assert users[0]["name"] == "Alice"
+
+
+def test_scan_as_dict_false_returns_model_instances(user_model):
+    """scan(as_dict=False) returns Model instances."""
+    with patch.object(ModelScanResult, "_build_result") as mock_build:
+        mock_scan_result = MagicMock()
+        items = [{"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30}]
+        mock_scan_result.__iter__ = MagicMock(return_value=iter(items))
+        mock_build.return_value = mock_scan_result
+
+        result = user_model.scan(as_dict=False)
+        users = list(result)
+
+        assert len(users) == 1
+        assert isinstance(users[0], user_model)
+
+
+def test_async_scan_as_dict_stores_parameter(user_model):
+    """AsyncModelScanResult stores as_dict parameter."""
+    result = user_model.async_scan(as_dict=True)
+    assert result._as_dict is True
+
+
+def test_parallel_scan_as_dict_true_returns_dicts(user_model, mock_client):
+    """parallel_scan(as_dict=True) returns plain dicts."""
+    mock_metrics = MagicMock()
+    mock_client.parallel_scan.return_value = (
+        [
+            {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
+            {"pk": "USER#2", "sk": "PROFILE", "name": "Bob", "age": 25},
+        ],
+        mock_metrics,
+    )
+
+    users, _ = user_model.parallel_scan(total_segments=2, as_dict=True)
+
+    assert len(users) == 2
+    assert isinstance(users[0], dict)
+    assert isinstance(users[1], dict)
+
+
+def test_parallel_scan_as_dict_false_returns_model_instances(user_model, mock_client):
+    """parallel_scan(as_dict=False) returns Model instances."""
+    mock_metrics = MagicMock()
+    mock_client.parallel_scan.return_value = (
+        [
+            {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
+        ],
+        mock_metrics,
+    )
+
+    users, _ = user_model.parallel_scan(total_segments=2, as_dict=False)
+
+    assert len(users) == 1
+    assert isinstance(users[0], user_model)

@@ -245,3 +245,62 @@ def test_model_query_complex_filter(populated_orders):
     assert len(orders) == 1
     assert orders[0].total == 100
     assert orders[0].status == "shipped"
+
+
+# ========== as_dict tests ==========
+
+
+def test_model_query_as_dict_returns_dicts(populated_orders):
+    """Test Model.query(as_dict=True) returns plain dicts."""
+    Order = populated_orders
+
+    orders = list(Order.query(hash_key="CUSTOMER#1", as_dict=True))
+
+    assert len(orders) == 4
+    for order in orders:
+        assert isinstance(order, dict)
+        assert order["pk"] == "CUSTOMER#1"
+
+
+def test_model_query_as_dict_false_returns_models(populated_orders):
+    """Test Model.query(as_dict=False) returns Model instances."""
+    Order = populated_orders
+
+    orders = list(Order.query(hash_key="CUSTOMER#1", as_dict=False))
+
+    assert len(orders) == 4
+    for order in orders:
+        assert isinstance(order, Order)
+
+
+def test_model_query_as_dict_with_filter(populated_orders):
+    """Test Model.query(as_dict=True) works with filter_condition."""
+    Order = populated_orders
+
+    orders = list(
+        Order.query(
+            hash_key="CUSTOMER#1",
+            filter_condition=Order.status == "shipped",
+            as_dict=True,
+        )
+    )
+
+    assert len(orders) == 2
+    for order in orders:
+        assert isinstance(order, dict)
+        assert order["status"] == "shipped"
+
+
+def test_model_query_as_dict_first(populated_orders):
+    """Test Model.query(as_dict=True).first() returns dict."""
+    Order = populated_orders
+
+    order = Order.query(
+        hash_key="CUSTOMER#1",
+        range_key_condition=Order.sk.begins_with("ORDER#"),
+        as_dict=True,
+    ).first()
+
+    assert order is not None
+    assert isinstance(order, dict)
+    assert order["sk"] == "ORDER#001"

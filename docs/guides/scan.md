@@ -2,6 +2,9 @@
 
 Scan reads every item in a DynamoDB table. Use it when you need all items or don't know the partition key.
 
+!!! tip
+    For large result sets, you might want to use `as_dict=True`. See [as_dict](#return-dicts-instead-of-models).
+
 ## Key features
 
 - Scan all items in a table
@@ -165,6 +168,39 @@ print(f"Items scanned: {result.metrics.scanned_count}")
 print(f"RCU consumed: {result.metrics.consumed_rcu}")
 ```
 
+### Return dicts instead of models
+
+By default, scan returns Model instances. Each item from DynamoDB is converted to a Python object with all the Model methods and hooks.
+
+This conversion has a cost. Python object creation is slow compared to Rust. For scans that return many items (hundreds or thousands), this becomes a bottleneck.
+
+Use `as_dict=True` to skip Model instantiation and get plain dicts:
+
+=== "as_dict.py"
+    ```python
+    --8<-- "docs/examples/scan/as_dict.py"
+    ```
+
+**When to use `as_dict=True`:**
+
+- Read-only operations where you don't need `.save()`, `.delete()`, or hooks
+- Scans returning many items (100+)
+- Performance-critical code paths
+- Data export or migration scripts
+
+**Trade-offs:**
+
+| | Model instances | `as_dict=True` |
+|---|---|---|
+| Speed | Slower (Python object creation) | Faster (plain dicts) |
+| Methods | `.save()`, `.delete()`, `.update()` | None |
+| Hooks | `after_load` runs | No hooks |
+| Type hints | Full IDE support | Dict access |
+| Validation | Attribute types enforced | Raw DynamoDB types |
+
+!!! note "Why this happens"
+    This is how Python works. Creating class instances is expensive. Rust handles the DynamoDB call and deserialization fast, but Python must create each Model object. There's no way around this in Python itself.
+
 ### Scan parameters
 
 | Parameter | Type | Default | Description |
@@ -175,6 +211,7 @@ print(f"RCU consumed: {result.metrics.consumed_rcu}")
 | `last_evaluated_key` | dict | None | Start key for pagination |
 | `segment` | int | None | Segment number for parallel scan |
 | `total_segments` | int | None | Total segments for parallel scan |
+| `as_dict` | bool | False | Return dicts instead of Model instances |
 
 ### Parallel scan parameters
 
@@ -183,6 +220,7 @@ print(f"RCU consumed: {result.metrics.consumed_rcu}")
 | `total_segments` | int | Required | Number of parallel segments |
 | `filter_condition` | Condition | None | Filter on any attribute |
 | `consistent_read` | bool | None | Strongly consistent read |
+| `as_dict` | bool | False | Return dicts instead of Model instances |
 
 ### Count parameters
 
