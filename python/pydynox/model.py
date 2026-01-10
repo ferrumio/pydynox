@@ -700,3 +700,112 @@ class Model(ModelBase, metaclass=ModelMeta):
     async def _async_delete_s3_files(self) -> None:
         """Async delete S3 files associated with this model."""
         await _async_delete_s3_files(self)
+
+    # ========== TABLE OPERATIONS ==========
+
+    @classmethod
+    def create_table(
+        cls,
+        billing_mode: str = "PAY_PER_REQUEST",
+        read_capacity: int | None = None,
+        write_capacity: int | None = None,
+        table_class: str | None = None,
+        encryption: str | None = None,
+        kms_key_id: str | None = None,
+        wait: bool = False,
+    ) -> None:
+        """Create the DynamoDB table for this model.
+
+        Uses the model's schema to build the table definition, including
+        hash key, range key, and any GSIs defined on the model.
+
+        Args:
+            billing_mode: "PAY_PER_REQUEST" (default) or "PROVISIONED".
+            read_capacity: Read capacity units (only for PROVISIONED).
+            write_capacity: Write capacity units (only for PROVISIONED).
+            table_class: "STANDARD" (default) or "STANDARD_INFREQUENT_ACCESS".
+            encryption: "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED".
+            kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
+            wait: If True, wait for table to become active.
+
+        Raises:
+            ValueError: If model has no hash_key defined.
+            TableAlreadyExistsError: If table already exists.
+
+        Example:
+            >>> class User(Model):
+            ...     model_config = ModelConfig(table="users")
+            ...     pk = StringAttribute(hash_key=True)
+            ...     sk = StringAttribute(range_key=True)
+            ...     email = StringAttribute()
+            ...
+            ...     email_index = GlobalSecondaryIndex(
+            ...         index_name="email-index",
+            ...         hash_key="email",
+            ...     )
+            >>>
+            >>> User.create_table(wait=True)
+        """
+        if cls._hash_key is None:
+            raise ValueError(f"Model {cls.__name__} has no hash_key defined")
+
+        client = cls._get_client()
+        table = cls._get_table()
+
+        # Get hash key type
+        hash_key_attr = cls._attributes[cls._hash_key]
+        hash_key = (cls._hash_key, hash_key_attr.attr_type)
+
+        # Get range key type if defined
+        range_key = None
+        if cls._range_key:
+            range_key_attr = cls._attributes[cls._range_key]
+            range_key = (cls._range_key, range_key_attr.attr_type)
+
+        # Build GSI definitions
+        gsis = None
+        if cls._indexes:
+            gsis = [idx.to_create_table_definition(cls) for idx in cls._indexes.values()]
+
+        client.create_table(
+            table,
+            hash_key=hash_key,
+            range_key=range_key,
+            billing_mode=billing_mode,
+            read_capacity=read_capacity,
+            write_capacity=write_capacity,
+            table_class=table_class,
+            encryption=encryption,
+            kms_key_id=kms_key_id,
+            global_secondary_indexes=gsis,
+            wait=wait,
+        )
+
+    @classmethod
+    def table_exists(cls) -> bool:
+        """Check if the table for this model exists.
+
+        Returns:
+            True if table exists, False otherwise.
+
+        Example:
+            >>> if not User.table_exists():
+            ...     User.create_table(wait=True)
+        """
+        client = cls._get_client()
+        table = cls._get_table()
+        return client.table_exists(table)
+
+    @classmethod
+    def delete_table(cls) -> None:
+        """Delete the table for this model.
+
+        Warning:
+            This permanently deletes the table and all its data.
+
+        Example:
+            >>> User.delete_table()
+        """
+        client = cls._get_client()
+        table = cls._get_table()
+        client.delete_table(table)

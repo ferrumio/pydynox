@@ -1,2 +1,2 @@
 aws-lambda-powertools>=3.0.0
-pydynox>=0.13.0
+pydynox>=0.16.0

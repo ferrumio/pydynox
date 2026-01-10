@@ -33,8 +33,10 @@ from pydynox.generators import AutoGenerate
 from pydynox.integrations.functions import dynamodb_model
 from pydynox.model import Model
 from pydynox.transaction import Transaction
+from pydynox.version import VERSION
 
-__version__ = "0.15.0"
+__version__ = VERSION
+
 
 __all__ = [
     # Core
