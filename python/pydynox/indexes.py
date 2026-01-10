@@ -283,6 +283,78 @@ class GlobalSecondaryIndex(Generic[M]):
             "Projection": projection,
         }
 
+    def to_create_table_definition(self, model_class: type[M]) -> dict[str, Any]:
+        """Convert to format expected by client.create_table().
+
+        This includes attribute types from the model's attributes.
+
+        Args:
+            model_class: The model class to get attribute types from.
+
+        Returns:
+            Dict with index_name, hash_keys/hash_key, range_keys/range_key, projection.
+        """
+        # Get attribute types from model
+        attributes = model_class._attributes
+
+        # Build hash_keys with types
+        hash_keys: list[tuple[str, str]] = []
+        for attr_name in self.hash_keys:
+            if attr_name not in attributes:
+                raise ValueError(
+                    f"GSI '{self.index_name}' references attribute '{attr_name}' "
+                    f"which is not defined on {model_class.__name__}"
+                )
+            attr_type = attributes[attr_name].attr_type
+            hash_keys.append((attr_name, attr_type))
+
+        # Build range_keys with types
+        range_keys: list[tuple[str, str]] = []
+        for attr_name in self.range_keys:
+            if attr_name not in attributes:
+                raise ValueError(
+                    f"GSI '{self.index_name}' references attribute '{attr_name}' "
+                    f"which is not defined on {model_class.__name__}"
+                )
+            attr_type = attributes[attr_name].attr_type
+            range_keys.append((attr_name, attr_type))
+
+        # Build projection string
+        projection_type: str
+        non_key_attributes: list[str] | None = None
+        match self.projection:
+            case "ALL":
+                projection_type = "ALL"
+            case "KEYS_ONLY":
+                projection_type = "KEYS_ONLY"
+            case list() as attrs:
+                projection_type = "INCLUDE"
+                non_key_attributes = attrs
+            case _:
+                projection_type = "ALL"
+
+        result: dict[str, Any] = {
+            "index_name": self.index_name,
+            "projection": projection_type,
+        }
+
+        # Use multi-attribute format if more than one key attribute
+        if len(hash_keys) == 1:
+            result["hash_key"] = hash_keys[0]
+        else:
+            result["hash_keys"] = hash_keys
+
+        if range_keys:
+            if len(range_keys) == 1:
+                result["range_key"] = range_keys[0]
+            else:
+                result["range_keys"] = range_keys
+
+        if non_key_attributes:
+            result["non_key_attributes"] = non_key_attributes
+
+        return result
+
 
 class GSIQueryResult(Generic[M]):
     """Result of a GSI query with automatic pagination.

@@ -7,7 +7,7 @@ client = DynamoDBClient()
 # Select only name and age columns
 result = client.execute_statement(
     "SELECT name, age FROM users WHERE pk = ? AND sk = ?",
-    parameters=["USER#123", "PROFILE"],
+    parameters=["USER#1", "PROFILE"],
 )
 
 for item in result:

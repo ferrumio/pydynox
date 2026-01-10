@@ -1,40 +1,33 @@
+"""Example: Table creation with different options."""
+
 from pydynox import DynamoDBClient
 
+client = DynamoDBClient()
 
-def create_provisioned_table():
-    client = DynamoDBClient()
-
-    # Provisioned capacity (fixed cost, predictable performance)
+# Provisioned capacity (fixed cost, predictable performance)
+if not client.table_exists("example_provisioned"):
     client.create_table(
-        "high_traffic_table",
+        "example_provisioned",
         hash_key=("pk", "S"),
         billing_mode="PROVISIONED",
-        read_capacity=100,
-        write_capacity=50,
+        read_capacity=5,
+        write_capacity=5,
         wait=True,
     )
 
-
-def create_encrypted_table():
-    client = DynamoDBClient()
-
-    # Customer managed KMS encryption
+# Infrequent access class (cheaper storage, higher read cost)
+if not client.table_exists("example_archive"):
     client.create_table(
-        "sensitive_data",
-        hash_key=("pk", "S"),
-        encryption="CUSTOMER_MANAGED",
-        kms_key_id="arn:aws:kms:us-east-1:123456789:key/abc-123",
-        wait=True,
-    )
-
-
-def create_infrequent_access_table():
-    client = DynamoDBClient()
-
-    # Infrequent access class (cheaper storage, higher read cost)
-    client.create_table(
-        "archive",
+        "example_archive",
         hash_key=("pk", "S"),
         table_class="STANDARD_INFREQUENT_ACCESS",
         wait=True,
     )
+
+# Verify tables exist
+assert client.table_exists("example_provisioned")
+assert client.table_exists("example_archive")
+
+# Cleanup
+client.delete_table("example_provisioned")
+client.delete_table("example_archive")

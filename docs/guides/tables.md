@@ -5,6 +5,7 @@ Create, check, and delete DynamoDB tables programmatically.
 ## Key features
 
 - Create tables with hash key and optional range key
+- Create tables from Model schema (auto-detects keys and GSIs)
 - On-demand or provisioned billing
 - Customer managed encryption (KMS)
 - Wait for table to become active
@@ -12,9 +13,24 @@ Create, check, and delete DynamoDB tables programmatically.
 
 ## Getting started
 
-### Create a table
+### Create a table from Model
 
-Use `create_table()` to create a new DynamoDB table:
+The easiest way to create a table is from your Model. It uses the model's schema to build the table definition, including hash key, range key, and any GSIs.
+
+=== "model_create_table.py"
+    ```python
+    --8<-- "docs/examples/tables/model_create_table.py"
+    ```
+
+This is the recommended approach because:
+
+- No need to repeat key definitions
+- GSIs are created automatically
+- Attribute types are inferred from the model
+
+### Create a table with client
+
+You can also create tables directly with the client:
 
 === "create_table.py"
     ```python
@@ -34,8 +50,12 @@ The `hash_key` and `range_key` are tuples of `(attribute_name, attribute_type)`.
 Before creating a table, check if it already exists:
 
 ```python
-client = DynamoDBClient()
+# Using Model
+if not User.table_exists():
+    User.create_table(wait=True)
 
+# Using client
+client = DynamoDBClient()
 if not client.table_exists("users"):
     client.create_table("users", hash_key=("pk", "S"), wait=True)
 ```
@@ -43,6 +63,10 @@ if not client.table_exists("users"):
 ### Delete a table
 
 ```python
+# Using Model
+User.delete_table()
+
+# Using client
 client = DynamoDBClient()
 client.delete_table("users")
 ```
@@ -67,6 +91,17 @@ On-demand (PAY_PER_REQUEST) is the default. For provisioned capacity:
     ```python
     --8<-- "docs/examples/tables/table_options.py"
     ```
+
+With Model:
+
+```python
+User.create_table(
+    billing_mode="PROVISIONED",
+    read_capacity=10,
+    write_capacity=5,
+    wait=True,
+)
+```
 
 ### Table class
 
@@ -96,8 +131,12 @@ For `CUSTOMER_MANAGED`, you must provide the KMS key ARN.
 Tables take a few seconds to create. Use `wait=True` to block until the table is ready:
 
 ```python
-client.create_table("users", hash_key=("pk", "S"), wait=True)
+# Using Model
+User.create_table(wait=True)
 # Table is now ready to use
+
+# Using client
+client.create_table("users", hash_key=("pk", "S"), wait=True)
 ```
 
 Or wait separately:
@@ -108,7 +147,19 @@ client.create_table("users", hash_key=("pk", "S"))
 client.wait_for_table_active("users", timeout_seconds=30)
 ```
 
-### Create table parameters
+### Model.create_table() parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `billing_mode` | str | `"PAY_PER_REQUEST"` | Billing mode |
+| `read_capacity` | int | None | RCU (only for PROVISIONED) |
+| `write_capacity` | int | None | WCU (only for PROVISIONED) |
+| `table_class` | str | None | Storage class |
+| `encryption` | str | None | Encryption type |
+| `kms_key_id` | str | None | KMS key ARN |
+| `wait` | bool | False | Wait for table to be active |
+
+### Client.create_table() parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -121,6 +172,7 @@ client.wait_for_table_active("users", timeout_seconds=30)
 | `table_class` | str | `"STANDARD"` | Storage class |
 | `encryption` | str | `"AWS_OWNED"` | Encryption type |
 | `kms_key_id` | str | None | KMS key ARN |
+| `global_secondary_indexes` | list | None | GSI definitions |
 | `wait` | bool | False | Wait for table to be active |
 
 
