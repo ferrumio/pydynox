@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
 
 from pydynox.hooks import HookType
 from pydynox.query import AsyncQueryResult, AsyncScanResult, QueryResult, ScanResult
@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from pydynox.model import Model
 
 M = TypeVar("M", bound="Model")
+
+# Type alias for results that can be either Model or dict
+ResultItem = Union[M, dict[str, Any]]
 
 
 def _serialize_filter(
@@ -101,6 +104,7 @@ class BaseModelResult(ABC, Generic[M]):
     _model_class: type[M]
     _result: Any
     _initialized: bool
+    _as_dict: bool
 
     @property
     def last_evaluated_key(self) -> dict[str, Any] | None:
@@ -124,6 +128,12 @@ class BaseModelResult(ABC, Generic[M]):
             instance._run_hooks(HookType.AFTER_LOAD)
         return instance
 
+    def _to_result(self, item: dict[str, Any]) -> M | dict[str, Any]:
+        """Convert item based on as_dict flag."""
+        if self._as_dict:
+            return item
+        return self._to_instance(item)
+
     @abstractmethod
     def _build_result(self) -> Any:
         """Build the underlying result iterator."""
@@ -143,6 +153,7 @@ class ModelQueryResult(BaseModelResult[M]):
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
+        as_dict: bool = False,
     ) -> None:
         self._model_class = model_class
         self._hash_key_value = hash_key_value
@@ -152,6 +163,7 @@ class ModelQueryResult(BaseModelResult[M]):
         self._scan_index_forward = scan_index_forward
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
+        self._as_dict = as_dict
         self._result: Any = None
         self._items_iter: Any = None
         self._initialized = False
@@ -185,14 +197,14 @@ class ModelQueryResult(BaseModelResult[M]):
     def __iter__(self) -> ModelQueryResult[M]:
         return self
 
-    def __next__(self) -> M:
+    def __next__(self) -> M | dict[str, Any]:
         if not self._initialized:
             self._result = self._build_result()
             self._items_iter = iter(self._result)
             self._initialized = True
-        return self._to_instance(next(self._items_iter))
+        return self._to_result(next(self._items_iter))
 
-    def first(self) -> M | None:
+    def first(self) -> M | dict[str, Any] | None:
         """Get the first result or None."""
         try:
             return next(iter(self))
@@ -213,6 +225,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
+        as_dict: bool = False,
     ) -> None:
         self._model_class = model_class
         self._hash_key_value = hash_key_value
@@ -222,6 +235,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         self._scan_index_forward = scan_index_forward
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
+        self._as_dict = as_dict
         self._result: Any = None
         self._initialized = False
 
@@ -254,14 +268,14 @@ class AsyncModelQueryResult(BaseModelResult[M]):
     def __aiter__(self) -> AsyncModelQueryResult[M]:
         return self
 
-    async def __anext__(self) -> M:
+    async def __anext__(self) -> M | dict[str, Any]:
         if not self._initialized:
             self._result = self._build_result()
             self._initialized = True
         item = await self._result.__anext__()
-        return self._to_instance(item)
+        return self._to_result(item)
 
-    async def first(self) -> M | None:
+    async def first(self) -> M | dict[str, Any] | None:
         """Get the first result or None."""
         try:
             return await self.__anext__()
@@ -281,6 +295,7 @@ class ModelScanResult(BaseModelResult[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
         total_segments: int | None = None,
+        as_dict: bool = False,
     ) -> None:
         self._model_class = model_class
         self._filter_condition = filter_condition
@@ -289,6 +304,7 @@ class ModelScanResult(BaseModelResult[M]):
         self._start_key = last_evaluated_key
         self._segment = segment
         self._total_segments = total_segments
+        self._as_dict = as_dict
         self._result: Any = None
         self._items_iter: Any = None
         self._initialized = False
@@ -318,14 +334,14 @@ class ModelScanResult(BaseModelResult[M]):
     def __iter__(self) -> ModelScanResult[M]:
         return self
 
-    def __next__(self) -> M:
+    def __next__(self) -> M | dict[str, Any]:
         if not self._initialized:
             self._result = self._build_result()
             self._items_iter = iter(self._result)
             self._initialized = True
-        return self._to_instance(next(self._items_iter))
+        return self._to_result(next(self._items_iter))
 
-    def first(self) -> M | None:
+    def first(self) -> M | dict[str, Any] | None:
         """Get the first result or None."""
         try:
             return next(iter(self))
@@ -345,6 +361,7 @@ class AsyncModelScanResult(BaseModelResult[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
         total_segments: int | None = None,
+        as_dict: bool = False,
     ) -> None:
         self._model_class = model_class
         self._filter_condition = filter_condition
@@ -353,6 +370,7 @@ class AsyncModelScanResult(BaseModelResult[M]):
         self._start_key = last_evaluated_key
         self._segment = segment
         self._total_segments = total_segments
+        self._as_dict = as_dict
         self._result: Any = None
         self._initialized = False
 
@@ -381,14 +399,14 @@ class AsyncModelScanResult(BaseModelResult[M]):
     def __aiter__(self) -> AsyncModelScanResult[M]:
         return self
 
-    async def __anext__(self) -> M:
+    async def __anext__(self) -> M | dict[str, Any]:
         if not self._initialized:
             self._result = self._build_result()
             self._initialized = True
         item = await self._result.__anext__()
-        return self._to_instance(item)
+        return self._to_result(item)
 
-    async def first(self) -> M | None:
+    async def first(self) -> M | dict[str, Any] | None:
         """Get the first result or None."""
         try:
             return await self.__anext__()

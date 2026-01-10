@@ -2,6 +2,9 @@
 
 Query items from DynamoDB using typed conditions. Returns model instances with full type hints.
 
+!!! tip
+    For large result sets, you might want to use `as_dict=True`. See [as_dict](#return-dicts-instead-of-models).
+
 ## Key features
 
 - Type-safe queries with model attributes
@@ -137,6 +140,39 @@ Use `async_query()` for async code:
     --8<-- "docs/examples/query/async_query.py"
     ```
 
+### Return dicts instead of models
+
+By default, query returns Model instances. Each item from DynamoDB is converted to a Python object with all the Model methods and hooks.
+
+This conversion has a cost. Python object creation is slow compared to Rust. For queries that return many items (hundreds or thousands), this becomes a bottleneck.
+
+Use `as_dict=True` to skip Model instantiation and get plain dicts:
+
+=== "as_dict.py"
+    ```python
+    --8<-- "docs/examples/query/as_dict.py"
+    ```
+
+**When to use `as_dict=True`:**
+
+- Read-only operations where you don't need `.save()`, `.delete()`, or hooks
+- Queries returning many items (100+)
+- Performance-critical code paths
+- Data export or transformation pipelines
+
+**Trade-offs:**
+
+| | Model instances | `as_dict=True` |
+|---|---|---|
+| Speed | Slower (Python object creation) | Faster (plain dicts) |
+| Methods | `.save()`, `.delete()`, `.update()` | None |
+| Hooks | `after_load` runs | No hooks |
+| Type hints | Full IDE support | Dict access |
+| Validation | Attribute types enforced | Raw DynamoDB types |
+
+!!! note "Why this happens"
+    This is how Python works. Creating class instances is expensive. Rust handles the DynamoDB call and deserialization fast, but Python must create each Model object. There's no way around this in Python itself.
+
 ### Query parameters
 
 | Parameter | Type | Default | Description |
@@ -148,6 +184,7 @@ Use `async_query()` for async code:
 | `scan_index_forward` | bool | True | Sort order |
 | `consistent_read` | bool | None | Strongly consistent read |
 | `last_evaluated_key` | dict | None | Start key for pagination |
+| `as_dict` | bool | False | Return dicts instead of Model instances |
 
 ## Query vs GSI query
 

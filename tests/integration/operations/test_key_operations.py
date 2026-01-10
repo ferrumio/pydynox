@@ -216,3 +216,63 @@ async def test_async_delete_by_key(user_model):
 
     result = await user_model.async_get(pk=pk, sk="PROFILE")
     assert result is None
+
+
+# ========== as_dict tests ==========
+
+
+def test_get_as_dict_returns_dict(user_model):
+    """Model.get(as_dict=True) returns plain dict."""
+    uid = str(uuid.uuid4())
+    pk = f"USER#{uid}"
+
+    user = user_model(pk=pk, sk="PROFILE", name="Alice", age=25)
+    user.save()
+
+    result = user_model.get(pk=pk, sk="PROFILE", as_dict=True)
+
+    assert result is not None
+    assert isinstance(result, dict)
+    assert result["name"] == "Alice"
+    assert result["age"] == 25
+
+
+def test_get_as_dict_false_returns_model(user_model):
+    """Model.get(as_dict=False) returns Model instance."""
+    uid = str(uuid.uuid4())
+    pk = f"USER#{uid}"
+
+    user = user_model(pk=pk, sk="PROFILE", name="Bob", age=30)
+    user.save()
+
+    result = user_model.get(pk=pk, sk="PROFILE", as_dict=False)
+
+    assert result is not None
+    assert isinstance(result, user_model)
+    assert result.name == "Bob"
+
+
+def test_get_as_dict_not_found_returns_none(user_model):
+    """Model.get(as_dict=True) returns None when not found."""
+    uid = str(uuid.uuid4())
+    pk = f"USER#{uid}"
+
+    result = user_model.get(pk=pk, sk="PROFILE", as_dict=True)
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_async_get_as_dict_returns_dict(user_model):
+    """Model.async_get(as_dict=True) returns plain dict."""
+    uid = str(uuid.uuid4())
+    pk = f"USER#{uid}"
+
+    user = user_model(pk=pk, sk="PROFILE", name="Charlie", age=35)
+    await user.async_save()
+
+    result = await user_model.async_get(pk=pk, sk="PROFILE", as_dict=True)
+
+    assert result is not None
+    assert isinstance(result, dict)
+    assert result["name"] == "Charlie"

@@ -29,6 +29,7 @@ def query(
     scan_index_forward: bool = True,
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
+    as_dict: bool = False,
 ) -> ModelQueryResult[M]:
     """Query items by hash key with optional conditions.
 
@@ -40,9 +41,10 @@ def query(
         scan_index_forward: Sort order. True = ascending, False = descending.
         consistent_read: If True, use strongly consistent read.
         last_evaluated_key: Start key for pagination.
+        as_dict: If True, return dicts instead of Model instances.
 
     Returns:
-        ModelQueryResult that yields typed model instances.
+        ModelQueryResult that yields typed model instances or dicts.
     """
     return ModelQueryResult(
         model_class=cls,
@@ -53,6 +55,7 @@ def query(
         scan_index_forward=scan_index_forward,
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
+        as_dict=as_dict,
     )
 
 
@@ -64,6 +67,7 @@ def scan(
     last_evaluated_key: dict[str, Any] | None = None,
     segment: int | None = None,
     total_segments: int | None = None,
+    as_dict: bool = False,
 ) -> ModelScanResult[M]:
     """Scan all items in the table.
 
@@ -76,9 +80,10 @@ def scan(
         last_evaluated_key: Start key for pagination.
         segment: Segment number for parallel scan (0 to total_segments-1).
         total_segments: Total number of segments for parallel scan.
+        as_dict: If True, return dicts instead of Model instances.
 
     Returns:
-        ModelScanResult that yields typed model instances.
+        ModelScanResult that yields typed model instances or dicts.
 
     Example:
         >>> for user in User.scan():
@@ -96,6 +101,7 @@ def scan(
         last_evaluated_key=last_evaluated_key,
         segment=segment,
         total_segments=total_segments,
+        as_dict=as_dict,
     )
 
 
@@ -172,6 +178,7 @@ def async_query(
     scan_index_forward: bool = True,
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
+    as_dict: bool = False,
 ) -> AsyncModelQueryResult[M]:
     """Async version of query."""
     return AsyncModelQueryResult(
@@ -183,6 +190,7 @@ def async_query(
         scan_index_forward=scan_index_forward,
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
+        as_dict=as_dict,
     )
 
 
@@ -194,6 +202,7 @@ def async_scan(
     last_evaluated_key: dict[str, Any] | None = None,
     segment: int | None = None,
     total_segments: int | None = None,
+    as_dict: bool = False,
 ) -> AsyncModelScanResult[M]:
     """Async version of scan."""
     return AsyncModelScanResult(
@@ -204,6 +213,7 @@ def async_scan(
         last_evaluated_key=last_evaluated_key,
         segment=segment,
         total_segments=total_segments,
+        as_dict=as_dict,
     )
 
 
@@ -263,7 +273,8 @@ def parallel_scan(
     total_segments: int,
     filter_condition: Condition | None = None,
     consistent_read: bool | None = None,
-) -> tuple[list[M], OperationMetrics]:
+    as_dict: bool = False,
+) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
     """Parallel scan - runs multiple segment scans concurrently.
 
     Much faster than regular scan for large tables. Each segment is
@@ -278,9 +289,10 @@ def parallel_scan(
                        Good starting point: 4-8 for most tables.
         filter_condition: Optional filter on attributes.
         consistent_read: If True, use strongly consistent read.
+        as_dict: If True, return dicts instead of Model instances.
 
     Returns:
-        Tuple of (list of model instances, metrics).
+        Tuple of (list of model instances or dicts, metrics).
 
     Example:
         >>> users, metrics = User.parallel_scan(total_segments=4)
@@ -317,6 +329,9 @@ def parallel_scan(
         consistent_read=use_consistent,
     )
 
+    if as_dict:
+        return items, metrics
+
     instances = [cls.from_dict(item) for item in items]
 
     skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
@@ -332,7 +347,8 @@ async def async_parallel_scan(
     total_segments: int,
     filter_condition: Condition | None = None,
     consistent_read: bool | None = None,
-) -> tuple[list[M], OperationMetrics]:
+    as_dict: bool = False,
+) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
     """Async parallel scan - runs multiple segment scans concurrently.
 
     Much faster than regular scan for large tables. Each segment is
@@ -347,9 +363,10 @@ async def async_parallel_scan(
                        Good starting point: 4-8 for most tables.
         filter_condition: Optional filter on attributes.
         consistent_read: If True, use strongly consistent read.
+        as_dict: If True, return dicts instead of Model instances.
 
     Returns:
-        Tuple of (list of model instances, metrics).
+        Tuple of (list of model instances or dicts, metrics).
 
     Example:
         >>> users, metrics = await User.async_parallel_scan(total_segments=4)
@@ -379,6 +396,9 @@ async def async_parallel_scan(
         expression_attribute_values=values if values else None,
         consistent_read=use_consistent,
     )
+
+    if as_dict:
+        return items, metrics
 
     instances = [cls.from_dict(item) for item in items]
 

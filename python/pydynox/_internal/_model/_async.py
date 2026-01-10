@@ -25,11 +25,17 @@ if TYPE_CHECKING:
 M = TypeVar("M", bound="Model")
 
 
-async def async_get(cls: type[M], consistent_read: bool | None = None, **keys: Any) -> M | None:
-    """Async get item by key. Returns model instance or None."""
+async def async_get(
+    cls: type[M], consistent_read: bool | None = None, as_dict: bool = False, **keys: Any
+) -> M | dict[str, Any] | None:
+    """Async get item by key. Returns model instance, dict, or None."""
     # prepare: get client, table, resolve consistent_read
     client, table, keys_dict, use_consistent = prepare_get(cls, consistent_read, keys)
     item = await client.async_get_item(table, keys_dict, consistent_read=use_consistent)
+    if item is None:
+        return None
+    if as_dict:
+        return item
     # finalize: convert to model, run AFTER_LOAD hooks
     return finalize_get(cls, item)
 

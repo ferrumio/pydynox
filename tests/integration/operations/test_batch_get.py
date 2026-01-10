@@ -1,5 +1,11 @@
 """Integration tests for batch_get operation."""
 
+import uuid
+
+import pytest
+from pydynox import Model, ModelConfig
+from pydynox.attributes import NumberAttribute, StringAttribute
+
 
 def test_batch_get_returns_items(dynamo):
     """Test batch get with a few items."""
@@ -133,3 +139,91 @@ def test_batch_get_with_various_types(dynamo):
         result = by_sk[item["sk"]]
         for field, value in item.items():
             assert result[field] == value
+
+
+# ========== Model.batch_get tests ==========
+
+
+@pytest.fixture
+def user_model(dynamo):
+    """Create a User model for batch_get tests."""
+
+    class User(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(hash_key=True)
+        sk = StringAttribute(range_key=True)
+        name = StringAttribute()
+        age = NumberAttribute()
+
+    User._client_instance = None
+    return User
+
+
+def test_model_batch_get_returns_model_instances(dynamo, user_model):
+    """Model.batch_get returns Model instances by default."""
+    uid = str(uuid.uuid4())
+
+    items = [
+        {"pk": f"MBGET#{uid}", "sk": "USER#1", "name": "Alice", "age": 25},
+        {"pk": f"MBGET#{uid}", "sk": "USER#2", "name": "Bob", "age": 30},
+        {"pk": f"MBGET#{uid}", "sk": "USER#3", "name": "Charlie", "age": 35},
+    ]
+    for item in items:
+        dynamo.put_item("test_table", item)
+
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    users = user_model.batch_get(keys)
+
+    assert len(users) == 3
+    for user in users:
+        assert isinstance(user, user_model)
+
+    names = {u.name for u in users}
+    assert names == {"Alice", "Bob", "Charlie"}
+
+
+def test_model_batch_get_as_dict_returns_dicts(dynamo, user_model):
+    """Model.batch_get(as_dict=True) returns plain dicts."""
+    uid = str(uuid.uuid4())
+
+    items = [
+        {"pk": f"MBGETD#{uid}", "sk": "USER#1", "name": "Alice", "age": 25},
+        {"pk": f"MBGETD#{uid}", "sk": "USER#2", "name": "Bob", "age": 30},
+    ]
+    for item in items:
+        dynamo.put_item("test_table", item)
+
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    users = user_model.batch_get(keys, as_dict=True)
+
+    assert len(users) == 2
+    for user in users:
+        assert isinstance(user, dict)
+
+    names = {u["name"] for u in users}
+    assert names == {"Alice", "Bob"}
+
+
+def test_model_batch_get_empty_keys(user_model):
+    """Model.batch_get with empty keys returns empty list."""
+    users = user_model.batch_get([])
+    assert users == []
+
+
+def test_model_batch_get_missing_items(dynamo, user_model):
+    """Model.batch_get only returns existing items."""
+    uid = str(uuid.uuid4())
+
+    dynamo.put_item(
+        "test_table",
+        {"pk": f"MBGETM#{uid}", "sk": "EXISTS", "name": "Found", "age": 20},
+    )
+
+    keys = [
+        {"pk": f"MBGETM#{uid}", "sk": "EXISTS"},
+        {"pk": f"MBGETM#{uid}", "sk": "NOTEXISTS"},
+    ]
+    users = user_model.batch_get(keys)
+
+    assert len(users) == 1
+    assert users[0].name == "Found"

@@ -307,3 +307,52 @@ def test_model_count_consistent_read(populated_users):
     count, _ = User.count(consistent_read=True)
 
     assert count == 5
+
+
+# ========== as_dict tests ==========
+
+
+def test_model_scan_as_dict_returns_dicts(populated_users):
+    """Test Model.scan(as_dict=True) returns plain dicts."""
+    User = populated_users
+
+    users = list(User.scan(as_dict=True))
+
+    assert len(users) == 5
+    for user in users:
+        assert isinstance(user, dict)
+        assert "pk" in user
+        assert "name" in user
+
+
+def test_model_scan_as_dict_false_returns_models(populated_users):
+    """Test Model.scan(as_dict=False) returns Model instances."""
+    User = populated_users
+
+    users = list(User.scan(as_dict=False))
+
+    assert len(users) == 5
+    for user in users:
+        assert isinstance(user, User)
+
+
+def test_model_scan_as_dict_with_filter(populated_users):
+    """Test Model.scan(as_dict=True) works with filter_condition."""
+    User = populated_users
+
+    users = list(User.scan(filter_condition=User.status == "active", as_dict=True))
+
+    assert len(users) == 3
+    for user in users:
+        assert isinstance(user, dict)
+        assert user["status"] == "active"
+
+
+def test_model_scan_as_dict_first(populated_users):
+    """Test Model.scan(as_dict=True).first() returns dict."""
+    User = populated_users
+
+    user = User.scan(as_dict=True).first()
+
+    assert user is not None
+    assert isinstance(user, dict)

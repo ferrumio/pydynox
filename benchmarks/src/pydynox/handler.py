@@ -128,10 +128,10 @@ def run_basic_benchmarks() -> None:
 
     measure_and_publish("delete_item", do_delete)
 
-    # query
+    # query (as_dict for fair comparison with boto3/pynamodb)
     measure_and_publish(
         "query",
-        lambda: list(BenchmarkItem.query(f"{PK_PREFIX}#basic", limit=10)),
+        lambda: list(BenchmarkItem.query(f"{PK_PREFIX}#basic", limit=10, as_dict=True)),
         iterations=10,
     )
 

@@ -14,6 +14,7 @@ from pydynox._internal._model._async import (
     async_update_by_key,
 )
 from pydynox._internal._model._base import ModelBase, ModelMeta
+from pydynox._internal._model._batch import batch_get
 from pydynox._internal._model._crud import (
     delete,
     delete_by_key,
@@ -93,22 +94,31 @@ class Model(ModelBase, metaclass=ModelMeta):
     # ========== SYNC CRUD ==========
 
     @classmethod
-    def get(cls: type[M], consistent_read: bool | None = None, **keys: Any) -> M | None:
+    def get(
+        cls: type[M],
+        consistent_read: bool | None = None,
+        as_dict: bool = False,
+        **keys: Any,
+    ) -> M | dict[str, Any] | None:
         """Get an item from DynamoDB by its key.
 
         Args:
             consistent_read: Use strongly consistent read. Defaults to model_config value.
+            as_dict: If True, return dict instead of Model instance.
             **keys: The key attributes (hash_key and optional range_key).
 
         Returns:
-            The model instance if found, None otherwise.
+            The model instance (or dict if as_dict=True) if found, None otherwise.
 
         Example:
             >>> user = User.get(pk="USER#1", sk="PROFILE")
             >>> if user:
             ...     print(user.name)
+            >>>
+            >>> # Return as dict for better performance
+            >>> user_dict = User.get(pk="USER#1", sk="PROFILE", as_dict=True)
         """
-        return get(cls, consistent_read, **keys)
+        return get(cls, consistent_read, as_dict, **keys)
 
     def save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
         """Save the model to DynamoDB.
@@ -203,16 +213,55 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         delete_by_key(cls, condition, **kwargs)
 
+    @classmethod
+    def batch_get(
+        cls: type[M],
+        keys: list[dict[str, Any]],
+        consistent_read: bool | None = None,
+        as_dict: bool = False,
+    ) -> list[M] | list[dict[str, Any]]:
+        """Batch get multiple items by their keys.
+
+        Args:
+            keys: List of key dicts (each with hash_key and optional range_key).
+            consistent_read: Use strongly consistent read.
+            as_dict: If True, return dicts instead of Model instances.
+
+        Returns:
+            List of model instances or dicts.
+
+        Example:
+            >>> keys = [
+            ...     {"pk": "USER#1", "sk": "PROFILE"},
+            ...     {"pk": "USER#2", "sk": "PROFILE"},
+            ... ]
+            >>> users = User.batch_get(keys)
+            >>> for user in users:
+            ...     print(user.name)
+            >>>
+            >>> # Return as dicts for better performance
+            >>> users = User.batch_get(keys, as_dict=True)
+        """
+        return batch_get(cls, keys, consistent_read, as_dict)
+
     # ========== ASYNC CRUD ==========
 
     @classmethod
-    async def async_get(cls: type[M], consistent_read: bool | None = None, **keys: Any) -> M | None:
+    async def async_get(
+        cls: type[M],
+        consistent_read: bool | None = None,
+        as_dict: bool = False,
+        **keys: Any,
+    ) -> M | dict[str, Any] | None:
         """Async version of get.
 
         Example:
             >>> user = await User.async_get(pk="USER#1", sk="PROFILE")
+            >>>
+            >>> # Return as dict for better performance
+            >>> user_dict = await User.async_get(pk="USER#1", as_dict=True)
         """
-        return await async_get(cls, consistent_read, **keys)
+        return await async_get(cls, consistent_read, as_dict, **keys)
 
     async def async_save(
         self, condition: Condition | None = None, skip_hooks: bool | None = None
@@ -285,6 +334,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
+        as_dict: bool = False,
     ) -> ModelQueryResult[M]:
         """Query items by hash key with optional conditions.
 
@@ -296,6 +346,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             scan_index_forward: True for ascending, False for descending.
             consistent_read: Use strongly consistent read.
             last_evaluated_key: Start key for pagination.
+            as_dict: If True, return dicts instead of Model instances.
 
         Returns:
             Iterable result that auto-paginates.
@@ -310,6 +361,10 @@ class Model(ModelBase, metaclass=ModelMeta):
             ...     hash_key="USER#1",
             ...     range_key_condition=Order.sk.begins_with("ORDER#2024")
             ... )
+            >>>
+            >>> # Return as dicts for better performance
+            >>> for order in Order.query(hash_key="USER#1", as_dict=True):
+            ...     print(order["order_id"])
         """
         return query(
             cls,
@@ -320,6 +375,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             scan_index_forward,
             consistent_read,
             last_evaluated_key,
+            as_dict,
         )
 
     @classmethod
@@ -331,6 +387,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
         total_segments: int | None = None,
+        as_dict: bool = False,
     ) -> ModelScanResult[M]:
         """Scan all items in the table.
 
@@ -341,6 +398,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             last_evaluated_key: Start key for pagination.
             segment: Segment number for parallel scan.
             total_segments: Total segments for parallel scan.
+            as_dict: If True, return dicts instead of Model instances.
 
         Returns:
             Iterable result that auto-paginates.
@@ -352,6 +410,10 @@ class Model(ModelBase, metaclass=ModelMeta):
             >>>
             >>> # With filter
             >>> active = User.scan(filter_condition=User.status == "active")
+            >>>
+            >>> # Return as dicts for better performance
+            >>> for user in User.scan(as_dict=True):
+            ...     print(user["name"])
         """
         return scan(
             cls,
@@ -361,6 +423,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             last_evaluated_key,
             segment,
             total_segments,
+            as_dict,
         )
 
     @classmethod
@@ -422,12 +485,17 @@ class Model(ModelBase, metaclass=ModelMeta):
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
+        as_dict: bool = False,
     ) -> AsyncModelQueryResult[M]:
         """Async version of query.
 
         Example:
             >>> async for order in Order.async_query(hash_key="USER#1"):
             ...     print(order.order_id)
+            >>>
+            >>> # Return as dicts for better performance
+            >>> async for order in Order.async_query(hash_key="USER#1", as_dict=True):
+            ...     print(order["order_id"])
         """
         return async_query(
             cls,
@@ -438,6 +506,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             scan_index_forward,
             consistent_read,
             last_evaluated_key,
+            as_dict,
         )
 
     @classmethod
@@ -449,12 +518,17 @@ class Model(ModelBase, metaclass=ModelMeta):
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
         total_segments: int | None = None,
+        as_dict: bool = False,
     ) -> AsyncModelScanResult[M]:
         """Async version of scan.
 
         Example:
             >>> async for user in User.async_scan():
             ...     print(user.name)
+            >>>
+            >>> # Return as dicts for better performance
+            >>> async for user in User.async_scan(as_dict=True):
+            ...     print(user["name"])
         """
         return async_scan(
             cls,
@@ -464,6 +538,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             last_evaluated_key,
             segment,
             total_segments,
+            as_dict,
         )
 
     @classmethod
@@ -502,13 +577,15 @@ class Model(ModelBase, metaclass=ModelMeta):
         total_segments: int,
         filter_condition: Condition | None = None,
         consistent_read: bool | None = None,
-    ) -> tuple[list[M], OperationMetrics]:
+        as_dict: bool = False,
+    ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
         """Parallel scan - runs multiple segment scans concurrently.
 
         Args:
             total_segments: Number of parallel segments (workers).
             filter_condition: Optional filter applied after scan.
             consistent_read: Use strongly consistent read.
+            as_dict: If True, return dicts instead of Model instances.
 
         Returns:
             Tuple of (list of items, combined metrics).
@@ -517,8 +594,11 @@ class Model(ModelBase, metaclass=ModelMeta):
             >>> # Scan with 4 parallel workers
             >>> users, metrics = User.parallel_scan(total_segments=4)
             >>> print(f"Found {len(users)} users")
+            >>>
+            >>> # Return as dicts for better performance
+            >>> users, metrics = User.parallel_scan(total_segments=4, as_dict=True)
         """
-        return parallel_scan(cls, total_segments, filter_condition, consistent_read)
+        return parallel_scan(cls, total_segments, filter_condition, consistent_read, as_dict)
 
     @classmethod
     async def async_parallel_scan(
@@ -526,13 +606,19 @@ class Model(ModelBase, metaclass=ModelMeta):
         total_segments: int,
         filter_condition: Condition | None = None,
         consistent_read: bool | None = None,
-    ) -> tuple[list[M], OperationMetrics]:
+        as_dict: bool = False,
+    ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
         """Async parallel scan - runs multiple segment scans concurrently.
 
         Example:
             >>> users, metrics = await User.async_parallel_scan(total_segments=4)
+            >>>
+            >>> # Return as dicts for better performance
+            >>> users, metrics = await User.async_parallel_scan(total_segments=4, as_dict=True)
         """
-        return await async_parallel_scan(cls, total_segments, filter_condition, consistent_read)
+        return await async_parallel_scan(
+            cls, total_segments, filter_condition, consistent_read, as_dict
+        )
 
     # ========== TTL ==========
 
