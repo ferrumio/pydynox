@@ -1,6 +1,26 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.16.0] - 2026-01-10
+
+
+### CI/CD
+
+- bump actions/download-artifact from 4.3.0 to 7.0.0 (#139)
+- bump actions/setup-python from 5.6.0 to 6.1.0 (#137)
+- bump actions/upload-artifact from 4.6.2 to 6.0.0 (#135)
+
+
+### Documentation
+
+- update changelog for v0.15.0 (#141)
+
+
+### Features
+
+- adding OTEL (#143)
+- add `as_dict` parameter to skip Model instantiation (#144)
+- adding table operations to model (#145)
 ## [0.15.0] - 2026-01-09
 
 
