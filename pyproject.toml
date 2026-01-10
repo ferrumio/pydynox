@@ -35,6 +35,9 @@ Homepage = "https://github.com/leandrodamascena/pydynox"
 pydantic = ["pydantic>=2.0"]
 opentelemetry = ["opentelemetry-api>=1.0"]
 
+[project.entry-points.pytest11]
+pydynox = "pydynox.testing.pytest_plugin"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",

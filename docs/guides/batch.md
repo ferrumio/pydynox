@@ -71,6 +71,17 @@ except Exception as e:
 3. **Consider rate limiting** - If you're writing a lot of data, combine batch operations with rate limiting to avoid throttling.
 
 
+## Testing your code
+
+Test batch operations without DynamoDB using the built-in memory backend:
+
+=== "testing_batch.py"
+    ```python
+    --8<-- "docs/examples/batch/testing_batch.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Next steps
 
 - [Transactions](transactions.md) - All-or-nothing operations
