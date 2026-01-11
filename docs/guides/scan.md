@@ -229,6 +229,17 @@ Use `as_dict=True` to skip Model instantiation and get plain dicts:
 | `filter_condition` | Condition | None | Filter on any attribute |
 | `consistent_read` | bool | None | Strongly consistent read |
 
+## Testing your code
+
+Test scans without DynamoDB using the built-in memory backend:
+
+=== "testing_scan.py"
+    ```python
+    --8<-- "docs/examples/scan/testing_scan.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Anti-patterns
 
 ### Scan in API endpoints

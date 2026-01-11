@@ -202,6 +202,17 @@ for order in Order.status_index.query(status="shipped"):
     print(order.pk)
 ```
 
+## Testing your code
+
+Test queries without DynamoDB using the built-in memory backend:
+
+=== "testing_query.py"
+    ```python
+    --8<-- "docs/examples/query/testing_query.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Next steps
 
 - [Atomic updates](atomic-updates.md) - Increment, append, and other atomic operations

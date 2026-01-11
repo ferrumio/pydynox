@@ -127,6 +127,17 @@ Session management with TTL:
 3. **Enable TTL on table** - TTL won't work without table-level configuration
 4. **Choose the right duration** - Too short = bad UX, too long = wasted storage
 
+## Testing your code
+
+Test TTL without DynamoDB using the built-in memory backend:
+
+=== "testing_ttl.py"
+    ```python
+    --8<-- "docs/examples/ttl/testing_ttl.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Next steps
 
 - [Attributes](attributes.md) - All attribute types

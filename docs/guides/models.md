@@ -303,6 +303,17 @@ except ThrottlingError:
     print("Rate limited, try again")
 ```
 
+## Testing your code
+
+Test models without DynamoDB using the built-in memory backend:
+
+=== "testing_models.py"
+    ```python
+    --8<-- "docs/examples/models/testing_models.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Next steps
 
 - [Query](query.md) - Query items by hash key with conditions

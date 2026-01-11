@@ -156,6 +156,17 @@ def apply_filter(cond: Condition) -> None:
 ```
 
 
+## Testing your code
+
+Test conditions without DynamoDB using the built-in memory backend:
+
+=== "testing_conditions.py"
+    ```python
+    --8<-- "docs/examples/conditions/testing_conditions.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Next steps
 
 - [Query](query.md) - Query items with conditions

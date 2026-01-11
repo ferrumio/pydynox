@@ -167,6 +167,17 @@ Use regular `update()` with kwargs when:
 - You're doing a simple field update
 
 
+## Testing your code
+
+Test atomic updates without DynamoDB using the built-in memory backend:
+
+=== "testing_atomic.py"
+    ```python
+    --8<-- "docs/examples/atomic/testing_atomic.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Next steps
 
 - [Observability](observability.md) - Track metrics on every operation

@@ -112,6 +112,17 @@ Hooks run for each item in a transaction. If you're saving 10 items in a transac
 If a hook raises an exception, the entire transaction fails and nothing is saved.
 
 
+## Testing your code
+
+Test hooks without DynamoDB using the built-in memory backend:
+
+=== "testing_hooks.py"
+    ```python
+    --8<-- "docs/examples/hooks/testing_hooks.py"
+    ```
+
+No setup needed. Just add `pydynox_memory_backend` to your test function. See [Testing](testing.md) for more details.
+
 ## Next steps
 
 - [Auto-generate](auto-generate.md) - Generate IDs and timestamps
