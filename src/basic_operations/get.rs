@@ -19,13 +19,51 @@ pub struct RawGetItemResult {
     pub metrics: OperationMetrics,
 }
 
+/// Prepared get_item data (converted from Python).
+pub struct PreparedGetItem {
+    pub table: String,
+    pub key: HashMap<String, AttributeValue>,
+    pub consistent_read: bool,
+    pub projection_expression: Option<String>,
+    pub expression_attribute_names: Option<HashMap<String, String>>,
+}
+
+/// Prepare get_item by converting Python data to Rust.
+pub fn prepare_get_item(
+    py: Python<'_>,
+    table: &str,
+    key: &Bound<'_, PyDict>,
+    consistent_read: bool,
+    projection_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
+) -> PyResult<PreparedGetItem> {
+    let dynamo_key = py_dict_to_attribute_values(py, key)?;
+
+    let names = match expression_attribute_names {
+        Some(dict) => {
+            let mut map = HashMap::new();
+            for (k, v) in dict.iter() {
+                map.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+            Some(map)
+        }
+        None => None,
+    };
+
+    Ok(PreparedGetItem {
+        table: table.to_string(),
+        key: dynamo_key,
+        consistent_read,
+        projection_expression,
+        expression_attribute_names: names,
+    })
+}
+
 /// Core async get_item operation.
 /// This is the shared logic used by both sync and async wrappers.
 pub async fn execute_get_item(
     client: Client,
-    table: String,
-    key: HashMap<String, AttributeValue>,
-    consistent_read: bool,
+    prepared: PreparedGetItem,
 ) -> Result<
     RawGetItemResult,
     (
@@ -34,14 +72,25 @@ pub async fn execute_get_item(
     ),
 > {
     let start = Instant::now();
-    let result = client
+
+    let mut request = client
         .get_item()
-        .table_name(&table)
-        .set_key(Some(key))
-        .consistent_read(consistent_read)
-        .return_consumed_capacity(ReturnConsumedCapacity::Total)
-        .send()
-        .await;
+        .table_name(&prepared.table)
+        .set_key(Some(prepared.key))
+        .consistent_read(prepared.consistent_read)
+        .return_consumed_capacity(ReturnConsumedCapacity::Total);
+
+    if let Some(projection) = prepared.projection_expression {
+        request = request.projection_expression(projection);
+    }
+
+    if let Some(names) = prepared.expression_attribute_names {
+        for (placeholder, attr_name) in names {
+            request = request.expression_attribute_names(placeholder, attr_name);
+        }
+    }
+
+    let result = request.send().await;
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     match result {
@@ -53,11 +102,12 @@ pub async fn execute_get_item(
                 metrics,
             })
         }
-        Err(e) => Err((e, table)),
+        Err(e) => Err((e, prepared.table)),
     }
 }
 
 /// Sync get_item - blocks until complete.
+#[allow(clippy::too_many_arguments)]
 pub fn get_item(
     py: Python<'_>,
     client: &Client,
@@ -65,17 +115,21 @@ pub fn get_item(
     table: &str,
     key: &Bound<'_, PyDict>,
     consistent_read: bool,
+    projection_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
-    // Convert Python -> Rust (needs GIL)
-    let dynamo_key = py_dict_to_attribute_values(py, key)?;
+    // Prepare: convert Python -> Rust (needs GIL)
+    let prepared = prepare_get_item(
+        py,
+        table,
+        key,
+        consistent_read,
+        projection_expression,
+        expression_attribute_names,
+    )?;
 
     // Execute async operation (releases GIL during I/O)
-    let result = runtime.block_on(execute_get_item(
-        client.clone(),
-        table.to_string(),
-        dynamo_key,
-        consistent_read,
-    ));
+    let result = runtime.block_on(execute_get_item(client.clone(), prepared));
 
     // Convert result back to Python (needs GIL)
     match result {
@@ -92,19 +146,29 @@ pub fn get_item(
 }
 
 /// Async get_item - returns a Python awaitable.
+#[allow(clippy::too_many_arguments)]
 pub fn async_get_item<'py>(
     py: Python<'py>,
     client: Client,
-    table: String,
+    table: &str,
     key: &Bound<'_, PyDict>,
     consistent_read: bool,
+    projection_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    // Convert Python -> Rust (needs GIL, done before async)
-    let dynamo_key = py_dict_to_attribute_values(py, key)?;
+    // Prepare: convert Python -> Rust (needs GIL, done before async)
+    let prepared = prepare_get_item(
+        py,
+        table,
+        key,
+        consistent_read,
+        projection_expression,
+        expression_attribute_names,
+    )?;
 
     // Return a Python awaitable
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_get_item(client, table, dynamo_key, consistent_read).await;
+        let result = execute_get_item(client, prepared).await;
 
         // Convert result back to Python (needs GIL)
         #[allow(deprecated)]

@@ -18,6 +18,7 @@ class ScanOperations:
         self,
         table: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -27,11 +28,29 @@ class ScanOperations:
         segment: int | None = None,
         total_segments: int | None = None,
     ) -> ScanResult:
-        """Scan items from a DynamoDB table."""
+        """Scan items from a DynamoDB table.
+
+        Args:
+            table: Table name.
+            filter_expression: Optional filter expression.
+            projection_expression: Optional projection expression (saves RCU).
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            limit: Max items per page.
+            index_name: GSI or LSI name.
+            last_evaluated_key: Start key for pagination.
+            consistent_read: Use strongly consistent read.
+            segment: Segment number for parallel scan.
+            total_segments: Total segments for parallel scan.
+
+        Returns:
+            ScanResult iterator.
+        """
         return ScanResult(
             self._client,  # type: ignore[attr-defined]
             table,
             filter_expression=filter_expression,
+            projection_expression=projection_expression,
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             limit=limit,
@@ -47,6 +66,7 @@ class ScanOperations:
         self,
         table: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -56,11 +76,29 @@ class ScanOperations:
         segment: int | None = None,
         total_segments: int | None = None,
     ) -> AsyncScanResult:
-        """Async scan items from a DynamoDB table."""
+        """Async scan items from a DynamoDB table.
+
+        Args:
+            table: Table name.
+            filter_expression: Optional filter expression.
+            projection_expression: Optional projection expression (saves RCU).
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            limit: Max items per page.
+            index_name: GSI or LSI name.
+            last_evaluated_key: Start key for pagination.
+            consistent_read: Use strongly consistent read.
+            segment: Segment number for parallel scan.
+            total_segments: Total segments for parallel scan.
+
+        Returns:
+            AsyncScanResult iterator.
+        """
         return AsyncScanResult(
             self._client,  # type: ignore[attr-defined]
             table,
             filter_expression=filter_expression,
+            projection_expression=projection_expression,
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             limit=limit,
@@ -125,6 +163,7 @@ class ScanOperations:
         table: str,
         total_segments: int,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         consistent_read: bool = False,
@@ -138,6 +177,7 @@ class ScanOperations:
             table: Table name.
             total_segments: Number of parallel segments (1-1000000).
             filter_expression: Optional filter expression.
+            projection_expression: Optional projection expression (saves RCU).
             expression_attribute_names: Attribute name placeholders.
             expression_attribute_values: Attribute value placeholders.
             consistent_read: Use strongly consistent reads.
@@ -153,6 +193,7 @@ class ScanOperations:
             table,
             total_segments,
             filter_expression=filter_expression,
+            projection_expression=projection_expression,
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             consistent_read=consistent_read,
@@ -167,6 +208,7 @@ class ScanOperations:
         table: str,
         total_segments: int,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         consistent_read: bool = False,
@@ -180,6 +222,7 @@ class ScanOperations:
             table: Table name.
             total_segments: Number of parallel segments (1-1000000).
             filter_expression: Optional filter expression.
+            projection_expression: Optional projection expression (saves RCU).
             expression_attribute_names: Attribute name placeholders.
             expression_attribute_values: Attribute value placeholders.
             consistent_read: Use strongly consistent reads.
@@ -195,6 +238,7 @@ class ScanOperations:
             table,
             total_segments,
             filter_expression=filter_expression,
+            projection_expression=projection_expression,
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             consistent_read=consistent_read,

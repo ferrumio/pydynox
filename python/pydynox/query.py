@@ -37,6 +37,7 @@ class QueryResult:
         table: str,
         key_condition_expression: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -50,6 +51,7 @@ class QueryResult:
         self._table = table
         self._key_condition_expression = key_condition_expression
         self._filter_expression = filter_expression
+        self._projection_expression = projection_expression
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
@@ -129,6 +131,7 @@ class QueryResult:
             self._table,
             self._key_condition_expression,
             filter_expression=self._filter_expression,
+            projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
             limit=self._limit,
@@ -173,6 +176,7 @@ class AsyncQueryResult:
         table: str,
         key_condition_expression: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -186,6 +190,7 @@ class AsyncQueryResult:
         self._table = table
         self._key_condition_expression = key_condition_expression
         self._filter_expression = filter_expression
+        self._projection_expression = projection_expression
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
@@ -257,6 +262,7 @@ class AsyncQueryResult:
             self._table,
             self._key_condition_expression,
             filter_expression=self._filter_expression,
+            projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
             limit=self._limit,
@@ -318,6 +324,7 @@ class ScanResult:
         client: pydynox_core.DynamoDBClient,
         table: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -331,6 +338,7 @@ class ScanResult:
         self._client = client
         self._table = table
         self._filter_expression = filter_expression
+        self._projection_expression = projection_expression
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
@@ -395,6 +403,7 @@ class ScanResult:
         items, self._last_evaluated_key, self._metrics = self._client.scan_page(
             self._table,
             filter_expression=self._filter_expression,
+            projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
             limit=self._limit,
@@ -437,6 +446,7 @@ class AsyncScanResult:
         client: pydynox_core.DynamoDBClient,
         table: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -450,6 +460,7 @@ class AsyncScanResult:
         self._client = client
         self._table = table
         self._filter_expression = filter_expression
+        self._projection_expression = projection_expression
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
@@ -514,6 +525,7 @@ class AsyncScanResult:
         result = await self._client.async_scan_page(
             self._table,
             filter_expression=self._filter_expression,
+            projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
             limit=self._limit,

@@ -89,6 +89,7 @@ Now that you have the basics, explore these guides:
 | [TTL](guides/ttl.md) | Auto-delete items after expiration |
 | [Optimistic locking](guides/optimistic-locking.md) | Prevent concurrent update conflicts |
 | [Encryption](guides/encryption.md) | Field-level encryption with KMS |
+| [Projections](guides/projections.md) | Fetch only the fields you need |
 | [Size calculator](guides/size-calculator.md) | Calculate item sizes |
 | [PartiQL](guides/partiql.md) | SQL-like queries for DynamoDB |
 

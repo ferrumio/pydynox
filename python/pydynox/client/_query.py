@@ -15,6 +15,7 @@ class QueryOperations:
         table: str,
         key_condition_expression: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -23,12 +24,30 @@ class QueryOperations:
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
     ) -> QueryResult:
-        """Query items from a DynamoDB table."""
+        """Query items from a DynamoDB table.
+
+        Args:
+            table: Table name.
+            key_condition_expression: Key condition expression.
+            filter_expression: Optional filter expression.
+            projection_expression: Optional projection expression (saves RCU).
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            limit: Max items per page.
+            scan_index_forward: Sort order (True = ascending).
+            index_name: GSI or LSI name.
+            last_evaluated_key: Start key for pagination.
+            consistent_read: Use strongly consistent read.
+
+        Returns:
+            QueryResult iterator.
+        """
         return QueryResult(
             self._client,  # type: ignore[attr-defined]
             table,
             key_condition_expression,
             filter_expression=filter_expression,
+            projection_expression=projection_expression,
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             limit=limit,
@@ -44,6 +63,7 @@ class QueryOperations:
         table: str,
         key_condition_expression: str,
         filter_expression: str | None = None,
+        projection_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
@@ -52,12 +72,30 @@ class QueryOperations:
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
     ) -> AsyncQueryResult:
-        """Async query items from a DynamoDB table."""
+        """Async query items from a DynamoDB table.
+
+        Args:
+            table: Table name.
+            key_condition_expression: Key condition expression.
+            filter_expression: Optional filter expression.
+            projection_expression: Optional projection expression (saves RCU).
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            limit: Max items per page.
+            scan_index_forward: Sort order (True = ascending).
+            index_name: GSI or LSI name.
+            last_evaluated_key: Start key for pagination.
+            consistent_read: Use strongly consistent read.
+
+        Returns:
+            AsyncQueryResult iterator.
+        """
         return AsyncQueryResult(
             self._client,  # type: ignore[attr-defined]
             table,
             key_condition_expression,
             filter_expression=filter_expression,
+            projection_expression=projection_expression,
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             limit=limit,
