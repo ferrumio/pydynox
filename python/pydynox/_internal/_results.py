@@ -57,7 +57,7 @@ def _build_query_params(
     # Build key condition
     hk_placeholder = "#pk"
     hk_val_placeholder = ":pkv"
-    names[hk_placeholder] = hash_key_name
+    names[hash_key_name] = hk_placeholder
     values[hk_val_placeholder] = hash_key_value
     key_condition = f"{hk_placeholder} = {hk_val_placeholder}"
 
@@ -69,6 +69,7 @@ def _build_query_params(
 
     # Build projection expression
     projection_expr = None
+    proj_names: dict[str, str] = {}
     if fields:
         proj_parts = []
         for i, field in enumerate(fields):
@@ -76,10 +77,15 @@ def _build_query_params(
             part_placeholders = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
-                names[placeholder] = part
+                proj_names[placeholder] = part
                 part_placeholders.append(placeholder)
             proj_parts.append(".".join(part_placeholders))
         projection_expr = ", ".join(proj_parts)
+
+    # Merge names: conditions use {name: placeholder}, projection uses {placeholder: name}
+    # Convert condition names to {placeholder: name} format and merge with projection
+    attr_names = {v: k for k, v in names.items()}
+    attr_names.update(proj_names)
 
     use_consistent = _get_consistent_read(model_class, consistent_read)
 
@@ -87,7 +93,7 @@ def _build_query_params(
         key_condition,
         filter_expr,
         projection_expr,
-        names if names else None,
+        attr_names if attr_names else None,
         values if values else None,
         use_consistent,
     )
@@ -110,6 +116,7 @@ def _build_scan_params(
 
     # Build projection expression
     projection_expr = None
+    proj_names: dict[str, str] = {}
     if fields:
         proj_parts = []
         for i, field in enumerate(fields):
@@ -117,17 +124,22 @@ def _build_scan_params(
             part_placeholders = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
-                names[placeholder] = part
+                proj_names[placeholder] = part
                 part_placeholders.append(placeholder)
             proj_parts.append(".".join(part_placeholders))
         projection_expr = ", ".join(proj_parts)
+
+    # Merge names: filter uses {name: placeholder}, projection uses {placeholder: name}
+    # Convert filter names to {placeholder: name} format and merge with projection
+    attr_names = {v: k for k, v in names.items()}
+    attr_names.update(proj_names)
 
     use_consistent = _get_consistent_read(model_class, consistent_read)
 
     return (
         filter_expr,
         projection_expr,
-        names if names else None,
+        attr_names if attr_names else None,
         values if values else None,
         use_consistent,
     )

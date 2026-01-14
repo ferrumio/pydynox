@@ -3,8 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from pydynox import Model, ModelConfig
-from pydynox.attributes import StringAttribute
-from pydynox.ttl import ExpiresIn, TTLAttribute
+from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
 
 
 class Session(Model):

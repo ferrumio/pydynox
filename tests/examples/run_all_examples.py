@@ -33,7 +33,7 @@ TEST_SECRET_KEY = "testing"
 # Directories to skip entirely
 SKIP_DIRS = {"agentic"}
 
-# Files to skip (incomplete snippets, extra deps, LocalStack limitations)
+# Files to skip (incomplete snippets, extra deps, LocalStack limitations, pytest-only)
 SKIP_FILES = {
     "filter_condition.py",
     "query_gsi.py",
@@ -42,6 +42,14 @@ SKIP_FILES = {
     "fastapi_example.py",
     "create_table_multi_attr.py",
     "sdk_debug.py",
+    # Testing examples - these use pytest fixtures, not standalone scripts
+    "testing_query.py",
+    "testing_scan.py",
+    "testing_ttl.py",
+    "query_scan.py",
+    # Client projection examples - need specific table setup
+    "client_projection.py",
+    "nested_projection.py",
 }
 
 

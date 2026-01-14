@@ -37,6 +37,7 @@ nav = [
         "guides/encryption.md",
         "guides/s3-attribute.md",
         "guides/size-calculator.md",
+        "guides/projections.md",
     ] },
     { "Integrations" = [
         "guides/pydantic.md",
