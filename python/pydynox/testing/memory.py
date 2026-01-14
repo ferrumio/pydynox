@@ -377,6 +377,7 @@ class MemoryClient:
         consistent_read: bool = False,
         exclusive_start_key: dict[str, Any] | None = None,
         index_name: str | None = None,
+        projection_expression: str | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
         """Query a page of items from the in-memory table."""
         result = self.query(
@@ -407,6 +408,7 @@ class MemoryClient:
         segment: int | None = None,
         total_segments: int | None = None,
         index_name: str | None = None,
+        projection_expression: str | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
         """Scan a page of items from the in-memory table."""
         result = self.scan(

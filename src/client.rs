@@ -238,15 +238,38 @@ impl DynamoDBClient {
     }
 
     /// Get an item from a DynamoDB table by its key.
-    #[pyo3(signature = (table, key, consistent_read=false))]
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - Table name
+    /// * `key` - Key attributes as a dict
+    /// * `consistent_read` - Use strongly consistent read
+    /// * `projection` - List of attributes to return (saves RCU)
+    /// * `expression_attribute_names` - Attribute name placeholders for reserved words
+    ///
+    /// # Returns
+    ///
+    /// Tuple of (item or None, metrics).
+    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None))]
     pub fn get_item(
         &self,
         py: Python<'_>,
         table: &str,
         key: &Bound<'_, PyDict>,
         consistent_read: bool,
+        projection: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
-        basic_operations::get_item(py, &self.client, &self.runtime, table, key, consistent_read)
+        basic_operations::get_item(
+            py,
+            &self.client,
+            &self.runtime,
+            table,
+            key,
+            consistent_read,
+            projection,
+            expression_attribute_names,
+        )
     }
 
     /// Delete an item from a DynamoDB table.
@@ -301,7 +324,21 @@ impl DynamoDBClient {
     }
 
     /// Query a single page of items from a DynamoDB table.
-    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - Table name
+    /// * `key_condition_expression` - Key condition expression
+    /// * `filter_expression` - Optional filter expression
+    /// * `projection_expression` - Optional projection expression (saves RCU)
+    /// * `expression_attribute_names` - Attribute name placeholders
+    /// * `expression_attribute_values` - Attribute value placeholders
+    /// * `limit` - Max items per page
+    /// * `exclusive_start_key` - Start key for pagination
+    /// * `scan_index_forward` - Sort order (true = ascending)
+    /// * `index_name` - GSI or LSI name
+    /// * `consistent_read` - Use strongly consistent read
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
     pub fn query_page(
@@ -310,6 +347,7 @@ impl DynamoDBClient {
         table: &str,
         key_condition_expression: &str,
         filter_expression: Option<String>,
+        projection_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         limit: Option<i32>,
@@ -325,6 +363,7 @@ impl DynamoDBClient {
             table,
             key_condition_expression,
             filter_expression,
+            projection_expression,
             expression_attribute_names,
             expression_attribute_values,
             limit,
@@ -337,7 +376,21 @@ impl DynamoDBClient {
     }
 
     /// Scan a single page of items from a DynamoDB table.
-    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - Table name
+    /// * `filter_expression` - Optional filter expression
+    /// * `projection_expression` - Optional projection expression (saves RCU)
+    /// * `expression_attribute_names` - Attribute name placeholders
+    /// * `expression_attribute_values` - Attribute value placeholders
+    /// * `limit` - Max items per page
+    /// * `exclusive_start_key` - Start key for pagination
+    /// * `index_name` - GSI or LSI name
+    /// * `consistent_read` - Use strongly consistent read
+    /// * `segment` - Segment number for parallel scan
+    /// * `total_segments` - Total segments for parallel scan
+    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
     pub fn scan_page(
@@ -345,6 +398,7 @@ impl DynamoDBClient {
         py: Python<'_>,
         table: &str,
         filter_expression: Option<String>,
+        projection_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         limit: Option<i32>,
@@ -360,6 +414,7 @@ impl DynamoDBClient {
             &self.runtime,
             table,
             filter_expression,
+            projection_expression,
             expression_attribute_names,
             expression_attribute_values,
             limit,
@@ -510,20 +565,24 @@ impl DynamoDBClient {
     // ========== ASYNC METHODS ==========
 
     /// Async version of get_item.
-    #[pyo3(signature = (table, key, consistent_read=false))]
+    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None))]
     pub fn async_get_item<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         key: &Bound<'_, PyDict>,
         consistent_read: bool,
+        projection: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::async_get_item(
             py,
             self.client.clone(),
-            table.to_string(),
+            table,
             key,
             consistent_read,
+            projection,
+            expression_attribute_names,
         )
     }
 
@@ -599,7 +658,7 @@ impl DynamoDBClient {
     }
 
     /// Async version of query_page.
-    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn async_query_page<'py>(
         &self,
@@ -607,6 +666,7 @@ impl DynamoDBClient {
         table: &str,
         key_condition_expression: &str,
         filter_expression: Option<String>,
+        projection_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         limit: Option<i32>,
@@ -621,6 +681,7 @@ impl DynamoDBClient {
             table,
             key_condition_expression,
             filter_expression,
+            projection_expression,
             expression_attribute_names,
             expression_attribute_values,
             limit,
@@ -632,13 +693,14 @@ impl DynamoDBClient {
     }
 
     /// Async version of scan_page.
-    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
+    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn async_scan_page<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         filter_expression: Option<String>,
+        projection_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         limit: Option<i32>,
@@ -653,6 +715,7 @@ impl DynamoDBClient {
             self.client.clone(),
             table,
             filter_expression,
+            projection_expression,
             expression_attribute_names,
             expression_attribute_values,
             limit,
@@ -699,6 +762,7 @@ impl DynamoDBClient {
     /// * `table` - Table name
     /// * `total_segments` - Number of parallel segments (1-1000000)
     /// * `filter_expression` - Optional filter expression
+    /// * `projection_expression` - Optional projection expression (saves RCU)
     /// * `expression_attribute_names` - Attribute name placeholders
     /// * `expression_attribute_values` - Attribute value placeholders
     /// * `consistent_read` - Use strongly consistent reads
@@ -706,7 +770,7 @@ impl DynamoDBClient {
     /// # Returns
     ///
     /// Tuple of (items, metrics) where items is a list of all scanned items.
-    #[pyo3(signature = (table, total_segments, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
+    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn parallel_scan(
         &self,
@@ -714,6 +778,7 @@ impl DynamoDBClient {
         table: &str,
         total_segments: i32,
         filter_expression: Option<String>,
+        projection_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         consistent_read: bool,
@@ -725,6 +790,7 @@ impl DynamoDBClient {
             table,
             total_segments,
             filter_expression,
+            projection_expression,
             expression_attribute_names,
             expression_attribute_values,
             consistent_read,
@@ -732,7 +798,7 @@ impl DynamoDBClient {
     }
 
     /// Async version of parallel_scan.
-    #[pyo3(signature = (table, total_segments, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
+    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn async_parallel_scan<'py>(
         &self,
@@ -740,6 +806,7 @@ impl DynamoDBClient {
         table: &str,
         total_segments: i32,
         filter_expression: Option<String>,
+        projection_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         consistent_read: bool,
@@ -750,6 +817,7 @@ impl DynamoDBClient {
             table,
             total_segments,
             filter_expression,
+            projection_expression,
             expression_attribute_names,
             expression_attribute_values,
             consistent_read,

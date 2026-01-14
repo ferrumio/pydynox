@@ -335,6 +335,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> ModelQueryResult[M]:
         """Query items by hash key with optional conditions.
 
@@ -347,6 +348,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             consistent_read: Use strongly consistent read.
             last_evaluated_key: Start key for pagination.
             as_dict: If True, return dicts instead of Model instances.
+            fields: List of fields to return. Saves RCU by fetching only what you need.
 
         Returns:
             Iterable result that auto-paginates.
@@ -365,6 +367,10 @@ class Model(ModelBase, metaclass=ModelMeta):
             >>> # Return as dicts for better performance
             >>> for order in Order.query(hash_key="USER#1", as_dict=True):
             ...     print(order["order_id"])
+            >>>
+            >>> # Fetch only specific fields (saves RCU)
+            >>> for order in Order.query(hash_key="USER#1", fields=["order_id", "total"]):
+            ...     print(order.order_id, order.total)
         """
         return query(
             cls,
@@ -376,6 +382,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             consistent_read,
             last_evaluated_key,
             as_dict,
+            fields,
         )
 
     @classmethod
@@ -388,6 +395,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         segment: int | None = None,
         total_segments: int | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> ModelScanResult[M]:
         """Scan all items in the table.
 
@@ -399,6 +407,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             segment: Segment number for parallel scan.
             total_segments: Total segments for parallel scan.
             as_dict: If True, return dicts instead of Model instances.
+            fields: List of fields to return. Saves RCU by fetching only what you need.
 
         Returns:
             Iterable result that auto-paginates.
@@ -414,6 +423,10 @@ class Model(ModelBase, metaclass=ModelMeta):
             >>> # Return as dicts for better performance
             >>> for user in User.scan(as_dict=True):
             ...     print(user["name"])
+            >>>
+            >>> # Fetch only specific fields (saves RCU)
+            >>> for user in User.scan(fields=["pk", "name"]):
+            ...     print(user.pk, user.name)
         """
         return scan(
             cls,
@@ -424,6 +437,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             segment,
             total_segments,
             as_dict,
+            fields,
         )
 
     @classmethod
@@ -486,6 +500,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> AsyncModelQueryResult[M]:
         """Async version of query.
 
@@ -496,6 +511,10 @@ class Model(ModelBase, metaclass=ModelMeta):
             >>> # Return as dicts for better performance
             >>> async for order in Order.async_query(hash_key="USER#1", as_dict=True):
             ...     print(order["order_id"])
+            >>>
+            >>> # Fetch only specific fields (saves RCU)
+            >>> async for order in Order.async_query(hash_key="USER#1", fields=["order_id"]):
+            ...     print(order.order_id)
         """
         return async_query(
             cls,
@@ -507,6 +526,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             consistent_read,
             last_evaluated_key,
             as_dict,
+            fields,
         )
 
     @classmethod
@@ -519,6 +539,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         segment: int | None = None,
         total_segments: int | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> AsyncModelScanResult[M]:
         """Async version of scan.
 
@@ -529,6 +550,10 @@ class Model(ModelBase, metaclass=ModelMeta):
             >>> # Return as dicts for better performance
             >>> async for user in User.async_scan(as_dict=True):
             ...     print(user["name"])
+            >>>
+            >>> # Fetch only specific fields (saves RCU)
+            >>> async for user in User.async_scan(fields=["pk", "name"]):
+            ...     print(user.pk, user.name)
         """
         return async_scan(
             cls,
@@ -539,6 +564,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             segment,
             total_segments,
             as_dict,
+            fields,
         )
 
     @classmethod

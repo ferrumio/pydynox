@@ -41,10 +41,11 @@ def _build_query_params(
     range_key_condition: Condition | None,
     filter_condition: Condition | None,
     consistent_read: bool | None,
-) -> tuple[str, str | None, dict[str, str] | None, dict[str, Any] | None, bool]:
+    fields: list[str] | None = None,
+) -> tuple[str, str | None, str | None, dict[str, str] | None, dict[str, Any] | None, bool]:
     """Build query expression params.
 
-    Returns (key_cond, filter_expr, attr_names, attr_values, consistent).
+    Returns (key_cond, filter_expr, projection_expr, attr_names, attr_values, consistent).
     """
     hash_key_name = model_class._hash_key
     if hash_key_name is None:
@@ -65,12 +66,28 @@ def _build_query_params(
         key_condition = f"{key_condition} AND {rk_expr}"
 
     filter_expr = _serialize_filter(filter_condition, names, values)
+
+    # Build projection expression
+    projection_expr = None
+    if fields:
+        proj_parts = []
+        for i, field in enumerate(fields):
+            parts = field.split(".")
+            part_placeholders = []
+            for part in parts:
+                placeholder = f"#proj{i}_{len(part_placeholders)}"
+                names[part] = placeholder
+                part_placeholders.append(placeholder)
+            proj_parts.append(".".join(part_placeholders))
+        projection_expr = ", ".join(proj_parts)
+
     attr_names = {v: k for k, v in names.items()}
     use_consistent = _get_consistent_read(model_class, consistent_read)
 
     return (
         key_condition,
         filter_expr,
+        projection_expr,
         attr_names if attr_names else None,
         values if values else None,
         use_consistent,
@@ -81,17 +98,37 @@ def _build_scan_params(
     model_class: type[M],
     filter_condition: Condition | None,
     consistent_read: bool | None,
-) -> tuple[str | None, dict[str, str] | None, dict[str, Any] | None, bool]:
-    """Build scan expression params. Returns (filter_expr, attr_names, attr_values, consistent)."""
+    fields: list[str] | None = None,
+) -> tuple[str | None, str | None, dict[str, str] | None, dict[str, Any] | None, bool]:
+    """Build scan expression params.
+
+    Returns (filter_expr, projection_expr, attr_names, attr_values, consistent).
+    """
     names: dict[str, str] = {}
     values: dict[str, Any] = {}
 
     filter_expr = _serialize_filter(filter_condition, names, values)
+
+    # Build projection expression
+    projection_expr = None
+    if fields:
+        proj_parts = []
+        for i, field in enumerate(fields):
+            parts = field.split(".")
+            part_placeholders = []
+            for part in parts:
+                placeholder = f"#proj{i}_{len(part_placeholders)}"
+                names[part] = placeholder
+                part_placeholders.append(placeholder)
+            proj_parts.append(".".join(part_placeholders))
+        projection_expr = ", ".join(proj_parts)
+
     attr_names = {v: k for k, v in names.items()}
     use_consistent = _get_consistent_read(model_class, consistent_read)
 
     return (
         filter_expr,
+        projection_expr,
         attr_names if attr_names else None,
         values if values else None,
         use_consistent,
@@ -154,6 +191,7 @@ class ModelQueryResult(BaseModelResult[M]):
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> None:
         self._model_class = model_class
         self._hash_key_value = hash_key_value
@@ -164,6 +202,7 @@ class ModelQueryResult(BaseModelResult[M]):
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
         self._as_dict = as_dict
+        self._fields = fields
         self._result: Any = None
         self._items_iter: Any = None
         self._initialized = False
@@ -172,12 +211,15 @@ class ModelQueryResult(BaseModelResult[M]):
         client = self._model_class._get_client()
         table = self._model_class._get_table()
 
-        key_cond, filter_expr, attr_names, attr_values, use_consistent = _build_query_params(
-            self._model_class,
-            self._hash_key_value,
-            self._range_key_condition,
-            self._filter_condition,
-            self._consistent_read,
+        key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
+            _build_query_params(
+                self._model_class,
+                self._hash_key_value,
+                self._range_key_condition,
+                self._filter_condition,
+                self._consistent_read,
+                self._fields,
+            )
         )
 
         return QueryResult(
@@ -185,6 +227,7 @@ class ModelQueryResult(BaseModelResult[M]):
             table,
             key_cond,
             filter_expression=filter_expr,
+            projection_expression=projection_expr,
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,
@@ -226,6 +269,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> None:
         self._model_class = model_class
         self._hash_key_value = hash_key_value
@@ -236,6 +280,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
         self._as_dict = as_dict
+        self._fields = fields
         self._result: Any = None
         self._initialized = False
 
@@ -243,12 +288,15 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         client = self._model_class._get_client()
         table = self._model_class._get_table()
 
-        key_cond, filter_expr, attr_names, attr_values, use_consistent = _build_query_params(
-            self._model_class,
-            self._hash_key_value,
-            self._range_key_condition,
-            self._filter_condition,
-            self._consistent_read,
+        key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
+            _build_query_params(
+                self._model_class,
+                self._hash_key_value,
+                self._range_key_condition,
+                self._filter_condition,
+                self._consistent_read,
+                self._fields,
+            )
         )
 
         return AsyncQueryResult(
@@ -256,6 +304,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
             table,
             key_cond,
             filter_expression=filter_expr,
+            projection_expression=projection_expr,
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,
@@ -296,6 +345,7 @@ class ModelScanResult(BaseModelResult[M]):
         segment: int | None = None,
         total_segments: int | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> None:
         self._model_class = model_class
         self._filter_condition = filter_condition
@@ -305,6 +355,7 @@ class ModelScanResult(BaseModelResult[M]):
         self._segment = segment
         self._total_segments = total_segments
         self._as_dict = as_dict
+        self._fields = fields
         self._result: Any = None
         self._items_iter: Any = None
         self._initialized = False
@@ -313,14 +364,15 @@ class ModelScanResult(BaseModelResult[M]):
         client = self._model_class._get_client()
         table = self._model_class._get_table()
 
-        filter_expr, attr_names, attr_values, use_consistent = _build_scan_params(
-            self._model_class, self._filter_condition, self._consistent_read
+        filter_expr, projection_expr, attr_names, attr_values, use_consistent = _build_scan_params(
+            self._model_class, self._filter_condition, self._consistent_read, self._fields
         )
 
         return ScanResult(
             client._client,
             table,
             filter_expression=filter_expr,
+            projection_expression=projection_expr,
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,
@@ -362,6 +414,7 @@ class AsyncModelScanResult(BaseModelResult[M]):
         segment: int | None = None,
         total_segments: int | None = None,
         as_dict: bool = False,
+        fields: list[str] | None = None,
     ) -> None:
         self._model_class = model_class
         self._filter_condition = filter_condition
@@ -371,6 +424,7 @@ class AsyncModelScanResult(BaseModelResult[M]):
         self._segment = segment
         self._total_segments = total_segments
         self._as_dict = as_dict
+        self._fields = fields
         self._result: Any = None
         self._initialized = False
 
@@ -378,14 +432,15 @@ class AsyncModelScanResult(BaseModelResult[M]):
         client = self._model_class._get_client()
         table = self._model_class._get_table()
 
-        filter_expr, attr_names, attr_values, use_consistent = _build_scan_params(
-            self._model_class, self._filter_condition, self._consistent_read
+        filter_expr, projection_expr, attr_names, attr_values, use_consistent = _build_scan_params(
+            self._model_class, self._filter_condition, self._consistent_read, self._fields
         )
 
         return AsyncScanResult(
             client._client,
             table,
             filter_expression=filter_expr,
+            projection_expression=projection_expr,
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,

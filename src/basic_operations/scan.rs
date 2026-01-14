@@ -31,6 +31,7 @@ pub struct RawScanResult {
 pub struct PreparedScan {
     pub table: String,
     pub filter_expression: Option<String>,
+    pub projection_expression: Option<String>,
     pub expression_attribute_names: Option<HashMap<String, String>>,
     pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
     pub limit: Option<i32>,
@@ -47,6 +48,7 @@ pub fn prepare_scan(
     py: Python<'_>,
     table: &str,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     limit: Option<i32>,
@@ -80,6 +82,7 @@ pub fn prepare_scan(
     Ok(PreparedScan {
         table: table.to_string(),
         filter_expression,
+        projection_expression,
         expression_attribute_names: names,
         expression_attribute_values: values,
         limit,
@@ -109,6 +112,10 @@ pub async fn execute_scan(
 
     if let Some(filter) = prepared.filter_expression {
         request = request.filter_expression(filter);
+    }
+
+    if let Some(projection) = prepared.projection_expression {
+        request = request.projection_expression(projection);
     }
 
     if let Some(names) = prepared.expression_attribute_names {
@@ -201,6 +208,7 @@ pub fn scan(
     runtime: &Arc<Runtime>,
     table: &str,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     limit: Option<i32>,
@@ -214,6 +222,7 @@ pub fn scan(
         py,
         table,
         filter_expression,
+        projection_expression,
         expression_attribute_names,
         expression_attribute_values,
         limit,
@@ -239,6 +248,7 @@ pub fn async_scan<'py>(
     client: Client,
     table: &str,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     limit: Option<i32>,
@@ -252,6 +262,7 @@ pub fn async_scan<'py>(
         py,
         table,
         filter_expression,
+        projection_expression,
         expression_attribute_names,
         expression_attribute_values,
         limit,
@@ -507,6 +518,7 @@ pub struct PreparedParallelScan {
     pub table: String,
     pub total_segments: i32,
     pub filter_expression: Option<String>,
+    pub projection_expression: Option<String>,
     pub expression_attribute_names: Option<HashMap<String, String>>,
     pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
     pub consistent_read: bool,
@@ -519,6 +531,7 @@ pub fn prepare_parallel_scan(
     table: &str,
     total_segments: i32,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     consistent_read: bool,
@@ -543,6 +556,7 @@ pub fn prepare_parallel_scan(
         table: table.to_string(),
         total_segments,
         filter_expression,
+        projection_expression,
         expression_attribute_names: names,
         expression_attribute_values: values,
         consistent_read,
@@ -557,6 +571,7 @@ async fn execute_segment_scan(
     segment: i32,
     total_segments: i32,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<HashMap<String, String>>,
     expression_attribute_values: Option<HashMap<String, AttributeValue>>,
     consistent_read: bool,
@@ -574,6 +589,7 @@ async fn execute_segment_scan(
         let prepared = PreparedScan {
             table: table.clone(),
             filter_expression: filter_expression.clone(),
+            projection_expression: projection_expression.clone(),
             expression_attribute_names: expression_attribute_names.clone(),
             expression_attribute_values: expression_attribute_values.clone(),
             limit: None,
@@ -614,6 +630,7 @@ pub async fn execute_parallel_scan(
             let client = client.clone();
             let table = prepared.table.clone();
             let filter = prepared.filter_expression.clone();
+            let projection = prepared.projection_expression.clone();
             let names = prepared.expression_attribute_names.clone();
             let values = prepared.expression_attribute_values.clone();
             let consistent = prepared.consistent_read;
@@ -621,7 +638,7 @@ pub async fn execute_parallel_scan(
 
             tokio::spawn(async move {
                 execute_segment_scan(
-                    client, table, segment, total, filter, names, values, consistent,
+                    client, table, segment, total, filter, projection, names, values, consistent,
                 )
                 .await
             })
@@ -665,6 +682,7 @@ pub fn parallel_scan(
     table: &str,
     total_segments: i32,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     consistent_read: bool,
@@ -674,6 +692,7 @@ pub fn parallel_scan(
         table,
         total_segments,
         filter_expression,
+        projection_expression,
         expression_attribute_names,
         expression_attribute_values,
         consistent_read,
@@ -702,6 +721,7 @@ pub fn async_parallel_scan<'py>(
     table: &str,
     total_segments: i32,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     consistent_read: bool,
@@ -711,6 +731,7 @@ pub fn async_parallel_scan<'py>(
         table,
         total_segments,
         filter_expression,
+        projection_expression,
         expression_attribute_names,
         expression_attribute_values,
         consistent_read,

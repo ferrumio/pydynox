@@ -30,6 +30,7 @@ def query(
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
     as_dict: bool = False,
+    fields: list[str] | None = None,
 ) -> ModelQueryResult[M]:
     """Query items by hash key with optional conditions.
 
@@ -42,6 +43,7 @@ def query(
         consistent_read: If True, use strongly consistent read.
         last_evaluated_key: Start key for pagination.
         as_dict: If True, return dicts instead of Model instances.
+        fields: List of fields to return. Saves RCU by fetching only what you need.
 
     Returns:
         ModelQueryResult that yields typed model instances or dicts.
@@ -56,6 +58,7 @@ def query(
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
         as_dict=as_dict,
+        fields=fields,
     )
 
 
@@ -68,6 +71,7 @@ def scan(
     segment: int | None = None,
     total_segments: int | None = None,
     as_dict: bool = False,
+    fields: list[str] | None = None,
 ) -> ModelScanResult[M]:
     """Scan all items in the table.
 
@@ -81,6 +85,7 @@ def scan(
         segment: Segment number for parallel scan (0 to total_segments-1).
         total_segments: Total number of segments for parallel scan.
         as_dict: If True, return dicts instead of Model instances.
+        fields: List of fields to return. Saves RCU by fetching only what you need.
 
     Returns:
         ModelScanResult that yields typed model instances or dicts.
@@ -102,6 +107,7 @@ def scan(
         segment=segment,
         total_segments=total_segments,
         as_dict=as_dict,
+        fields=fields,
     )
 
 
@@ -179,6 +185,7 @@ def async_query(
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
     as_dict: bool = False,
+    fields: list[str] | None = None,
 ) -> AsyncModelQueryResult[M]:
     """Async version of query."""
     return AsyncModelQueryResult(
@@ -191,6 +198,7 @@ def async_query(
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
         as_dict=as_dict,
+        fields=fields,
     )
 
 
@@ -203,6 +211,7 @@ def async_scan(
     segment: int | None = None,
     total_segments: int | None = None,
     as_dict: bool = False,
+    fields: list[str] | None = None,
 ) -> AsyncModelScanResult[M]:
     """Async version of scan."""
     return AsyncModelScanResult(
@@ -214,6 +223,7 @@ def async_scan(
         segment=segment,
         total_segments=total_segments,
         as_dict=as_dict,
+        fields=fields,
     )
 
 

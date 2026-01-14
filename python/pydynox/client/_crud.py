@@ -11,6 +11,46 @@ from pydynox._internal._tracing import add_response_attributes, trace_operation
 _SLOW_QUERY_THRESHOLD_MS = 100.0
 
 
+def _build_projection(
+    projection: list[str] | None,
+) -> tuple[str | None, dict[str, str] | None]:
+    """Build projection expression and attribute names from a list of fields.
+
+    Handles reserved words by using placeholders (#p0, #p1, etc).
+    Supports nested attributes with dot notation.
+
+    Args:
+        projection: List of attribute names to project.
+
+    Returns:
+        Tuple of (projection_expression, expression_attribute_names).
+        Both are None if projection is None or empty.
+
+    Example:
+        >>> _build_projection(["name", "address.city"])
+        ("#p0, #p1.#p2", {"#p0": "name", "#p1": "address", "#p2": "city"})
+    """
+    if not projection:
+        return None, None
+
+    attr_names: dict[str, str] = {}
+    placeholders: list[str] = []
+    counter = 0
+
+    for field in projection:
+        # Handle nested attributes (e.g., "address.city")
+        parts = field.split(".")
+        part_placeholders = []
+        for part in parts:
+            placeholder = f"#p{counter}"
+            attr_names[placeholder] = part
+            part_placeholders.append(placeholder)
+            counter += 1
+        placeholders.append(".".join(part_placeholders))
+
+    return ", ".join(placeholders), attr_names
+
+
 def _extract_pk(item_or_key: dict[str, Any]) -> str | None:
     """Extract partition key value from item or key dict.
 
@@ -93,17 +133,43 @@ class CrudOperations:
     # ========== GET ==========
 
     def get_item(
-        self, table: str, key: dict[str, Any], consistent_read: bool = False
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        projection: list[str] | None = None,
     ) -> DictWithMetrics | None:
-        """Get an item from a DynamoDB table by its key."""
+        """Get an item from a DynamoDB table by its key.
+
+        Args:
+            table: Table name.
+            key: Key attributes as a dict.
+            consistent_read: Use strongly consistent read.
+            projection: List of attributes to return. Saves RCU by fetching only
+                what you need. Use dot notation for nested: ["name", "address.city"].
+
+        Returns:
+            The item as a dict with metrics, or None if not found.
+
+        Example:
+            >>> # Get only name and email
+            >>> item = client.get_item("users", {"pk": "USER#1"}, projection=["name", "email"])
+        """
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
         if pk:
             self._record_read(table, pk)  # type: ignore[attr-defined]
 
+        # Build projection expression
+        projection_expr, attr_names = _build_projection(projection)
+
         with trace_operation("get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             result, metrics = self._client.get_item(  # type: ignore[attr-defined]
-                table, key, consistent_read=consistent_read
+                table,
+                key,
+                consistent_read=consistent_read,
+                projection=projection_expr,
+                expression_attribute_names=attr_names,
             )
             add_response_attributes(
                 span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
@@ -117,17 +183,38 @@ class CrudOperations:
         return DictWithMetrics(result, metrics)
 
     async def async_get_item(
-        self, table: str, key: dict[str, Any], consistent_read: bool = False
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        projection: list[str] | None = None,
     ) -> DictWithMetrics | None:
-        """Async version of get_item."""
+        """Async version of get_item.
+
+        Args:
+            table: Table name.
+            key: Key attributes as a dict.
+            consistent_read: Use strongly consistent read.
+            projection: List of attributes to return. Saves RCU.
+
+        Returns:
+            The item as a dict with metrics, or None if not found.
+        """
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
         if pk:
             self._record_read(table, pk)  # type: ignore[attr-defined]
 
+        # Build projection expression
+        projection_expr, attr_names = _build_projection(projection)
+
         with trace_operation("async_get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             result = await self._client.async_get_item(  # type: ignore[attr-defined]
-                table, key, consistent_read=consistent_read
+                table,
+                key,
+                consistent_read=consistent_read,
+                projection=projection_expr,
+                expression_attribute_names=attr_names,
             )
             metrics = result["metrics"]
             add_response_attributes(

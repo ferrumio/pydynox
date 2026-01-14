@@ -32,6 +32,7 @@ pub struct PreparedQuery {
     pub table: String,
     pub key_condition_expression: String,
     pub filter_expression: Option<String>,
+    pub projection_expression: Option<String>,
     pub expression_attribute_names: Option<HashMap<String, String>>,
     pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
     pub limit: Option<i32>,
@@ -48,6 +49,7 @@ pub fn prepare_query(
     table: &str,
     key_condition_expression: &str,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     limit: Option<i32>,
@@ -81,6 +83,7 @@ pub fn prepare_query(
         table: table.to_string(),
         key_condition_expression: key_condition_expression.to_string(),
         filter_expression,
+        projection_expression,
         expression_attribute_names: names,
         expression_attribute_values: values,
         limit,
@@ -110,6 +113,10 @@ pub async fn execute_query(
 
     if let Some(filter) = prepared.filter_expression {
         request = request.filter_expression(filter);
+    }
+
+    if let Some(projection) = prepared.projection_expression {
+        request = request.projection_expression(projection);
     }
 
     if let Some(names) = prepared.expression_attribute_names {
@@ -202,6 +209,7 @@ pub fn query(
     table: &str,
     key_condition_expression: &str,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     limit: Option<i32>,
@@ -215,6 +223,7 @@ pub fn query(
         table,
         key_condition_expression,
         filter_expression,
+        projection_expression,
         expression_attribute_names,
         expression_attribute_values,
         limit,
@@ -240,6 +249,7 @@ pub fn async_query<'py>(
     table: &str,
     key_condition_expression: &str,
     filter_expression: Option<String>,
+    projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     limit: Option<i32>,
@@ -253,6 +263,7 @@ pub fn async_query<'py>(
         table,
         key_condition_expression,
         filter_expression,
+        projection_expression,
         expression_attribute_names,
         expression_attribute_values,
         limit,
