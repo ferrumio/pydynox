@@ -57,7 +57,7 @@ def _build_query_params(
     # Build key condition
     hk_placeholder = "#pk"
     hk_val_placeholder = ":pkv"
-    names[hash_key_name] = hk_placeholder
+    names[hk_placeholder] = hash_key_name
     values[hk_val_placeholder] = hash_key_value
     key_condition = f"{hk_placeholder} = {hk_val_placeholder}"
 
@@ -76,19 +76,18 @@ def _build_query_params(
             part_placeholders = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
-                names[part] = placeholder
+                names[placeholder] = part
                 part_placeholders.append(placeholder)
             proj_parts.append(".".join(part_placeholders))
         projection_expr = ", ".join(proj_parts)
 
-    attr_names = {v: k for k, v in names.items()}
     use_consistent = _get_consistent_read(model_class, consistent_read)
 
     return (
         key_condition,
         filter_expr,
         projection_expr,
-        attr_names if attr_names else None,
+        names if names else None,
         values if values else None,
         use_consistent,
     )
@@ -118,18 +117,17 @@ def _build_scan_params(
             part_placeholders = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
-                names[part] = placeholder
+                names[placeholder] = part
                 part_placeholders.append(placeholder)
             proj_parts.append(".".join(part_placeholders))
         projection_expr = ", ".join(proj_parts)
 
-    attr_names = {v: k for k, v in names.items()}
     use_consistent = _get_consistent_read(model_class, consistent_read)
 
     return (
         filter_expr,
         projection_expr,
-        attr_names if attr_names else None,
+        names if names else None,
         values if values else None,
         use_consistent,
     )
