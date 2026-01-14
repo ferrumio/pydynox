@@ -15,6 +15,7 @@ pydynox answers these questions automatically. Every operation returns metrics, 
 ## Key features
 
 - Metrics on every operation (duration, RCU/WCU, item counts)
+- Model-level metrics with class methods (no field conflicts)
 - Automatic logging at INFO level
 - Custom logger support (Powertools, structlog)
 - Correlation ID for request tracing
@@ -22,29 +23,52 @@ pydynox answers these questions automatically. Every operation returns metrics, 
 
 ## Getting started
 
-### Metrics on every operation
+pydynox has two ways to access metrics:
 
-Every pydynox operation returns metrics. You don't need to enable anything.
+1. **Client metrics** - Direct access on client operations (low-level)
+2. **Model metrics** - Class methods on Model classes (high-level)
 
-For `get_item`, the returned dict has a `.metrics` attribute:
+### Client metrics
 
-=== "get_item_metrics.py"
-    ```python
-    --8<-- "docs/examples/observability/get_item_metrics.py"
-    ```
+For low-level client operations, metrics are available directly.
 
-For write operations, metrics are returned directly:
+Write operations return `OperationMetrics`:
 
 === "put_item_metrics.py"
     ```python
     --8<-- "docs/examples/observability/put_item_metrics.py"
     ```
 
-For queries, access metrics after iteration:
+Read operations store metrics in `client._last_metrics`:
 
-=== "query_metrics.py"
+=== "get_item_metrics.py"
     ```python
-    --8<-- "docs/examples/observability/query_metrics.py"
+    --8<-- "docs/examples/observability/get_item_metrics.py"
+    ```
+
+### Model metrics
+
+For Model operations, use class methods. This avoids conflicts with user fields named "metrics".
+
+=== "model_metrics.py"
+    ```python
+    --8<-- "docs/examples/observability/model_metrics.py"
+    ```
+
+Each Model class has isolated metrics:
+
+=== "model_metrics_isolated.py"
+    ```python
+    --8<-- "docs/examples/observability/model_metrics_isolated.py"
+    ```
+
+### Reset metrics per request
+
+In long-running processes (FastAPI, Flask), metrics accumulate forever. Reset at the start of each request:
+
+=== "model_metrics_reset.py"
+    ```python
+    --8<-- "docs/examples/observability/model_metrics_reset.py"
     ```
 
 ### What's in metrics
@@ -57,6 +81,23 @@ For queries, access metrics after iteration:
 | `items_count` | int or None | Items returned (query/scan) |
 | `scanned_count` | int or None | Items scanned before filtering |
 | `request_id` | str or None | AWS request ID for support tickets |
+
+### Model total metrics
+
+`get_total_metrics()` returns aggregated metrics:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_rcu` | float | Total RCU consumed |
+| `total_wcu` | float | Total WCU consumed |
+| `total_duration_ms` | float | Total time spent |
+| `operation_count` | int | Total operations |
+| `get_count` | int | Number of get operations |
+| `put_count` | int | Number of put operations |
+| `delete_count` | int | Number of delete operations |
+| `update_count` | int | Number of update operations |
+| `query_count` | int | Number of query operations |
+| `scan_count` | int | Number of scan operations |
 
 ### Automatic logging
 

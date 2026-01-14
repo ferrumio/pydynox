@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core
+    from pydynox._internal._metrics import OperationMetrics
     from pydynox.diagnostics import HotPartitionDetector
     from pydynox.rate_limit import AdaptiveRate, FixedRate
 
@@ -17,6 +18,7 @@ class BaseClient:
     _rate_limit: FixedRate | AdaptiveRate | None
     _diagnostics: HotPartitionDetector | None
     _config: dict[str, str | float | int | None]
+    _last_metrics: OperationMetrics | None
 
     def __init__(
         self,
@@ -55,6 +57,7 @@ class BaseClient:
         )
         self._rate_limit = rate_limit
         self._diagnostics = diagnostics
+        self._last_metrics = None
 
         # Store config for S3/KMS to inherit
         self._config = {

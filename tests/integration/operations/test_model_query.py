@@ -183,23 +183,6 @@ def test_model_query_empty_result(populated_orders):
     assert orders == []
 
 
-def test_model_query_metrics(populated_orders):
-    """Test Model.query exposes metrics after iteration."""
-    Order = populated_orders
-
-    result = Order.query(hash_key="CUSTOMER#1")
-
-    # metrics is None before iteration
-    assert result.metrics is None
-
-    # iterate
-    _ = list(result)
-
-    # metrics available after iteration
-    assert result.metrics is not None
-    assert result.metrics.duration_ms > 0
-
-
 def test_model_query_last_evaluated_key(populated_orders):
     """Test Model.query exposes last_evaluated_key."""
     Order = populated_orders

@@ -26,14 +26,6 @@ class FakeMetrics:
     items_count: int = 0
 
 
-class FakeDictWithMetrics(dict):
-    """Fake DictWithMetrics for in-memory backend."""
-
-    def __init__(self, data: dict[str, Any], metrics: FakeMetrics):
-        super().__init__(data)
-        self.metrics = metrics
-
-
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -167,6 +159,7 @@ class MemoryClient:
         self._table_schemas: dict[str, dict[str, str]] = {}  # table -> {hash_key, range_key}
         self._rate_limit = None
         self._diagnostics = None
+        self._last_metrics: FakeMetrics | None = None
         # For compatibility with code that accesses _client directly
         self._client = self
 
@@ -273,19 +266,21 @@ class MemoryClient:
                 raise ConditionCheckFailedError("Condition check failed")
 
         tbl[key_str] = copy.deepcopy(item)
-        return self._make_metrics(start, wcu=1)
+        self._last_metrics = self._make_metrics(start, wcu=1)
+        return self._last_metrics
 
     def get_item(
         self, table: str, key: dict[str, Any], consistent_read: bool = False
-    ) -> FakeDictWithMetrics | None:
+    ) -> dict[str, Any] | None:
         """Get an item from the in-memory table."""
         start = time.time()
         tbl = self._get_table(table)
         key_str = self._make_key_string(key)
         item = tbl.get(key_str)
+        self._last_metrics = self._make_metrics(start, rcu=1)
         if item is None:
             return None
-        return FakeDictWithMetrics(copy.deepcopy(item), self._make_metrics(start, rcu=1))
+        return copy.deepcopy(item)
 
     def delete_item(
         self,
@@ -314,7 +309,8 @@ class MemoryClient:
                 raise ConditionCheckFailedError("Condition check failed")
 
         tbl.pop(key_str, None)
-        return self._make_metrics(start, wcu=1)
+        self._last_metrics = self._make_metrics(start, wcu=1)
+        return self._last_metrics
 
     def update_item(
         self,
@@ -361,7 +357,8 @@ class MemoryClient:
                 existing, update_expression, expression_attribute_names, expression_attribute_values
             )
 
-        return self._make_metrics(start, wcu=1)
+        self._last_metrics = self._make_metrics(start, wcu=1)
+        return self._last_metrics
 
     # ========== QUERY/SCAN ==========
 

@@ -9,7 +9,6 @@ from pydynox.hooks import HookType
 from pydynox.query import AsyncQueryResult, AsyncScanResult, QueryResult, ScanResult
 
 if TYPE_CHECKING:
-    from pydynox._internal._metrics import OperationMetrics
     from pydynox.conditions import Condition
     from pydynox.model import Model
 
@@ -159,13 +158,6 @@ class BaseModelResult(ABC, Generic[M]):
         if self._result is None:
             return None
         return self._result.last_evaluated_key
-
-    @property
-    def metrics(self) -> OperationMetrics | None:
-        """Metrics from the last page fetch."""
-        if self._result is None:
-            return None
-        return self._result.metrics
 
     def _to_instance(self, item: dict[str, Any]) -> M:
         """Convert dict to model instance and run hooks."""

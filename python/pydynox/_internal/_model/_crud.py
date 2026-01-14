@@ -32,6 +32,11 @@ def get(
     # prepare: get client, table, resolve consistent_read
     client, table, keys_dict, use_consistent = prepare_get(cls, consistent_read, keys)
     item = client.get_item(table, keys_dict, consistent_read=use_consistent)
+
+    # Record metrics from client
+    if client._last_metrics is not None:
+        cls._record_metrics(client._last_metrics, "get")
+
     if item is None:
         return None
     if as_dict:
@@ -60,6 +65,10 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
     else:
         client.put_item(table, item)
 
+    # Record metrics from client
+    if client._last_metrics is not None:
+        self.__class__._record_metrics(client._last_metrics, "put")
+
     # finalize: run AFTER_SAVE hooks
     finalize_save(self, skip)
 
@@ -81,6 +90,10 @@ def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | N
         )
     else:
         client.delete_item(table, key)
+
+    # Record metrics from client
+    if client._last_metrics is not None:
+        self.__class__._record_metrics(client._last_metrics, "delete")
 
     # S3 cleanup after successful delete
     self._delete_s3_files()
@@ -123,6 +136,10 @@ def update(
         else:
             client.update_item(table, key, updates=updates)
 
+    # Record metrics from client
+    if client._last_metrics is not None:
+        self.__class__._record_metrics(client._last_metrics, "update")
+
     # finalize: run AFTER_UPDATE hooks
     finalize_update(self, skip)
 
@@ -151,6 +168,10 @@ def update_by_key(
     else:
         client.update_item(table, key, updates=updates)
 
+    # Record metrics from client
+    if client._last_metrics is not None:
+        cls._record_metrics(client._last_metrics, "update")
+
 
 def delete_by_key(
     cls: type[M],
@@ -173,3 +194,7 @@ def delete_by_key(
         )
     else:
         client.delete_item(table, key)
+
+    # Record metrics from client
+    if client._last_metrics is not None:
+        cls._record_metrics(client._last_metrics, "delete")
