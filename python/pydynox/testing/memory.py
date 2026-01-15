@@ -26,6 +26,55 @@ class FakeMetrics:
     items_count: int = 0
 
 
+@dataclass
+class FakeTotalMetrics:
+    """Fake total metrics for in-memory backend."""
+
+    total_rcu: float = 0.0
+    total_wcu: float = 0.0
+    total_duration_ms: float = 0.0
+    operation_count: int = 0
+    get_count: int = 0
+    put_count: int = 0
+    delete_count: int = 0
+    update_count: int = 0
+    query_count: int = 0
+    scan_count: int = 0
+
+    def add(self, metrics: FakeMetrics, operation: str) -> None:
+        """Add metrics from an operation."""
+        self.total_rcu += metrics.consumed_rcu
+        self.total_wcu += metrics.consumed_wcu
+        self.total_duration_ms += metrics.duration_ms
+        self.operation_count += 1
+
+        if operation == "get":
+            self.get_count += 1
+        elif operation == "put":
+            self.put_count += 1
+        elif operation == "delete":
+            self.delete_count += 1
+        elif operation == "update":
+            self.update_count += 1
+        elif operation == "query":
+            self.query_count += 1
+        elif operation == "scan":
+            self.scan_count += 1
+
+    def reset(self) -> None:
+        """Reset all metrics to zero."""
+        self.total_rcu = 0.0
+        self.total_wcu = 0.0
+        self.total_duration_ms = 0.0
+        self.operation_count = 0
+        self.get_count = 0
+        self.put_count = 0
+        self.delete_count = 0
+        self.update_count = 0
+        self.query_count = 0
+        self.scan_count = 0
+
+
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -160,6 +209,7 @@ class MemoryClient:
         self._rate_limit = None
         self._diagnostics = None
         self._last_metrics: FakeMetrics | None = None
+        self._total_metrics = FakeTotalMetrics()
         # For compatibility with code that accesses _client directly
         self._client = self
 
@@ -237,6 +287,11 @@ class MemoryClient:
             request_id="memory-backend",
         )
 
+    def _record_metrics(self, metrics: FakeMetrics, operation: str) -> None:
+        """Record metrics for an operation."""
+        self._last_metrics = metrics
+        self._total_metrics.add(metrics, operation)
+
     # ========== CRUD ==========
 
     def put_item(
@@ -266,8 +321,9 @@ class MemoryClient:
                 raise ConditionCheckFailedError("Condition check failed")
 
         tbl[key_str] = copy.deepcopy(item)
-        self._last_metrics = self._make_metrics(start, wcu=1)
-        return self._last_metrics
+        metrics = self._make_metrics(start, wcu=1)
+        self._record_metrics(metrics, "put")
+        return metrics
 
     def get_item(
         self, table: str, key: dict[str, Any], consistent_read: bool = False
@@ -277,7 +333,8 @@ class MemoryClient:
         tbl = self._get_table(table)
         key_str = self._make_key_string(key)
         item = tbl.get(key_str)
-        self._last_metrics = self._make_metrics(start, rcu=1)
+        metrics = self._make_metrics(start, rcu=1)
+        self._record_metrics(metrics, "get")
         if item is None:
             return None
         return copy.deepcopy(item)
@@ -309,8 +366,9 @@ class MemoryClient:
                 raise ConditionCheckFailedError("Condition check failed")
 
         tbl.pop(key_str, None)
-        self._last_metrics = self._make_metrics(start, wcu=1)
-        return self._last_metrics
+        metrics = self._make_metrics(start, wcu=1)
+        self._record_metrics(metrics, "delete")
+        return metrics
 
     def update_item(
         self,
@@ -357,8 +415,9 @@ class MemoryClient:
                 existing, update_expression, expression_attribute_names, expression_attribute_values
             )
 
-        self._last_metrics = self._make_metrics(start, wcu=1)
-        return self._last_metrics
+        metrics = self._make_metrics(start, wcu=1)
+        self._record_metrics(metrics, "update")
+        return metrics
 
     # ========== QUERY/SCAN ==========
 
@@ -584,6 +643,19 @@ class MemoryClient:
     def get_region(self) -> str:
         """Return fake region."""
         return "us-east-1"
+
+    def get_last_metrics(self) -> FakeMetrics | None:
+        """Get metrics from the last operation."""
+        return self._last_metrics
+
+    def get_total_metrics(self) -> FakeTotalMetrics:
+        """Get aggregated metrics from all operations."""
+        return self._total_metrics
+
+    def reset_metrics(self) -> None:
+        """Reset all metrics to zero."""
+        self._last_metrics = None
+        self._total_metrics.reset()
 
     def ping(self) -> bool:
         """Always returns True for memory backend."""

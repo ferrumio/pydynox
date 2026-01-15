@@ -30,20 +30,27 @@ pydynox has two ways to access metrics:
 
 ### Client metrics
 
-For low-level client operations, metrics are available directly.
+For low-level client operations, use `client.get_last_metrics()` and `client.get_total_metrics()`.
 
-Write operations return `OperationMetrics`:
+Write operations also return metrics directly:
 
 === "put_item_metrics.py"
     ```python
     --8<-- "docs/examples/observability/put_item_metrics.py"
     ```
 
-Read operations store metrics in `client._last_metrics`:
+Read operations store metrics for retrieval:
 
 === "get_item_metrics.py"
     ```python
     --8<-- "docs/examples/observability/get_item_metrics.py"
+    ```
+
+Get total metrics across all operations:
+
+=== "client_total_metrics.py"
+    ```python
+    --8<-- "docs/examples/observability/client_total_metrics.py"
     ```
 
 ### Model metrics
@@ -69,6 +76,11 @@ In long-running processes (FastAPI, Flask), metrics accumulate forever. Reset at
 === "model_metrics_reset.py"
     ```python
     --8<-- "docs/examples/observability/model_metrics_reset.py"
+    ```
+
+=== "client_reset_metrics.py"
+    ```python
+    --8<-- "docs/examples/observability/client_reset_metrics.py"
     ```
 
 ### What's in metrics

@@ -66,6 +66,11 @@ def _extract_pk(item_or_key: dict[str, Any]) -> str | None:
 class CrudOperations:
     """CRUD operations: get, put, delete, update."""
 
+    def _record_metrics(self, metrics: OperationMetrics, operation: str) -> None:
+        """Record metrics for an operation."""
+        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._total_metrics.add(metrics, operation)  # type: ignore[attr-defined]
+
     # ========== PUT ==========
 
     def put_item(
@@ -97,7 +102,7 @@ class CrudOperations:
         _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "put")
         return metrics  # type: ignore[no-any-return]
 
     async def async_put_item(
@@ -129,7 +134,7 @@ class CrudOperations:
         _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "put")
         return metrics  # type: ignore[no-any-return]
 
     # ========== GET ==========
@@ -176,7 +181,7 @@ class CrudOperations:
                 span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
             )
 
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "get")
         _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("get_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
@@ -224,7 +229,7 @@ class CrudOperations:
         _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("get_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "get")
         return result["item"]
 
     # ========== DELETE ==========
@@ -258,7 +263,7 @@ class CrudOperations:
         _log_operation("delete_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("delete_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "delete")
         return metrics  # type: ignore[no-any-return]
 
     async def async_delete_item(
@@ -290,7 +295,7 @@ class CrudOperations:
         _log_operation("delete_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("delete_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "delete")
         return metrics  # type: ignore[no-any-return]
 
     # ========== UPDATE ==========
@@ -328,7 +333,7 @@ class CrudOperations:
         _log_operation("update_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("update_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "update")
         return metrics  # type: ignore[no-any-return]
 
     async def async_update_item(
@@ -364,5 +369,5 @@ class CrudOperations:
         _log_operation("update_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("update_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._record_metrics(metrics, "update")
         return metrics  # type: ignore[no-any-return]
