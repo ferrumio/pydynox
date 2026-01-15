@@ -73,7 +73,7 @@ async def test_concurrent_operations_faster_than_sequential(async_table: DynamoD
     If async is truly non-blocking, running N operations concurrently
     should take roughly the same time as 1 operation, not N times longer.
     """
-    n_operations = 10
+    n_operations = 100
 
     # Create test items first
     for i in range(n_operations):
