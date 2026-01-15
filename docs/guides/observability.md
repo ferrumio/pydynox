@@ -110,6 +110,8 @@ In long-running processes (FastAPI, Flask), metrics accumulate forever. Reset at
 | `update_count` | int | Number of update operations |
 | `query_count` | int | Number of query operations |
 | `scan_count` | int | Number of scan operations |
+| `kms_duration_ms` | float | Time spent on KMS calls |
+| `kms_calls` | int | Number of KMS API calls |
 
 ### Automatic logging
 

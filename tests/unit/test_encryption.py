@@ -83,30 +83,38 @@ def test_encrypted_attribute_none_value():
 
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
-    """serialize calls encryptor.encrypt."""
+    """serialize calls encryptor.encrypt_with_metrics."""
     mock_encryptor = MagicMock()
-    mock_encryptor.encrypt.return_value = "ENC:encrypted_data"
+    mock_result = MagicMock()
+    mock_result.ciphertext = "ENC:encrypted_data"
+    mock_result.metrics.duration_ms = 10.0
+    mock_result.metrics.kms_calls = 1
+    mock_encryptor.encrypt_with_metrics.return_value = mock_result
     mock_kms_class.return_value = mock_encryptor
 
     attr = EncryptedAttribute(key_id="alias/test")
     result = attr.serialize("secret")
 
-    mock_encryptor.encrypt.assert_called_once_with("secret")
+    mock_encryptor.encrypt_with_metrics.assert_called_once_with("secret")
     assert result == "ENC:encrypted_data"
 
 
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_deserialize_calls_decrypt(mock_kms_class):
-    """deserialize calls encryptor.decrypt for encrypted values."""
+    """deserialize calls encryptor.decrypt_with_metrics for encrypted values."""
     mock_encryptor = MagicMock()
-    mock_encryptor.decrypt.return_value = "secret"
+    mock_result = MagicMock()
+    mock_result.plaintext = "secret"
+    mock_result.metrics.duration_ms = 10.0
+    mock_result.metrics.kms_calls = 1
+    mock_encryptor.decrypt_with_metrics.return_value = mock_result
     mock_kms_class.return_value = mock_encryptor
     mock_kms_class.is_encrypted.return_value = True
 
     attr = EncryptedAttribute(key_id="alias/test")
     result = attr.deserialize("ENC:encrypted_data")
 
-    mock_encryptor.decrypt.assert_called_once_with("ENC:encrypted_data")
+    mock_encryptor.decrypt_with_metrics.assert_called_once_with("ENC:encrypted_data")
     assert result == "secret"
 
 
@@ -173,8 +181,18 @@ def test_encrypted_attribute_writeonly_skips_decrypt(mock_kms_class):
 def test_encrypted_attribute_readwrite_can_do_both(mock_kms_class):
     """ReadWrite mode allows both encrypt and decrypt."""
     mock_encryptor = MagicMock()
-    mock_encryptor.encrypt.return_value = "ENC:data"
-    mock_encryptor.decrypt.return_value = "secret"
+    mock_encrypt_result = MagicMock()
+    mock_encrypt_result.ciphertext = "ENC:data"
+    mock_encrypt_result.metrics.duration_ms = 10.0
+    mock_encrypt_result.metrics.kms_calls = 1
+    mock_encryptor.encrypt_with_metrics.return_value = mock_encrypt_result
+
+    mock_decrypt_result = MagicMock()
+    mock_decrypt_result.plaintext = "secret"
+    mock_decrypt_result.metrics.duration_ms = 10.0
+    mock_decrypt_result.metrics.kms_calls = 1
+    mock_encryptor.decrypt_with_metrics.return_value = mock_decrypt_result
+
     mock_kms_class.return_value = mock_encryptor
     mock_kms_class.is_encrypted.return_value = True
 

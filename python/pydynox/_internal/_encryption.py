@@ -7,6 +7,9 @@ from enum import IntEnum
 from pydynox import pydynox_core
 
 KmsEncryptor = pydynox_core.KmsEncryptor
+KmsMetrics = pydynox_core.KmsMetrics
+EncryptResult = pydynox_core.EncryptResult
+DecryptResult = pydynox_core.DecryptResult
 
 
 class EncryptionMode(IntEnum):

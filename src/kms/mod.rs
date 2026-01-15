@@ -14,6 +14,7 @@ mod client;
 mod operations;
 
 pub use client::KmsEncryptor;
+pub use operations::{DecryptResult, EncryptResult, KmsMetrics};
 
 use pyo3::prelude::*;
 
@@ -23,5 +24,8 @@ pub const ENCRYPTED_PREFIX: &str = "ENC:";
 /// Register KMS classes in the Python module.
 pub fn register_kms(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<KmsEncryptor>()?;
+    m.add_class::<KmsMetrics>()?;
+    m.add_class::<EncryptResult>()?;
+    m.add_class::<DecryptResult>()?;
     Ok(())
 }
