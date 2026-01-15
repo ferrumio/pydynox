@@ -52,7 +52,34 @@ def test_user_can_login():
     ...
 ```
 
-## 4. Missing Type Hints
+## 4. Missing GIVEN/WHEN/THEN Comments
+
+Tests should have clear separation between setup, action, and assertion.
+
+**Wrong:**
+```python
+def test_model_uses_config_client():
+    mock_client = MagicMock()
+    mock_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
+    User.get(pk="USER#1")
+    mock_client.get_item.assert_called_once()
+```
+
+**Right:**
+```python
+def test_model_uses_config_client():
+    # GIVEN a model with a mock client configured
+    mock_client = MagicMock()
+    mock_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
+
+    # WHEN we call get
+    User.get(pk="USER#1")
+
+    # THEN the mock client should be called
+    mock_client.get_item.assert_called_once()
+```
+
+## 5. Missing Type Hints
 
 All Python code needs type hints.
 
@@ -68,7 +95,7 @@ def get_item(self, pk: str, sk: Optional[str] = None) -> Optional["Model"]:
     ...
 ```
 
-## 5. Missing Doc Comments in Rust
+## 6. Missing Doc Comments in Rust
 
 All public Rust items need doc comments.
 
@@ -92,7 +119,7 @@ pub fn serialize(py: Python<'_>, value: PyObject) -> PyResult<PyObject> {
 }
 ```
 
-## 6. Importing Optional Dependencies at Module Level
+## 7. Importing Optional Dependencies at Module Level
 
 Optional dependencies (like Pydantic) must only be imported when used.
 
@@ -116,7 +143,7 @@ def dynamodb_model(table: str, hash_key: str):
         )
 ```
 
-## 7. Letting AWS SDK Errors Bubble Up
+## 8. Letting AWS SDK Errors Bubble Up
 
 DynamoDB errors must be mapped to our custom exceptions.
 
@@ -134,7 +161,7 @@ match result {
 }
 ```
 
-## 8. Putting Hot Path Code in Python
+## 9. Putting Hot Path Code in Python
 
 Code that runs on every request should be in Rust.
 
@@ -156,7 +183,7 @@ pub fn serialize_to_dynamodb(value: &PyAny) -> PyResult<HashMap<String, Attribut
 }
 ```
 
-## 9. Importing from pydynox_core Directly
+## 10. Importing from pydynox_core Directly
 
 Always go through the pydynox module.
 
@@ -171,7 +198,7 @@ from pydynox import pydynox_core
 result = pydynox_core.serialize(data)
 ```
 
-## 10. Not Running Tests Before PR
+## 11. Not Running Tests Before PR
 
 Always run the full test suite:
 
