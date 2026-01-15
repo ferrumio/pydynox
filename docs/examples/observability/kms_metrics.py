@@ -7,7 +7,7 @@ class SecureUser(Model):
 
     pk: str = StringAttribute(hash_key=True)
     sk: str = StringAttribute(range_key=True)
-    ssn: str = EncryptedAttribute(key_id="alias/my-key")
+    ssn: str = EncryptedAttribute(key_id="alias/my-app-key")
 
 
 # Save with encrypted field
