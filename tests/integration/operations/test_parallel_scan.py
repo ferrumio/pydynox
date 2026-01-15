@@ -60,8 +60,10 @@ def test_parallel_scan_all_items(populated_users):
     """Test parallel_scan returns all items."""
     User = populated_users
 
+    # WHEN we parallel scan
     users, metrics = User.parallel_scan(total_segments=2)
 
+    # THEN all items are returned
     assert len(users) == 5
     for user in users:
         assert isinstance(user, User)
@@ -72,8 +74,10 @@ def test_parallel_scan_with_filter(populated_users):
     """Test parallel_scan with filter_condition."""
     User = populated_users
 
+    # WHEN we parallel scan with filter
     users, metrics = User.parallel_scan(total_segments=2, filter_condition=User.status == "active")
 
+    # THEN only matching items are returned
     assert len(users) == 3
     for user in users:
         assert user.status == "active"

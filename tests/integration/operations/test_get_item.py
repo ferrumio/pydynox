@@ -29,13 +29,14 @@ GET_ITEM_CASES = [
 @pytest.mark.parametrize("item", GET_ITEM_CASES)
 def test_get_item_retrieves_correctly(dynamo, item):
     """Test retrieving items with different data types."""
-    # Setup: save the item first
+    # GIVEN an item saved in DynamoDB
     dynamo.put_item("test_table", item)
 
-    # Test: get the item
+    # WHEN getting the item by key
     key = {"pk": item["pk"], "sk": item["sk"]}
     result = dynamo.get_item("test_table", key)
 
+    # THEN all fields match
     assert result is not None
     for field, value in item.items():
         assert result[field] == value
@@ -43,55 +44,68 @@ def test_get_item_retrieves_correctly(dynamo, item):
 
 def test_get_item_not_found_returns_none(dynamo):
     """Test that get_item returns None for non-existent items."""
+    # WHEN getting a non-existent item
     result = dynamo.get_item("test_table", {"pk": "NONEXISTENT", "sk": "NONE"})
+
+    # THEN None is returned
     assert result is None
 
 
 def test_get_item_with_partial_key(dynamo):
     """Test get_item only returns exact key match."""
+    # GIVEN two items with same pk but different sk
     dynamo.put_item("test_table", {"pk": "PARTIAL#1", "sk": "A", "data": "first"})
     dynamo.put_item("test_table", {"pk": "PARTIAL#1", "sk": "B", "data": "second"})
 
+    # WHEN getting with specific sk
     result = dynamo.get_item("test_table", {"pk": "PARTIAL#1", "sk": "A"})
 
+    # THEN only the exact match is returned
     assert result is not None
     assert result["data"] == "first"
 
 
 def test_get_item_eventually_consistent(dynamo):
     """Test get_item with eventually consistent read (default)."""
+    # GIVEN an item in DynamoDB
     dynamo.put_item("test_table", {"pk": "CONSISTENT#1", "sk": "TEST", "data": "value"})
 
-    # Default is eventually consistent
+    # WHEN getting with default consistency
     result = dynamo.get_item(
         "test_table",
         {"pk": "CONSISTENT#1", "sk": "TEST"},
     )
 
+    # THEN item is returned
     assert result is not None
     assert result["data"] == "value"
 
 
 def test_get_item_strongly_consistent(dynamo):
     """Test get_item with strongly consistent read."""
+    # GIVEN an item in DynamoDB
     dynamo.put_item("test_table", {"pk": "CONSISTENT#2", "sk": "TEST", "data": "value"})
 
-    # Strongly consistent read
+    # WHEN getting with consistent_read=True
     result = dynamo.get_item(
         "test_table",
         {"pk": "CONSISTENT#2", "sk": "TEST"},
         consistent_read=True,
     )
 
+    # THEN item is returned
     assert result is not None
     assert result["data"] == "value"
 
 
 def test_get_item_consistent_read_not_found(dynamo):
     """Test get_item with consistent_read returns None for non-existent items."""
+    # WHEN getting a non-existent item with consistent_read
     result = dynamo.get_item(
         "test_table",
         {"pk": "NONEXISTENT", "sk": "NONE"},
         consistent_read=True,
     )
+
+    # THEN None is returned
     assert result is None

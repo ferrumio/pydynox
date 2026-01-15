@@ -29,6 +29,8 @@ def document_model(dynamo, s3_bucket, localstack_endpoint):
 def test_save_with_s3file(document_model):
     """Model.save() uploads S3File to S3."""
     doc_id = str(uuid.uuid4())
+
+    # GIVEN a document with S3File content
     doc = document_model(
         pk=f"DOC#{doc_id}",
         sk="v1",
@@ -36,9 +38,10 @@ def test_save_with_s3file(document_model):
     )
     doc.content = S3File(b"PDF content here", name="report.pdf", content_type="application/pdf")
 
+    # WHEN we save it
     doc.save()
 
-    # After save, content should be S3Value
+    # THEN content becomes S3Value with metadata
     assert isinstance(doc.content, S3Value)
     assert doc.content.size == 16
     assert doc.content.content_type == "application/pdf"
@@ -48,7 +51,7 @@ def test_get_returns_s3value(document_model):
     """Model.get() returns S3Value for S3Attribute."""
     doc_id = str(uuid.uuid4())
 
-    # Save document
+    # GIVEN a saved document with S3 content
     doc = document_model(
         pk=f"DOC#{doc_id}",
         sk="v1",
@@ -57,9 +60,10 @@ def test_get_returns_s3value(document_model):
     doc.content = S3File(b"Hello World", name="test.txt")
     doc.save()
 
-    # Get document
+    # WHEN we get the document
     loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
+    # THEN content is S3Value
     assert loaded is not None
     assert isinstance(loaded.content, S3Value)
     assert loaded.content.size == 11

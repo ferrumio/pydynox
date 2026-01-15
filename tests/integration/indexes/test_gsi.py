@@ -70,7 +70,7 @@ class User(Model):
 
 def test_gsi_query_by_email(gsi_client):
     """Test querying GSI by email."""
-    # Create test users
+    # GIVEN users saved with email attribute
     user1 = User(
         pk="USER#1",
         sk="PROFILE",
@@ -91,9 +91,10 @@ def test_gsi_query_by_email(gsi_client):
     )
     user2.save()
 
-    # Query by email
+    # WHEN we query by email
     results = list(User.email_index.query(email="john@example.com"))
 
+    # THEN only the matching user is returned
     assert len(results) == 1
     assert results[0].pk == "USER#1"
     assert results[0].name == "John"
@@ -102,7 +103,7 @@ def test_gsi_query_by_email(gsi_client):
 
 def test_gsi_query_by_status(gsi_client):
     """Test querying GSI by status."""
-    # Create test users
+    # GIVEN users with different statuses
     User(
         pk="USER#1",
         sk="PROFILE",
@@ -130,9 +131,10 @@ def test_gsi_query_by_status(gsi_client):
         age=35,
     ).save()
 
-    # Query active users
+    # WHEN we query active users
     results = list(User.status_index.query(status="active"))
 
+    # THEN only active users are returned
     assert len(results) == 2
     pks = {r.pk for r in results}
     assert pks == {"USER#1", "USER#2"}
@@ -140,7 +142,7 @@ def test_gsi_query_by_status(gsi_client):
 
 def test_gsi_query_with_range_key_condition(gsi_client):
     """Test GSI query with range key condition."""
-    # Create test users
+    # GIVEN users with different pk prefixes
     User(
         pk="USER#1",
         sk="PROFILE",
@@ -168,7 +170,7 @@ def test_gsi_query_with_range_key_condition(gsi_client):
         age=40,
     ).save()
 
-    # Query active users with pk starting with "USER#"
+    # WHEN we query active users with pk starting with "USER#"
     results = list(
         User.status_index.query(
             status="active",
@@ -176,6 +178,7 @@ def test_gsi_query_with_range_key_condition(gsi_client):
         )
     )
 
+    # THEN only USER# items are returned
     assert len(results) == 2
     pks = {r.pk for r in results}
     assert pks == {"USER#1", "USER#2"}
@@ -183,7 +186,7 @@ def test_gsi_query_with_range_key_condition(gsi_client):
 
 def test_gsi_query_with_filter(gsi_client):
     """Test GSI query with filter condition."""
-    # Create test users
+    # GIVEN users with different ages
     User(
         pk="USER#1",
         sk="PROFILE",
@@ -202,7 +205,7 @@ def test_gsi_query_with_filter(gsi_client):
         age=25,
     ).save()
 
-    # Query active users with age >= 30
+    # WHEN we query active users with age >= 30
     results = list(
         User.status_index.query(
             status="active",
@@ -210,6 +213,7 @@ def test_gsi_query_with_filter(gsi_client):
         )
     )
 
+    # THEN only users with age >= 30 are returned
     assert len(results) == 1
     assert results[0].pk == "USER#1"
     assert results[0].name == "John"
@@ -217,7 +221,7 @@ def test_gsi_query_with_filter(gsi_client):
 
 def test_gsi_query_with_limit(gsi_client):
     """Test GSI query with limit."""
-    # Create test users
+    # GIVEN multiple users
     for i in range(5):
         User(
             pk=f"USER#{i}",
@@ -228,17 +232,16 @@ def test_gsi_query_with_limit(gsi_client):
             age=20 + i,
         ).save()
 
-    # Query with limit
+    # WHEN we query with limit
     results = list(User.status_index.query(status="active", limit=2))
 
-    # Should get all 5 because limit is per page, not total
-    # But we iterate through all pages
+    # THEN all items are returned (limit is per page, iterator fetches all)
     assert len(results) == 5
 
 
 def test_gsi_query_descending(gsi_client):
     """Test GSI query with descending order."""
-    # Create test users
+    # GIVEN users
     User(
         pk="USER#1",
         sk="PROFILE",
@@ -257,7 +260,7 @@ def test_gsi_query_descending(gsi_client):
         age=25,
     ).save()
 
-    # Query in descending order (by range key)
+    # WHEN we query in descending order
     results = list(
         User.status_index.query(
             status="active",
@@ -265,8 +268,8 @@ def test_gsi_query_descending(gsi_client):
         )
     )
 
+    # THEN results are in descending order by pk (range key)
     assert len(results) == 2
-    # Descending order by pk (range key)
     assert results[0].pk == "USER#2"
     assert results[1].pk == "USER#1"
 

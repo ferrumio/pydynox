@@ -64,8 +64,10 @@ def test_model_scan_all_items(populated_users):
     """Test Model.scan returns all items."""
     User = populated_users
 
+    # WHEN we scan
     users = list(User.scan())
 
+    # THEN all items are returned as model instances
     assert len(users) == 5
     for user in users:
         assert isinstance(user, User)
@@ -75,8 +77,10 @@ def test_model_scan_with_filter(populated_users):
     """Test Model.scan with filter_condition."""
     User = populated_users
 
+    # WHEN we scan with filter
     users = list(User.scan(filter_condition=User.status == "active"))
 
+    # THEN only matching items are returned
     assert len(users) == 3
     for user in users:
         assert user.status == "active"
@@ -214,8 +218,10 @@ def test_model_count_all(populated_users):
     """Test Model.count returns total count."""
     User = populated_users
 
+    # WHEN we count all items
     count, metrics = User.count()
 
+    # THEN the count is correct
     assert count == 5
     assert metrics is not None
     assert metrics.duration_ms > 0

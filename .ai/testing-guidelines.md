@@ -79,6 +79,40 @@ class TestUserLogin:
         ...
 ```
 
+## GIVEN/WHEN/THEN Comments
+
+Use `# GIVEN`, `# WHEN`, `# THEN` comments to separate test sections. Each comment should explain what it does.
+
+### Example
+
+```python
+def test_model_uses_config_client():
+    """Model uses client from model_config."""
+    # GIVEN a model with a mock client configured
+    mock_client = MagicMock()
+    mock_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
+
+    class User(Model):
+        model_config = ModelConfig(table="users", client=mock_client)
+        pk = StringAttribute(hash_key=True)
+        name = StringAttribute()
+
+    User._client_instance = None
+
+    # WHEN we call get
+    User.get(pk="USER#1")
+
+    # THEN the mock client should be called with correct params
+    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1"}, consistent_read=False)
+```
+
+### Rules
+
+- Not all tests need all three sections
+- Simple tests with just assertion can skip GIVEN/WHEN
+- Keep it practical, don't force it where it doesn't make sense
+- The comment should explain what the section does, not just say "GIVEN"
+
 ## Use pytest.mark.parametrize
 
 When testing the same logic with different inputs:

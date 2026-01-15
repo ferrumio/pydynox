@@ -21,9 +21,14 @@ def make_attr(cls, name):
 
 
 def test_eq():
+    """Test equality condition."""
+    # GIVEN a name attribute
     name = make_attr(StringAttribute, "name")
+
+    # WHEN we create an equality condition
     cond = name == "John"
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -34,9 +39,14 @@ def test_eq():
 
 
 def test_ne():
+    """Test not-equal condition."""
+    # GIVEN a status attribute
     status = make_attr(StringAttribute, "status")
+
+    # WHEN we create a not-equal condition
     cond = status != "deleted"
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -45,9 +55,14 @@ def test_ne():
 
 
 def test_gt():
+    """Test greater-than condition."""
+    # GIVEN an age attribute
     age = make_attr(NumberAttribute, "age")
+
+    # WHEN we create a greater-than condition
     cond = age > 18
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -57,9 +72,14 @@ def test_gt():
 
 
 def test_ge():
+    """Test greater-than-or-equal condition."""
+    # GIVEN an age attribute
     age = make_attr(NumberAttribute, "age")
+
+    # WHEN we create a >= condition
     cond = age >= 21
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -68,9 +88,14 @@ def test_ge():
 
 
 def test_lt():
+    """Test less-than condition."""
+    # GIVEN a price attribute
     price = make_attr(NumberAttribute, "price")
+
+    # WHEN we create a less-than condition
     cond = price < 100
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -79,9 +104,14 @@ def test_lt():
 
 
 def test_le():
+    """Test less-than-or-equal condition."""
+    # GIVEN a price attribute
     price = make_attr(NumberAttribute, "price")
+
+    # WHEN we create a <= condition
     cond = price <= 50
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -93,9 +123,14 @@ def test_le():
 
 
 def test_exists():
+    """Test attribute_exists condition."""
+    # GIVEN an email attribute
     email = make_attr(StringAttribute, "email")
+
+    # WHEN we create an exists condition
     cond = email.exists()
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -105,9 +140,14 @@ def test_exists():
 
 
 def test_does_not_exist():
+    """Test attribute_not_exists condition."""
+    # GIVEN a deleted_at attribute
     deleted = make_attr(StringAttribute, "deleted_at")
+
+    # WHEN we create a does_not_exist condition
     cond = deleted.does_not_exist()
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -116,9 +156,14 @@ def test_does_not_exist():
 
 
 def test_begins_with():
+    """Test begins_with condition."""
+    # GIVEN a sk attribute
     sk = make_attr(StringAttribute, "sk")
+
+    # WHEN we create a begins_with condition
     cond = sk.begins_with("ORDER#")
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -128,9 +173,14 @@ def test_begins_with():
 
 
 def test_contains():
+    """Test contains condition."""
+    # GIVEN a tags attribute
     tags = make_attr(ListAttribute, "tags")
+
+    # WHEN we create a contains condition
     cond = tags.contains("premium")
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -139,9 +189,14 @@ def test_contains():
 
 
 def test_between():
+    """Test between condition."""
+    # GIVEN an age attribute
     age = make_attr(NumberAttribute, "age")
+
+    # WHEN we create a between condition
     cond = age.between(18, 65)
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -151,9 +206,14 @@ def test_between():
 
 
 def test_is_in():
+    """Test IN condition."""
+    # GIVEN a status attribute
     status = make_attr(StringAttribute, "status")
+
+    # WHEN we create an is_in condition
     cond = status.is_in("active", "pending", "review")
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -166,10 +226,15 @@ def test_is_in():
 
 
 def test_and_operator():
+    """Test AND operator with &."""
+    # GIVEN age and status attributes
     age = make_attr(NumberAttribute, "age")
     status = make_attr(StringAttribute, "status")
+
+    # WHEN we combine conditions with &
     cond = (age > 18) & (status == "active")
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -179,9 +244,14 @@ def test_and_operator():
 
 
 def test_or_operator():
+    """Test OR operator with |."""
+    # GIVEN a status attribute
     status = make_attr(StringAttribute, "status")
+
+    # WHEN we combine conditions with |
     cond = (status == "active") | (status == "pending")
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -190,9 +260,14 @@ def test_or_operator():
 
 
 def test_not_operator():
+    """Test NOT operator with ~."""
+    # GIVEN a deleted attribute
     deleted = make_attr(StringAttribute, "deleted")
+
+    # WHEN we negate a condition with ~
     cond = ~deleted.exists()
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -201,12 +276,16 @@ def test_not_operator():
 
 
 def test_complex_combination():
+    """Test complex combination of conditions."""
+    # GIVEN multiple attributes
     age = make_attr(NumberAttribute, "age")
     status = make_attr(StringAttribute, "status")
     deleted = make_attr(StringAttribute, "deleted")
 
+    # WHEN we create a complex condition
     cond = ((age > 18) & (status == "active")) | ~deleted.exists()
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -218,9 +297,14 @@ def test_complex_combination():
 
 
 def test_map_access():
+    """Test nested map access in conditions."""
+    # GIVEN an address map attribute
     address = make_attr(MapAttribute, "address")
+
+    # WHEN we access a nested key
     cond = address["city"] == "NYC"
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -230,9 +314,14 @@ def test_map_access():
 
 
 def test_list_access():
+    """Test list index access in conditions."""
+    # GIVEN a tags list attribute
     tags = make_attr(ListAttribute, "tags")
+
+    # WHEN we access by index
     cond = tags[0] == "premium"
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -241,9 +330,14 @@ def test_list_access():
 
 
 def test_deep_nested():
+    """Test deep nested access in conditions."""
+    # GIVEN a data map attribute
     data = make_attr(MapAttribute, "data")
+
+    # WHEN we access deeply nested path
     cond = data["users"][0]["name"] == "John"
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -255,12 +349,16 @@ def test_deep_nested():
 
 
 def test_and_function():
+    """Test And() function with multiple conditions."""
+    # GIVEN multiple attributes
     age = make_attr(NumberAttribute, "age")
     status = make_attr(StringAttribute, "status")
     active = make_attr(StringAttribute, "active")
 
+    # WHEN we use And() function
     cond = And(age > 18, status == "active", active == True)  # noqa: E712
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -269,10 +367,14 @@ def test_and_function():
 
 
 def test_or_function():
+    """Test Or() function with multiple conditions."""
+    # GIVEN a status attribute
     status = make_attr(StringAttribute, "status")
 
+    # WHEN we use Or() function
     cond = Or(status == "a", status == "b", status == "c")
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -281,10 +383,14 @@ def test_or_function():
 
 
 def test_not_function():
+    """Test Not() function."""
+    # GIVEN a deleted attribute
     deleted = make_attr(StringAttribute, "deleted")
 
+    # WHEN we use Not() function
     cond = Not(deleted.exists())
 
+    # THEN serialization should produce correct expression
     names: dict = {}
     values: dict = {}
     result = cond.serialize(names, values)
@@ -293,14 +399,22 @@ def test_not_function():
 
 
 def test_and_requires_two_conditions():
+    """Test And() requires at least 2 conditions."""
+    # GIVEN an age attribute
     age = make_attr(NumberAttribute, "age")
 
+    # WHEN we try to create And with one condition
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="at least 2"):
         And(age > 18)
 
 
 def test_or_requires_two_conditions():
+    """Test Or() requires at least 2 conditions."""
+    # GIVEN an age attribute
     age = make_attr(NumberAttribute, "age")
 
+    # WHEN we try to create Or with one condition
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="at least 2"):
         Or(age > 18)

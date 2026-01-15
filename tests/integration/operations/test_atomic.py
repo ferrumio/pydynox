@@ -23,11 +23,14 @@ def setup_client(dynamo):
 
 
 def test_atomic_add_increments_value(dynamo):
+    # GIVEN a user with count=0
     user = User(pk="USER#1", sk="PROFILE", name="John", count=0)
     user.save()
 
+    # WHEN we add 1 atomically
     user.update(atomic=[User.count.add(1)])
 
+    # THEN count is incremented
     result = User.get(pk="USER#1", sk="PROFILE")
     assert result.count == 1
 
@@ -83,29 +86,37 @@ def test_atomic_prepend_adds_to_front(dynamo):
 
 
 def test_atomic_if_not_exists_sets_when_missing(dynamo):
+    # GIVEN a user without count attribute
     user = User(pk="USER#7", sk="PROFILE", name="John")
     user.save()
 
+    # WHEN we use if_not_exists
     user.update(atomic=[User.count.if_not_exists(100)])
 
+    # THEN count is set to 100
     result = User.get(pk="USER#7", sk="PROFILE")
     assert result.count == 100
 
 
 def test_atomic_if_not_exists_keeps_existing(dynamo):
+    # GIVEN a user with count=50
     user = User(pk="USER#8", sk="PROFILE", name="John", count=50)
     user.save()
 
+    # WHEN we use if_not_exists
     user.update(atomic=[User.count.if_not_exists(100)])
 
+    # THEN count stays at 50 (existing value kept)
     result = User.get(pk="USER#8", sk="PROFILE")
     assert result.count == 50
 
 
 def test_multiple_atomic_operations(dynamo):
+    # GIVEN a user with count=0 and tags=["a"]
     user = User(pk="USER#9", sk="PROFILE", name="John", count=0, tags=["a"])
     user.save()
 
+    # WHEN we apply multiple atomic operations
     user.update(
         atomic=[
             User.count.add(5),
@@ -114,6 +125,7 @@ def test_multiple_atomic_operations(dynamo):
         ]
     )
 
+    # THEN all operations are applied
     result = User.get(pk="USER#9", sk="PROFILE")
     assert result.count == 5
     assert result.tags == ["a", "b"]
@@ -121,28 +133,35 @@ def test_multiple_atomic_operations(dynamo):
 
 
 def test_atomic_with_condition_succeeds(dynamo):
+    # GIVEN a user with balance=100
     user = User(pk="USER#COND1", sk="PROFILE", name="John", balance=100)
     user.save()
 
+    # WHEN we subtract 50 with condition balance >= 50
     user.update(
         atomic=[User.balance.add(-50)],
         condition=User.balance >= 50,
     )
 
+    # THEN the update succeeds
     result = User.get(pk="USER#COND1", sk="PROFILE")
     assert result.balance == 50
 
 
 def test_atomic_with_condition_fails(dynamo):
+    # GIVEN a user with balance=30
     user = User(pk="USER#COND2", sk="PROFILE", name="John", balance=30)
     user.save()
 
+    # WHEN we try to subtract 50 with condition balance >= 50
+    # THEN ConditionCheckFailedError is raised
     with pytest.raises(ConditionCheckFailedError):
         user.update(
             atomic=[User.balance.add(-50)],
             condition=User.balance >= 50,
         )
 
+    # AND balance is unchanged
     result = User.get(pk="USER#COND2", sk="PROFILE")
     assert result.balance == 30
 

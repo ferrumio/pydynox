@@ -9,23 +9,27 @@ OperationMetrics = pydynox_core.OperationMetrics
 
 def test_put_item_returns_metrics(dynamo):
     """put_item returns OperationMetrics."""
+    # WHEN we put an item
     metrics = dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 
+    # THEN metrics are returned
     assert isinstance(metrics, OperationMetrics)
     assert metrics.duration_ms > 0
 
 
 def test_get_item_returns_dict(dynamo):
     """get_item returns a plain dict."""
+    # GIVEN an existing item
     dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 
+    # WHEN we get the item
     item = dynamo.get_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
-    # Works like a normal dict
+    # THEN it works like a normal dict
     assert item["name"] == "John"
     assert item["pk"] == "USER#1"
 
-    # Metrics available via client._last_metrics
+    # AND metrics are available via client._last_metrics
     assert dynamo._last_metrics is not None
     assert isinstance(dynamo._last_metrics, OperationMetrics)
     assert dynamo._last_metrics.duration_ms > 0
@@ -64,23 +68,23 @@ def test_update_item_returns_metrics(dynamo):
 
 def test_query_result_has_last_evaluated_key(dynamo):
     """QueryResult exposes last_evaluated_key after iteration."""
-    # Setup data
+    # GIVEN items in the table
     for i in range(3):
         dynamo.put_item("test_table", {"pk": "ORG#1", "sk": f"USER#{i}", "name": f"User {i}"})
 
-    # Query
+    # WHEN we query and iterate
     result = dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
         expression_attribute_values={":pk": "ORG#1"},
     )
-
-    # Iterate to trigger fetch
     items = list(result)
+
+    # THEN all items are returned
     assert len(items) == 3
 
-    # last_evaluated_key is None when all results fetched
+    # AND last_evaluated_key is None when all results fetched
     assert result.last_evaluated_key is None
 
 

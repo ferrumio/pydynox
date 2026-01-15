@@ -48,13 +48,13 @@ def test_put_item_tracks_wcu(client_with_fixed_rate):
     client = client_with_fixed_rate
     pk = _unique_pk()
 
-    # Initial WCU should be 0
+    # GIVEN initial WCU is 0
     assert client.rate_limit.consumed_wcu == pytest.approx(0.0)
 
-    # Put an item
+    # WHEN we put an item
     client.put_item("test_table", {"pk": pk, "sk": "PROFILE", "name": "Alice"})
 
-    # WCU should be tracked
+    # THEN WCU is tracked
     assert client.rate_limit.consumed_wcu == pytest.approx(1.0)
 
 
@@ -63,16 +63,14 @@ def test_get_item_tracks_rcu(client_with_fixed_rate):
     client = client_with_fixed_rate
     pk = _unique_pk()
 
-    # Put an item first
+    # GIVEN an existing item
     client.put_item("test_table", {"pk": pk, "sk": "PROFILE", "name": "Alice"})
-
-    # Reset by creating new client (or just check delta)
     initial_rcu = client.rate_limit.consumed_rcu
 
-    # Get the item
+    # WHEN we get the item
     client.get_item("test_table", {"pk": pk, "sk": "PROFILE"})
 
-    # RCU should be tracked
+    # THEN RCU is tracked
     assert client.rate_limit.consumed_rcu == pytest.approx(initial_rcu + 1.0)
 
 
@@ -238,30 +236,30 @@ def test_rate_limiting_slows_operations(table, dynamodb_endpoint):
     """Test that rate limiting actually slows down operations."""
     pk1, pk2, pk3 = _unique_pk(), _unique_pk(), _unique_pk()
 
-    # Create client with very low rate
+    # GIVEN a client with very low rate (2 WCU per second)
     client = DynamoDBClient(
         region="us-east-1",
         endpoint_url=dynamodb_endpoint,
         access_key="testing",
         secret_key="testing",
-        rate_limit=FixedRate(wcu=2),  # Only 2 WCU per second
+        rate_limit=FixedRate(wcu=2),
     )
 
-    # First 2 writes should be fast (tokens available)
+    # WHEN first 2 writes (tokens available)
     start = time.time()
     client.put_item("test_table", {"pk": pk1, "sk": "A", "data": "x"})
     client.put_item("test_table", {"pk": pk2, "sk": "A", "data": "x"})
     first_two = time.time() - start
 
-    # Third write should wait for token refill
+    # AND third write (must wait for token refill)
     start = time.time()
     client.put_item("test_table", {"pk": pk3, "sk": "A", "data": "x"})
     third = time.time() - start
 
-    # First two should be fast
+    # THEN first two are fast
     assert first_two < 0.5
 
-    # Third should have waited (at least 0.4 seconds for 1 token at 2/sec)
+    # AND third waited for token refill
     assert third >= 0.4
 
 

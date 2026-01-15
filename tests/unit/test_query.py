@@ -42,13 +42,16 @@ def user_model(mock_client):
 
 def test_query_returns_model_query_result(user_model):
     """Model.query returns a ModelQueryResult."""
+    # WHEN we call query
     result = user_model.query(hash_key="USER#123")
 
+    # THEN a ModelQueryResult should be returned
     assert isinstance(result, ModelQueryResult)
 
 
 def test_query_stores_parameters(user_model):
     """ModelQueryResult stores all query parameters."""
+    # WHEN we call query with various parameters
     result = user_model.query(
         hash_key="USER#123",
         limit=10,
@@ -56,6 +59,7 @@ def test_query_stores_parameters(user_model):
         consistent_read=True,
     )
 
+    # THEN all parameters should be stored
     assert result._hash_key_value == "USER#123"
     assert result._limit == 10
     assert result._scan_index_forward is False
@@ -64,55 +68,69 @@ def test_query_stores_parameters(user_model):
 
 def test_query_with_range_key_condition(user_model):
     """Model.query accepts range_key_condition."""
+    # GIVEN a range key condition
     condition = user_model.sk.begins_with("ORDER#")
 
+    # WHEN we call query with the condition
     result = user_model.query(
         hash_key="USER#123",
         range_key_condition=condition,
     )
 
+    # THEN the condition should be stored
     assert result._range_key_condition is condition
 
 
 def test_query_with_filter_condition(user_model):
     """Model.query accepts filter_condition."""
+    # GIVEN a filter condition
     condition = user_model.age > 18
 
+    # WHEN we call query with the condition
     result = user_model.query(
         hash_key="USER#123",
         filter_condition=condition,
     )
 
+    # THEN the condition should be stored
     assert result._filter_condition is condition
 
 
 def test_query_with_pagination(user_model):
     """Model.query accepts last_evaluated_key for pagination."""
+    # GIVEN a last evaluated key
     last_key = {"pk": "USER#123", "sk": "ORDER#999"}
 
+    # WHEN we call query with the key
     result = user_model.query(
         hash_key="USER#123",
         last_evaluated_key=last_key,
     )
 
+    # THEN the key should be stored
     assert result._start_key == last_key
 
 
 def test_model_query_result_first_returns_none_when_empty(user_model):
     """ModelQueryResult.first() returns None when no results."""
+    # GIVEN a query that returns no results
     with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         mock_query_result.__iter__ = MagicMock(return_value=iter([]))
         mock_build.return_value = mock_query_result
 
         result = user_model.query(hash_key="USER#123")
+
+        # WHEN we call first
         first = result.first()
 
+        # THEN None should be returned
         assert first is None
 
 
 def test_model_query_result_list(user_model):
     """list(ModelQueryResult) collects all results."""
+    # GIVEN a query that returns multiple items
     with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         items = [
@@ -123,8 +141,11 @@ def test_model_query_result_list(user_model):
         mock_build.return_value = mock_query_result
 
         result = user_model.query(hash_key="USER#123")
+
+        # WHEN we convert to list
         users = list(result)
 
+        # THEN all items should be returned
         assert len(users) == 2
         assert users[0].sk == "ORDER#1"
         assert users[1].sk == "ORDER#2"
@@ -132,6 +153,7 @@ def test_model_query_result_list(user_model):
 
 def test_model_query_result_iteration(user_model):
     """ModelQueryResult can be iterated."""
+    # GIVEN a query that returns items
     with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         items = [
@@ -141,28 +163,36 @@ def test_model_query_result_iteration(user_model):
         mock_build.return_value = mock_query_result
 
         result = user_model.query(hash_key="USER#123")
+
+        # WHEN we iterate
         users = list(result)
 
+        # THEN items should be Model instances
         assert len(users) == 1
         assert isinstance(users[0], user_model)
 
 
 def test_model_query_result_last_evaluated_key_before_iteration(user_model):
     """ModelQueryResult.last_evaluated_key is None before iteration."""
+    # GIVEN a query result
     result = user_model.query(hash_key="USER#123")
 
+    # THEN last_evaluated_key should be None before iteration
     assert result.last_evaluated_key is None
 
 
 def test_async_query_returns_async_model_query_result(user_model):
     """Model.async_query returns an AsyncModelQueryResult."""
+    # WHEN we call async_query
     result = user_model.async_query(hash_key="USER#123")
 
+    # THEN an AsyncModelQueryResult should be returned
     assert isinstance(result, AsyncModelQueryResult)
 
 
 def test_async_query_stores_parameters(user_model):
     """AsyncModelQueryResult stores all query parameters."""
+    # WHEN we call async_query with various parameters
     result = user_model.async_query(
         hash_key="USER#123",
         limit=10,
@@ -170,6 +200,7 @@ def test_async_query_stores_parameters(user_model):
         consistent_read=True,
     )
 
+    # THEN all parameters should be stored
     assert result._hash_key_value == "USER#123"
     assert result._limit == 10
     assert result._scan_index_forward is False
@@ -179,6 +210,7 @@ def test_async_query_stores_parameters(user_model):
 def test_query_raises_error_without_hash_key(mock_client):
     """Model.query raises error if model has no hash key."""
 
+    # GIVEN a model without hash key
     class BadModel(Model):
         model_config = ModelConfig(table="bad", client=mock_client)
         name = StringAttribute()
@@ -187,6 +219,8 @@ def test_query_raises_error_without_hash_key(mock_client):
 
     result = BadModel.query(hash_key="test")
 
+    # WHEN we try to get results
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="has no hash key defined"):
         result.first()
 
@@ -196,18 +230,25 @@ def test_query_raises_error_without_hash_key(mock_client):
 
 def test_query_as_dict_default_is_false(user_model):
     """query() defaults as_dict to False."""
+    # WHEN we call query without as_dict
     result = user_model.query(hash_key="USER#123")
+
+    # THEN as_dict should default to False
     assert result._as_dict is False
 
 
 def test_query_as_dict_stores_parameter(user_model):
     """ModelQueryResult stores as_dict parameter."""
+    # WHEN we call query with as_dict=True
     result = user_model.query(hash_key="USER#123", as_dict=True)
+
+    # THEN as_dict should be stored
     assert result._as_dict is True
 
 
 def test_query_as_dict_true_returns_dicts(user_model):
     """query(as_dict=True) returns plain dicts."""
+    # GIVEN a query with as_dict=True
     with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         items = [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}]
@@ -215,8 +256,11 @@ def test_query_as_dict_true_returns_dicts(user_model):
         mock_build.return_value = mock_query_result
 
         result = user_model.query(hash_key="USER#123", as_dict=True)
+
+        # WHEN we iterate
         orders = list(result)
 
+        # THEN plain dicts should be returned
         assert len(orders) == 1
         assert isinstance(orders[0], dict)
         assert orders[0]["name"] == "Order 1"
@@ -224,6 +268,7 @@ def test_query_as_dict_true_returns_dicts(user_model):
 
 def test_query_as_dict_false_returns_model_instances(user_model):
     """query(as_dict=False) returns Model instances."""
+    # GIVEN a query with as_dict=False
     with patch.object(ModelQueryResult, "_build_result") as mock_build:
         mock_query_result = MagicMock()
         items = [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}]
@@ -231,13 +276,19 @@ def test_query_as_dict_false_returns_model_instances(user_model):
         mock_build.return_value = mock_query_result
 
         result = user_model.query(hash_key="USER#123", as_dict=False)
+
+        # WHEN we iterate
         orders = list(result)
 
+        # THEN Model instances should be returned
         assert len(orders) == 1
         assert isinstance(orders[0], user_model)
 
 
 def test_async_query_as_dict_stores_parameter(user_model):
     """AsyncModelQueryResult stores as_dict parameter."""
+    # WHEN we call async_query with as_dict=True
     result = user_model.async_query(hash_key="USER#123", as_dict=True)
+
+    # THEN as_dict should be stored
     assert result._as_dict is True

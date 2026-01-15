@@ -6,33 +6,34 @@ from pydynox.exceptions import ConditionCheckFailedError, TableNotFoundError
 
 def test_delete_item_removes_item(dynamo):
     """Test that delete_item removes an existing item."""
+    # GIVEN an existing item
     item = {"pk": "USER#DEL1", "sk": "PROFILE", "name": "ToDelete"}
     dynamo.put_item("test_table", item)
-
-    # Verify item exists
     result = dynamo.get_item("test_table", {"pk": "USER#DEL1", "sk": "PROFILE"})
     assert result is not None
 
-    # Delete it
+    # WHEN deleting the item
     dynamo.delete_item("test_table", {"pk": "USER#DEL1", "sk": "PROFILE"})
 
-    # Verify it's gone
+    # THEN the item is gone
     result = dynamo.get_item("test_table", {"pk": "USER#DEL1", "sk": "PROFILE"})
     assert result is None
 
 
 def test_delete_item_nonexistent_succeeds(dynamo):
     """Test that deleting a non-existent item does not raise an error."""
-    # This should not raise - DynamoDB delete is idempotent
+    # WHEN deleting a non-existent item
+    # THEN no error is raised (DynamoDB delete is idempotent)
     dynamo.delete_item("test_table", {"pk": "NONEXISTENT", "sk": "NONE"})
 
 
 def test_delete_item_with_condition_success(dynamo):
     """Test delete with a condition that passes."""
+    # GIVEN an item with status=inactive
     item = {"pk": "USER#DEL2", "sk": "PROFILE", "status": "inactive"}
     dynamo.put_item("test_table", item)
 
-    # Delete only if status is inactive
+    # WHEN deleting with condition status=inactive
     dynamo.delete_item(
         "test_table",
         {"pk": "USER#DEL2", "sk": "PROFILE"},
@@ -41,16 +42,19 @@ def test_delete_item_with_condition_success(dynamo):
         expression_attribute_values={":val": "inactive"},
     )
 
+    # THEN the item is deleted
     result = dynamo.get_item("test_table", {"pk": "USER#DEL2", "sk": "PROFILE"})
     assert result is None
 
 
 def test_delete_item_with_condition_fails(dynamo):
     """Test delete with a condition that fails raises an error."""
+    # GIVEN an item with status=active
     item = {"pk": "USER#DEL3", "sk": "PROFILE", "status": "active"}
     dynamo.put_item("test_table", item)
 
-    # Try to delete only if status is inactive (it's active, so should fail)
+    # WHEN deleting with condition status=inactive
+    # THEN ConditionCheckFailedError is raised
     with pytest.raises(ConditionCheckFailedError):
         dynamo.delete_item(
             "test_table",
@@ -60,7 +64,7 @@ def test_delete_item_with_condition_fails(dynamo):
             expression_attribute_values={":val": "inactive"},
         )
 
-    # Item should still exist
+    # AND item still exists
     result = dynamo.get_item("test_table", {"pk": "USER#DEL3", "sk": "PROFILE"})
     assert result is not None
     assert result["status"] == "active"
@@ -68,10 +72,11 @@ def test_delete_item_with_condition_fails(dynamo):
 
 def test_delete_item_with_attribute_exists_condition(dynamo):
     """Test delete with attribute_exists condition."""
+    # GIVEN an existing item
     item = {"pk": "USER#DEL4", "sk": "PROFILE", "name": "Test"}
     dynamo.put_item("test_table", item)
 
-    # Delete only if pk exists
+    # WHEN deleting with attribute_exists condition
     dynamo.delete_item(
         "test_table",
         {"pk": "USER#DEL4", "sk": "PROFILE"},
@@ -79,11 +84,14 @@ def test_delete_item_with_attribute_exists_condition(dynamo):
         expression_attribute_names={"#pk": "pk"},
     )
 
+    # THEN the item is deleted
     result = dynamo.get_item("test_table", {"pk": "USER#DEL4", "sk": "PROFILE"})
     assert result is None
 
 
 def test_delete_item_table_not_found(dynamo):
     """Test delete from non-existent table raises error."""
+    # WHEN deleting from a non-existent table
+    # THEN TableNotFoundError is raised
     with pytest.raises(TableNotFoundError):
         dynamo.delete_item("nonexistent_table", {"pk": "X", "sk": "Y"})

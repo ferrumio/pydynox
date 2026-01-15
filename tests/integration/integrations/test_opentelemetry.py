@@ -50,11 +50,14 @@ def user_model(dynamo: DynamoDBClient):
 
 def test_model_save_creates_span(otel_exporter: InMemorySpanExporter, user_model: type[Model]):
     """Model.save() should create a PutItem span."""
+    # GIVEN tracing is enabled
     enable_tracing()
 
+    # WHEN we save a model
     user = user_model(pk=f"USER#{uuid.uuid4()}", sk="PROFILE", name="John")
     user.save()
 
+    # THEN a PutItem span is created
     spans = otel_exporter.get_finished_spans()
     assert len(spans) >= 1
 
@@ -69,17 +72,17 @@ def test_model_get_creates_span(otel_exporter: InMemorySpanExporter, user_model:
     """Model.get() should create a GetItem span."""
     enable_tracing()
 
-    # First save a user
+    # GIVEN a saved user
     pk = f"USER#{uuid.uuid4()}"
     user = user_model(pk=pk, sk="PROFILE", name="Jane")
     user.save()
-
     otel_exporter.clear()
 
-    # Now get it
+    # WHEN we get the user
     result = user_model.get(pk=pk, sk="PROFILE")
     assert result is not None
 
+    # THEN a GetItem span is created
     spans = otel_exporter.get_finished_spans()
     assert len(spans) >= 1
 
@@ -92,16 +95,16 @@ def test_model_delete_creates_span(otel_exporter: InMemorySpanExporter, user_mod
     """Model.delete() should create a DeleteItem span."""
     enable_tracing()
 
-    # First save a user
+    # GIVEN a saved user
     pk = f"USER#{uuid.uuid4()}"
     user = user_model(pk=pk, sk="PROFILE", name="Bob")
     user.save()
-
     otel_exporter.clear()
 
-    # Now delete it
+    # WHEN we delete the user
     user.delete()
 
+    # THEN a DeleteItem span is created
     spans = otel_exporter.get_finished_spans()
     assert len(spans) >= 1
 
@@ -178,21 +181,19 @@ def test_multiple_operations_create_multiple_spans(
 
 def test_disable_tracing_stops_spans(otel_exporter: InMemorySpanExporter, user_model: type[Model]):
     """disable_tracing() should stop creating spans."""
+    # GIVEN tracing is enabled and we save a user
     enable_tracing()
-
     user1 = user_model(pk=f"USER#{uuid.uuid4()}", sk="PROFILE", name="First")
     user1.save()
-
     span_count_before = len(otel_exporter.get_finished_spans())
 
+    # WHEN we disable tracing and save another user
     disable_tracing()
-
     user2 = user_model(pk=f"USER#{uuid.uuid4()}", sk="PROFILE", name="Second")
     user2.save()
-
     span_count_after = len(otel_exporter.get_finished_spans())
 
-    # No new spans should be created after disabling
+    # THEN no new spans are created
     assert span_count_after == span_count_before
 
 

@@ -34,10 +34,12 @@ def mock_client():
 def test_hook_decorator_sets_hook_type():
     """Test that decorators set _hook_type attribute."""
 
+    # GIVEN a function decorated with before_save
     @before_save
     def my_hook(self):
         pass
 
+    # THEN _hook_type should be set
     assert my_hook._hook_type == HookType.BEFORE_SAVE
 
 
@@ -56,16 +58,19 @@ def test_hook_decorator_sets_hook_type():
 def test_all_hook_decorators(decorator, expected_type):
     """Test all hook decorators set correct type."""
 
+    # GIVEN a function decorated with the hook decorator
     @decorator
     def hook(self):
         pass
 
+    # THEN _hook_type should match expected type
     assert hook._hook_type == expected_type
 
 
 def test_model_collects_hooks(mock_client):
     """Test that Model metaclass collects hooks."""
 
+    # GIVEN a model with before_save and after_save hooks
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
@@ -78,6 +83,7 @@ def test_model_collects_hooks(mock_client):
         def notify(self):
             pass
 
+    # THEN hooks should be collected
     assert len(User._hooks[HookType.BEFORE_SAVE]) == 1
     assert len(User._hooks[HookType.AFTER_SAVE]) == 1
 
@@ -85,6 +91,7 @@ def test_model_collects_hooks(mock_client):
 def test_model_inherits_hooks(mock_client):
     """Test that hooks are inherited from parent class."""
 
+    # GIVEN a base model with a hook
     class BaseModel(Model):
         model_config = ModelConfig(table="base", client=mock_client)
         pk = StringAttribute(hash_key=True)
@@ -93,6 +100,7 @@ def test_model_inherits_hooks(mock_client):
         def base_validate(self):
             pass
 
+    # AND a child model with its own hook
     class User(BaseModel):
         model_config = ModelConfig(table="users", client=mock_client)
 
@@ -100,12 +108,13 @@ def test_model_inherits_hooks(mock_client):
         def user_validate(self):
             pass
 
-    # Should have both hooks
+    # THEN child should have both hooks
     assert len(User._hooks[HookType.BEFORE_SAVE]) == 2
 
 
 def test_before_save_hook_runs(mock_client):
     """Test that before_save hook runs before save."""
+    # GIVEN a model with a before_save hook that logs calls
     call_order = []
 
     class User(Model):
@@ -119,14 +128,18 @@ def test_before_save_hook_runs(mock_client):
     User._client_instance = None
 
     user = User(pk="USER#1")
+
+    # WHEN we save
     user.save()
 
+    # THEN before_save should have been called
     assert "before_save" in call_order
     mock_client.put_item.assert_called_once()
 
 
 def test_after_save_hook_runs(mock_client):
     """Test that after_save hook runs after save."""
+    # GIVEN a model with an after_save hook
     call_order = []
 
     class User(Model):
@@ -140,13 +153,17 @@ def test_after_save_hook_runs(mock_client):
     User._client_instance = None
 
     user = User(pk="USER#1")
+
+    # WHEN we save
     user.save()
 
+    # THEN after_save should have been called
     assert "after_save" in call_order
 
 
 def test_skip_hooks_on_save(mock_client):
     """Test that skip_hooks=True skips hooks."""
+    # GIVEN a model with a before_save hook
     hook_called = []
 
     class User(Model):
@@ -160,14 +177,18 @@ def test_skip_hooks_on_save(mock_client):
     User._client_instance = None
 
     user = User(pk="USER#1")
+
+    # WHEN we save with skip_hooks=True
     user.save(skip_hooks=True)
 
+    # THEN hook should not be called, but save should happen
     assert len(hook_called) == 0
     mock_client.put_item.assert_called_once()
 
 
 def test_model_config_skip_hooks_default(mock_client):
     """Test that model_config.skip_hooks=True skips hooks by default."""
+    # GIVEN a model with skip_hooks=True in config
     hook_called = []
 
     class BulkModel(Model):
@@ -181,13 +202,17 @@ def test_model_config_skip_hooks_default(mock_client):
     BulkModel._client_instance = None
 
     item = BulkModel(pk="ITEM#1")
+
+    # WHEN we save without specifying skip_hooks
     item.save()
 
+    # THEN hook should not be called
     assert len(hook_called) == 0
 
 
 def test_model_config_skip_hooks_override(mock_client):
     """Test that skip_hooks=False overrides model_config.skip_hooks=True."""
+    # GIVEN a model with skip_hooks=True in config
     hook_called = []
 
     class BulkModel(Model):
@@ -201,13 +226,17 @@ def test_model_config_skip_hooks_override(mock_client):
     BulkModel._client_instance = None
 
     item = BulkModel(pk="ITEM#1")
+
+    # WHEN we save with skip_hooks=False
     item.save(skip_hooks=False)
 
+    # THEN hook should be called
     assert len(hook_called) == 1
 
 
 def test_before_delete_hook_runs(mock_client):
     """Test that before_delete hook runs."""
+    # GIVEN a model with a before_delete hook
     hook_called = []
 
     class User(Model):
@@ -221,13 +250,17 @@ def test_before_delete_hook_runs(mock_client):
     User._client_instance = None
 
     user = User(pk="USER#1")
+
+    # WHEN we delete
     user.delete()
 
+    # THEN before_delete should have been called
     assert "before_delete" in hook_called
 
 
 def test_before_update_hook_runs(mock_client):
     """Test that before_update hook runs."""
+    # GIVEN a model with a before_update hook
     hook_called = []
 
     class User(Model):
@@ -242,14 +275,18 @@ def test_before_update_hook_runs(mock_client):
     User._client_instance = None
 
     user = User(pk="USER#1", name="John")
+
+    # WHEN we update
     user.update(name="Jane")
 
+    # THEN before_update should have been called
     assert "before_update" in hook_called
 
 
 def test_hook_can_raise_exception(mock_client):
     """Test that hooks can raise exceptions to stop operation."""
 
+    # GIVEN a model with a validating hook that raises on invalid email
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
         pk = StringAttribute(hash_key=True)
@@ -264,15 +301,18 @@ def test_hook_can_raise_exception(mock_client):
 
     user = User(pk="USER#1", email="test@gmail.com")
 
+    # WHEN we try to save with invalid email
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="Invalid email domain"):
         user.save()
 
-    # put_item should not be called
+    # AND put_item should not be called
     mock_client.put_item.assert_not_called()
 
 
 def test_multiple_hooks_run_in_order(mock_client):
     """Test that multiple hooks run in definition order."""
+    # GIVEN a model with multiple before_save hooks
     call_order = []
 
     class User(Model):
@@ -290,6 +330,9 @@ def test_multiple_hooks_run_in_order(mock_client):
     User._client_instance = None
 
     user = User(pk="USER#1")
+
+    # WHEN we save
     user.save()
 
+    # THEN hooks should run in definition order
     assert call_order == ["first", "second"]

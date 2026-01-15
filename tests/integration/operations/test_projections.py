@@ -37,7 +37,7 @@ def test_get_item_with_projection(projection_table):
     client, table_name = projection_table
     pk = f"USER#{uuid.uuid4().hex}"
 
-    # Put item with many fields
+    # GIVEN an item with many fields
     client.put_item(
         table_name,
         {
@@ -50,13 +50,14 @@ def test_get_item_with_projection(projection_table):
         },
     )
 
-    # Get with projection
+    # WHEN we get with projection
     item = client.get_item(
         table_name,
         {"pk": pk, "sk": "PROFILE"},
         projection=["name", "email"],
     )
 
+    # THEN only projected fields are returned
     assert item is not None
     assert "name" in item
     assert "email" in item

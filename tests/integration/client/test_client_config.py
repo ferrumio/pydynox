@@ -6,6 +6,7 @@ from pydynox import DynamoDBClient
 
 def test_client_with_timeouts(dynamodb_endpoint):
     """Test client creation with timeout configuration."""
+    # WHEN we create a client with timeout settings
     client = DynamoDBClient(
         region="us-east-1",
         endpoint_url=dynamodb_endpoint,
@@ -15,6 +16,7 @@ def test_client_with_timeouts(dynamodb_endpoint):
         read_timeout=30.0,
     )
 
+    # THEN the client works
     assert client.ping() is True
 
 
@@ -49,6 +51,7 @@ def test_client_with_all_config_options(dynamodb_endpoint):
 
 def test_client_operations_with_timeouts(dynamodb_endpoint):
     """Test that operations work with timeout configuration."""
+    # GIVEN a client with timeout settings
     client = DynamoDBClient(
         region="us-east-1",
         endpoint_url=dynamodb_endpoint,
@@ -68,11 +71,11 @@ def test_client_operations_with_timeouts(dynamodb_endpoint):
             wait=True,
         )
 
-    # Test put_item
+    # WHEN we do put_item and get_item
     client.put_item(table_name, {"pk": "CONFIG#1", "sk": "TEST", "data": "value"})
-
-    # Test get_item
     result = client.get_item(table_name, {"pk": "CONFIG#1", "sk": "TEST"})
+
+    # THEN operations succeed
     assert result is not None
     assert result["data"] == "value"
 

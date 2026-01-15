@@ -27,24 +27,32 @@ def versioned_model(dynamo):
 
 def test_version_starts_at_one(versioned_model):
     """First save sets version to 1."""
+    # GIVEN a new document
     doc = versioned_model(pk="VERSION#1", sk="DOC#1", content="Hello")
     assert doc.version is None
 
+    # WHEN we save it
     doc.save()
 
+    # THEN version is set to 1
     assert doc.version == 1
 
 
 def test_version_increments_on_save(versioned_model):
     """Each save increments version."""
+    # GIVEN a document
     doc = versioned_model(pk="VERSION#2", sk="DOC#1", content="Hello")
     doc.save()
     assert doc.version == 1
 
+    # WHEN we save again
     doc.content = "Updated"
     doc.save()
+
+    # THEN version increments
     assert doc.version == 2
 
+    # AND again
     doc.content = "Updated again"
     doc.save()
     assert doc.version == 3
@@ -63,11 +71,11 @@ def test_version_loaded_from_db(versioned_model):
 
 def test_concurrent_update_fails(versioned_model):
     """Concurrent updates fail with ConditionCheckFailedError."""
-    # Create initial document
+    # GIVEN a document
     doc = versioned_model(pk="VERSION#4", sk="DOC#1", content="Original")
     doc.save()
 
-    # Simulate two clients loading the same document
+    # AND two clients load the same document
     doc1 = versioned_model.get(pk="VERSION#4", sk="DOC#1")
     doc2 = versioned_model.get(pk="VERSION#4", sk="DOC#1")
 
@@ -76,12 +84,12 @@ def test_concurrent_update_fails(versioned_model):
     assert doc1.version == 1
     assert doc2.version == 1
 
-    # First update succeeds
+    # WHEN first client updates
     doc1.content = "Update from client 1"
     doc1.save()
     assert doc1.version == 2
 
-    # Second update fails - version mismatch
+    # THEN second client's update fails (version mismatch)
     doc2.content = "Update from client 2"
     with pytest.raises(ConditionCheckFailedError):
         doc2.save()
