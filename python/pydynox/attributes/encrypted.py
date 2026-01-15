@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydynox._internal._encryption import EncryptionMode, KmsEncryptor
+from pydynox._internal._metrics import _record_kms_metrics
 from pydynox.attributes.base import Attribute
 
 
@@ -115,7 +116,9 @@ class EncryptedAttribute(Attribute[str]):
         if not self._can_encrypt():
             return value  # ReadOnly mode: store as-is
 
-        return self.encryptor.encrypt(value)
+        result = self.encryptor.encrypt_with_metrics(value)
+        _record_kms_metrics(result.metrics.duration_ms, result.metrics.kms_calls)
+        return result.ciphertext
 
     def deserialize(self, value: Any) -> str | None:
         """Decrypt value from DynamoDB.
@@ -140,4 +143,6 @@ class EncryptedAttribute(Attribute[str]):
         if not self._can_decrypt():
             return value  # WriteOnly mode: return encrypted value
 
-        return self.encryptor.decrypt(value)
+        result = self.encryptor.decrypt_with_metrics(value)
+        _record_kms_metrics(result.metrics.duration_ms, result.metrics.kms_calls)
+        return result.plaintext

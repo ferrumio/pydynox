@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from pydynox._internal._metrics import (
+    _start_kms_metrics_collection,
+    _stop_kms_metrics_collection,
+)
 from pydynox._internal._model._helpers import (
     finalize_delete,
     finalize_get,
@@ -41,18 +45,36 @@ def get(
         return None
     if as_dict:
         return item
+
+    # Start KMS metrics collection for deserialization
+    _start_kms_metrics_collection()
+
     # finalize: convert to model, run AFTER_LOAD hooks
-    return finalize_get(cls, item)
+    result = finalize_get(cls, item)
+
+    # Collect KMS metrics
+    kms_duration, kms_calls = _stop_kms_metrics_collection()
+    if kms_calls > 0:
+        cls._metrics_storage.total.add_kms(kms_duration, kms_calls)
+
+    return result
 
 
 def save(self: Model, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
     """Save model to DynamoDB."""
     # S3 upload before prepare (needs to happen before to_dict)
     self._upload_s3_files()
+
+    # Start KMS metrics collection for serialization
+    _start_kms_metrics_collection()
+
     # prepare: run BEFORE_SAVE hooks, auto-generate, version condition, size check
     client, table, item, cond_expr, attr_names, attr_values, skip = prepare_save(
         self, condition, skip_hooks
     )
+
+    # Collect KMS metrics from serialization
+    kms_duration, kms_calls = _stop_kms_metrics_collection()
 
     if cond_expr is not None:
         client.put_item(
@@ -68,6 +90,10 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
     # Record metrics from client
     if client._last_metrics is not None:
         self.__class__._record_metrics(client._last_metrics, "put")
+
+    # Record KMS metrics
+    if kms_calls > 0:
+        self.__class__._metrics_storage.total.add_kms(kms_duration, kms_calls)
 
     # finalize: run AFTER_SAVE hooks
     finalize_save(self, skip)

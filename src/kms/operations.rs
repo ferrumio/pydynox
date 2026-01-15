@@ -23,6 +23,7 @@ use pyo3::prelude::*;
 use rand::RngCore;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::runtime::Runtime;
 
 /// Storage format version for future compatibility.
@@ -30,6 +31,64 @@ const FORMAT_VERSION: u8 = 1;
 
 /// Nonce size for AES-GCM (96 bits = 12 bytes).
 const NONCE_SIZE: usize = 12;
+
+/// Metrics from a KMS operation.
+#[pyclass]
+#[derive(Clone, Debug, Default)]
+pub struct KmsMetrics {
+    /// Total duration in milliseconds.
+    #[pyo3(get)]
+    pub duration_ms: f64,
+
+    /// Number of KMS API calls made.
+    #[pyo3(get)]
+    pub kms_calls: u32,
+}
+
+#[pymethods]
+impl KmsMetrics {
+    #[new]
+    #[pyo3(signature = (duration_ms=0.0, kms_calls=0))]
+    pub fn new(duration_ms: f64, kms_calls: u32) -> Self {
+        Self {
+            duration_ms,
+            kms_calls,
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "KmsMetrics(duration_ms={:.2}, kms_calls={})",
+            self.duration_ms, self.kms_calls
+        )
+    }
+}
+
+/// Result of an encrypt operation with metrics.
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct EncryptResult {
+    /// The encrypted ciphertext.
+    #[pyo3(get)]
+    pub ciphertext: String,
+
+    /// Metrics from the operation.
+    #[pyo3(get)]
+    pub metrics: KmsMetrics,
+}
+
+/// Result of a decrypt operation with metrics.
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct DecryptResult {
+    /// The decrypted plaintext.
+    #[pyo3(get)]
+    pub plaintext: String,
+
+    /// Metrics from the operation.
+    #[pyo3(get)]
+    pub metrics: KmsMetrics,
+}
 
 // ========== LOCAL AES OPERATIONS ==========
 
@@ -124,12 +183,16 @@ fn unpack_envelope(data: &[u8]) -> Result<(&[u8], &[u8]), PyErr> {
 /// 1. Call KMS GenerateDataKey to get plaintext + encrypted DEK
 /// 2. Use plaintext DEK to AES encrypt locally
 /// 3. Pack encrypted DEK + encrypted data together
+///
+/// Returns: (ciphertext, metrics)
 pub async fn execute_encrypt(
     client: Client,
     key_id: String,
     context: HashMap<String, String>,
     plaintext: String,
-) -> Result<String, PyErr> {
+) -> Result<(String, KmsMetrics), PyErr> {
+    let start = Instant::now();
+
     // Generate data key
     let mut req = client
         .generate_data_key()
@@ -162,7 +225,14 @@ pub async fn execute_encrypt(
 
             // Encode and add prefix
             let encoded = BASE64.encode(&envelope);
-            Ok(format!("{}{}", ENCRYPTED_PREFIX, encoded))
+            let ciphertext = format!("{}{}", ENCRYPTED_PREFIX, encoded);
+
+            let metrics = KmsMetrics {
+                duration_ms: start.elapsed().as_secs_f64() * 1000.0,
+                kms_calls: 1, // GenerateDataKey
+            };
+
+            Ok((ciphertext, metrics))
         }
         Err(e) => Err(map_kms_error(e)),
     }
@@ -173,11 +243,15 @@ pub async fn execute_encrypt(
 /// 1. Unpack encrypted DEK + encrypted data
 /// 2. Call KMS Decrypt to get plaintext DEK
 /// 3. Use plaintext DEK to AES decrypt locally
+///
+/// Returns: (plaintext, metrics)
 pub async fn execute_decrypt(
     client: Client,
     context: HashMap<String, String>,
     ciphertext: String,
-) -> Result<String, PyErr> {
+) -> Result<(String, KmsMetrics), PyErr> {
+    let start = Instant::now();
+
     // Check for prefix
     let encoded = match ciphertext.strip_prefix(ENCRYPTED_PREFIX) {
         Some(s) => s,
@@ -216,9 +290,16 @@ pub async fn execute_decrypt(
             // Decrypt data locally
             let plaintext_bytes = decrypt_local(encrypted_data, plaintext_key.as_ref())?;
 
-            String::from_utf8(plaintext_bytes).map_err(|e| {
+            let plaintext = String::from_utf8(plaintext_bytes).map_err(|e| {
                 pyo3::exceptions::PyValueError::new_err(format!("Invalid UTF-8: {}", e))
-            })
+            })?;
+
+            let metrics = KmsMetrics {
+                duration_ms: start.elapsed().as_secs_f64() * 1000.0,
+                kms_calls: 1, // Decrypt
+            };
+
+            Ok((plaintext, metrics))
         }
         Err(e) => Err(map_kms_error(e)),
     }
@@ -226,14 +307,14 @@ pub async fn execute_decrypt(
 
 // ========== SYNC WRAPPERS ==========
 
-/// Sync encrypt.
+/// Sync encrypt - returns (ciphertext, metrics).
 pub fn sync_encrypt(
     client: &Client,
     runtime: &Arc<Runtime>,
     key_id: &str,
     context: &HashMap<String, String>,
     plaintext: &str,
-) -> PyResult<String> {
+) -> PyResult<(String, KmsMetrics)> {
     runtime.block_on(execute_encrypt(
         client.clone(),
         key_id.to_string(),
@@ -242,13 +323,13 @@ pub fn sync_encrypt(
     ))
 }
 
-/// Sync decrypt.
+/// Sync decrypt - returns (plaintext, metrics).
 pub fn sync_decrypt(
     client: &Client,
     runtime: &Arc<Runtime>,
     context: &HashMap<String, String>,
     ciphertext: &str,
-) -> PyResult<String> {
+) -> PyResult<(String, KmsMetrics)> {
     runtime.block_on(execute_decrypt(
         client.clone(),
         context.clone(),
@@ -258,7 +339,7 @@ pub fn sync_decrypt(
 
 // ========== ASYNC WRAPPERS ==========
 
-/// Async encrypt - returns Python awaitable.
+/// Async encrypt - returns EncryptResult with ciphertext and metrics.
 pub fn async_encrypt<'py>(
     py: Python<'py>,
     client: Client,
@@ -267,11 +348,15 @@ pub fn async_encrypt<'py>(
     plaintext: String,
 ) -> PyResult<Bound<'py, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        execute_encrypt(client, key_id, context, plaintext).await
+        let (ciphertext, metrics) = execute_encrypt(client, key_id, context, plaintext).await?;
+        Ok(EncryptResult {
+            ciphertext,
+            metrics,
+        })
     })
 }
 
-/// Async decrypt - returns Python awaitable.
+/// Async decrypt - returns DecryptResult with plaintext and metrics.
 pub fn async_decrypt<'py>(
     py: Python<'py>,
     client: Client,
@@ -279,6 +364,7 @@ pub fn async_decrypt<'py>(
     ciphertext: String,
 ) -> PyResult<Bound<'py, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        execute_decrypt(client, context, ciphertext).await
+        let (plaintext, metrics) = execute_decrypt(client, context, ciphertext).await?;
+        Ok(DecryptResult { plaintext, metrics })
     })
 }

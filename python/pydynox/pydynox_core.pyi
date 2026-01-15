@@ -331,6 +331,18 @@ def compress_string(
 def decompress_string(value: str) -> str: ...
 
 # Encryption (uses envelope encryption with GenerateDataKey + local AES-256-GCM)
+class KmsMetrics:
+    duration_ms: float
+    kms_calls: int
+
+class EncryptResult:
+    ciphertext: str
+    metrics: KmsMetrics
+
+class DecryptResult:
+    plaintext: str
+    metrics: KmsMetrics
+
 class KmsEncryptor:
     key_id: str
 
@@ -354,6 +366,8 @@ class KmsEncryptor:
     ) -> None: ...
     def encrypt(self, plaintext: str) -> str: ...
     def decrypt(self, ciphertext: str) -> str: ...
+    def encrypt_with_metrics(self, plaintext: str) -> EncryptResult: ...
+    def decrypt_with_metrics(self, ciphertext: str) -> DecryptResult: ...
     def async_encrypt(self, plaintext: str) -> Coroutine[Any, Any, str]: ...
     def async_decrypt(self, ciphertext: str) -> Coroutine[Any, Any, str]: ...
     @staticmethod

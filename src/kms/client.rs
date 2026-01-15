@@ -5,7 +5,9 @@
 
 use crate::client_internal::{build_credential_provider, ClientConfig, CredentialProvider};
 use crate::errors::EncryptionError;
-use crate::kms::operations::{async_decrypt, async_encrypt, sync_decrypt, sync_encrypt};
+use crate::kms::operations::{
+    async_decrypt, async_encrypt, sync_decrypt, sync_encrypt, DecryptResult, EncryptResult,
+};
 use crate::kms::ENCRYPTED_PREFIX;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::retry::RetryConfig;
@@ -126,14 +128,34 @@ impl KmsEncryptor {
     /// 3. Returns base64-encoded envelope with "ENC:" prefix
     ///
     /// The envelope contains the encrypted data key + encrypted data.
+    /// Returns the ciphertext string (for backward compatibility).
+    /// Use encrypt_with_metrics() to get metrics.
     pub fn encrypt(&self, plaintext: &str) -> PyResult<String> {
-        sync_encrypt(
+        let (ciphertext, _metrics) = sync_encrypt(
             &self.client,
             &self.runtime,
             &self.key_id,
             &self.context,
             plaintext,
-        )
+        )?;
+        Ok(ciphertext)
+    }
+
+    /// Encrypt with metrics.
+    ///
+    /// Returns EncryptResult with ciphertext and KmsMetrics.
+    pub fn encrypt_with_metrics(&self, plaintext: &str) -> PyResult<EncryptResult> {
+        let (ciphertext, metrics) = sync_encrypt(
+            &self.client,
+            &self.runtime,
+            &self.key_id,
+            &self.context,
+            plaintext,
+        )?;
+        Ok(EncryptResult {
+            ciphertext,
+            metrics,
+        })
     }
 
     /// Decrypt a ciphertext string using envelope encryption.
@@ -143,13 +165,27 @@ impl KmsEncryptor {
     /// 3. Decrypts data locally with AES-256-GCM
     ///
     /// Expects base64-encoded envelope with "ENC:" prefix.
+    /// Returns the plaintext string (for backward compatibility).
+    /// Use decrypt_with_metrics() to get metrics.
     pub fn decrypt(&self, ciphertext: &str) -> PyResult<String> {
-        sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)
+        let (plaintext, _metrics) =
+            sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)?;
+        Ok(plaintext)
+    }
+
+    /// Decrypt with metrics.
+    ///
+    /// Returns DecryptResult with plaintext and KmsMetrics.
+    pub fn decrypt_with_metrics(&self, ciphertext: &str) -> PyResult<DecryptResult> {
+        let (plaintext, metrics) =
+            sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)?;
+        Ok(DecryptResult { plaintext, metrics })
     }
 
     // ========== ASYNC METHODS ==========
 
     /// Async encrypt a plaintext string.
+    /// Returns EncryptResult with ciphertext and metrics.
     pub fn async_encrypt<'py>(
         &self,
         py: Python<'py>,
@@ -165,6 +201,7 @@ impl KmsEncryptor {
     }
 
     /// Async decrypt a ciphertext string.
+    /// Returns DecryptResult with plaintext and metrics.
     pub fn async_decrypt<'py>(
         &self,
         py: Python<'py>,
