@@ -172,23 +172,6 @@ def test_model_scan_empty_result(scan_table, user_model):
     scan_table.delete_table("empty_test_table")
 
 
-def test_model_scan_metrics(populated_users):
-    """Test Model.scan exposes metrics after iteration."""
-    User = populated_users
-
-    result = User.scan()
-
-    # metrics is None before iteration
-    assert result.metrics is None
-
-    # iterate
-    _ = list(result)
-
-    # metrics available after iteration
-    assert result.metrics is not None
-    assert result.metrics.duration_ms > 0
-
-
 def test_model_scan_last_evaluated_key(populated_users):
     """Test Model.scan exposes last_evaluated_key."""
     User = populated_users

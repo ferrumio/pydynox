@@ -32,6 +32,11 @@ async def async_get(
     # prepare: get client, table, resolve consistent_read
     client, table, keys_dict, use_consistent = prepare_get(cls, consistent_read, keys)
     item = await client.async_get_item(table, keys_dict, consistent_read=use_consistent)
+
+    # Record metrics from client
+    if client._last_metrics is not None:
+        cls._record_metrics(client._last_metrics, "get")
+
     if item is None:
         return None
     if as_dict:
@@ -62,6 +67,10 @@ async def async_save(
     else:
         await client.async_put_item(table, item)
 
+    # Record metrics from client
+    if client._last_metrics is not None:
+        self.__class__._record_metrics(client._last_metrics, "put")
+
     # finalize: run AFTER_SAVE hooks
     finalize_save(self, skip)
 
@@ -85,6 +94,10 @@ async def async_delete(
         )
     else:
         await client.async_delete_item(table, key)
+
+    # Record metrics from client
+    if client._last_metrics is not None:
+        self.__class__._record_metrics(client._last_metrics, "delete")
 
     # S3 cleanup after successful delete
     await self._async_delete_s3_files()
@@ -127,6 +140,10 @@ async def async_update(
         else:
             await client.async_update_item(table, key, updates=updates)
 
+    # Record metrics from client
+    if client._last_metrics is not None:
+        self.__class__._record_metrics(client._last_metrics, "update")
+
     # finalize: run AFTER_UPDATE hooks
     finalize_update(self, skip)
 
@@ -155,6 +172,10 @@ async def async_update_by_key(
     else:
         await client.async_update_item(table, key, updates=updates)
 
+    # Record metrics from client
+    if client._last_metrics is not None:
+        cls._record_metrics(client._last_metrics, "update")
+
 
 async def async_delete_by_key(
     cls: type[M],
@@ -177,3 +198,7 @@ async def async_delete_by_key(
         )
     else:
         await client.async_delete_item(table, key)
+
+    # Record metrics from client
+    if client._last_metrics is not None:
+        cls._record_metrics(client._last_metrics, "delete")

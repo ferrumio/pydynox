@@ -304,25 +304,3 @@ def test_gsi_query_empty_result(gsi_client):
     results = list(User.email_index.query(email="nonexistent@example.com"))
 
     assert len(results) == 0
-
-
-def test_gsi_query_metrics(gsi_client):
-    """Test that GSI query provides metrics."""
-    User(
-        pk="USER#1",
-        sk="PROFILE",
-        email="john@example.com",
-        status="active",
-        name="John",
-        age=30,
-    ).save()
-
-    result = User.email_index.query(email="john@example.com")
-
-    # Iterate to trigger the query
-    items = list(result)
-    assert len(items) == 1
-
-    # Check metrics are available
-    assert result.metrics is not None
-    assert result.metrics.duration_ms >= 0

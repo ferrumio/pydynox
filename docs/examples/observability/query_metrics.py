@@ -1,20 +1,29 @@
-from pydynox import DynamoDBClient
+from pydynox import Model, ModelConfig
+from pydynox.attributes import StringAttribute
 
-client = DynamoDBClient()
+# For Model-level metrics, use class methods
 
-# Query returns a result object with .metrics
-result = client.query(
-    "users",
-    key_condition_expression="#pk = :pk",
-    expression_attribute_names={"#pk": "pk"},
-    expression_attribute_values={":pk": "ORG#123"},
-)
 
-# Iterate over results
-for item in result:
-    print(item["name"])
+class User(Model):
+    model_config = ModelConfig(table="users")
+    pk = StringAttribute(hash_key=True)
+    sk = StringAttribute(range_key=True)
+    name = StringAttribute()
 
-# Access metrics after iteration
-print(result.metrics.duration_ms)  # 45.2
-print(result.metrics.consumed_rcu)  # 2.5
-print(result.metrics.items_count)  # 10
+
+# After operations, access metrics via class methods
+user = User.get(pk="USER#1", sk="PROFILE")
+
+# Get last operation metrics
+last = User.get_last_metrics()
+if last:
+    print(last.duration_ms)  # 12.1
+    print(last.consumed_rcu)  # 0.5
+
+# Get total metrics across all operations
+total = User.get_total_metrics()
+print(total.total_rcu)  # 5.0
+print(total.get_count)  # 3
+
+# Reset metrics
+User.reset_metrics()

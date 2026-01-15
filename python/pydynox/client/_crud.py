@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydynox._internal._logging import _log_operation, _log_warning
-from pydynox._internal._metrics import DictWithMetrics, OperationMetrics
+from pydynox._internal._metrics import OperationMetrics
 from pydynox._internal._tracing import add_response_attributes, trace_operation
 
 _SLOW_QUERY_THRESHOLD_MS = 100.0
@@ -66,6 +66,11 @@ def _extract_pk(item_or_key: dict[str, Any]) -> str | None:
 class CrudOperations:
     """CRUD operations: get, put, delete, update."""
 
+    def _record_metrics(self, metrics: OperationMetrics, operation: str) -> None:
+        """Record metrics for an operation."""
+        self._last_metrics = metrics  # type: ignore[attr-defined]
+        self._total_metrics.add(metrics, operation)  # type: ignore[attr-defined]
+
     # ========== PUT ==========
 
     def put_item(
@@ -97,6 +102,7 @@ class CrudOperations:
         _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        self._record_metrics(metrics, "put")
         return metrics  # type: ignore[no-any-return]
 
     async def async_put_item(
@@ -128,6 +134,7 @@ class CrudOperations:
         _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        self._record_metrics(metrics, "put")
         return metrics  # type: ignore[no-any-return]
 
     # ========== GET ==========
@@ -138,7 +145,7 @@ class CrudOperations:
         key: dict[str, Any],
         consistent_read: bool = False,
         projection: list[str] | None = None,
-    ) -> DictWithMetrics | None:
+    ) -> dict[str, Any] | None:
         """Get an item from a DynamoDB table by its key.
 
         Args:
@@ -149,10 +156,9 @@ class CrudOperations:
                 what you need. Use dot notation for nested: ["name", "address.city"].
 
         Returns:
-            The item as a dict with metrics, or None if not found.
+            The item as a dict, or None if not found.
 
         Example:
-            >>> # Get only name and email
             >>> item = client.get_item("users", {"pk": "USER#1"}, projection=["name", "email"])
         """
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
@@ -175,12 +181,11 @@ class CrudOperations:
                 span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
             )
 
+        self._record_metrics(metrics, "get")
         _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("get_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        if result is None:
-            return None
-        return DictWithMetrics(result, metrics)
+        return result
 
     async def async_get_item(
         self,
@@ -188,7 +193,7 @@ class CrudOperations:
         key: dict[str, Any],
         consistent_read: bool = False,
         projection: list[str] | None = None,
-    ) -> DictWithMetrics | None:
+    ) -> dict[str, Any] | None:
         """Async version of get_item.
 
         Args:
@@ -198,7 +203,7 @@ class CrudOperations:
             projection: List of attributes to return. Saves RCU.
 
         Returns:
-            The item as a dict with metrics, or None if not found.
+            The item as a dict, or None if not found.
         """
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
@@ -224,9 +229,8 @@ class CrudOperations:
         _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("get_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        if result["item"] is None:
-            return None
-        return DictWithMetrics(result["item"], metrics)
+        self._record_metrics(metrics, "get")
+        return result["item"]
 
     # ========== DELETE ==========
 
@@ -259,6 +263,7 @@ class CrudOperations:
         _log_operation("delete_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("delete_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        self._record_metrics(metrics, "delete")
         return metrics  # type: ignore[no-any-return]
 
     async def async_delete_item(
@@ -290,6 +295,7 @@ class CrudOperations:
         _log_operation("delete_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("delete_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        self._record_metrics(metrics, "delete")
         return metrics  # type: ignore[no-any-return]
 
     # ========== UPDATE ==========
@@ -327,6 +333,7 @@ class CrudOperations:
         _log_operation("update_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("update_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        self._record_metrics(metrics, "update")
         return metrics  # type: ignore[no-any-return]
 
     async def async_update_item(
@@ -362,4 +369,5 @@ class CrudOperations:
         _log_operation("update_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("update_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        self._record_metrics(metrics, "update")
         return metrics  # type: ignore[no-any-return]

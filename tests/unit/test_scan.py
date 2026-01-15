@@ -133,13 +133,6 @@ def test_model_scan_result_iteration(user_model):
         assert isinstance(users[0], user_model)
 
 
-def test_model_scan_result_metrics_before_iteration(user_model):
-    """ModelScanResult.metrics is None before iteration."""
-    result = user_model.scan()
-
-    assert result.metrics is None
-
-
 def test_model_scan_result_last_evaluated_key_before_iteration(user_model):
     """ModelScanResult.last_evaluated_key is None before iteration."""
     result = user_model.scan()

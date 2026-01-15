@@ -147,13 +147,6 @@ def test_model_query_result_iteration(user_model):
         assert isinstance(users[0], user_model)
 
 
-def test_model_query_result_metrics_before_iteration(user_model):
-    """ModelQueryResult.metrics is None before iteration."""
-    result = user_model.query(hash_key="USER#123")
-
-    assert result.metrics is None
-
-
 def test_model_query_result_last_evaluated_key_before_iteration(user_model):
     """ModelQueryResult.last_evaluated_key is None before iteration."""
     result = user_model.query(hash_key="USER#123")

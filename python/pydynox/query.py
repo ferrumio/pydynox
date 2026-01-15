@@ -19,16 +19,11 @@ class QueryResult:
     """Result of a DynamoDB query with automatic pagination.
 
     Iterate over results and access `last_evaluated_key` for manual pagination.
-    Access `metrics` for timing and capacity info from the last page fetch.
 
     Example:
         >>> results = client.query("users", key_condition_expression="pk = :pk", ...)
         >>> for item in results:
         ...     print(item["name"])
-        >>>
-        >>> # Access metrics from last fetch
-        >>> print(results.metrics.duration_ms)
-        >>> print(results.metrics.consumed_rcu)
     """
 
     def __init__(
@@ -76,15 +71,6 @@ class QueryResult:
         Use this to continue pagination in a new query.
         """
         return self._last_evaluated_key
-
-    @property
-    def metrics(self) -> OperationMetrics | None:
-        """Metrics from the last page fetch.
-
-        Returns None if no pages have been fetched yet.
-        Updated after each page fetch during iteration.
-        """
-        return self._metrics
 
     def __iter__(self) -> "QueryResult":
         return self
@@ -212,11 +198,6 @@ class AsyncQueryResult:
         """The last evaluated key for pagination."""
         return self._last_evaluated_key
 
-    @property
-    def metrics(self) -> OperationMetrics | None:
-        """Metrics from the last page fetch."""
-        return self._metrics
-
     def __aiter__(self) -> "AsyncQueryResult":
         return self
 
@@ -308,15 +289,11 @@ class ScanResult:
     """Result of a DynamoDB scan with automatic pagination.
 
     Iterate over results and access `last_evaluated_key` for manual pagination.
-    Access `metrics` for timing and capacity info from the last page fetch.
 
     Example:
         >>> results = client.scan("users")
         >>> for item in results:
         ...     print(item["name"])
-        >>>
-        >>> # Access metrics from last fetch
-        >>> print(results.metrics.duration_ms)
     """
 
     def __init__(
@@ -360,11 +337,6 @@ class ScanResult:
     def last_evaluated_key(self) -> dict[str, Any] | None:
         """The last evaluated key for pagination."""
         return self._last_evaluated_key
-
-    @property
-    def metrics(self) -> OperationMetrics | None:
-        """Metrics from the last page fetch."""
-        return self._metrics
 
     def __iter__(self) -> "ScanResult":
         return self
@@ -482,11 +454,6 @@ class AsyncScanResult:
     def last_evaluated_key(self) -> dict[str, Any] | None:
         """The last evaluated key for pagination."""
         return self._last_evaluated_key
-
-    @property
-    def metrics(self) -> OperationMetrics | None:
-        """Metrics from the last page fetch."""
-        return self._metrics
 
     def __aiter__(self) -> "AsyncScanResult":
         return self

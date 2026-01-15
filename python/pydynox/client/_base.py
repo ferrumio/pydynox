@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core
+    from pydynox._internal._metrics import ModelMetrics, OperationMetrics
     from pydynox.diagnostics import HotPartitionDetector
     from pydynox.rate_limit import AdaptiveRate, FixedRate
 
@@ -17,6 +18,8 @@ class BaseClient:
     _rate_limit: FixedRate | AdaptiveRate | None
     _diagnostics: HotPartitionDetector | None
     _config: dict[str, str | float | int | None]
+    _last_metrics: OperationMetrics | None
+    _total_metrics: ModelMetrics
 
     def __init__(
         self,
@@ -37,6 +40,7 @@ class BaseClient:
         diagnostics: HotPartitionDetector | None = None,
     ):
         from pydynox import pydynox_core
+        from pydynox._internal._metrics import ModelMetrics
 
         self._client = pydynox_core.DynamoDBClient(
             region=region,
@@ -55,6 +59,8 @@ class BaseClient:
         )
         self._rate_limit = rate_limit
         self._diagnostics = diagnostics
+        self._last_metrics = None
+        self._total_metrics = ModelMetrics()
 
         # Store config for S3/KMS to inherit
         self._config = {
@@ -111,6 +117,49 @@ class BaseClient:
     def get_region(self) -> str:
         """Get the configured AWS region."""
         return self._client.get_region()
+
+    def get_last_metrics(self) -> OperationMetrics | None:
+        """Get metrics from the last operation.
+
+        Returns the OperationMetrics from the most recent operation,
+        or None if no operations have been performed.
+
+        Example:
+            client.get_item("users", {"pk": "USER#1"})
+            metrics = client.get_last_metrics()
+            print(metrics.duration_ms)
+        """
+        return self._last_metrics
+
+    def get_total_metrics(self) -> ModelMetrics:
+        """Get aggregated metrics from all operations.
+
+        Returns total RCU/WCU consumed and operation counts
+        since the client was created or last reset.
+
+        Example:
+            client.get_item("users", {"pk": "USER#1"})
+            client.put_item("users", {"pk": "USER#2", "name": "John"})
+            total = client.get_total_metrics()
+            print(total.total_rcu)  # Total RCU consumed
+            print(total.operation_count)  # 2
+        """
+        return self._total_metrics
+
+    def reset_metrics(self) -> None:
+        """Reset all metrics to zero.
+
+        Useful in long-running processes to reset metrics
+        at the start of each request.
+
+        Example:
+            def handle_request():
+                client.reset_metrics()
+                # ... do operations ...
+                print(client.get_total_metrics().total_rcu)
+        """
+        self._last_metrics = None
+        self._total_metrics.reset()
 
     def ping(self) -> bool:
         """Check if the client can connect to DynamoDB."""

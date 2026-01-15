@@ -60,7 +60,7 @@ from pydynox._internal._results import (
 
 if TYPE_CHECKING:
     from pydynox._internal._atomic import AtomicOp
-    from pydynox._internal._metrics import OperationMetrics
+    from pydynox._internal._metrics import ModelMetrics, OperationMetrics
     from pydynox.conditions import Condition
 
 __all__ = [
@@ -835,3 +835,60 @@ class Model(ModelBase, metaclass=ModelMeta):
         client = cls._get_client()
         table = cls._get_table()
         client.delete_table(table)
+
+    # ========== METRICS ==========
+
+    @classmethod
+    def get_last_metrics(cls) -> "OperationMetrics | None":
+        """Get metrics from the last operation on this Model.
+
+        Returns:
+            OperationMetrics from the last operation, or None if no operations yet.
+
+        Example:
+            >>> user = User.get(pk="USER#1")
+            >>> metrics = User.get_last_metrics()
+            >>> if metrics:
+            ...     print(f"RCU: {metrics.consumed_rcu}")
+        """
+        return cls._metrics_storage.last
+
+    @classmethod
+    def get_total_metrics(cls) -> "ModelMetrics":
+        """Get aggregated metrics for all operations on this Model.
+
+        Returns:
+            ModelMetrics with totals for RCU, WCU, duration, and operation counts.
+
+        Example:
+            >>> # After several operations
+            >>> metrics = User.get_total_metrics()
+            >>> print(f"Total RCU: {metrics.total_rcu}")
+            >>> print(f"Total WCU: {metrics.total_wcu}")
+            >>> print(f"Operations: {metrics.operation_count}")
+        """
+        return cls._metrics_storage.total
+
+    @classmethod
+    def reset_metrics(cls) -> None:
+        """Reset all metrics for this Model.
+
+        Use this in long-running processes (FastAPI, Flask) to reset per request.
+        Metrics accumulate forever if not reset.
+
+        Example:
+            >>> # At the start of each request
+            >>> User.reset_metrics()
+            >>> Order.reset_metrics()
+            >>>
+            >>> # ... do operations ...
+            >>>
+            >>> # At the end, check metrics
+            >>> print(User.get_total_metrics())
+        """
+        cls._metrics_storage.reset()
+
+    @classmethod
+    def _record_metrics(cls, metrics: "OperationMetrics", operation: str) -> None:
+        """Record metrics from an operation. Internal use only."""
+        cls._metrics_storage.record(metrics, operation)

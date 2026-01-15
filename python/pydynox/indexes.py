@@ -361,16 +361,11 @@ class GSIQueryResult(Generic[M]):
 
     Iterate over results to get model instances.
     Access `last_evaluated_key` for manual pagination.
-    Access `metrics` for timing and capacity info.
 
     Example:
         >>> results = User.email_index.query(email="john@example.com")
         >>> for user in results:
         ...     print(user.name)
-        >>>
-        >>> # Check metrics
-        >>> print(results.metrics.duration_ms)
-        >>> print(results.metrics.consumed_rcu)
     """
 
     def __init__(
@@ -412,16 +407,6 @@ class GSIQueryResult(Generic[M]):
             return None
         result: dict[str, Any] | None = self._query_result.last_evaluated_key
         return result
-
-    @property
-    def metrics(self) -> Any:
-        """Metrics from the last page fetch.
-
-        Returns None if no pages have been fetched yet.
-        """
-        if self._query_result is None:
-            return None
-        return self._query_result.metrics
 
     def _build_query(self) -> Any:
         """Build the underlying QueryResult."""

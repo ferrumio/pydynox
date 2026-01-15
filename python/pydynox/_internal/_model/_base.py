@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from pydynox.attributes import Attribute
 from pydynox.client import DynamoDBClient
@@ -11,6 +11,9 @@ from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
 from pydynox.indexes import GlobalSecondaryIndex
 from pydynox.size import ItemSize, calculate_item_size
+
+if TYPE_CHECKING:
+    from pydynox._internal._metrics import MetricsStorage
 
 M = TypeVar("M", bound="ModelBase")
 
@@ -23,6 +26,7 @@ class ModelMeta(type):
     _range_key: str | None
     _hooks: dict[HookType, list[Any]]
     _indexes: dict[str, GlobalSecondaryIndex[Any]]
+    _metrics_storage: "MetricsStorage"
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> ModelMeta:
         attributes: dict[str, Attribute[Any]] = {}
@@ -73,6 +77,11 @@ class ModelMeta(type):
         cls._hooks = hooks
         cls._indexes = indexes
 
+        # Each Model class gets its own metrics storage
+        from pydynox._internal._metrics import MetricsStorage
+
+        cls._metrics_storage = MetricsStorage()
+
         for idx in indexes.values():
             idx._bind_to_model(cls)
 
@@ -92,6 +101,7 @@ class ModelBase(metaclass=ModelMeta):
     _hooks: ClassVar[dict[HookType, list[Any]]]
     _indexes: ClassVar[dict[str, GlobalSecondaryIndex[Any]]]
     _client_instance: ClassVar[DynamoDBClient | None] = None
+    _metrics_storage: ClassVar["MetricsStorage"]
 
     model_config: ClassVar[ModelConfig]
 
