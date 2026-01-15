@@ -11,6 +11,7 @@ from pydynox.integrations.functions import dynamodb_model
 def test_decorator_adds_metadata():
     """Decorator adds pydynox metadata to the class."""
 
+    # GIVEN a dataclass decorated with dynamodb_model
     @dynamodb_model(table="users", hash_key="pk", range_key="sk")
     @dataclass
     class User:
@@ -18,6 +19,7 @@ def test_decorator_adds_metadata():
         sk: str
         name: str
 
+    # THEN pydynox metadata should be added
     assert User._pydynox_table == "users"
     assert User._pydynox_hash_key == "pk"
     assert User._pydynox_range_key == "sk"
@@ -26,12 +28,14 @@ def test_decorator_adds_metadata():
 def test_decorator_adds_methods():
     """Decorator adds CRUD methods to the class."""
 
+    # GIVEN a dataclass decorated with dynamodb_model
     @dynamodb_model(table="users", hash_key="pk")
     @dataclass
     class User:
         pk: str
         name: str
 
+    # THEN CRUD methods should be added
     assert hasattr(User, "get")
     assert hasattr(User, "save")
     assert hasattr(User, "delete")
@@ -43,6 +47,7 @@ def test_decorator_adds_methods():
 def test_dataclass_still_works():
     """Dataclass still works normally."""
 
+    # GIVEN a decorated dataclass
     @dynamodb_model(table="users", hash_key="pk", range_key="sk")
     @dataclass
     class User:
@@ -51,8 +56,10 @@ def test_dataclass_still_works():
         name: str
         age: int = 0
 
+    # WHEN we create an instance
     user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
 
+    # THEN dataclass behavior should work normally
     assert user.pk == "USER#1"
     assert user.name == "John"
     assert user.age == 30
@@ -61,6 +68,7 @@ def test_dataclass_still_works():
 def test_get_key_returns_hash_and_range():
     """_get_key returns both hash and range key."""
 
+    # GIVEN a decorated dataclass with hash and range key
     @dynamodb_model(table="users", hash_key="pk", range_key="sk")
     @dataclass
     class User:
@@ -69,13 +77,17 @@ def test_get_key_returns_hash_and_range():
         name: str
 
     user = User(pk="USER#1", sk="PROFILE", name="John")
+
+    # WHEN we get the key
     key = user._get_key()
 
+    # THEN both keys should be returned
     assert key == {"pk": "USER#1", "sk": "PROFILE"}
 
 
 def test_get_fetches_from_dynamodb():
     """get() fetches item from DynamoDB and returns dataclass."""
+    # GIVEN a mock client that returns user data
     mock_client = MagicMock()
     mock_client.get_item.return_value = {
         "pk": "USER#1",
@@ -92,8 +104,10 @@ def test_get_fetches_from_dynamodb():
         name: str
         age: int = 0
 
+    # WHEN we call get
     user = User.get(pk="USER#1", sk="PROFILE")
 
+    # THEN a dataclass instance should be returned with correct data
     assert user is not None
     assert isinstance(user, User)
     assert user.pk == "USER#1"
@@ -103,6 +117,7 @@ def test_get_fetches_from_dynamodb():
 
 def test_get_returns_none_when_not_found():
     """get() returns None when item not found."""
+    # GIVEN a mock client that returns None
     mock_client = MagicMock()
     mock_client.get_item.return_value = None
 
@@ -113,13 +128,16 @@ def test_get_returns_none_when_not_found():
         sk: str
         name: str
 
+    # WHEN we call get for non-existent item
     user = User.get(pk="USER#1", sk="PROFILE")
 
+    # THEN None should be returned
     assert user is None
 
 
 def test_save_puts_to_dynamodb():
     """save() puts item to DynamoDB."""
+    # GIVEN a mock client
     mock_client = MagicMock()
 
     @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
@@ -131,8 +149,11 @@ def test_save_puts_to_dynamodb():
         age: int = 0
 
     user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
+
+    # WHEN we save
     user.save()
 
+    # THEN put_item should be called with correct data
     mock_client.put_item.assert_called_once_with(
         "users", {"pk": "USER#1", "sk": "PROFILE", "name": "John", "age": 30}
     )
@@ -140,6 +161,7 @@ def test_save_puts_to_dynamodb():
 
 def test_delete_removes_from_dynamodb():
     """delete() removes item from DynamoDB."""
+    # GIVEN a mock client
     mock_client = MagicMock()
 
     @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
@@ -150,13 +172,17 @@ def test_delete_removes_from_dynamodb():
         name: str
 
     user = User(pk="USER#1", sk="PROFILE", name="John")
+
+    # WHEN we delete
     user.delete()
 
+    # THEN delete_item should be called with the key
     mock_client.delete_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
 
 
 def test_update_updates_dynamodb():
     """update() updates item in DynamoDB."""
+    # GIVEN a mock client
     mock_client = MagicMock()
 
     @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
@@ -168,13 +194,15 @@ def test_update_updates_dynamodb():
         age: int = 0
 
     user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
+
+    # WHEN we update
     user.update(name="Jane", age=31)
 
-    # Local instance updated
+    # THEN local instance should be updated
     assert user.name == "Jane"
     assert user.age == 31
 
-    # DynamoDB updated
+    # AND DynamoDB should be updated
     mock_client.update_item.assert_called_once_with(
         "users", {"pk": "USER#1", "sk": "PROFILE"}, updates={"name": "Jane", "age": 31}
     )
@@ -183,14 +211,17 @@ def test_update_updates_dynamodb():
 def test_from_dataclass_creates_model():
     """from_dataclass() creates a DynamoDB-enabled dataclass."""
 
+    # GIVEN a plain dataclass
     @dataclass
     class Product:
         pk: str
         name: str
         price: float
 
+    # WHEN we call from_dataclass
     ProductDB = from_dataclass(Product, table="products", hash_key="pk")
 
+    # THEN a DynamoDB-enabled class should be created
     assert ProductDB._pydynox_table == "products"
     assert ProductDB._pydynox_hash_key == "pk"
     assert hasattr(ProductDB, "save")
@@ -198,6 +229,8 @@ def test_from_dataclass_creates_model():
 
 def test_decorator_requires_dataclass_or_pydantic():
     """Decorator raises error if class is not a dataclass or Pydantic model."""
+    # WHEN we try to decorate a plain class
+    # THEN TypeError should be raised
     with pytest.raises(TypeError, match="must be a dataclass or Pydantic BaseModel"):
 
         @dynamodb_model(table="test", hash_key="id")
@@ -208,6 +241,7 @@ def test_decorator_requires_dataclass_or_pydantic():
 def test_hash_key_only_model():
     """Model with only hash key (no range key) works."""
 
+    # GIVEN a model with only hash key
     @dynamodb_model(table="simple", hash_key="id")
     @dataclass
     class SimpleModel:
@@ -215,14 +249,18 @@ def test_hash_key_only_model():
         data: str
 
     item = SimpleModel(id="123", data="test")
+
+    # WHEN we get the key
     key = item._get_key()
 
+    # THEN only hash key should be returned
     assert key == {"id": "123"}
 
 
 def test_set_client_after_creation():
     """_set_client() allows setting client after model creation."""
 
+    # GIVEN a model without client
     @dynamodb_model(table="users", hash_key="pk")
     @dataclass
     class User:
@@ -232,9 +270,11 @@ def test_set_client_after_creation():
     mock_client = MagicMock()
     mock_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
 
+    # WHEN we set the client
     User._set_client(mock_client)
     user = User.get(pk="USER#1")
 
+    # THEN operations should work
     assert user is not None
     assert user.name == "John"
 
@@ -242,6 +282,7 @@ def test_set_client_after_creation():
 def test_no_client_raises_error():
     """Operations without client raise RuntimeError."""
 
+    # GIVEN a model without client
     @dynamodb_model(table="users", hash_key="pk")
     @dataclass
     class User:
@@ -250,12 +291,16 @@ def test_no_client_raises_error():
 
     user = User(pk="USER#1", name="John")
 
+    # WHEN we try to save without client
+    # THEN RuntimeError should be raised
     with pytest.raises(RuntimeError, match="No client set"):
         user.save()
 
 
 def test_invalid_hash_key_raises_error():
     """Invalid hash_key raises ValueError."""
+    # WHEN we try to create a model with invalid hash_key
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="hash_key 'invalid' not found"):
 
         @dynamodb_model(table="test", hash_key="invalid")
@@ -266,6 +311,8 @@ def test_invalid_hash_key_raises_error():
 
 def test_invalid_range_key_raises_error():
     """Invalid range_key raises ValueError."""
+    # WHEN we try to create a model with invalid range_key
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="range_key 'invalid' not found"):
 
         @dynamodb_model(table="test", hash_key="pk", range_key="invalid")
@@ -276,6 +323,7 @@ def test_invalid_range_key_raises_error():
 
 def test_update_invalid_attribute_raises_error():
     """update() with invalid attribute raises AttributeError."""
+    # GIVEN a model with known attributes
     mock_client = MagicMock()
 
     @dynamodb_model(table="users", hash_key="pk", client=mock_client)
@@ -286,5 +334,7 @@ def test_update_invalid_attribute_raises_error():
 
     user = User(pk="USER#1", name="John")
 
+    # WHEN we try to update an invalid attribute
+    # THEN AttributeError should be raised
     with pytest.raises(AttributeError, match="has no attribute 'invalid'"):
         user.update(invalid="value")

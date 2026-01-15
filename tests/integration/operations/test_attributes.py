@@ -37,14 +37,18 @@ def test_json_attribute_roundtrip(setup_client, table):
         sk = StringAttribute(range_key=True)
         settings = JSONAttribute()
 
+    # GIVEN a model with JSON data
     config = Config(
         pk="CFG#1",
         sk="SETTINGS",
         settings={"theme": "dark", "notifications": True, "count": 42},
     )
-    config.save()
 
+    # WHEN we save and load it
+    config.save()
     loaded = Config.get(pk="CFG#1", sk="SETTINGS")
+
+    # THEN JSON data is preserved
     assert loaded is not None
     assert loaded.settings == {"theme": "dark", "notifications": True, "count": 42}
 
@@ -75,10 +79,14 @@ def test_enum_attribute_roundtrip(setup_client, table):
         sk = StringAttribute(range_key=True)
         status = EnumAttribute(Status)
 
+    # GIVEN a model with enum value
     user = User(pk="USER#1", sk="PROFILE", status=Status.ACTIVE)
-    user.save()
 
+    # WHEN we save and load it
+    user.save()
     loaded = User.get(pk="USER#1", sk="PROFILE")
+
+    # THEN enum value is preserved
     assert loaded is not None
     assert loaded.status == Status.ACTIVE
 
@@ -109,11 +117,15 @@ def test_datetime_attribute_roundtrip(setup_client, table):
         sk = StringAttribute(range_key=True)
         created_at = DatetimeAttribute()
 
+    # GIVEN a model with datetime value
     dt = datetime(2024, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
     event = Event(pk="EVT#1", sk="DATA", created_at=dt)
-    event.save()
 
+    # WHEN we save and load it
+    event.save()
     loaded = Event.get(pk="EVT#1", sk="DATA")
+
+    # THEN datetime is preserved
     assert loaded is not None
     assert loaded.created_at == dt
 
@@ -127,10 +139,14 @@ def test_string_set_attribute_roundtrip(setup_client, table):
         sk = StringAttribute(range_key=True)
         tags = StringSetAttribute()
 
+    # GIVEN a model with string set
     user = User(pk="USER#3", sk="PROFILE", tags={"admin", "verified", "premium"})
-    user.save()
 
+    # WHEN we save and load it
+    user.save()
     loaded = User.get(pk="USER#3", sk="PROFILE")
+
+    # THEN set is preserved
     assert loaded is not None
     assert loaded.tags == {"admin", "verified", "premium"}
 

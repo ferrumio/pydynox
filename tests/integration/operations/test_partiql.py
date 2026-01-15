@@ -21,11 +21,13 @@ def test_execute_statement_select_all(populated_table):
     """Test SELECT * with PartiQL."""
     dynamo = populated_table
 
+    # WHEN we execute a PartiQL SELECT
     result = dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["USER#1"],
     )
 
+    # THEN matching items are returned
     assert len(result) == 3
     assert all(item["pk"] == "USER#1" for item in result)
     assert result.metrics.duration_ms > 0

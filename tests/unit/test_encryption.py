@@ -11,6 +11,7 @@ from pydynox.attributes import EncryptedAttribute
 
 def test_encryption_mode_values():
     """EncryptionMode has correct values."""
+    # THEN each mode should have the expected value
     assert EncryptionMode.ReadWrite == 0
     assert EncryptionMode.WriteOnly == 1
     assert EncryptionMode.ReadOnly == 2
@@ -30,7 +31,11 @@ def test_encryption_mode_values():
 )
 def test_is_encrypted(value, expected):
     """is_encrypted detects ENC: prefix."""
-    assert KmsEncryptor.is_encrypted(value) == expected
+    # WHEN we check if value is encrypted
+    result = KmsEncryptor.is_encrypted(value)
+
+    # THEN it should match expected
+    assert result == expected
 
 
 # --- EncryptedAttribute ---
@@ -38,13 +43,16 @@ def test_is_encrypted(value, expected):
 
 def test_encrypted_attribute_type():
     """EncryptedAttribute has string type."""
+    # GIVEN an encrypted attribute
     attr = EncryptedAttribute(key_id="alias/test")
 
+    # THEN attr_type should be string
     assert attr.attr_type == "S"
 
 
 def test_encrypted_attribute_stores_config():
     """EncryptedAttribute stores key_id, mode, region, context."""
+    # WHEN we create an encrypted attribute with all options
     attr = EncryptedAttribute(
         key_id="alias/test",
         mode=EncryptionMode.WriteOnly,
@@ -52,6 +60,7 @@ def test_encrypted_attribute_stores_config():
         context={"tenant": "abc"},
     )
 
+    # THEN all config should be stored
     assert attr.key_id == "alias/test"
     assert attr.mode == EncryptionMode.WriteOnly
     assert attr.region == "us-west-2"
@@ -60,23 +69,30 @@ def test_encrypted_attribute_stores_config():
 
 def test_encrypted_attribute_default_mode():
     """Default mode is None (means ReadWrite)."""
+    # WHEN we create an encrypted attribute without mode
     attr = EncryptedAttribute(key_id="alias/test")
 
+    # THEN mode should be None (defaults to ReadWrite)
     assert attr.mode is None
 
 
 def test_encrypted_attribute_no_key_flags():
     """EncryptedAttribute cannot be hash_key or range_key."""
+    # GIVEN an encrypted attribute
     attr = EncryptedAttribute(key_id="alias/test")
 
+    # THEN it should not be a key
     assert attr.hash_key is False
     assert attr.range_key is False
 
 
 def test_encrypted_attribute_none_value():
     """None values are handled correctly."""
+    # GIVEN an encrypted attribute
     attr = EncryptedAttribute(key_id="alias/test")
 
+    # WHEN we serialize/deserialize None
+    # THEN None should be returned
     assert attr.serialize(None) is None
     assert attr.deserialize(None) is None
 
@@ -84,6 +100,7 @@ def test_encrypted_attribute_none_value():
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
     """serialize calls encryptor.encrypt_with_metrics."""
+    # GIVEN a mocked encryptor
     mock_encryptor = MagicMock()
     mock_result = MagicMock()
     mock_result.ciphertext = "ENC:encrypted_data"
@@ -93,8 +110,11 @@ def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
     mock_kms_class.return_value = mock_encryptor
 
     attr = EncryptedAttribute(key_id="alias/test")
+
+    # WHEN we serialize a value
     result = attr.serialize("secret")
 
+    # THEN encrypt_with_metrics should be called
     mock_encryptor.encrypt_with_metrics.assert_called_once_with("secret")
     assert result == "ENC:encrypted_data"
 
@@ -102,6 +122,7 @@ def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_deserialize_calls_decrypt(mock_kms_class):
     """deserialize calls encryptor.decrypt_with_metrics for encrypted values."""
+    # GIVEN a mocked encryptor
     mock_encryptor = MagicMock()
     mock_result = MagicMock()
     mock_result.plaintext = "secret"
@@ -112,24 +133,31 @@ def test_encrypted_attribute_deserialize_calls_decrypt(mock_kms_class):
     mock_kms_class.is_encrypted.return_value = True
 
     attr = EncryptedAttribute(key_id="alias/test")
+
+    # WHEN we deserialize an encrypted value
     result = attr.deserialize("ENC:encrypted_data")
 
+    # THEN decrypt_with_metrics should be called
     mock_encryptor.decrypt_with_metrics.assert_called_once_with("ENC:encrypted_data")
     assert result == "secret"
 
 
 def test_encrypted_attribute_deserialize_plain_value():
     """deserialize returns plain values unchanged."""
+    # GIVEN an encrypted attribute
     attr = EncryptedAttribute(key_id="alias/test")
 
+    # WHEN we deserialize a plain value
     result = attr.deserialize("plain text")
 
+    # THEN it should be returned unchanged
     assert result == "plain text"
 
 
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_lazy_loads_encryptor(mock_kms_class):
     """Encryptor is created on first use, not on init."""
+    # GIVEN an encrypted attribute
     attr = EncryptedAttribute(
         key_id="alias/test",
         mode=EncryptionMode.WriteOnly,
@@ -137,13 +165,13 @@ def test_encrypted_attribute_lazy_loads_encryptor(mock_kms_class):
         context={"tenant": "abc"},
     )
 
-    # Not created yet
+    # THEN encryptor should not be created yet
     mock_kms_class.assert_not_called()
 
-    # Access encryptor
+    # WHEN we access the encryptor
     _ = attr.encryptor
 
-    # Now created with correct args (no mode - it's handled in Python)
+    # THEN it should be created with correct args
     mock_kms_class.assert_called_once_with(
         key_id="alias/test",
         region="us-west-2",
@@ -156,30 +184,35 @@ def test_encrypted_attribute_lazy_loads_encryptor(mock_kms_class):
 
 def test_encrypted_attribute_readonly_skips_encrypt():
     """ReadOnly mode returns value as-is on serialize."""
+    # GIVEN an attribute with ReadOnly mode
     attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.ReadOnly)
 
+    # WHEN we serialize
     result = attr.serialize("secret")
 
-    # Should return the value without encrypting
+    # THEN value should be returned without encrypting
     assert result == "secret"
 
 
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_writeonly_skips_decrypt(mock_kms_class):
     """WriteOnly mode returns encrypted value as-is on deserialize."""
+    # GIVEN an attribute with WriteOnly mode
     mock_kms_class.is_encrypted.return_value = True
 
     attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.WriteOnly)
 
+    # WHEN we deserialize an encrypted value
     result = attr.deserialize("ENC:encrypted_data")
 
-    # Should return the encrypted value without decrypting
+    # THEN encrypted value should be returned without decrypting
     assert result == "ENC:encrypted_data"
 
 
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_readwrite_can_do_both(mock_kms_class):
     """ReadWrite mode allows both encrypt and decrypt."""
+    # GIVEN a mocked encryptor with ReadWrite mode
     mock_encryptor = MagicMock()
     mock_encrypt_result = MagicMock()
     mock_encrypt_result.ciphertext = "ENC:data"
@@ -198,6 +231,7 @@ def test_encrypted_attribute_readwrite_can_do_both(mock_kms_class):
 
     attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.ReadWrite)
 
-    # Both should work
+    # WHEN we serialize and deserialize
+    # THEN both should work
     assert attr.serialize("secret") == "ENC:data"
     assert attr.deserialize("ENC:data") == "secret"

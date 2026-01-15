@@ -32,9 +32,13 @@ def test_save_with_does_not_exist_condition_succeeds(user_model):
     """First save with does_not_exist should work."""
     User = user_model
 
+    # GIVEN a new user
     user = User(pk="COND#1", sk="PROFILE", name="Alice", age=25, status="active")
+
+    # WHEN we save with does_not_exist condition
     user.save(condition=User.pk.does_not_exist())
 
+    # THEN the save succeeds
     loaded = User.get(pk="COND#1", sk="PROFILE")
     assert loaded is not None
     assert loaded.name == "Alice"
@@ -44,12 +48,14 @@ def test_save_with_does_not_exist_condition_fails_on_existing(user_model):
     """Second save with does_not_exist should fail."""
     User = user_model
 
-    # First save
+    # GIVEN an existing user
     user = User(pk="COND#2", sk="PROFILE", name="Bob", age=30, status="active")
     user.save()
 
-    # Second save with condition should fail
+    # WHEN we try to save another with same key and does_not_exist condition
     user2 = User(pk="COND#2", sk="PROFILE", name="Bob2", age=35, status="active")
+
+    # THEN it fails
     with pytest.raises(Exception) as exc_info:
         user2.save(condition=User.pk.does_not_exist())
 
@@ -93,11 +99,14 @@ def test_delete_with_condition_succeeds(user_model):
     """Delete with matching condition should work."""
     User = user_model
 
+    # GIVEN an active user
     user = User(pk="COND#5", sk="PROFILE", name="Eve", age=25, status="active")
     user.save()
 
+    # WHEN we delete with matching condition
     user.delete(condition=User.status == "active")
 
+    # THEN the user is deleted
     loaded = User.get(pk="COND#5", sk="PROFILE")
     assert loaded is None
 
@@ -106,13 +115,16 @@ def test_delete_with_condition_fails_on_mismatch(user_model):
     """Delete with non-matching condition should fail."""
     User = user_model
 
+    # GIVEN an active user
     user = User(pk="COND#6", sk="PROFILE", name="Frank", age=25, status="active")
     user.save()
 
+    # WHEN we try to delete with wrong condition
+    # THEN it fails
     with pytest.raises(Exception):
         user.delete(condition=User.status == "inactive")
 
-    # Should NOT be deleted
+    # AND user is NOT deleted
     loaded = User.get(pk="COND#6", sk="PROFILE")
     assert loaded is not None
     assert loaded.name == "Frank"

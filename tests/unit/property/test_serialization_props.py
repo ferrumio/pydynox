@@ -113,13 +113,12 @@ def test_serialization_round_trip(value):
     **Feature: pydynox, Property 1: Serialization Round-Trip**
     **Validates: Requirements 1.6, 12.1, 12.2**
     """
-    # Convert Python -> DynamoDB
+    # GIVEN any valid Python value
+    # WHEN converting Python -> DynamoDB -> Python
     dynamo_value = py_to_dynamo(value)
-
-    # Convert DynamoDB -> Python
     result = dynamo_to_py(dynamo_value)
 
-    # Values should be equivalent
+    # THEN values should be equivalent
     assert compare_values(value, result), (
         f"Round-trip failed: {value!r} -> {dynamo_value!r} -> {result!r}"
     )

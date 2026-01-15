@@ -40,8 +40,10 @@ def test_model_query_by_hash_key(populated_orders):
     """Test Model.query returns typed instances."""
     Order = populated_orders
 
+    # WHEN we query by hash key
     orders = list(Order.query(hash_key="CUSTOMER#1"))
 
+    # THEN typed model instances are returned
     assert len(orders) == 4
     for order in orders:
         assert isinstance(order, Order)
@@ -68,6 +70,7 @@ def test_model_query_with_filter_condition(populated_orders):
     """Test Model.query with filter_condition."""
     Order = populated_orders
 
+    # WHEN we query with filter condition
     orders = list(
         Order.query(
             hash_key="CUSTOMER#1",
@@ -75,6 +78,7 @@ def test_model_query_with_filter_condition(populated_orders):
         )
     )
 
+    # THEN only matching items are returned
     assert len(orders) == 2
     for order in orders:
         assert order.status == "shipped"

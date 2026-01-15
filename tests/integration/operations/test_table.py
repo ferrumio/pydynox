@@ -22,8 +22,10 @@ def client(dynamodb_endpoint):
 
 def test_create_table_with_hash_key_only(client):
     """Test creating a table with only a hash key."""
+    # WHEN we create a table with hash key only
     client.create_table("hash_only_table", hash_key=("pk", "S"))
 
+    # THEN the table exists
     assert client.table_exists("hash_only_table")
     client.delete_table("hash_only_table")
 
@@ -95,23 +97,32 @@ def test_table_exists_returns_false_for_nonexistent(client):
 
 def test_delete_table(client):
     """Test deleting a table."""
+    # GIVEN an existing table
     client.create_table("to_delete_table", hash_key=("pk", "S"))
     assert client.table_exists("to_delete_table")
 
+    # WHEN we delete it
     client.delete_table("to_delete_table")
+
+    # THEN it no longer exists
     assert client.table_exists("to_delete_table") is False
 
 
 def test_delete_nonexistent_table_raises_error(client):
     """Test that deleting a non-existent table raises TableNotFoundError."""
+    # WHEN we try to delete a non-existent table
+    # THEN TableNotFoundError is raised
     with pytest.raises(TableNotFoundError):
         client.delete_table("nonexistent_table_12345")
 
 
 def test_create_duplicate_table_raises_error(client):
     """Test that creating a duplicate table raises TableAlreadyExistsError."""
+    # GIVEN an existing table
     client.create_table("duplicate_table", hash_key=("pk", "S"))
 
+    # WHEN we try to create it again
+    # THEN TableAlreadyExistsError is raised
     with pytest.raises(TableAlreadyExistsError):
         client.create_table("duplicate_table", hash_key=("pk", "S"))
 

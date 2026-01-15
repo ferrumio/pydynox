@@ -28,14 +28,14 @@ def test_update_by_key_updates_item(user_model):
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
-    # Create item first
+    # GIVEN an existing item
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
-    # Update by key without fetching
+    # WHEN we update by key without fetching
     user_model.update_by_key(pk=pk, sk="PROFILE", name="Jane", age=31)
 
-    # Verify update
+    # THEN the update is applied
     result = user_model.get(pk=pk, sk="PROFILE")
     assert result is not None
     assert result.name == "Jane"
@@ -124,13 +124,14 @@ def test_delete_by_key_deletes_item(user_model):
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
+    # GIVEN an existing item
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
-    # Delete by key without fetching
+    # WHEN we delete by key without fetching
     user_model.delete_by_key(pk=pk, sk="PROFILE")
 
-    # Verify deletion
+    # THEN the item is deleted
     result = user_model.get(pk=pk, sk="PROFILE")
     assert result is None
 
@@ -226,11 +227,14 @@ def test_get_as_dict_returns_dict(user_model):
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
+    # GIVEN an existing item
     user = user_model(pk=pk, sk="PROFILE", name="Alice", age=25)
     user.save()
 
+    # WHEN we get with as_dict=True
     result = user_model.get(pk=pk, sk="PROFILE", as_dict=True)
 
+    # THEN a plain dict is returned
     assert result is not None
     assert isinstance(result, dict)
     assert result["name"] == "Alice"

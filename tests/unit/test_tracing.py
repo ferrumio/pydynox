@@ -29,6 +29,7 @@ def reset_tracing():
 
 def test_tracing_disabled_by_default():
     """Tracing should be disabled by default."""
+    # THEN tracing is disabled and returns None
     assert is_tracing_enabled() is False
     assert get_tracer() is None
     assert get_config() is None
@@ -36,10 +37,13 @@ def test_tracing_disabled_by_default():
 
 def test_enable_tracing_with_mock_tracer():
     """Enable tracing with a mock tracer."""
+    # GIVEN a mock tracer
     mock_tracer = MagicMock()
 
+    # WHEN enabling tracing
     enable_tracing(tracer=mock_tracer)
 
+    # THEN tracing is enabled with the tracer
     assert is_tracing_enabled() is True
     assert get_tracer() is mock_tracer
     assert get_config() is not None
@@ -47,11 +51,14 @@ def test_enable_tracing_with_mock_tracer():
 
 def test_disable_tracing():
     """Disable tracing after enabling."""
+    # GIVEN tracing is enabled
     mock_tracer = MagicMock()
     enable_tracing(tracer=mock_tracer)
 
+    # WHEN disabling tracing
     disable_tracing()
 
+    # THEN tracing is disabled
     assert is_tracing_enabled() is False
     assert get_tracer() is None
     assert get_config() is None
@@ -59,8 +66,10 @@ def test_disable_tracing():
 
 def test_tracing_config_defaults():
     """TracingConfig should have correct defaults."""
+    # WHEN creating a config with defaults
     config = TracingConfig()
 
+    # THEN defaults are set correctly
     assert config.record_exceptions is True
     assert config.record_consumed_capacity is True
     assert config.span_name_prefix is None
@@ -68,12 +77,14 @@ def test_tracing_config_defaults():
 
 def test_tracing_config_custom():
     """TracingConfig should accept custom values."""
+    # WHEN creating a config with custom values
     config = TracingConfig(
         record_exceptions=False,
         record_consumed_capacity=False,
         span_name_prefix="myapp",
     )
 
+    # THEN custom values are stored
     assert config.record_exceptions is False
     assert config.record_consumed_capacity is False
     assert config.span_name_prefix == "myapp"
@@ -81,8 +92,10 @@ def test_tracing_config_custom():
 
 def test_enable_tracing_with_config():
     """Enable tracing with custom config."""
+    # GIVEN a mock tracer
     mock_tracer = MagicMock()
 
+    # WHEN enabling tracing with custom config
     enable_tracing(
         tracer=mock_tracer,
         record_exceptions=False,
@@ -90,6 +103,7 @@ def test_enable_tracing_with_config():
         span_name_prefix="myapp",
     )
 
+    # THEN config is stored with custom values
     config = get_config()
     assert config is not None
     assert config.record_exceptions is False
@@ -138,47 +152,49 @@ def test_get_operation_name_unknown():
 
 def test_trace_operation_disabled():
     """trace_operation should yield None when tracing is disabled."""
+    # WHEN using trace_operation with tracing disabled
     with trace_operation("put_item", "users", "us-east-1") as span:
+        # THEN span is None
         assert span is None
 
 
 def test_trace_operation_enabled():
     """trace_operation should create span when tracing is enabled."""
+    # GIVEN tracing is enabled with a mock tracer
     mock_span = MagicMock()
     mock_tracer = MagicMock()
-    # start_as_current_span is a context manager that returns the span
     mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
     mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-
     enable_tracing(tracer=mock_tracer)
 
+    # WHEN using trace_operation
     with patch.dict("sys.modules", {"opentelemetry.trace": MagicMock()}):
         with trace_operation("put_item", "users", "us-east-1") as span:
+            # THEN span is returned
             assert span is mock_span
 
-    # Verify span was created with correct name
+    # THEN span was created with correct name and ended
     mock_tracer.start_as_current_span.assert_called_once()
     call_args = mock_tracer.start_as_current_span.call_args
     assert call_args[0][0] == "PutItem users"
-
-    # Verify span was ended
     mock_span.end.assert_called_once()
 
 
 def test_trace_operation_sets_attributes():
     """trace_operation should set correct attributes."""
+    # GIVEN tracing is enabled
     mock_span = MagicMock()
     mock_tracer = MagicMock()
     mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
     mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-
     enable_tracing(tracer=mock_tracer)
 
+    # WHEN using trace_operation
     with patch.dict("sys.modules", {"opentelemetry.trace": MagicMock()}):
         with trace_operation("put_item", "users", "us-east-1"):
             pass
 
-    # Check attributes were set
+    # THEN correct attributes are set on the span
     set_attribute_calls = {
         call[0][0]: call[0][1] for call in mock_span.set_attribute.call_args_list
     }
@@ -191,37 +207,40 @@ def test_trace_operation_sets_attributes():
 
 def test_trace_operation_with_prefix():
     """trace_operation should add prefix to span name."""
+    # GIVEN tracing is enabled with a prefix
     mock_span = MagicMock()
     mock_tracer = MagicMock()
     mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
     mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-
     enable_tracing(tracer=mock_tracer, span_name_prefix="myapp")
 
+    # WHEN using trace_operation
     with patch.dict("sys.modules", {"opentelemetry.trace": MagicMock()}):
         with trace_operation("put_item", "users"):
             pass
 
+    # THEN span name includes the prefix
     call_args = mock_tracer.start_as_current_span.call_args
     assert call_args[0][0] == "myapp PutItem users"
 
 
 def test_trace_operation_batch():
     """trace_operation should handle batch operations."""
+    # GIVEN tracing is enabled
     mock_span = MagicMock()
     mock_tracer = MagicMock()
     mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
     mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-
     enable_tracing(tracer=mock_tracer)
 
+    # WHEN using trace_operation for a batch operation
     with patch.dict("sys.modules", {"opentelemetry.trace": MagicMock()}):
         with trace_operation("batch_write", "users", batch_size=25):
             pass
 
+    # THEN span name includes BATCH prefix and batch size is set
     call_args = mock_tracer.start_as_current_span.call_args
     assert call_args[0][0] == "BATCH BatchWriteItem users"
-
     set_attribute_calls = {
         call[0][0]: call[0][1] for call in mock_span.set_attribute.call_args_list
     }
@@ -230,39 +249,41 @@ def test_trace_operation_batch():
 
 def test_trace_operation_no_table():
     """trace_operation should work without table name."""
+    # GIVEN tracing is enabled
     mock_span = MagicMock()
     mock_tracer = MagicMock()
     mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
     mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-
     enable_tracing(tracer=mock_tracer)
 
+    # WHEN using trace_operation without table name
     with patch.dict("sys.modules", {"opentelemetry.trace": MagicMock()}):
         with trace_operation("query"):
             pass
 
+    # THEN span name is just the operation
     call_args = mock_tracer.start_as_current_span.call_args
     assert call_args[0][0] == "Query"
 
 
 def test_trace_operation_exception():
     """trace_operation should record exceptions."""
+    # GIVEN tracing is enabled
     mock_span = MagicMock()
     mock_tracer = MagicMock()
     mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
     mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-
     enable_tracing(tracer=mock_tracer)
-
     mock_otel = MagicMock()
     mock_otel.StatusCode.ERROR = "ERROR"
 
+    # WHEN an exception is raised inside trace_operation
     with patch.dict("sys.modules", {"opentelemetry.trace": mock_otel}):
         with pytest.raises(ValueError):
             with trace_operation("put_item", "users"):
                 raise ValueError("test error")
 
-    # Verify error was recorded
+    # THEN error is recorded on the span
     mock_span.set_attribute.assert_any_call("error.type", "ValueError")
     mock_span.record_exception.assert_called_once()
     mock_span.set_status.assert_called_once()
@@ -271,34 +292,34 @@ def test_trace_operation_exception():
 
 def test_trace_operation_exception_not_recorded():
     """trace_operation should not record exceptions when disabled."""
+    # GIVEN tracing is enabled with record_exceptions=False
     mock_span = MagicMock()
     mock_tracer = MagicMock()
     mock_tracer.start_as_current_span.return_value.__enter__ = MagicMock(return_value=mock_span)
     mock_tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-
     enable_tracing(tracer=mock_tracer, record_exceptions=False)
-
     mock_otel = MagicMock()
     mock_otel.StatusCode.ERROR = "ERROR"
 
+    # WHEN an exception is raised
     with patch.dict("sys.modules", {"opentelemetry.trace": mock_otel}):
         with pytest.raises(ValueError):
             with trace_operation("put_item", "users"):
                 raise ValueError("test error")
 
-    # Verify exception was NOT recorded
+    # THEN exception is NOT recorded but error.type is still set
     mock_span.record_exception.assert_not_called()
-    # But error.type should still be set
     mock_span.set_attribute.assert_any_call("error.type", "ValueError")
 
 
 def test_add_response_attributes():
     """add_response_attributes should add metrics to span."""
+    # GIVEN tracing is enabled
     mock_span = MagicMock()
     mock_tracer = MagicMock()
-
     enable_tracing(tracer=mock_tracer)
 
+    # WHEN adding response attributes
     add_response_attributes(
         mock_span,
         consumed_rcu=1.5,
@@ -306,6 +327,7 @@ def test_add_response_attributes():
         request_id="ABC123",
     )
 
+    # THEN attributes are set on the span
     mock_span.set_attribute.assert_any_call("aws.dynamodb.consumed_capacity.read", 1.5)
     mock_span.set_attribute.assert_any_call("aws.dynamodb.consumed_capacity.write", 2.0)
     mock_span.set_attribute.assert_any_call("aws.request_id", "ABC123")
@@ -313,11 +335,12 @@ def test_add_response_attributes():
 
 def test_add_response_attributes_disabled():
     """add_response_attributes should do nothing when capacity recording is disabled."""
+    # GIVEN tracing is enabled with record_consumed_capacity=False
     mock_span = MagicMock()
     mock_tracer = MagicMock()
-
     enable_tracing(tracer=mock_tracer, record_consumed_capacity=False)
 
+    # WHEN adding response attributes
     add_response_attributes(
         mock_span,
         consumed_rcu=1.5,
@@ -325,17 +348,20 @@ def test_add_response_attributes_disabled():
         request_id="ABC123",
     )
 
+    # THEN no attributes are set
     mock_span.set_attribute.assert_not_called()
 
 
 def test_add_response_attributes_none_span():
     """add_response_attributes should handle None span."""
-    # Should not raise
+    # WHEN calling with None span
+    # THEN it should not raise
     add_response_attributes(None, consumed_rcu=1.5)
 
 
 def test_operation_names_complete():
     """All expected operations should be in OPERATION_NAMES."""
+    # GIVEN a list of expected operations
     expected_ops = [
         "put_item",
         "get_item",
@@ -348,5 +374,7 @@ def test_operation_names_complete():
         "transact_write",
         "transact_get",
     ]
+
+    # THEN all operations are in OPERATION_NAMES
     for op in expected_ops:
         assert op in OPERATION_NAMES, f"Missing operation: {op}"

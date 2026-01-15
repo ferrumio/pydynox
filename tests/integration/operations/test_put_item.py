@@ -41,9 +41,10 @@ PUT_ITEM_CASES = [
 @pytest.mark.parametrize("item", PUT_ITEM_CASES)
 def test_put_item_saves_correctly(dynamo, item):
     """Test saving items with different data types."""
+    # WHEN saving an item
     dynamo.put_item("test_table", item)
 
-    # Verify by getting the item back
+    # THEN the item can be retrieved with all fields intact
     key = {"pk": item["pk"], "sk": item["sk"]}
     result = dynamo.get_item("test_table", key)
 
@@ -54,13 +55,15 @@ def test_put_item_saves_correctly(dynamo, item):
 
 def test_put_item_overwrites_existing(dynamo):
     """Test that put_item overwrites an existing item."""
+    # GIVEN an existing item
     item1 = {"pk": "USER#100", "sk": "PROFILE", "name": "Original"}
     item2 = {"pk": "USER#100", "sk": "PROFILE", "name": "Updated", "new_field": "value"}
-
     dynamo.put_item("test_table", item1)
+
+    # WHEN saving a new item with the same key
     dynamo.put_item("test_table", item2)
 
+    # THEN the item is overwritten
     result = dynamo.get_item("test_table", {"pk": "USER#100", "sk": "PROFILE"})
-
     assert result["name"] == "Updated"
     assert result["new_field"] == "value"

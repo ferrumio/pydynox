@@ -11,6 +11,7 @@ from pydynox.exceptions import PydynoxError, TransactionCanceledError
 
 def test_transact_write_puts_multiple_items(dynamo):
     """Test transaction with multiple put operations."""
+    # GIVEN multiple items to put
     operations = [
         {
             "type": "put",
@@ -29,9 +30,10 @@ def test_transact_write_puts_multiple_items(dynamo):
         },
     ]
 
+    # WHEN we execute the transaction
     dynamo.transact_write(operations)
 
-    # Verify all items were saved
+    # THEN all items are saved
     for op in operations:
         item = op["item"]
         key = {"pk": item["pk"], "sk": item["sk"]}
@@ -99,11 +101,11 @@ def test_transact_write_rollback_on_condition_failure(dynamo):
 
     Requirements: 9.4
     """
-    # Put initial items
+    # GIVEN initial items
     dynamo.put_item("test_table", {"pk": "TXN#4", "sk": "ITEM#1", "value": "original"})
     dynamo.put_item("test_table", {"pk": "TXN#4", "sk": "CHECK", "status": "inactive"})
 
-    # Transaction with a condition check that will fail
+    # AND a transaction with a condition check that will fail
     operations = [
         {
             "type": "put",
@@ -120,11 +122,12 @@ def test_transact_write_rollback_on_condition_failure(dynamo):
         },
     ]
 
-    # Transaction should fail
+    # WHEN we execute the transaction
+    # THEN it fails
     with pytest.raises((TransactionCanceledError, PydynoxError)):
         dynamo.transact_write(operations)
 
-    # Verify the put was rolled back - original value should remain
+    # AND the put was rolled back - original value remains
     result = dynamo.get_item("test_table", {"pk": "TXN#4", "sk": "ITEM#1"})
     assert result is not None
     assert result["value"] == "original"
@@ -161,11 +164,12 @@ def test_transact_write_condition_check_success(dynamo):
 
 def test_transaction_context_manager(dynamo):
     """Test Transaction context manager commits on exit."""
+    # WHEN we use the context manager
     with Transaction(dynamo) as txn:
         txn.put("test_table", {"pk": "TXN#6", "sk": "ITEM#1", "name": "Alice"})
         txn.put("test_table", {"pk": "TXN#6", "sk": "ITEM#2", "name": "Bob"})
 
-    # Verify items were saved
+    # THEN items are saved
     result = dynamo.get_item("test_table", {"pk": "TXN#6", "sk": "ITEM#1"})
     assert result is not None
     assert result["name"] == "Alice"
@@ -177,9 +181,10 @@ def test_transaction_context_manager(dynamo):
 
 def test_transaction_context_manager_rollback_on_exception(dynamo):
     """Test Transaction context manager does not commit on exception."""
-    # Put an item that we'll try to update
+    # GIVEN an existing item
     dynamo.put_item("test_table", {"pk": "TXN#7", "sk": "ITEM", "value": "original"})
 
+    # WHEN an exception occurs in the context
     try:
         with Transaction(dynamo) as txn:
             txn.put("test_table", {"pk": "TXN#7", "sk": "ITEM", "value": "updated"})
@@ -187,7 +192,7 @@ def test_transaction_context_manager_rollback_on_exception(dynamo):
     except RuntimeError:
         pass
 
-    # Verify the put was NOT committed - original value should remain
+    # THEN the put was NOT committed - original value remains
     result = dynamo.get_item("test_table", {"pk": "TXN#7", "sk": "ITEM"})
     assert result is not None
     assert result["value"] == "original"

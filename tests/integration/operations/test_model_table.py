@@ -35,10 +35,10 @@ def test_create_table_basic(model_table_client):
         pk = StringAttribute(hash_key=True)
         name = StringAttribute()
 
-    # Create table
+    # WHEN we create the table
     SimpleUser.create_table(wait=True)
 
-    # Verify table exists
+    # THEN the table exists
     assert model_table_client.table_exists(table_name)
 
     # Cleanup
@@ -182,10 +182,11 @@ def test_table_exists_true(model_table_client):
         model_config = ModelConfig(table=table_name)
         pk = StringAttribute(hash_key=True)
 
-    # Create table
+    # GIVEN a created table
     ExistsModel.create_table(wait=True)
 
-    # Check exists
+    # WHEN we check if it exists
+    # THEN it returns True
     assert ExistsModel.table_exists() is True
 
     # Cleanup
@@ -212,14 +213,14 @@ def test_delete_table(model_table_client):
         model_config = ModelConfig(table=table_name)
         pk = StringAttribute(hash_key=True)
 
-    # Create and verify
+    # GIVEN a created table
     DeleteModel.create_table(wait=True)
     assert DeleteModel.table_exists() is True
 
-    # Delete
+    # WHEN we delete it
     DeleteModel.delete_table()
 
-    # Verify deleted
+    # THEN it no longer exists
     assert DeleteModel.table_exists() is False
 
 

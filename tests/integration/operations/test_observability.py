@@ -18,8 +18,10 @@ def capture_logs(caplog):
 
 def test_put_item_logs_operation(dynamo, capture_logs):
     """put_item logs the operation."""
+    # WHEN we put an item
     dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 
+    # THEN the operation is logged
     assert len(capture_logs.records) >= 1
     msg = capture_logs.records[0].message
     assert "put_item" in msg
@@ -87,12 +89,14 @@ def test_query_logs_operation(dynamo, capture_logs):
 
 def test_correlation_id_in_logs(dynamo, capture_logs):
     """Correlation ID appears in logs when set."""
+    # GIVEN a correlation ID is set
     set_correlation_id("lambda-req-123")
 
+    # WHEN we do an operation
     dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
+    # THEN the correlation ID is in the log record
     record = capture_logs.records[0]
-    # Check extra dict for correlation_id
     assert hasattr(record, "correlation_id") or "correlation_id" in getattr(record, "__dict__", {})
 
     # Cleanup

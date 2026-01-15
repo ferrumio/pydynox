@@ -17,11 +17,14 @@ def test_pydantic_save_and_get(dynamo):
         name: str
         age: int = 0
 
+    # GIVEN a Pydantic model instance
     user = User(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
 
+    # WHEN we save and retrieve it
+    user.save()
     retrieved = User.get(pk=pk, sk="PROFILE")
 
+    # THEN all fields are preserved
     assert retrieved is not None
     assert retrieved.pk == pk
     assert retrieved.name == "John"
@@ -39,11 +42,14 @@ def test_pydantic_update(dynamo):
         name: str
         age: int = 0
 
+    # GIVEN a saved Pydantic model
     user = User(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
+    # WHEN we update it
     user.update(name="Jane", age=31)
 
+    # THEN changes are persisted
     retrieved = User.get(pk=pk, sk="PROFILE")
     assert retrieved.name == "Jane"
     assert retrieved.age == 31
@@ -59,13 +65,15 @@ def test_pydantic_delete(dynamo):
         sk: str
         name: str
 
+    # GIVEN a saved Pydantic model
     user = User(pk=pk, sk="PROFILE", name="John")
     user.save()
-
     assert User.get(pk=pk, sk="PROFILE") is not None
 
+    # WHEN we delete it
     user.delete()
 
+    # THEN it's gone
     assert User.get(pk=pk, sk="PROFILE") is None
 
 
@@ -116,14 +124,18 @@ def test_pydantic_with_complex_types(dynamo):
         tags: list[str]
         metadata: dict[str, int]
 
+    # GIVEN a Pydantic model with complex types
     item = ComplexItem(
         pk=pk,
         sk="COMPLEX",
         tags=["tag1", "tag2"],
         metadata={"count": 42, "score": 100},
     )
-    item.save()
 
+    # WHEN we save and retrieve it
+    item.save()
     retrieved = ComplexItem.get(pk=pk, sk="COMPLEX")
+
+    # THEN complex types are preserved
     assert retrieved.tags == ["tag1", "tag2"]
     assert retrieved.metadata == {"count": 42, "score": 100}

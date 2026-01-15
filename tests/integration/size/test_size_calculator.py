@@ -18,9 +18,13 @@ def test_calculate_size_simple_item(dynamo):
 
     User._client_instance = None
 
+    # GIVEN a simple model instance
     user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
+
+    # WHEN we calculate size
     size = user.calculate_size()
 
+    # THEN size info is returned
     assert size.bytes > 0
     assert size.kb > 0
     assert size.percent < 1  # Small item
@@ -108,12 +112,15 @@ def test_save_raises_when_over_limit(dynamo):
 
     LimitedUser._client_instance = None
 
+    # GIVEN a model with data exceeding max_size
     user = LimitedUser(
         pk="USER#5",
         sk="PROFILE",
         bio="X" * 1000,  # Way over 500 byte limit
     )
 
+    # WHEN we try to save
+    # THEN ItemTooLargeError is raised
     with pytest.raises(ItemTooLargeError) as exc_info:
         user.save()
 

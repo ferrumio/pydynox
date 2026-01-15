@@ -91,7 +91,7 @@ class Product(Model):
 
 def test_multi_attr_gsi_query_basic(multi_attr_client):
     """Test basic query on multi-attribute GSI."""
-    # Create test products
+    # GIVEN products in different regions
     Product(
         pk="PROD#1",
         sk="DATA",
@@ -131,7 +131,7 @@ def test_multi_attr_gsi_query_basic(multi_attr_client):
         price=899,
     ).save()
 
-    # Query by tenant_id + region (both hash key attrs required)
+    # WHEN querying by tenant_id + region (both hash key attrs required)
     results = list(
         Product.location_index.query(
             tenant_id="ACME",
@@ -139,6 +139,7 @@ def test_multi_attr_gsi_query_basic(multi_attr_client):
         )
     )
 
+    # THEN only us-east-1 products should be returned
     assert len(results) == 2
     names = {r.name for r in results}
     assert names == {"iPhone", "MacBook"}
@@ -146,7 +147,7 @@ def test_multi_attr_gsi_query_basic(multi_attr_client):
 
 def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
     """Test query returns only matching tenant/region combo."""
-    # Create products for different tenants
+    # GIVEN products for different tenants
     Product(
         pk="PROD#10",
         sk="DATA",
@@ -173,7 +174,7 @@ def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
         price=25,
     ).save()
 
-    # Query ACME only
+    # WHEN querying ACME only
     results = list(
         Product.location_index.query(
             tenant_id="ACME",
@@ -181,6 +182,7 @@ def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
         )
     )
 
+    # THEN only ACME products should be returned
     assert len(results) == 1
     assert results[0].name == "Book A"
     assert results[0].tenant_id == "ACME"
@@ -188,6 +190,7 @@ def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
 
 def test_multi_attr_gsi_query_category_index(multi_attr_client):
     """Test query on category index (2 hash keys, no range key)."""
+    # GIVEN products in different subcategories
     Product(
         pk="PROD#20",
         sk="DATA",
@@ -227,7 +230,7 @@ def test_multi_attr_gsi_query_category_index(multi_attr_client):
         price=80,
     ).save()
 
-    # Query clothing/shirts
+    # WHEN querying clothing/shirts
     results = list(
         Product.category_index.query(
             category="clothing",
@@ -235,6 +238,7 @@ def test_multi_attr_gsi_query_category_index(multi_attr_client):
         )
     )
 
+    # THEN only shirts should be returned
     assert len(results) == 2
     names = {r.name for r in results}
     assert names == {"T-Shirt", "Polo"}
@@ -242,6 +246,7 @@ def test_multi_attr_gsi_query_category_index(multi_attr_client):
 
 def test_multi_attr_gsi_query_with_filter(multi_attr_client):
     """Test multi-attribute GSI query with filter condition."""
+    # GIVEN products with different prices
     Product(
         pk="PROD#30",
         sk="DATA",
@@ -268,7 +273,7 @@ def test_multi_attr_gsi_query_with_filter(multi_attr_client):
         price=100,
     ).save()
 
-    # Query with price filter
+    # WHEN querying with price filter
     results = list(
         Product.location_index.query(
             tenant_id="FILTER_TEST",
@@ -277,12 +282,14 @@ def test_multi_attr_gsi_query_with_filter(multi_attr_client):
         )
     )
 
+    # THEN only expensive items should be returned
     assert len(results) == 1
     assert results[0].name == "Expensive Game"
 
 
 def test_multi_attr_gsi_query_empty_result(multi_attr_client):
     """Test multi-attribute GSI query with no matches."""
+    # WHEN querying for non-existent tenant/region
     results = list(
         Product.location_index.query(
             tenant_id="NONEXISTENT",
@@ -290,11 +297,13 @@ def test_multi_attr_gsi_query_empty_result(multi_attr_client):
         )
     )
 
+    # THEN no results should be returned
     assert len(results) == 0
 
 
 def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
     """Test that query returns proper model instances."""
+    # GIVEN a product in the table
     Product(
         pk="PROD#40",
         sk="DATA",
@@ -308,6 +317,7 @@ def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
         price=5,
     ).save()
 
+    # WHEN querying via GSI
     results = list(
         Product.location_index.query(
             tenant_id="INSTANCE_TEST",
@@ -315,13 +325,11 @@ def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
         )
     )
 
+    # THEN result should be a Product instance with all attributes
     assert len(results) == 1
     product = results[0]
 
-    # Should be a Product instance
     assert isinstance(product, Product)
-
-    # Should have all attributes
     assert product.pk == "PROD#40"
     assert product.tenant_id == "INSTANCE_TEST"
     assert product.region == "ap-south-1"
@@ -331,6 +339,8 @@ def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
 
 def test_multi_attr_gsi_query_requires_all_hash_keys(multi_attr_client):
     """Test that query fails if not all hash keys provided."""
+    # WHEN querying with missing hash key
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="Missing"):
         list(Product.location_index.query(tenant_id="ACME"))
 

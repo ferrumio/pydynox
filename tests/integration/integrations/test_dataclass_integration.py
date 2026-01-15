@@ -18,11 +18,14 @@ def test_dataclass_save_and_get(dynamo):
         name: str
         age: int = 0
 
+    # GIVEN a dataclass model instance
     user = User(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
 
+    # WHEN we save and retrieve it
+    user.save()
     retrieved = User.get(pk=pk, sk="PROFILE")
 
+    # THEN all fields are preserved
     assert retrieved is not None
     assert retrieved.pk == pk
     assert retrieved.name == "John"
@@ -41,11 +44,14 @@ def test_dataclass_update(dynamo):
         name: str
         age: int = 0
 
+    # GIVEN a saved dataclass item
     user = User(pk=pk, sk="PROFILE", name="John", age=30)
     user.save()
 
+    # WHEN we update it
     user.update(name="Jane", age=31)
 
+    # THEN changes are persisted
     retrieved = User.get(pk=pk, sk="PROFILE")
     assert retrieved.name == "Jane"
     assert retrieved.age == 31
@@ -62,13 +68,15 @@ def test_dataclass_delete(dynamo):
         sk: str
         name: str
 
+    # GIVEN a saved dataclass item
     user = User(pk=pk, sk="PROFILE", name="John")
     user.save()
-
     assert User.get(pk=pk, sk="PROFILE") is not None
 
+    # WHEN we delete it
     user.delete()
 
+    # THEN it's gone
     assert User.get(pk=pk, sk="PROFILE") is None
 
 
@@ -99,14 +107,18 @@ def test_dataclass_with_complex_types(dynamo):
         tags: list
         metadata: dict
 
+    # GIVEN a dataclass with complex types
     item = ComplexItem(
         pk=pk,
         sk="COMPLEX",
         tags=["tag1", "tag2"],
         metadata={"key": "value", "count": 42},
     )
-    item.save()
 
+    # WHEN we save and retrieve it
+    item.save()
     retrieved = ComplexItem.get(pk=pk, sk="COMPLEX")
+
+    # THEN complex types are preserved
     assert retrieved.tags == ["tag1", "tag2"]
     assert retrieved.metadata == {"key": "value", "count": 42}

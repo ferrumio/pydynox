@@ -64,9 +64,12 @@ def mock_client() -> MagicMock:
 
 def test_create_table_basic(mock_client: MagicMock) -> None:
     """Test create_table with basic model."""
+    # GIVEN a simple model with mock client
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
+        # WHEN we create the table
         SimpleModel.create_table()
 
+    # THEN create_table should be called with correct params
     mock_client.create_table.assert_called_once_with(
         "simple",
         hash_key=("pk", "S"),
@@ -85,14 +88,17 @@ def test_create_table_basic(mock_client: MagicMock) -> None:
 def test_create_table_with_range_key(mock_client: MagicMock) -> None:
     """Test create_table with hash and range key."""
 
+    # GIVEN a model with range key
     class WithRange(Model):
         model_config = ModelConfig(table="with_range")
         pk = StringAttribute(hash_key=True)
         sk = NumberAttribute(range_key=True)
 
     with patch.object(WithRange, "_get_client", return_value=mock_client):
+        # WHEN we create the table
         WithRange.create_table()
 
+    # THEN both hash and range key should be included
     mock_client.create_table.assert_called_once()
     call_args = mock_client.create_table.call_args
     assert call_args[0][0] == "with_range"
@@ -102,9 +108,12 @@ def test_create_table_with_range_key(mock_client: MagicMock) -> None:
 
 def test_create_table_with_gsis(mock_client: MagicMock) -> None:
     """Test create_table includes GSI definitions."""
+    # GIVEN a model with GSIs
     with patch.object(User, "_get_client", return_value=mock_client):
+        # WHEN we create the table
         User.create_table()
 
+    # THEN GSIs should be included
     mock_client.create_table.assert_called_once()
     call_args = mock_client.create_table.call_args
 
@@ -132,7 +141,9 @@ def test_create_table_with_gsis(mock_client: MagicMock) -> None:
 
 def test_create_table_with_options(mock_client: MagicMock) -> None:
     """Test create_table with all options."""
+    # GIVEN a model with mock client
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
+        # WHEN we create the table with all options
         SimpleModel.create_table(
             billing_mode="PROVISIONED",
             read_capacity=10,
@@ -143,6 +154,7 @@ def test_create_table_with_options(mock_client: MagicMock) -> None:
             wait=True,
         )
 
+    # THEN all options should be passed
     mock_client.create_table.assert_called_once_with(
         "simple",
         hash_key=("pk", "S"),
@@ -160,46 +172,62 @@ def test_create_table_with_options(mock_client: MagicMock) -> None:
 
 def test_create_table_no_hash_key_raises() -> None:
     """Test create_table raises error if no hash key defined."""
+    # GIVEN a model without hash key
     mock_client = MagicMock(spec=DynamoDBClient)
 
     with patch.object(NoKeyModel, "_get_client", return_value=mock_client):
+        # WHEN we try to create the table
+        # THEN ValueError should be raised
         with pytest.raises(ValueError, match="has no hash_key defined"):
             NoKeyModel.create_table()
 
 
 def test_table_exists(mock_client: MagicMock) -> None:
     """Test table_exists calls client correctly."""
+    # GIVEN a mock client that returns True
     mock_client.table_exists.return_value = True
 
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
+        # WHEN we check if table exists
         result = SimpleModel.table_exists()
 
+    # THEN it should return True
     assert result is True
     mock_client.table_exists.assert_called_once_with("simple")
 
 
 def test_table_exists_false(mock_client: MagicMock) -> None:
     """Test table_exists returns False when table doesn't exist."""
+    # GIVEN a mock client that returns False
     mock_client.table_exists.return_value = False
 
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
+        # WHEN we check if table exists
         result = SimpleModel.table_exists()
 
+    # THEN it should return False
     assert result is False
 
 
 def test_delete_table(mock_client: MagicMock) -> None:
     """Test delete_table calls client correctly."""
+    # GIVEN a model with mock client
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
+        # WHEN we delete the table
         SimpleModel.delete_table()
 
+    # THEN delete_table should be called
     mock_client.delete_table.assert_called_once_with("simple")
 
 
 def test_gsi_to_create_table_definition_single_attr() -> None:
     """Test GSI to_create_table_definition with single attribute keys."""
+    # GIVEN a GSI with single attribute hash key
+
+    # WHEN we get the definition
     definition = User.email_index.to_create_table_definition(User)
 
+    # THEN it should have correct format
     assert definition["index_name"] == "email-index"
     assert definition["hash_key"] == ("email", "S")
     assert "range_key" not in definition
@@ -208,8 +236,12 @@ def test_gsi_to_create_table_definition_single_attr() -> None:
 
 def test_gsi_to_create_table_definition_with_range() -> None:
     """Test GSI to_create_table_definition with range key."""
+    # GIVEN a GSI with range key
+
+    # WHEN we get the definition
     definition = User.status_age_index.to_create_table_definition(User)
 
+    # THEN it should include range key
     assert definition["index_name"] == "status-age-index"
     assert definition["hash_key"] == ("status", "S")
     assert definition["range_key"] == ("age", "N")
@@ -217,8 +249,12 @@ def test_gsi_to_create_table_definition_with_range() -> None:
 
 def test_gsi_to_create_table_definition_multi_attr() -> None:
     """Test GSI to_create_table_definition with multi-attribute keys."""
+    # GIVEN a multi-attribute GSI
+
+    # WHEN we get the definition
     definition = User.location_index.to_create_table_definition(User)
 
+    # THEN it should use hash_keys (plural)
     assert definition["index_name"] == "location-index"
     assert definition["hash_keys"] == [("tenant_id", "S"), ("region", "S")]
     assert "hash_key" not in definition
@@ -227,6 +263,7 @@ def test_gsi_to_create_table_definition_multi_attr() -> None:
 def test_gsi_to_create_table_definition_keys_only_projection() -> None:
     """Test GSI to_create_table_definition with KEYS_ONLY projection."""
 
+    # GIVEN a model with KEYS_ONLY projection GSI
     class ModelWithKeysOnly(Model):
         model_config = ModelConfig(table="test")
         pk = StringAttribute(hash_key=True)
@@ -238,13 +275,17 @@ def test_gsi_to_create_table_definition_keys_only_projection() -> None:
             projection="KEYS_ONLY",
         )
 
+    # WHEN we get the definition
     definition = ModelWithKeysOnly.email_index.to_create_table_definition(ModelWithKeysOnly)
+
+    # THEN projection should be KEYS_ONLY
     assert definition["projection"] == "KEYS_ONLY"
 
 
 def test_gsi_to_create_table_definition_include_projection() -> None:
     """Test GSI to_create_table_definition with INCLUDE projection."""
 
+    # GIVEN a model with INCLUDE projection GSI
     class ModelWithInclude(Model):
         model_config = ModelConfig(table="test")
         pk = StringAttribute(hash_key=True)
@@ -258,7 +299,10 @@ def test_gsi_to_create_table_definition_include_projection() -> None:
             projection=["name", "age"],
         )
 
+    # WHEN we get the definition
     definition = ModelWithInclude.email_index.to_create_table_definition(ModelWithInclude)
+
+    # THEN projection should be INCLUDE with non_key_attributes
     assert definition["projection"] == "INCLUDE"
     assert definition["non_key_attributes"] == ["name", "age"]
 
@@ -266,6 +310,7 @@ def test_gsi_to_create_table_definition_include_projection() -> None:
 def test_gsi_to_create_table_definition_missing_attr_raises() -> None:
     """Test GSI to_create_table_definition raises if attribute not on model."""
 
+    # GIVEN a model with GSI referencing non-existent attribute
     class BadModel(Model):
         model_config = ModelConfig(table="test")
         pk = StringAttribute(hash_key=True)
@@ -275,5 +320,7 @@ def test_gsi_to_create_table_definition_missing_attr_raises() -> None:
             hash_key="nonexistent",
         )
 
+    # WHEN we try to get the definition
+    # THEN ValueError should be raised
     with pytest.raises(ValueError, match="references attribute 'nonexistent'"):
         BadModel.bad_index.to_create_table_definition(BadModel)

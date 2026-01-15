@@ -6,6 +6,7 @@ from pydynox import DynamoDBClient
 
 def test_explicit_credentials(dynamodb_endpoint):
     """Test client with explicit access_key and secret_key."""
+    # WHEN we create a client with explicit credentials
     client = DynamoDBClient(
         region="us-east-1",
         endpoint_url=dynamodb_endpoint,
@@ -13,6 +14,7 @@ def test_explicit_credentials(dynamodb_endpoint):
         secret_key="testing",
     )
 
+    # THEN the client works
     assert client.ping() is True
 
 
@@ -96,7 +98,7 @@ def test_various_regions(dynamodb_endpoint, region):
 
 def test_credentials_priority_explicit_over_profile(dynamodb_endpoint):
     """Test that explicit credentials take priority over profile."""
-    # Even with a profile specified, explicit credentials should be used
+    # GIVEN a client with both explicit credentials and a profile
     client = DynamoDBClient(
         region="us-east-1",
         endpoint_url=dynamodb_endpoint,
@@ -105,5 +107,6 @@ def test_credentials_priority_explicit_over_profile(dynamodb_endpoint):
         profile="nonexistent-profile",  # Should be ignored
     )
 
-    # Should work because explicit credentials are used
+    # WHEN we ping
+    # THEN it works because explicit credentials are used
     assert client.ping() is True

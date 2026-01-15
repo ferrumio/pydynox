@@ -31,10 +31,14 @@ class Order(Model):
 
 def test_pydynox_memory_backend_basic_crud(pydynox_memory_backend):
     """Test basic CRUD with pydynox_memory_backend fixture."""
+    # GIVEN a model instance
     user = User(pk="USER#1", name="John", age=30)
-    user.save()
 
+    # WHEN we save and get it
+    user.save()
     found = User.get(pk="USER#1")
+
+    # THEN it's found with correct data
     assert found is not None
     assert found.name == "John"
     assert found.age == 30
@@ -42,11 +46,14 @@ def test_pydynox_memory_backend_basic_crud(pydynox_memory_backend):
 
 def test_pydynox_memory_backend_update(pydynox_memory_backend):
     """Test update with pydynox_memory_backend fixture."""
+    # GIVEN a saved user
     user = User(pk="USER#1", name="Jane")
     user.save()
 
+    # WHEN we update it
     user.update(name="Janet", age=25)
 
+    # THEN changes are persisted
     found = User.get(pk="USER#1")
     assert found.name == "Janet"
     assert found.age == 25
@@ -54,21 +61,28 @@ def test_pydynox_memory_backend_update(pydynox_memory_backend):
 
 def test_pydynox_memory_backend_delete(pydynox_memory_backend):
     """Test delete with pydynox_memory_backend fixture."""
+    # GIVEN a saved user
     user = User(pk="USER#1", name="Bob")
     user.save()
 
+    # WHEN we delete it
     user.delete()
 
+    # THEN it's gone
     assert User.get(pk="USER#1") is None
 
 
 def test_pydynox_memory_backend_query(pydynox_memory_backend):
     """Test query with pydynox_memory_backend fixture."""
+    # GIVEN orders for different users
     Order(pk="USER#1", sk="ORDER#001", total=100).save()
     Order(pk="USER#1", sk="ORDER#002", total=200).save()
     Order(pk="USER#2", sk="ORDER#001", total=50).save()
 
+    # WHEN we query for USER#1
     results = list(Order.query(hash_key="USER#1"))
+
+    # THEN only USER#1 orders are returned
     assert len(results) == 2
 
 
@@ -84,10 +98,13 @@ def test_pydynox_memory_backend_scan(pydynox_memory_backend):
 
 def test_pydynox_memory_backend_isolation(pydynox_memory_backend):
     """Test that each test has isolated data."""
-    # This test should not see data from other tests
+    # GIVEN a fresh test (no data from other tests)
     assert User.get(pk="USER#1") is None
 
+    # WHEN we save a user
     User(pk="USER#1", name="Isolated").save()
+
+    # THEN it exists in this test
     assert User.get(pk="USER#1") is not None
 
 
@@ -102,11 +119,14 @@ def test_pydynox_memory_backend_tables_access(pydynox_memory_backend):
 
 def test_pydynox_memory_backend_clear(pydynox_memory_backend):
     """Test clearing data mid-test."""
+    # GIVEN a saved user
     User(pk="USER#1", name="Test").save()
     assert User.get(pk="USER#1") is not None
 
+    # WHEN we clear the backend
     pydynox_memory_backend.clear()
 
+    # THEN data is gone
     assert User.get(pk="USER#1") is None
 
 
