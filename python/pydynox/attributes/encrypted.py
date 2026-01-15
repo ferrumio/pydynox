@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydynox._internal._encryption import EncryptionMode, KmsEncryptor
-from pydynox._internal._metrics import _record_kms_metrics
+from pydynox._internal._operations_metrics import _record_kms_metrics
 from pydynox.attributes.base import Attribute
 
 

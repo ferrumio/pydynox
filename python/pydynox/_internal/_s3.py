@@ -9,6 +9,7 @@ from pydynox import pydynox_core
 # Re-export Rust classes
 S3Operations = pydynox_core.S3Operations
 S3Metadata = pydynox_core.S3Metadata
+S3Metrics = pydynox_core.S3Metrics
 
 
 class S3File:
@@ -161,11 +162,13 @@ class S3Value:
 
         Warning: Loads entire file into memory.
         """
-        return self._s3_ops.download_bytes(self._bucket, self._key)
+        data, _ = self._s3_ops.download_bytes(self._bucket, self._key)
+        return data
 
     async def async_get_bytes(self) -> bytes:
         """Async download the file as bytes."""
-        return await self._s3_ops.async_download_bytes(self._bucket, self._key)
+        data, _ = await self._s3_ops.async_download_bytes(self._bucket, self._key)
+        return data
 
     def save_to(self, path: str | Path) -> None:
         """Download and save to a file (streaming, memory efficient).
@@ -188,11 +191,13 @@ class S3Value:
         Returns:
             Presigned URL string.
         """
-        return self._s3_ops.presigned_url(self._bucket, self._key, expires)
+        url, _ = self._s3_ops.presigned_url(self._bucket, self._key, expires)
+        return url
 
     async def async_presigned_url(self, expires: int = 3600) -> str:
         """Async generate a presigned URL."""
-        return await self._s3_ops.async_presigned_url(self._bucket, self._key, expires)
+        url, _ = await self._s3_ops.async_presigned_url(self._bucket, self._key, expires)
+        return url
 
     def __repr__(self) -> str:
         return f"S3Value(bucket='{self._bucket}', key='{self._key}', size={self._size})"

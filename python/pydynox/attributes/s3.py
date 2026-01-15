@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pydynox._internal._s3 import S3File, S3Operations, S3Value
+from pydynox._internal._s3 import S3File, S3Metrics, S3Operations, S3Value
 from pydynox.attributes.base import Attribute
 
 if TYPE_CHECKING:
@@ -182,15 +182,15 @@ class S3Attribute(Attribute[S3Value | None]):
         value: S3File,
         model_instance: Any,
         client: DynamoDBClient,
-    ) -> S3Value:
-        """Upload S3File to S3 and return S3Value.
+    ) -> tuple[S3Value, S3Metrics]:
+        """Upload S3File to S3 and return (S3Value, S3Metrics).
 
         Called by Model.save() before serialization.
         """
         s3_ops = self._get_s3_ops(client)
         key = f"{self._generate_key(model_instance)}/{value.name}"
 
-        metadata = s3_ops.upload_bytes(
+        metadata, metrics = s3_ops.upload_bytes(
             self.bucket,
             key,
             value.data,
@@ -198,7 +198,7 @@ class S3Attribute(Attribute[S3Value | None]):
             value.metadata,
         )
 
-        return S3Value(
+        s3_value = S3Value(
             bucket=metadata.bucket,
             key=metadata.key,
             size=metadata.size,
@@ -209,18 +209,20 @@ class S3Attribute(Attribute[S3Value | None]):
             version_id=metadata.version_id,
             metadata=metadata.metadata,
         )
+
+        return s3_value, metrics
 
     async def async_upload_to_s3(
         self,
         value: S3File,
         model_instance: Any,
         client: DynamoDBClient,
-    ) -> S3Value:
-        """Async upload S3File to S3."""
+    ) -> tuple[S3Value, S3Metrics]:
+        """Async upload S3File to S3. Returns (S3Value, S3Metrics)."""
         s3_ops = self._get_s3_ops(client)
         key = f"{self._generate_key(model_instance)}/{value.name}"
 
-        metadata = await s3_ops.async_upload_bytes(
+        metadata, metrics = await s3_ops.async_upload_bytes(
             self.bucket,
             key,
             value.data,
@@ -228,7 +230,7 @@ class S3Attribute(Attribute[S3Value | None]):
             value.metadata,
         )
 
-        return S3Value(
+        s3_value = S3Value(
             bucket=metadata.bucket,
             key=metadata.key,
             size=metadata.size,
@@ -240,15 +242,17 @@ class S3Attribute(Attribute[S3Value | None]):
             metadata=metadata.metadata,
         )
 
-    def delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> None:
-        """Delete file from S3.
+        return s3_value, metrics
+
+    def delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> S3Metrics:
+        """Delete file from S3. Returns S3Metrics.
 
         Called by Model.delete().
         """
         s3_ops = self._get_s3_ops(client)
-        s3_ops.delete_object(value.bucket, value.key)
+        return s3_ops.delete_object(value.bucket, value.key)
 
-    async def async_delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> None:
-        """Async delete file from S3."""
+    async def async_delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> S3Metrics:
+        """Async delete file from S3. Returns S3Metrics."""
         s3_ops = self._get_s3_ops(client)
-        await s3_ops.async_delete_object(value.bucket, value.key)
+        return await s3_ops.async_delete_object(value.bucket, value.key)
