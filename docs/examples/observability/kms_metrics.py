@@ -3,7 +3,7 @@ from pydynox.attributes import EncryptedAttribute, StringAttribute
 
 
 class SecureUser(Model):
-    model_config = ModelConfig(table="secure_users")
+    model_config = ModelConfig(table="users")
 
     pk: str = StringAttribute(hash_key=True)
     sk: str = StringAttribute(range_key=True)
