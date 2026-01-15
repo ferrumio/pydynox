@@ -1,7 +1,7 @@
 """Tests for KMS metrics collection."""
 
-from pydynox._internal._metrics import (
-    ModelMetrics,
+from pydynox._internal._metrics import ModelMetrics
+from pydynox._internal._operations_metrics import (
     _record_kms_metrics,
     _start_kms_metrics_collection,
     _stop_kms_metrics_collection,

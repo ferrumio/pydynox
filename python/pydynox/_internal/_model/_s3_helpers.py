@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pydynox._internal._operations_metrics import _record_s3_metrics
 from pydynox._internal._s3 import S3File, S3Value
 from pydynox.attributes.s3 import S3Attribute
 
@@ -18,8 +19,15 @@ def _upload_s3_files(self: Model) -> None:
         if isinstance(attr, S3Attribute):
             value = getattr(self, attr_name, None)
             if isinstance(value, S3File):
-                s3_value = attr.upload_to_s3(value, self, client)
+                s3_value, metrics = attr.upload_to_s3(value, self, client)
                 setattr(self, attr_name, s3_value)
+                # Record S3 metrics
+                _record_s3_metrics(
+                    metrics.duration_ms,
+                    metrics.calls,
+                    metrics.bytes_uploaded,
+                    metrics.bytes_downloaded,
+                )
 
 
 async def _async_upload_s3_files(self: Model) -> None:
@@ -29,8 +37,15 @@ async def _async_upload_s3_files(self: Model) -> None:
         if isinstance(attr, S3Attribute):
             value = getattr(self, attr_name, None)
             if isinstance(value, S3File):
-                s3_value = await attr.async_upload_to_s3(value, self, client)
+                s3_value, metrics = await attr.async_upload_to_s3(value, self, client)
                 setattr(self, attr_name, s3_value)
+                # Record S3 metrics
+                _record_s3_metrics(
+                    metrics.duration_ms,
+                    metrics.calls,
+                    metrics.bytes_uploaded,
+                    metrics.bytes_downloaded,
+                )
 
 
 def _delete_s3_files(self: Model) -> None:
@@ -40,7 +55,14 @@ def _delete_s3_files(self: Model) -> None:
         if isinstance(attr, S3Attribute):
             value = getattr(self, attr_name, None)
             if isinstance(value, S3Value):
-                attr.delete_from_s3(value, client)
+                metrics = attr.delete_from_s3(value, client)
+                # Record S3 metrics
+                _record_s3_metrics(
+                    metrics.duration_ms,
+                    metrics.calls,
+                    metrics.bytes_uploaded,
+                    metrics.bytes_downloaded,
+                )
 
 
 async def _async_delete_s3_files(self: Model) -> None:
@@ -50,4 +72,11 @@ async def _async_delete_s3_files(self: Model) -> None:
         if isinstance(attr, S3Attribute):
             value = getattr(self, attr_name, None)
             if isinstance(value, S3Value):
-                await attr.async_delete_from_s3(value, client)
+                metrics = await attr.async_delete_from_s3(value, client)
+                # Record S3 metrics
+                _record_s3_metrics(
+                    metrics.duration_ms,
+                    metrics.calls,
+                    metrics.bytes_uploaded,
+                    metrics.bytes_downloaded,
+                )

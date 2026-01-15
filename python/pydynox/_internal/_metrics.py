@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -10,40 +9,6 @@ from pydynox import pydynox_core
 
 # Re-export OperationMetrics from Rust
 OperationMetrics = pydynox_core.OperationMetrics
-
-
-# Thread-local storage for KMS metrics during serialization
-_kms_metrics_context = threading.local()
-
-
-def _get_kms_metrics_accumulator() -> list[tuple[float, int]] | None:
-    """Get the current KMS metrics accumulator, if any."""
-    return getattr(_kms_metrics_context, "accumulator", None)
-
-
-def _start_kms_metrics_collection() -> None:
-    """Start collecting KMS metrics for the current operation."""
-    _kms_metrics_context.accumulator = []
-
-
-def _stop_kms_metrics_collection() -> tuple[float, int]:
-    """Stop collecting and return total (duration_ms, calls)."""
-    accumulator = getattr(_kms_metrics_context, "accumulator", None)
-    _kms_metrics_context.accumulator = None
-
-    if not accumulator:
-        return 0.0, 0
-
-    total_duration = sum(d for d, _ in accumulator)
-    total_calls = sum(c for _, c in accumulator)
-    return total_duration, total_calls
-
-
-def _record_kms_metrics(duration_ms: float, calls: int = 1) -> None:
-    """Record KMS metrics if collection is active."""
-    accumulator = getattr(_kms_metrics_context, "accumulator", None)
-    if accumulator is not None:
-        accumulator.append((duration_ms, calls))
 
 
 class ListWithMetrics(list[dict[str, Any]]):
@@ -67,7 +32,7 @@ class ListWithMetrics(list[dict[str, Any]]):
 class ModelMetrics:
     """Aggregated metrics for a Model class.
 
-    Tracks total RCU/WCU consumed, operation counts, and KMS metrics.
+    Tracks total RCU/WCU consumed, operation counts, KMS and S3 metrics.
     """
 
     total_rcu: float = 0.0
@@ -83,6 +48,11 @@ class ModelMetrics:
     # KMS metrics
     kms_duration_ms: float = 0.0
     kms_calls: int = 0
+    # S3 metrics
+    s3_duration_ms: float = 0.0
+    s3_calls: int = 0
+    s3_bytes_uploaded: int = 0
+    s3_bytes_downloaded: int = 0
 
     def add(self, metrics: OperationMetrics, operation: str) -> None:
         """Add metrics from an operation.
@@ -121,6 +91,26 @@ class ModelMetrics:
         self.kms_duration_ms += duration_ms
         self.kms_calls += calls
 
+    def add_s3(
+        self,
+        duration_ms: float,
+        calls: int,
+        bytes_uploaded: int = 0,
+        bytes_downloaded: int = 0,
+    ) -> None:
+        """Add S3 metrics.
+
+        Args:
+            duration_ms: Time spent on S3 calls.
+            calls: Number of S3 API calls.
+            bytes_uploaded: Bytes uploaded to S3.
+            bytes_downloaded: Bytes downloaded from S3.
+        """
+        self.s3_duration_ms += duration_ms
+        self.s3_calls += calls
+        self.s3_bytes_uploaded += bytes_uploaded
+        self.s3_bytes_downloaded += bytes_downloaded
+
     def reset(self) -> None:
         """Reset all metrics to zero."""
         self.total_rcu = 0.0
@@ -135,6 +125,10 @@ class ModelMetrics:
         self.scan_count = 0
         self.kms_duration_ms = 0.0
         self.kms_calls = 0
+        self.s3_duration_ms = 0.0
+        self.s3_calls = 0
+        self.s3_bytes_uploaded = 0
+        self.s3_bytes_downloaded = 0
 
 
 @dataclass

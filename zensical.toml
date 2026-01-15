@@ -27,6 +27,7 @@ nav = [
         "guides/transactions.md",
         "guides/partiql.md",
         "guides/tables.md",
+        "guides/operations-metrics.md",
     ] },
     { "Features" = [
         "guides/ttl.md",

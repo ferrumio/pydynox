@@ -16,6 +16,10 @@ from pydynox._internal._model._helpers import (
     prepare_update,
     prepare_update_by_key,
 )
+from pydynox._internal._operations_metrics import (
+    _start_s3_metrics_collection,
+    _stop_s3_metrics_collection,
+)
 
 if TYPE_CHECKING:
     from pydynox._internal._atomic import AtomicOp
@@ -49,8 +53,15 @@ async def async_save(
     self: Model, condition: Condition | None = None, skip_hooks: bool | None = None
 ) -> None:
     """Async save model to DynamoDB."""
+    # Start S3 metrics collection for uploads
+    _start_s3_metrics_collection()
+
     # S3 upload before prepare (needs to happen before to_dict)
     await self._async_upload_s3_files()
+
+    # Collect S3 metrics from uploads
+    s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
+
     # prepare: run BEFORE_SAVE hooks, auto-generate, version condition, size check
     client, table, item, cond_expr, attr_names, attr_values, skip = prepare_save(
         self, condition, skip_hooks
@@ -70,6 +81,12 @@ async def async_save(
     # Record metrics from client
     if client._last_metrics is not None:
         self.__class__._record_metrics(client._last_metrics, "put")
+
+    # Record S3 metrics
+    if s3_calls > 0:
+        self.__class__._metrics_storage.total.add_s3(
+            s3_duration, s3_calls, s3_uploaded, s3_downloaded
+        )
 
     # finalize: run AFTER_SAVE hooks
     finalize_save(self, skip)
@@ -99,8 +116,21 @@ async def async_delete(
     if client._last_metrics is not None:
         self.__class__._record_metrics(client._last_metrics, "delete")
 
+    # Start S3 metrics collection for deletes
+    _start_s3_metrics_collection()
+
     # S3 cleanup after successful delete
     await self._async_delete_s3_files()
+
+    # Collect S3 metrics from deletes
+    s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
+
+    # Record S3 metrics
+    if s3_calls > 0:
+        self.__class__._metrics_storage.total.add_s3(
+            s3_duration, s3_calls, s3_uploaded, s3_downloaded
+        )
+
     # finalize: run AFTER_DELETE hooks
     finalize_delete(self, skip)
 

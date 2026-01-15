@@ -8,7 +8,7 @@ mod client;
 mod operations;
 
 pub use client::S3Client as S3Operations;
-pub use operations::S3Metadata;
+pub use operations::{S3Metadata, S3Metrics};
 
 use pyo3::prelude::*;
 
@@ -16,5 +16,6 @@ use pyo3::prelude::*;
 pub fn register_s3(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<S3Operations>()?;
     m.add_class::<S3Metadata>()?;
+    m.add_class::<S3Metrics>()?;
     Ok(())
 }

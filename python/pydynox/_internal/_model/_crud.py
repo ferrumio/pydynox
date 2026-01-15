@@ -4,10 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from pydynox._internal._metrics import (
-    _start_kms_metrics_collection,
-    _stop_kms_metrics_collection,
-)
 from pydynox._internal._model._helpers import (
     finalize_delete,
     finalize_get,
@@ -19,6 +15,12 @@ from pydynox._internal._model._helpers import (
     prepare_save,
     prepare_update,
     prepare_update_by_key,
+)
+from pydynox._internal._operations_metrics import (
+    _start_kms_metrics_collection,
+    _start_s3_metrics_collection,
+    _stop_kms_metrics_collection,
+    _stop_s3_metrics_collection,
 )
 
 if TYPE_CHECKING:
@@ -62,8 +64,14 @@ def get(
 
 def save(self: Model, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
     """Save model to DynamoDB."""
+    # Start S3 metrics collection for uploads
+    _start_s3_metrics_collection()
+
     # S3 upload before prepare (needs to happen before to_dict)
     self._upload_s3_files()
+
+    # Collect S3 metrics from uploads
+    s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
 
     # Start KMS metrics collection for serialization
     _start_kms_metrics_collection()
@@ -95,6 +103,12 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
     if kms_calls > 0:
         self.__class__._metrics_storage.total.add_kms(kms_duration, kms_calls)
 
+    # Record S3 metrics
+    if s3_calls > 0:
+        self.__class__._metrics_storage.total.add_s3(
+            s3_duration, s3_calls, s3_uploaded, s3_downloaded
+        )
+
     # finalize: run AFTER_SAVE hooks
     finalize_save(self, skip)
 
@@ -121,8 +135,21 @@ def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | N
     if client._last_metrics is not None:
         self.__class__._record_metrics(client._last_metrics, "delete")
 
+    # Start S3 metrics collection for deletes
+    _start_s3_metrics_collection()
+
     # S3 cleanup after successful delete
     self._delete_s3_files()
+
+    # Collect S3 metrics from deletes
+    s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
+
+    # Record S3 metrics
+    if s3_calls > 0:
+        self.__class__._metrics_storage.total.add_s3(
+            s3_duration, s3_calls, s3_uploaded, s3_downloaded
+        )
+
     # finalize: run AFTER_DELETE hooks
     finalize_delete(self, skip)
 

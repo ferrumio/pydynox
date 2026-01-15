@@ -107,7 +107,9 @@ def test_s3value_get_bytes():
     """S3Value.get_bytes() calls s3_ops.download_bytes."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
-    mock_ops.download_bytes.return_value = b"downloaded data"
+    # download_bytes now returns (bytes, S3Metrics)
+    mock_metrics = MagicMock()
+    mock_ops.download_bytes.return_value = (b"downloaded data", mock_metrics)
 
     v = S3Value(
         bucket="bucket",
@@ -170,7 +172,9 @@ def test_s3value_presigned_url():
     """S3Value.presigned_url() calls s3_ops.presigned_url."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
-    mock_ops.presigned_url.return_value = "https://presigned.url"
+    # presigned_url now returns (url, S3Metrics)
+    mock_metrics = MagicMock()
+    mock_ops.presigned_url.return_value = ("https://presigned.url", mock_metrics)
 
     v = S3Value(
         bucket="bucket",
@@ -193,6 +197,10 @@ def test_s3value_presigned_url_default_expiry():
     """S3Value.presigned_url() defaults to 3600 seconds."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
+    # presigned_url now returns (url, S3Metrics)
+    mock_metrics = MagicMock()
+    mock_ops.presigned_url.return_value = ("https://presigned.url", mock_metrics)
+
     v = S3Value(
         bucket="bucket",
         key="key",
