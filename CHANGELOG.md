@@ -1,6 +1,38 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.17.0] - 2026-01-15
+
+
+### CI/CD
+
+- bump actions/checkout from 4.2.2 to 6.0.1 (#149)
+- bump astral-sh/setup-uv from 6.0.1 to 7.2.0 (#150)
+- bump github/codeql-action from 3.28.19 to 4.31.10 (#151)
+- bump softprops/action-gh-release from 2.2.1 to 2.5.0 (#148)
+
+
+### Documentation
+
+- update changelog for v0.16.0 (#146)
+
+
+### Features
+
+- adding testing feature (#147)
+- add projection fields (#153)
+- add KMS metrics (#159)
+- add S3 metrics to Model observability (#162)
+
+
+### Refactor
+
+- clean the tests (#161)
+
+
+### Refactoring
+
+- add class methods instead of instance attributes (#154)
 ## [0.16.0] - 2026-01-10
 
 
