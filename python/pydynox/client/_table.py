@@ -20,6 +20,7 @@ class TableOperations:
         encryption: str | None = None,
         kms_key_id: str | None = None,
         global_secondary_indexes: list[dict[str, Any]] | None = None,
+        local_secondary_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
     ) -> None:
         """Create a new DynamoDB table."""
@@ -34,6 +35,7 @@ class TableOperations:
             encryption=encryption,
             kms_key_id=kms_key_id,
             global_secondary_indexes=global_secondary_indexes,
+            local_secondary_indexes=local_secondary_indexes,
             wait=wait,
         )
 

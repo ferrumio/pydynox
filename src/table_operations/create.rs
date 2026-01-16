@@ -1,8 +1,9 @@
 //! Table creation operation.
 
 use aws_sdk_dynamodb::types::{
-    AttributeDefinition, BillingMode, GlobalSecondaryIndex, KeySchemaElement, KeyType, Projection,
-    ProjectionType, ScalarAttributeType, SseSpecification, SseType, TableClass,
+    AttributeDefinition, BillingMode, GlobalSecondaryIndex, KeySchemaElement, KeyType,
+    LocalSecondaryIndex, Projection, ProjectionType, ScalarAttributeType, SseSpecification,
+    SseType, TableClass,
 };
 use aws_sdk_dynamodb::Client;
 use pyo3::prelude::*;
@@ -11,6 +12,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use super::gsi::GsiDefinition;
+use super::lsi::LsiDefinition;
 use super::wait::wait_for_table_active;
 use crate::errors::{map_sdk_error, ValidationException};
 
@@ -32,6 +34,7 @@ use crate::errors::{map_sdk_error, ValidationException};
 /// * `encryption` - "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED"
 /// * `kms_key_id` - KMS key ARN (required when encryption is "CUSTOMER_MANAGED")
 /// * `gsis` - Optional list of GSI definitions
+/// * `lsis` - Optional list of LSI definitions
 /// * `wait` - Wait for table to become active
 #[allow(clippy::too_many_arguments)]
 pub fn create_table(
@@ -49,6 +52,7 @@ pub fn create_table(
     encryption: Option<&str>,
     kms_key_id: Option<&str>,
     gsis: Option<Vec<GsiDefinition>>,
+    lsis: Option<Vec<LsiDefinition>>,
     wait: bool,
 ) -> PyResult<()> {
     let hash_attr_type = parse_attribute_type(hash_key_type)?;
@@ -182,6 +186,65 @@ pub fn create_table(
         }
     }
 
+    // Build LSIs if provided
+    let mut lsi_list: Vec<LocalSecondaryIndex> = Vec::new();
+    if let Some(lsi_defs) = lsis {
+        for lsi in lsi_defs {
+            // LSI key schema: table's hash key + LSI's range key
+            let mut lsi_key_schema: Vec<KeySchemaElement> = Vec::new();
+
+            // Add table's hash key (LSIs share the table's hash key)
+            lsi_key_schema.push(
+                KeySchemaElement::builder()
+                    .attribute_name(hash_key_name)
+                    .key_type(KeyType::Hash)
+                    .build()
+                    .map_err(|e| {
+                        ValidationException::new_err(format!("Invalid LSI key schema: {}", e))
+                    })?,
+            );
+
+            // Add LSI's range key
+            // Add attribute definition if not already defined
+            if !defined_attrs.contains(&lsi.range_key_name) {
+                let attr_type = parse_attribute_type(&lsi.range_key_type)?;
+                attribute_definitions.push(
+                    AttributeDefinition::builder()
+                        .attribute_name(&lsi.range_key_name)
+                        .attribute_type(attr_type)
+                        .build()
+                        .map_err(|e| {
+                            ValidationException::new_err(format!("Invalid LSI attribute: {}", e))
+                        })?,
+                );
+                defined_attrs.insert(lsi.range_key_name.clone());
+            }
+
+            lsi_key_schema.push(
+                KeySchemaElement::builder()
+                    .attribute_name(&lsi.range_key_name)
+                    .key_type(KeyType::Range)
+                    .build()
+                    .map_err(|e| {
+                        ValidationException::new_err(format!("Invalid LSI key schema: {}", e))
+                    })?,
+            );
+
+            // Build projection
+            let projection = build_projection(&lsi.projection, lsi.non_key_attributes.as_deref())?;
+
+            // Build LSI
+            let lsi_builder = LocalSecondaryIndex::builder()
+                .index_name(&lsi.index_name)
+                .set_key_schema(Some(lsi_key_schema))
+                .projection(projection)
+                .build()
+                .map_err(|e| ValidationException::new_err(format!("Invalid LSI: {}", e)))?;
+
+            lsi_list.push(lsi_builder);
+        }
+    }
+
     // Parse billing mode
     let billing = parse_billing_mode(billing_mode)?;
 
@@ -199,6 +262,11 @@ pub fn create_table(
         // Add GSIs if any
         if !gsi_list.is_empty() {
             request = request.set_global_secondary_indexes(Some(gsi_list));
+        }
+
+        // Add LSIs if any
+        if !lsi_list.is_empty() {
+            request = request.set_local_secondary_indexes(Some(lsi_list));
         }
 
         // Add provisioned throughput if using PROVISIONED billing

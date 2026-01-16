@@ -1,4 +1,11 @@
-# Global secondary indexes
+# Indexes
+
+DynamoDB supports two types of secondary indexes:
+
+- **Global secondary index (GSI)** - Query by any attribute with a different hash key
+- **Local secondary index (LSI)** - Query by the same hash key with a different sort key
+
+## Global secondary indexes
 
 GSIs let you query by attributes other than the table's primary key. Define them as class attributes on your Model.
 
@@ -214,7 +221,7 @@ Control which attributes are copied to the index:
 }
 ```
 
-## Limitations
+## GSI limitations
 
 - GSIs are read-only. To update data, update the main table.
 - GSI queries are eventually consistent by default.
@@ -325,4 +332,4 @@ Using `Model.create_table()`:
 
 - [Conditions](conditions.md) - Filter and conditional writes
 - [Query](query.md) - Query items by hash key with conditions
-- [Tables](tables.md) - Create tables with GSIs
+- [Tables](tables.md) - Create tables with indexes
