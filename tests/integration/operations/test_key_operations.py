@@ -5,7 +5,7 @@ import uuid
 import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 @pytest.fixture
@@ -106,7 +106,7 @@ def test_update_by_key_with_condition_fails(user_model):
     # Build condition separately
     age_condition = user_model.age == 99  # Wrong age
 
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         user_model.update_by_key(
             pk=pk,
             sk="PROFILE",
@@ -177,7 +177,7 @@ def test_delete_by_key_with_condition_fails(user_model):
     # Build condition separately
     name_condition = user_model.name == "Jane"  # Wrong name
 
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         user_model.delete_by_key(
             pk=pk,
             sk="PROFILE",

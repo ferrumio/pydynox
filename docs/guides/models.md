@@ -285,21 +285,21 @@ DynamoDB operations can fail for various reasons. Common errors:
 
 | Error | Cause |
 |-------|-------|
-| `TableNotFoundError` | Table doesn't exist |
-| `ThrottlingError` | Exceeded capacity |
-| `ValidationError` | Invalid data (item too large, etc.) |
-| `ConditionCheckFailedError` | Conditional write failed |
+| `ResourceNotFoundException` | Table doesn't exist |
+| `ProvisionedThroughputExceededException` | Exceeded capacity |
+| `ValidationException` | Invalid data (item too large, etc.) |
+| `ConditionalCheckFailedException` | Conditional write failed |
 
 Wrap operations in try/except if you need to handle errors:
 
 ```python
-from pydynox.exceptions import TableNotFoundError, ThrottlingError
+from pydynox.exceptions import ResourceNotFoundException, ProvisionedThroughputExceededException
 
 try:
     user.save()
-except TableNotFoundError:
+except ResourceNotFoundException:
     print("Table doesn't exist")
-except ThrottlingError:
+except ProvisionedThroughputExceededException:
     print("Rate limited, try again")
 ```
 

@@ -316,9 +316,9 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-                from pydynox.exceptions import ConditionCheckFailedError
+                from pydynox.exceptions import ConditionalCheckFailedException
 
-                raise ConditionCheckFailedError("Condition check failed")
+                raise ConditionalCheckFailedException("Condition check failed")
 
         tbl[key_str] = copy.deepcopy(item)
         metrics = self._make_metrics(start, wcu=1)
@@ -361,9 +361,9 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-                from pydynox.exceptions import ConditionCheckFailedError
+                from pydynox.exceptions import ConditionalCheckFailedException
 
-                raise ConditionCheckFailedError("Condition check failed")
+                raise ConditionalCheckFailedException("Condition check failed")
 
         tbl.pop(key_str, None)
         metrics = self._make_metrics(start, wcu=1)
@@ -395,9 +395,9 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-                from pydynox.exceptions import ConditionCheckFailedError
+                from pydynox.exceptions import ConditionalCheckFailedException
 
-                raise ConditionCheckFailedError("Condition check failed")
+                raise ConditionalCheckFailedException("Condition check failed")
 
         # Create item if not exists
         if existing is None:

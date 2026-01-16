@@ -1,5 +1,5 @@
 from pydynox import DynamoDBClient
-from pydynox.pydynox_core import ConditionCheckFailedError
+from pydynox.pydynox_core import ConditionalCheckFailedException
 
 
 def update_if_exists():
@@ -13,5 +13,5 @@ def update_if_exists():
             condition_expression="attribute_exists(pk)",
         )
         print("Updated successfully")
-    except ConditionCheckFailedError:
+    except ConditionalCheckFailedException:
         print("Item does not exist, cannot update")

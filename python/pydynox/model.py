@@ -128,15 +128,15 @@ class Model(ModelBase, metaclass=ModelMeta):
             skip_hooks: If True, skip before/after save hooks.
 
         Raises:
-            ConditionCheckFailedError: If the condition is not met.
-            ItemTooLargeError: If item exceeds max_size in model_config.
+            ConditionalCheckFailedException: If the condition is not met.
+            ItemTooLargeException: If item exceeds max_size in model_config.
 
         Example:
             >>> user = User(pk="USER#1", sk="PROFILE", name="John")
             >>> user.save()
             >>>
             >>> # With condition (prevent overwrite)
-            >>> user.save(condition=User.pk.does_not_exist())
+            >>> user.save(condition=User.pk.not_exists())
         """
         save(self, condition, skip_hooks)
 
@@ -148,7 +148,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             skip_hooks: If True, skip before/after delete hooks.
 
         Raises:
-            ConditionCheckFailedError: If the condition is not met.
+            ConditionalCheckFailedException: If the condition is not met.
 
         Example:
             >>> user = User.get(pk="USER#1", sk="PROFILE")
@@ -756,7 +756,7 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         Raises:
             ValueError: If model has no hash_key defined.
-            TableAlreadyExistsError: If table already exists.
+            ResourceInUseException: If table already exists.
 
         Example:
             >>> class User(Model):

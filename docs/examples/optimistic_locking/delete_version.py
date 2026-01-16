@@ -1,6 +1,6 @@
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class Document(Model):
@@ -28,7 +28,7 @@ print(f"Version: {doc.version}")  # 3
 # Try to delete with stale version - fails!
 try:
     stale.delete()
-except ConditionCheckFailedError:
+except ConditionalCheckFailedException:
     print("Can't delete - version mismatch")
 
 # Delete with current version - succeeds

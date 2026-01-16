@@ -5,7 +5,7 @@ import asyncio
 import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class VersionedDoc(Model):
@@ -70,7 +70,7 @@ def test_version_loaded_from_db(versioned_model):
 
 
 def test_concurrent_update_fails(versioned_model):
-    """Concurrent updates fail with ConditionCheckFailedError."""
+    """Concurrent updates fail with ConditionalCheckFailedException."""
     # GIVEN a document
     doc = versioned_model(pk="VERSION#4", sk="DOC#1", content="Original")
     doc.save()
@@ -91,7 +91,7 @@ def test_concurrent_update_fails(versioned_model):
 
     # THEN second client's update fails (version mismatch)
     doc2.content = "Update from client 2"
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         doc2.save()
 
 
@@ -111,7 +111,7 @@ def test_delete_with_version_check(versioned_model):
     assert doc.version == 3
 
     # Delete with stale version fails
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         stale.delete()
 
     # Delete with current version succeeds
@@ -129,7 +129,7 @@ def test_new_item_fails_if_exists(versioned_model):
 
     # Try to create another with same key (version=None means new)
     doc2 = versioned_model(pk="VERSION#6", sk="DOC#1", content="Second")
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         doc2.save()
 
 
@@ -145,7 +145,7 @@ def test_version_with_user_condition(versioned_model):
 
     # Add user condition that fails
     doc.content = "Updated"
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         doc.save(condition=VersionedDoc.content == "Wrong")
 
     # Reload again since version was incremented locally
@@ -184,7 +184,7 @@ async def test_async_version_increments_on_save(versioned_model):
 
 
 async def test_async_concurrent_update_fails(versioned_model):
-    """Async: Concurrent updates fail with ConditionCheckFailedError."""
+    """Async: Concurrent updates fail with ConditionalCheckFailedException."""
     doc = versioned_model(pk="ASYNC_VERSION#3", sk="DOC#1", content="Original")
     await doc.async_save()
 
@@ -199,7 +199,7 @@ async def test_async_concurrent_update_fails(versioned_model):
     assert doc1.version == 2
 
     doc2.content = "Update from client 2"
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         await doc2.async_save()
 
 
@@ -216,7 +216,7 @@ async def test_async_delete_with_version_check(versioned_model):
     await doc.async_save()
     assert doc.version == 3
 
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         await stale.async_delete()
 
     await doc.async_delete()
@@ -255,7 +255,7 @@ async def test_high_concurrency_only_one_wins(versioned_model):
         try:
             await doc_to_save.async_save()
             success_count += 1
-        except ConditionCheckFailedError:
+        except ConditionalCheckFailedException:
             failure_count += 1
 
     # Run all saves concurrently
@@ -292,7 +292,7 @@ async def test_high_concurrency_sequential_updates(versioned_model):
                 try:
                     await loaded.async_save()
                     break
-                except ConditionCheckFailedError:
+                except ConditionalCheckFailedException:
                     if attempt == max_retries - 1:
                         raise
                     await asyncio.sleep(0.01)  # Small delay before retry
@@ -320,7 +320,7 @@ async def test_high_concurrency_new_item_race(versioned_model):
         try:
             await doc.async_save()
             success_count += 1
-        except ConditionCheckFailedError:
+        except ConditionalCheckFailedException:
             failure_count += 1
 
     await asyncio.gather(*[try_create(i) for i in range(num_concurrent)])
@@ -349,7 +349,7 @@ async def test_high_concurrency_mixed_operations(versioned_model):
             try:
                 await loaded.async_delete()
                 delete_success = True
-            except ConditionCheckFailedError:
+            except ConditionalCheckFailedException:
                 pass
 
     async def try_save(worker_id: int):
@@ -359,7 +359,7 @@ async def test_high_concurrency_mixed_operations(versioned_model):
             loaded.content = f"Updated by {worker_id}"
             try:
                 await loaded.async_save()
-            except ConditionCheckFailedError:
+            except ConditionalCheckFailedException:
                 save_after_delete_failures += 1
 
     # Run delete and saves concurrently

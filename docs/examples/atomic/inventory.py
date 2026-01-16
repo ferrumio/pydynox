@@ -2,7 +2,7 @@
 
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class Product(Model):
@@ -27,7 +27,7 @@ def reserve_stock(product: Product, quantity: int) -> None:
             ],
             condition=Product.stock >= quantity,
         )
-    except ConditionCheckFailedError:
+    except ConditionalCheckFailedException:
         raise OutOfStock(f"Not enough stock for {product.pk}")
 
 

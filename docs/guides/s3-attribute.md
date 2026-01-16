@@ -252,12 +252,12 @@ content = S3Attribute(bucket="my-bucket", null=False)
 ## Error handling
 
 ```python
-from pydynox.exceptions import S3AttributeError
+from pydynox.exceptions import S3AttributeException
 
 try:
     doc.content = S3File(b"...", name="file.txt")
     doc.save()
-except S3AttributeError as e:
+except S3AttributeException as e:
     print(f"S3 error: {e}")
 ```
 

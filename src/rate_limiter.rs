@@ -433,7 +433,7 @@ impl AdaptiveRate {
         self.metrics.add_wcu(wcu);
     }
 
-    /// Called when DynamoDB returns ThrottlingException.
+    /// Called when DynamoDB returns ProvisionedThroughputExceededException.
     ///
     /// Reduces rate by 20%, but not below minimum.
     pub fn on_throttle(&self) {

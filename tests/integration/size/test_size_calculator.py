@@ -3,7 +3,7 @@
 import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import ListAttribute, MapAttribute, NumberAttribute, StringAttribute
-from pydynox.exceptions import ItemTooLargeError
+from pydynox.exceptions import ItemTooLargeException
 
 
 def test_calculate_size_simple_item(dynamo):
@@ -102,7 +102,7 @@ def test_save_succeeds_under_limit(dynamo):
 
 
 def test_save_raises_when_over_limit(dynamo):
-    """save() raises ItemTooLargeError when item exceeds max_size."""
+    """save() raises ItemTooLargeException when item exceeds max_size."""
 
     class LimitedUser(Model):
         model_config = ModelConfig(table="test_table", client=dynamo, max_size=500)
@@ -120,8 +120,8 @@ def test_save_raises_when_over_limit(dynamo):
     )
 
     # WHEN we try to save
-    # THEN ItemTooLargeError is raised
-    with pytest.raises(ItemTooLargeError) as exc_info:
+    # THEN ItemTooLargeException is raised
+    with pytest.raises(ItemTooLargeException) as exc_info:
         user.save()
 
     assert exc_info.value.size > 500

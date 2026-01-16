@@ -43,7 +43,7 @@ class VersionAttribute(Attribute[int]):
         >>> doc1.content = "Update 1"
         >>> doc1.save()  # OK, version = 3
         >>> doc2.content = "Update 2"
-        >>> doc2.save()  # Raises ConditionCheckFailedError!
+        >>> doc2.save()  # Raises ConditionalCheckFailedException!
 
     Note:
         - Version is auto-managed. Don't set it manually.

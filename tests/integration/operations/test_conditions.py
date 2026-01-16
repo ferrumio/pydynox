@@ -36,7 +36,7 @@ def test_save_with_does_not_exist_condition_succeeds(user_model):
     user = User(pk="COND#1", sk="PROFILE", name="Alice", age=25, status="active")
 
     # WHEN we save with does_not_exist condition
-    user.save(condition=User.pk.does_not_exist())
+    user.save(condition=User.pk.not_exists())
 
     # THEN the save succeeds
     loaded = User.get(pk="COND#1", sk="PROFILE")
@@ -57,7 +57,7 @@ def test_save_with_does_not_exist_condition_fails_on_existing(user_model):
 
     # THEN it fails
     with pytest.raises(Exception) as exc_info:
-        user2.save(condition=User.pk.does_not_exist())
+        user2.save(condition=User.pk.not_exists())
 
     assert "condition" in str(exc_info.value).lower() or "Condition" in str(
         type(exc_info.value).__name__

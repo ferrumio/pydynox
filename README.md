@@ -145,14 +145,14 @@ Conditions use attribute operators directly:
 
 ```python
 # Save only if item doesn't exist
-user.save(condition=User.pk.does_not_exist())
+user.save(condition=User.pk.not_exists())
 
 # Delete with condition
 user.delete(condition=User.version == 5)
 
 # Combine conditions with & (AND) and | (OR)
 user.save(
-    condition=User.pk.does_not_exist() | (User.version == 1)
+    condition=User.pk.not_exists() | (User.version == 1)
 )
 ```
 
@@ -164,7 +164,7 @@ Available condition methods:
 - `User.field < value` - less than
 - `User.field <= value` - less than or equal
 - `User.field.exists()` - attribute exists
-- `User.field.does_not_exist()` - attribute does not exist
+- `User.field.not_exists()` - attribute does not exist
 - `User.field.begins_with(prefix)` - string starts with
 - `User.field.contains(value)` - string or list contains
 - `User.field.between(low, high)` - value in range

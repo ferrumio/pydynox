@@ -35,6 +35,6 @@ def _build_version_condition(self: Model) -> tuple[Condition | None, int]:
     path = ConditionPath(path=[version_attr])
 
     if current_version is None:
-        return path.does_not_exist(), 1
+        return path.not_exists(), 1
     else:
         return path == current_version, current_version + 1

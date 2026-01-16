@@ -2,7 +2,7 @@
 
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class Account(Model):
@@ -20,7 +20,7 @@ def withdraw(account: Account, amount: int) -> bool:
             condition=Account.balance >= amount,
         )
         return True
-    except ConditionCheckFailedError:
+    except ConditionalCheckFailedException:
         return False
 
 

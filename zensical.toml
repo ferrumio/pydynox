@@ -8,6 +8,7 @@ nav = [
     { "Home" = [
         "index.md",
         "getting-started.md",
+        "guides/migrating-from-boto3.md",
     ] },
     { "API Reference" = "api/pydynox/index.html" },
     { "Core" = [

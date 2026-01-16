@@ -1,9 +1,9 @@
 from pydynox import DynamoDBClient
 from pydynox.pydynox_core import (
-    ConnectionError,
-    CredentialsError,
-    PydynoxError,
-    TableNotFoundError,
+    ConnectionException,
+    CredentialsException,
+    PydynoxException,
+    ResourceNotFoundException,
 )
 
 
@@ -13,11 +13,11 @@ def safe_get_item():
     try:
         item = client.get_item("users", {"pk": "USER#123"})
         return item
-    except TableNotFoundError:
+    except ResourceNotFoundException:
         print("Table does not exist")
-    except CredentialsError:
+    except CredentialsException:
         print("Check your AWS credentials")
-    except ConnectionError:
+    except ConnectionException:
         print("Cannot connect to DynamoDB")
-    except PydynoxError as e:
+    except PydynoxException as e:
         print(f"Something went wrong: {e}")

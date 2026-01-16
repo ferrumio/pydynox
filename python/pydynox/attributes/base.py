@@ -103,9 +103,9 @@ class Attribute(Generic[T]):
         """Check if attribute exists."""
         return self._get_path().exists()
 
-    def does_not_exist(self) -> ConditionNotExists:
+    def not_exists(self) -> ConditionNotExists:
         """Check if attribute does not exist."""
-        return self._get_path().does_not_exist()
+        return self._get_path().not_exists()
 
     def begins_with(self, prefix: str) -> ConditionBeginsWith:
         """Check if string attribute starts with prefix."""

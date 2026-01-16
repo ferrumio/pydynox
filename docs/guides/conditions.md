@@ -26,7 +26,7 @@ The most common use case. Only save if the item doesn't exist yet:
     --8<-- "docs/examples/conditions/prevent_overwrite.py"
     ```
 
-Without this condition, `save()` would silently overwrite any existing item with the same key. With the condition, you get a `ConditionCheckFailedError` if the item already exists.
+Without this condition, `save()` would silently overwrite any existing item with the same key. With the condition, you get a `ConditionalCheckFailedException` if the item already exists.
 
 ### Safe delete
 
@@ -110,7 +110,7 @@ Use `And()` and `Or()` from `pydynox.conditions` when you have a list of conditi
 | Function | Example | Description |
 |----------|---------|-------------|
 | `exists()` | `User.email.exists()` | Attribute exists |
-| `does_not_exist()` | `User.pk.does_not_exist()` | Attribute doesn't exist |
+| `does_not_exist()` | `User.pk.not_exists()` | Attribute doesn't exist |
 | `begins_with()` | `User.sk.begins_with("ORDER#")` | String starts with prefix |
 | `contains()` | `User.tags.contains("vip")` | List contains value |
 | `between()` | `User.age.between(18, 65)` | Value in range (inclusive) |
@@ -133,14 +133,14 @@ User.metadata["preferences"]["theme"] == "dark"
 
 ## Error handling
 
-When a condition fails, DynamoDB raises `ConditionCheckFailedError`:
+When a condition fails, DynamoDB raises `ConditionalCheckFailedException`:
 
 ```python
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 try:
-    user.save(condition=User.pk.does_not_exist())
-except ConditionCheckFailedError:
+    user.save(condition=User.pk.not_exists())
+except ConditionalCheckFailedException:
     print("User already exists")
 ```
 

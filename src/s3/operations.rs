@@ -1,6 +1,6 @@
 //! S3 operations - upload, download, presigned URLs, delete.
 
-use crate::errors::S3AttributeError;
+use crate::errors::S3AttributeException;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
@@ -572,7 +572,7 @@ pub fn upload_bytes(
             content_type,
             metadata,
         ))
-        .map_err(S3AttributeError::new_err)?;
+        .map_err(S3AttributeException::new_err)?;
 
     Ok((result.metadata, result.metrics))
 }
@@ -591,7 +591,7 @@ pub fn download_bytes<'py>(
 
     let result = runtime
         .block_on(execute_download(client, bucket, key))
-        .map_err(S3AttributeError::new_err)?;
+        .map_err(S3AttributeException::new_err)?;
 
     Ok((PyBytes::new(py, &result.data), result.metrics))
 }
@@ -610,7 +610,7 @@ pub fn presigned_url(
 
     let result = runtime
         .block_on(execute_presigned_url(client, bucket, key, expires_secs))
-        .map_err(S3AttributeError::new_err)?;
+        .map_err(S3AttributeException::new_err)?;
 
     Ok((result.url, result.metrics))
 }
@@ -628,7 +628,7 @@ pub fn delete_object(
 
     let result = runtime
         .block_on(execute_delete(client, bucket, key))
-        .map_err(S3AttributeError::new_err)?;
+        .map_err(S3AttributeException::new_err)?;
 
     Ok(result.metrics)
 }
@@ -646,7 +646,7 @@ pub fn head_object(
 
     let result = runtime
         .block_on(execute_head(client, bucket, key))
-        .map_err(S3AttributeError::new_err)?;
+        .map_err(S3AttributeException::new_err)?;
 
     Ok((result.metadata, result.metrics))
 }
@@ -666,7 +666,7 @@ pub fn save_to_file(
 
     let result = runtime
         .block_on(execute_save_to_file(client, bucket, key, path))
-        .map_err(S3AttributeError::new_err)?;
+        .map_err(S3AttributeException::new_err)?;
 
     Ok((result.bytes_written, result.metrics))
 }
@@ -695,7 +695,7 @@ pub fn async_upload_bytes<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((meta, metrics))
             }
-            Err(e) => Err(S3AttributeError::new_err(e)),
+            Err(e) => Err(S3AttributeException::new_err(e)),
         })
     })
 }
@@ -717,7 +717,7 @@ pub fn async_download_bytes<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((bytes, metrics))
             }
-            Err(e) => Err(S3AttributeError::new_err(e)),
+            Err(e) => Err(S3AttributeException::new_err(e)),
         })
     })
 }
@@ -739,7 +739,7 @@ pub fn async_presigned_url<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((r.url, metrics))
             }
-            Err(e) => Err(S3AttributeError::new_err(e)),
+            Err(e) => Err(S3AttributeException::new_err(e)),
         })
     })
 }
@@ -757,7 +757,7 @@ pub fn async_delete_object<'py>(
         #[allow(deprecated)]
         Python::with_gil(|py| match result {
             Ok(r) => Ok(r.metrics.into_pyobject(py)?.into_any().unbind()),
-            Err(e) => Err(S3AttributeError::new_err(e)),
+            Err(e) => Err(S3AttributeException::new_err(e)),
         })
     })
 }
@@ -779,7 +779,7 @@ pub fn async_head_object<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((meta, metrics))
             }
-            Err(e) => Err(S3AttributeError::new_err(e)),
+            Err(e) => Err(S3AttributeException::new_err(e)),
         })
     })
 }
@@ -801,7 +801,7 @@ pub fn async_save_to_file<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((r.bytes_written, metrics))
             }
-            Err(e) => Err(S3AttributeError::new_err(e)),
+            Err(e) => Err(S3AttributeException::new_err(e)),
         })
     })
 }

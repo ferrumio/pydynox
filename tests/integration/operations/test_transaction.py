@@ -6,7 +6,7 @@ Requirements: 9.3, 9.4
 
 import pytest
 from pydynox import Transaction
-from pydynox.exceptions import PydynoxError, TransactionCanceledError
+from pydynox.exceptions import PydynoxException, TransactionCanceledException
 
 
 def test_transact_write_puts_multiple_items(dynamo):
@@ -124,7 +124,7 @@ def test_transact_write_rollback_on_condition_failure(dynamo):
 
     # WHEN we execute the transaction
     # THEN it fails
-    with pytest.raises((TransactionCanceledError, PydynoxError)):
+    with pytest.raises((TransactionCanceledException, PydynoxException)):
         dynamo.transact_write(operations)
 
     # AND the put was rolled back - original value remains

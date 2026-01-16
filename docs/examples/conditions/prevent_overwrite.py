@@ -16,6 +16,6 @@ class User(Model):
 
 # Only save if the item doesn't exist yet
 user = User(pk="USER#NEW", sk="PROFILE", email="john@example.com", name="John", age=30)
-user.save(condition=User.pk.does_not_exist())
+user.save(condition=User.pk.not_exists())
 
-# If USER#NEW already exists, this raises ConditionCheckFailedError
+# If USER#NEW already exists, this raises ConditionalCheckFailedException

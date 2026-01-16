@@ -3,7 +3,7 @@
 import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class User(Model):
@@ -17,12 +17,12 @@ class User(Model):
 def test_prevent_overwrite(pydynox_memory_backend):
     """Test condition to prevent overwriting existing items."""
     user = User(pk="USER#1", name="John")
-    user.save(condition=User.pk.does_not_exist())
+    user.save(condition=User.pk.not_exists())
 
     # Second save with same key should fail
     user2 = User(pk="USER#1", name="Jane")
-    with pytest.raises(ConditionCheckFailedError):
-        user2.save(condition=User.pk.does_not_exist())
+    with pytest.raises(ConditionalCheckFailedException):
+        user2.save(condition=User.pk.not_exists())
 
 
 def test_conditional_delete(pydynox_memory_backend):
@@ -42,7 +42,7 @@ def test_conditional_delete_fails(pydynox_memory_backend):
     user.save()
 
     # Cannot delete active users
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         user.delete(condition=User.status == "inactive")
 
     # User still exists
@@ -66,5 +66,5 @@ def test_optimistic_locking(pydynox_memory_backend):
     # Second update fails (version already changed)
     user2.name = "Bob"
     user2.version = 2
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         user2.save(condition=User.version == 1)
