@@ -202,13 +202,15 @@ def test_model_scan_consistent_read(populated_users):
 
 
 def test_model_scan_with_limit(populated_users):
-    """Test Model.scan with limit (auto-paginates)."""
+    """Test Model.scan with limit returns only N items total."""
     User = populated_users
 
-    # limit is per page, but iterator fetches all
+    # GIVEN 5 items in table
+    # WHEN we scan with limit=2
     users = list(User.scan(limit=2))
 
-    assert len(users) == 5
+    # THEN only 2 items are returned (limit stops iteration)
+    assert len(users) == 2
 
 
 # ========== COUNT TESTS ==========

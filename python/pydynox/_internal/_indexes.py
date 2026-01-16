@@ -110,6 +110,7 @@ class GlobalSecondaryIndex(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         **key_values: Any,
     ) -> GSIQueryResult[M]:
@@ -132,6 +133,7 @@ class GlobalSecondaryIndex(Generic[M]):
             range_key_condition=range_key_condition,
             filter_condition=filter_condition,
             limit=limit,
+            page_size=page_size,
             scan_index_forward=scan_index_forward,
         )
 
@@ -140,6 +142,7 @@ class GlobalSecondaryIndex(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         **key_values: Any,
     ) -> AsyncGSIQueryResult[M]:
@@ -162,6 +165,7 @@ class GlobalSecondaryIndex(Generic[M]):
             range_key_condition=range_key_condition,
             filter_condition=filter_condition,
             limit=limit,
+            page_size=page_size,
             scan_index_forward=scan_index_forward,
         )
 
@@ -267,6 +271,7 @@ class GSIQueryResult(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         last_evaluated_key: dict[str, Any] | None = None,
     ) -> None:
@@ -278,6 +283,7 @@ class GSIQueryResult(Generic[M]):
         self._range_key_condition = range_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._start_key = last_evaluated_key
 
@@ -329,6 +335,7 @@ class GSIQueryResult(Generic[M]):
             expression_attribute_names=attr_names if attr_names else None,
             expression_attribute_values=values if values else None,
             limit=self._limit,
+            page_size=self._page_size,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
             last_evaluated_key=self._start_key,
@@ -373,6 +380,7 @@ class AsyncGSIQueryResult(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         last_evaluated_key: dict[str, Any] | None = None,
     ) -> None:
@@ -384,6 +392,7 @@ class AsyncGSIQueryResult(Generic[M]):
         self._range_key_condition = range_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._start_key = last_evaluated_key
 
@@ -427,6 +436,7 @@ class AsyncGSIQueryResult(Generic[M]):
             expression_attribute_names=attr_names if attr_names else None,
             expression_attribute_values=values if values else None,
             limit=self._limit,
+            page_size=self._page_size,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
             last_evaluated_key=self._start_key,
@@ -531,6 +541,7 @@ class LocalSecondaryIndex(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool = False,
         **key_values: Any,
@@ -557,6 +568,7 @@ class LocalSecondaryIndex(Generic[M]):
             range_key_condition=range_key_condition,
             filter_condition=filter_condition,
             limit=limit,
+            page_size=page_size,
             scan_index_forward=scan_index_forward,
             consistent_read=consistent_read,
         )
@@ -566,6 +578,7 @@ class LocalSecondaryIndex(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool = False,
         **key_values: Any,
@@ -592,6 +605,7 @@ class LocalSecondaryIndex(Generic[M]):
             range_key_condition=range_key_condition,
             filter_condition=filter_condition,
             limit=limit,
+            page_size=page_size,
             scan_index_forward=scan_index_forward,
             consistent_read=consistent_read,
         )
@@ -646,6 +660,7 @@ class LSIQueryResult(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
@@ -658,6 +673,7 @@ class LSIQueryResult(Generic[M]):
         self._range_key_condition = range_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._start_key = last_evaluated_key
         self._consistent_read = consistent_read
@@ -706,6 +722,7 @@ class LSIQueryResult(Generic[M]):
             expression_attribute_names=attr_names if attr_names else None,
             expression_attribute_values=values if values else None,
             limit=self._limit,
+            page_size=self._page_size,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
             last_evaluated_key=self._start_key,
@@ -751,6 +768,7 @@ class AsyncLSIQueryResult(Generic[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
@@ -763,6 +781,7 @@ class AsyncLSIQueryResult(Generic[M]):
         self._range_key_condition = range_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._start_key = last_evaluated_key
         self._consistent_read = consistent_read
@@ -803,6 +822,7 @@ class AsyncLSIQueryResult(Generic[M]):
             expression_attribute_names=attr_names if attr_names else None,
             expression_attribute_values=values if values else None,
             limit=self._limit,
+            page_size=self._page_size,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
             last_evaluated_key=self._start_key,

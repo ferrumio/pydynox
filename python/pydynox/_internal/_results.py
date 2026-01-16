@@ -189,6 +189,7 @@ class ModelQueryResult(BaseModelResult[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
@@ -200,6 +201,7 @@ class ModelQueryResult(BaseModelResult[M]):
         self._range_key_condition = range_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
@@ -233,6 +235,7 @@ class ModelQueryResult(BaseModelResult[M]):
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,
+            page_size=self._page_size,
             scan_index_forward=self._scan_index_forward,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
@@ -267,6 +270,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
@@ -278,6 +282,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         self._range_key_condition = range_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
@@ -310,6 +315,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,
+            page_size=self._page_size,
             scan_index_forward=self._scan_index_forward,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
@@ -342,6 +348,7 @@ class ModelScanResult(BaseModelResult[M]):
         model_class: type[M],
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
@@ -352,6 +359,7 @@ class ModelScanResult(BaseModelResult[M]):
         self._model_class = model_class
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
         self._segment = segment
@@ -378,6 +386,7 @@ class ModelScanResult(BaseModelResult[M]):
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,
+            page_size=self._page_size,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=use_consistent,
@@ -411,6 +420,7 @@ class AsyncModelScanResult(BaseModelResult[M]):
         model_class: type[M],
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
@@ -421,6 +431,7 @@ class AsyncModelScanResult(BaseModelResult[M]):
         self._model_class = model_class
         self._filter_condition = filter_condition
         self._limit = limit
+        self._page_size = page_size
         self._consistent_read = consistent_read
         self._start_key = last_evaluated_key
         self._segment = segment
@@ -446,6 +457,7 @@ class AsyncModelScanResult(BaseModelResult[M]):
             expression_attribute_names=attr_names,
             expression_attribute_values=attr_values,
             limit=self._limit,
+            page_size=self._page_size,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=use_consistent,
