@@ -223,14 +223,14 @@ def test_condition_attribute_not_exists():
     # GIVEN a saved user
     with MemoryBackend():
         user = User(pk="USER#1", name="Test")
-        user.save(condition=User.pk.does_not_exist())
+        user.save(condition=User.pk.not_exists())
 
         # WHEN we try to save again with same condition
         user2 = User(pk="USER#1", name="Test2")
 
         # THEN it should fail
-        with pytest.raises(Exception):  # ConditionCheckFailedError
-            user2.save(condition=User.pk.does_not_exist())
+        with pytest.raises(Exception):  # ConditionalCheckFailedException
+            user2.save(condition=User.pk.not_exists())
 
 
 def test_multiple_tables():

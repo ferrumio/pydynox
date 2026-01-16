@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydynox._internal._atomic import AtomicOp, serialize_atomic
 from pydynox._internal._conditions import ConditionPath
-from pydynox.exceptions import ItemTooLargeError
+from pydynox.exceptions import ItemTooLargeException
 from pydynox.hooks import HookType
 
 if TYPE_CHECKING:
@@ -107,7 +107,7 @@ def prepare_save(self: Model, condition: Condition | None, skip_hooks: bool | No
     if max_size is not None:
         size = self.calculate_size()
         if size.bytes > max_size:
-            raise ItemTooLargeError(
+            raise ItemTooLargeException(
                 size=size.bytes,
                 max_size=max_size,
                 item_key=self._get_key(),

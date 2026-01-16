@@ -3,9 +3,9 @@
 import pytest
 from pydynox import DynamoDBClient
 from pydynox.exceptions import (
-    TableAlreadyExistsError,
-    TableNotFoundError,
-    ValidationError,
+    ResourceInUseException,
+    ResourceNotFoundException,
+    ValidationException,
 )
 
 
@@ -109,35 +109,35 @@ def test_delete_table(client):
 
 
 def test_delete_nonexistent_table_raises_error(client):
-    """Test that deleting a non-existent table raises TableNotFoundError."""
+    """Test that deleting a non-existent table raises ResourceNotFoundException."""
     # WHEN we try to delete a non-existent table
-    # THEN TableNotFoundError is raised
-    with pytest.raises(TableNotFoundError):
+    # THEN ResourceNotFoundException is raised
+    with pytest.raises(ResourceNotFoundException):
         client.delete_table("nonexistent_table_12345")
 
 
 def test_create_duplicate_table_raises_error(client):
-    """Test that creating a duplicate table raises TableAlreadyExistsError."""
+    """Test that creating a duplicate table raises ResourceInUseException."""
     # GIVEN an existing table
     client.create_table("duplicate_table", hash_key=("pk", "S"))
 
     # WHEN we try to create it again
-    # THEN TableAlreadyExistsError is raised
-    with pytest.raises(TableAlreadyExistsError):
+    # THEN ResourceInUseException is raised
+    with pytest.raises(ResourceInUseException):
         client.create_table("duplicate_table", hash_key=("pk", "S"))
 
     client.delete_table("duplicate_table")
 
 
 def test_create_table_with_invalid_key_type_raises_error(client):
-    """Test that invalid key type raises ValidationError."""
-    with pytest.raises(ValidationError):
+    """Test that invalid key type raises ValidationException."""
+    with pytest.raises(ValidationException):
         client.create_table("invalid_table", hash_key=("pk", "INVALID"))
 
 
 def test_create_table_with_invalid_billing_mode_raises_error(client):
-    """Test that invalid billing mode raises ValidationError."""
-    with pytest.raises(ValidationError):
+    """Test that invalid billing mode raises ValidationException."""
+    with pytest.raises(ValidationException):
         client.create_table(
             "invalid_billing_table",
             hash_key=("pk", "S"),

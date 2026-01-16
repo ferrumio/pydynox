@@ -9,50 +9,75 @@ use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 
 // Create Python exception classes
-create_exception!(pydynox, PydynoxError, PyException);
-create_exception!(pydynox, TableNotFoundError, PydynoxError);
-create_exception!(pydynox, TableAlreadyExistsError, PydynoxError);
-create_exception!(pydynox, ValidationError, PydynoxError);
-create_exception!(pydynox, ConditionCheckFailedError, PydynoxError);
-create_exception!(pydynox, TransactionCanceledError, PydynoxError);
-create_exception!(pydynox, ThrottlingError, PydynoxError);
-create_exception!(pydynox, AccessDeniedError, PydynoxError);
-create_exception!(pydynox, CredentialsError, PydynoxError);
-create_exception!(pydynox, SerializationError, PydynoxError);
-create_exception!(pydynox, ConnectionError, PydynoxError);
-create_exception!(pydynox, EncryptionError, PydynoxError);
-create_exception!(pydynox, S3AttributeError, PydynoxError);
+create_exception!(pydynox, PydynoxException, PyException);
+create_exception!(pydynox, ResourceNotFoundException, PydynoxException);
+create_exception!(pydynox, ResourceInUseException, PydynoxException);
+create_exception!(pydynox, ValidationException, PydynoxException);
+create_exception!(pydynox, ConditionalCheckFailedException, PydynoxException);
+create_exception!(pydynox, TransactionCanceledException, PydynoxException);
+create_exception!(
+    pydynox,
+    ProvisionedThroughputExceededException,
+    PydynoxException
+);
+create_exception!(pydynox, AccessDeniedException, PydynoxException);
+create_exception!(pydynox, CredentialsException, PydynoxException);
+create_exception!(pydynox, SerializationException, PydynoxException);
+create_exception!(pydynox, ConnectionException, PydynoxException);
+create_exception!(pydynox, EncryptionException, PydynoxException);
+create_exception!(pydynox, S3AttributeException, PydynoxException);
 
 /// Register exception classes with the Python module.
 pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("PydynoxError", m.py().get_type::<PydynoxError>())?;
+    m.add("PydynoxException", m.py().get_type::<PydynoxException>())?;
     m.add(
-        "TableNotFoundError",
-        m.py().get_type::<TableNotFoundError>(),
+        "ResourceNotFoundException",
+        m.py().get_type::<ResourceNotFoundException>(),
     )?;
     m.add(
-        "TableAlreadyExistsError",
-        m.py().get_type::<TableAlreadyExistsError>(),
-    )?;
-    m.add("ValidationError", m.py().get_type::<ValidationError>())?;
-    m.add(
-        "ConditionCheckFailedError",
-        m.py().get_type::<ConditionCheckFailedError>(),
+        "ResourceInUseException",
+        m.py().get_type::<ResourceInUseException>(),
     )?;
     m.add(
-        "TransactionCanceledError",
-        m.py().get_type::<TransactionCanceledError>(),
+        "ValidationException",
+        m.py().get_type::<ValidationException>(),
     )?;
-    m.add("ThrottlingError", m.py().get_type::<ThrottlingError>())?;
-    m.add("AccessDeniedError", m.py().get_type::<AccessDeniedError>())?;
-    m.add("CredentialsError", m.py().get_type::<CredentialsError>())?;
     m.add(
-        "SerializationError",
-        m.py().get_type::<SerializationError>(),
+        "ConditionalCheckFailedException",
+        m.py().get_type::<ConditionalCheckFailedException>(),
     )?;
-    m.add("ConnectionError", m.py().get_type::<ConnectionError>())?;
-    m.add("EncryptionError", m.py().get_type::<EncryptionError>())?;
-    m.add("S3AttributeError", m.py().get_type::<S3AttributeError>())?;
+    m.add(
+        "TransactionCanceledException",
+        m.py().get_type::<TransactionCanceledException>(),
+    )?;
+    m.add(
+        "ProvisionedThroughputExceededException",
+        m.py().get_type::<ProvisionedThroughputExceededException>(),
+    )?;
+    m.add(
+        "AccessDeniedException",
+        m.py().get_type::<AccessDeniedException>(),
+    )?;
+    m.add(
+        "CredentialsException",
+        m.py().get_type::<CredentialsException>(),
+    )?;
+    m.add(
+        "SerializationException",
+        m.py().get_type::<SerializationException>(),
+    )?;
+    m.add(
+        "ConnectionException",
+        m.py().get_type::<ConnectionException>(),
+    )?;
+    m.add(
+        "EncryptionException",
+        m.py().get_type::<EncryptionException>(),
+    )?;
+    m.add(
+        "S3AttributeException",
+        m.py().get_type::<S3AttributeException>(),
+    )?;
     Ok(())
 }
 
@@ -76,14 +101,16 @@ where
         || err_debug.contains("Connection refused")
         || err_debug.contains("ConnectError")
     {
-        return ConnectionError::new_err(
+        return ConnectionException::new_err(
             "Connection failed. Check if DynamoDB endpoint is reachable. \
             For local testing, make sure DynamoDB Local/LocalStack/Moto or any other emulator is running.",
         );
     }
 
     if err_debug.contains("timeout") || err_debug.contains("Timeout") {
-        return ConnectionError::new_err("Connection timed out. Check your network or endpoint.");
+        return ConnectionException::new_err(
+            "Connection timed out. Check your network or endpoint.",
+        );
     }
 
     // Check for credential errors first (these are dispatch failures, not service errors)
@@ -93,22 +120,24 @@ where
         || err_debug.contains("CredentialsError")
         || err_debug.contains("failed to load credentials")
     {
-        return CredentialsError::new_err(
+        return CredentialsException::new_err(
             "No AWS credentials found. Configure credentials via environment variables \
             (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY), AWS profile, or IAM role.",
         );
     }
 
     if err_debug.contains("InvalidAccessKeyId") || err_debug.contains("invalid access key") {
-        return CredentialsError::new_err("Invalid AWS access key ID. Check your credentials.");
+        return CredentialsException::new_err("Invalid AWS access key ID. Check your credentials.");
     }
 
     if err_debug.contains("SignatureDoesNotMatch") {
-        return CredentialsError::new_err("AWS signature mismatch. Check your secret access key.");
+        return CredentialsException::new_err(
+            "AWS signature mismatch. Check your secret access key.",
+        );
     }
 
     if err_debug.contains("ExpiredToken") || err_debug.contains("expired") {
-        return CredentialsError::new_err(
+        return CredentialsException::new_err(
             "AWS credentials have expired. Refresh your session token.",
         );
     }
@@ -124,7 +153,7 @@ where
             } else {
                 "Resource not found".to_string()
             };
-            TableNotFoundError::new_err(msg)
+            ResourceNotFoundException::new_err(msg)
         }
         Some("ResourceInUseException") => {
             let msg = if let Some(t) = table {
@@ -132,15 +161,15 @@ where
             } else {
                 "Resource already in use".to_string()
             };
-            TableAlreadyExistsError::new_err(msg)
+            ResourceInUseException::new_err(msg)
         }
         Some("ValidationException") => {
             // Try to extract the actual validation message
             let msg = extract_message(&err_debug).unwrap_or(err_display);
-            ValidationError::new_err(msg)
+            ValidationException::new_err(msg)
         }
         Some("ConditionalCheckFailedException") => {
-            ConditionCheckFailedError::new_err("The condition expression evaluated to false")
+            ConditionalCheckFailedException::new_err("The condition expression evaluated to false")
         }
         Some("TransactionCanceledException") => {
             let reasons = extract_cancellation_reasons(&err_debug);
@@ -149,25 +178,27 @@ where
             } else {
                 format!("Transaction was canceled: {}", reasons.join("; "))
             };
-            TransactionCanceledError::new_err(msg)
+            TransactionCanceledException::new_err(msg)
         }
-        Some("ProvisionedThroughputExceededException") | Some("ThrottlingException") => {
-            ThrottlingError::new_err("Request rate too high. Try again with exponential backoff.")
+        Some("ProvisionedThroughputExceededException") => {
+            ProvisionedThroughputExceededException::new_err(
+                "Request rate too high. Try again with exponential backoff.",
+            )
         }
         Some("AccessDeniedException") => {
             let msg = extract_message(&err_debug)
                 .unwrap_or_else(|| "Access denied. Check your IAM permissions.".to_string());
-            AccessDeniedError::new_err(msg)
+            AccessDeniedException::new_err(msg)
         }
-        Some("UnrecognizedClientException") => {
-            CredentialsError::new_err("Invalid AWS credentials. Check your access key and secret.")
-        }
+        Some("UnrecognizedClientException") => CredentialsException::new_err(
+            "Invalid AWS credentials. Check your access key and secret.",
+        ),
         Some("ItemCollectionSizeLimitExceededException") => {
-            ValidationError::new_err("Item collection size limit exceeded")
+            ValidationException::new_err("Item collection size limit exceeded")
         }
-        Some("RequestLimitExceeded") => {
-            ThrottlingError::new_err("Request limit exceeded. Try again later.")
-        }
+        Some("RequestLimitExceeded") => ProvisionedThroughputExceededException::new_err(
+            "Request limit exceeded. Try again later.",
+        ),
         _ => {
             // For unknown errors, include as much detail as possible
             let msg = extract_message(&err_debug).unwrap_or_else(|| {
@@ -184,7 +215,7 @@ where
                     err_display
                 }
             });
-            PydynoxError::new_err(msg)
+            PydynoxException::new_err(msg)
         }
     }
 }
@@ -207,7 +238,7 @@ fn extract_error_code(err_str: &str) -> Option<String> {
         "ConditionalCheckFailedException",
         "TransactionCanceledException",
         "ProvisionedThroughputExceededException",
-        "ThrottlingException",
+        "ProvisionedThroughputExceededException",
         "AccessDeniedException",
         "UnrecognizedClientException",
         "ItemCollectionSizeLimitExceededException",
@@ -272,7 +303,7 @@ where
         || err_debug.contains("connection refused")
         || err_debug.contains("ConnectError")
     {
-        return ConnectionError::new_err(
+        return ConnectionException::new_err(
             "Connection to KMS failed. Check if the endpoint is reachable.",
         );
     }
@@ -282,53 +313,59 @@ where
         || err_debug.contains("no credentials")
         || err_debug.contains("CredentialsError")
     {
-        return CredentialsError::new_err(
+        return CredentialsException::new_err(
             "No AWS credentials found for KMS. Configure credentials via environment variables.",
         );
     }
 
     if err_debug.contains("InvalidAccessKeyId") {
-        return CredentialsError::new_err("Invalid AWS access key ID for KMS.");
+        return CredentialsException::new_err("Invalid AWS access key ID for KMS.");
     }
 
     // KMS-specific errors
     if err_debug.contains("NotFoundException") || err_debug.contains("not found") {
-        return EncryptionError::new_err("KMS key not found. Check the key ID or alias.");
+        return EncryptionException::new_err("KMS key not found. Check the key ID or alias.");
     }
 
     if err_debug.contains("DisabledException") {
-        return EncryptionError::new_err("KMS key is disabled.");
+        return EncryptionException::new_err("KMS key is disabled.");
     }
 
     if err_debug.contains("InvalidKeyUsageException") {
-        return EncryptionError::new_err("KMS key cannot be used for this operation.");
+        return EncryptionException::new_err("KMS key cannot be used for this operation.");
     }
 
     if err_debug.contains("KeyUnavailableException") {
-        return EncryptionError::new_err("KMS key is not available. Try again later.");
+        return EncryptionException::new_err("KMS key is not available. Try again later.");
     }
 
     if err_debug.contains("InvalidCiphertextException") {
-        return EncryptionError::new_err("Invalid ciphertext. Data may be corrupted.");
+        return EncryptionException::new_err("Invalid ciphertext. Data may be corrupted.");
     }
 
     if err_debug.contains("IncorrectKeyException") {
-        return EncryptionError::new_err("Wrong KMS key used for decryption.");
+        return EncryptionException::new_err("Wrong KMS key used for decryption.");
     }
 
     if err_debug.contains("InvalidGrantTokenException") {
-        return EncryptionError::new_err("Invalid grant token.");
+        return EncryptionException::new_err("Invalid grant token.");
     }
 
     if err_debug.contains("AccessDeniedException") {
-        return AccessDeniedError::new_err("Access denied to KMS key. Check your IAM permissions.");
+        return AccessDeniedException::new_err(
+            "Access denied to KMS key. Check your IAM permissions.",
+        );
     }
 
-    if err_debug.contains("ThrottlingException") || err_debug.contains("LimitExceededException") {
-        return ThrottlingError::new_err("KMS request rate too high. Try again later.");
+    if err_debug.contains("ProvisionedThroughputExceededException")
+        || err_debug.contains("LimitExceededException")
+    {
+        return ProvisionedThroughputExceededException::new_err(
+            "KMS request rate too high. Try again later.",
+        );
     }
 
     // Generic encryption error
     let msg = extract_message(&err_debug).unwrap_or(err_display);
-    EncryptionError::new_err(format!("KMS operation failed: {}", msg))
+    EncryptionException::new_err(format!("KMS operation failed: {}", msg))
 }

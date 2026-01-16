@@ -5,12 +5,12 @@ making it easy for users familiar with boto3 to handle errors.
 
 Example:
     >>> from pydynox import DynamoDBClient
-    >>> from pydynox.exceptions import TableNotFoundError, ValidationError
+    >>> from pydynox.exceptions import ResourceNotFoundException, ValidationException
     >>>
     >>> client = DynamoDBClient()
     >>> try:
     ...     client.get_item("nonexistent-table", {"pk": "123"})
-    ... except TableNotFoundError as e:
+    ... except ResourceNotFoundException as e:
     ...     print(f"Table not found: {e}")
 """
 
@@ -22,7 +22,7 @@ from typing import Any
 from pydynox import pydynox_core
 
 
-class ItemTooLargeError(Exception):
+class ItemTooLargeException(Exception):
     """Raised when an item exceeds the DynamoDB 400KB size limit.
 
     This is a Python-only exception raised before calling DynamoDB,
@@ -34,10 +34,10 @@ class ItemTooLargeError(Exception):
         item_key: Key of the item (if available).
 
     Example:
-        >>> from pydynox.exceptions import ItemTooLargeError
+        >>> from pydynox.exceptions import ItemTooLargeException
         >>> try:
         ...     user.save()
-        ... except ItemTooLargeError as e:
+        ... except ItemTooLargeException as e:
         ...     print(f"Item too large: {e.size} bytes (max: {e.max_size})")
     """
 
@@ -54,33 +54,33 @@ class ItemTooLargeError(Exception):
 
 
 # These are the actual exception classes from Rust
-PydynoxError = pydynox_core.PydynoxError
-TableNotFoundError = pydynox_core.TableNotFoundError
-TableAlreadyExistsError = pydynox_core.TableAlreadyExistsError
-ValidationError = pydynox_core.ValidationError
-ConditionCheckFailedError = pydynox_core.ConditionCheckFailedError
-TransactionCanceledError = pydynox_core.TransactionCanceledError
-ThrottlingError = pydynox_core.ThrottlingError
-AccessDeniedError = pydynox_core.AccessDeniedError
-CredentialsError = pydynox_core.CredentialsError
-SerializationError = pydynox_core.SerializationError
-ConnectionError = pydynox_core.ConnectionError
-EncryptionError = pydynox_core.EncryptionError
-S3AttributeError = pydynox_core.S3AttributeError
+PydynoxException = pydynox_core.PydynoxException
+ResourceNotFoundException = pydynox_core.ResourceNotFoundException
+ResourceInUseException = pydynox_core.ResourceInUseException
+ValidationException = pydynox_core.ValidationException
+ConditionalCheckFailedException = pydynox_core.ConditionalCheckFailedException
+TransactionCanceledException = pydynox_core.TransactionCanceledException
+ProvisionedThroughputExceededException = pydynox_core.ProvisionedThroughputExceededException
+AccessDeniedException = pydynox_core.AccessDeniedException
+CredentialsException = pydynox_core.CredentialsException
+SerializationException = pydynox_core.SerializationException
+ConnectionException = pydynox_core.ConnectionException
+EncryptionException = pydynox_core.EncryptionException
+S3AttributeException = pydynox_core.S3AttributeException
 
 __all__ = [
-    "PydynoxError",
-    "TableNotFoundError",
-    "TableAlreadyExistsError",
-    "ValidationError",
-    "ConditionCheckFailedError",
-    "TransactionCanceledError",
-    "ThrottlingError",
-    "AccessDeniedError",
-    "CredentialsError",
-    "SerializationError",
-    "ConnectionError",
-    "EncryptionError",
-    "S3AttributeError",
-    "ItemTooLargeError",
+    "PydynoxException",
+    "ResourceNotFoundException",
+    "ResourceInUseException",
+    "ValidationException",
+    "ConditionalCheckFailedException",
+    "TransactionCanceledException",
+    "ProvisionedThroughputExceededException",
+    "AccessDeniedException",
+    "CredentialsException",
+    "SerializationException",
+    "ConnectionException",
+    "EncryptionException",
+    "S3AttributeException",
+    "ItemTooLargeException",
 ]

@@ -3,7 +3,7 @@
 import pytest
 from pydynox import Model, ModelConfig, set_default_client
 from pydynox.attributes import ListAttribute, NumberAttribute, StringAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class User(Model):
@@ -154,8 +154,8 @@ def test_atomic_with_condition_fails(dynamo):
     user.save()
 
     # WHEN we try to subtract 50 with condition balance >= 50
-    # THEN ConditionCheckFailedError is raised
-    with pytest.raises(ConditionCheckFailedError):
+    # THEN ConditionalCheckFailedException is raised
+    with pytest.raises(ConditionalCheckFailedException):
         user.update(
             atomic=[User.balance.add(-50)],
             condition=User.balance >= 50,
@@ -200,7 +200,7 @@ def test_atomic_add_with_string_condition_fails(dynamo):
     user = User(pk="USER#COND4", sk="PROFILE", name="John", balance=200)
     user.save()
 
-    with pytest.raises(ConditionCheckFailedError):
+    with pytest.raises(ConditionalCheckFailedException):
         user.update(
             atomic=[User.balance.add(-50)],
             condition=User.name == "Jane",
@@ -259,7 +259,7 @@ def test_atomic_with_not_exists_condition(dynamo):
 
     user.update(
         atomic=[User.count.if_not_exists(100)],
-        condition=User.count.does_not_exist(),
+        condition=User.count.not_exists(),
     )
 
     result = User.get(pk="USER#COND8", sk="PROFILE")

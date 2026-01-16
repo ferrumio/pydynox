@@ -27,4 +27,4 @@ product.version = current_version + 1
 product.save(condition=Product.version == current_version)
 
 # If someone else updated the product, version won't match
-# and ConditionCheckFailedError is raised
+# and ConditionalCheckFailedException is raised

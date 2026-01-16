@@ -1,6 +1,6 @@
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class Document(Model):
@@ -30,5 +30,5 @@ print(f"Published! Version: {doc.version}")  # 3
 doc.content = "Another update"
 try:
     doc.save(condition=Document.status == "draft")
-except ConditionCheckFailedError:
+except ConditionalCheckFailedException:
     print("Can't update - not a draft")

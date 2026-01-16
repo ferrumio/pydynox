@@ -2,7 +2,7 @@ import asyncio
 
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class Counter(Model):
@@ -24,7 +24,7 @@ async def increment_with_retry(pk: str, max_retries: int = 5) -> Counter:
         try:
             await counter.async_save()
             return counter
-        except ConditionCheckFailedError:
+        except ConditionalCheckFailedException:
             if attempt == max_retries - 1:
                 raise
             # Small delay before retry

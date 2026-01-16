@@ -1,6 +1,6 @@
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
-from pydynox.exceptions import ItemTooLargeError
+from pydynox.exceptions import ItemTooLargeException
 
 
 class Comment(Model):
@@ -19,7 +19,7 @@ comment = Comment(
 
 try:
     comment.save()
-except ItemTooLargeError as e:
+except ItemTooLargeException as e:
     print(f"Item too large: {e.size} bytes")
     print(f"Max allowed: {e.max_size} bytes")
     print(f"Item key: {e.item_key}")

@@ -40,7 +40,7 @@ Import `EncryptionMode` from `pydynox.attributes`:
     --8<-- "docs/examples/encryption/encryption_modes.py"
     ```
 
-If you try to decrypt in `WriteOnly` mode, you get an `EncryptionError`. Same for encrypting in `ReadOnly` mode.
+If you try to decrypt in `WriteOnly` mode, you get an `EncryptionException`. Same for encrypting in `ReadOnly` mode.
 
 ## Parameters
 
@@ -132,14 +132,14 @@ Note: We use `kms:GenerateDataKey` instead of `kms:Encrypt`. For `ReadOnly` mode
 
 ## Error handling
 
-Encryption errors raise `EncryptionError`:
+Encryption errors raise `EncryptionException`:
 
 ```python
-from pydynox.exceptions import EncryptionError
+from pydynox.exceptions import EncryptionException
 
 try:
     user.save()
-except EncryptionError as e:
+except EncryptionException as e:
     print(f"Encryption failed: {e}")
 ```
 

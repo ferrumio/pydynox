@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-use crate::errors::ValidationError;
+use crate::errors::ValidationException;
 
 /// GSI key attribute (name, type).
 #[derive(Debug, Clone)]
@@ -61,7 +61,7 @@ pub fn parse_gsi_definitions(
 
         let index_name: String = dict
             .get_item("index_name")?
-            .ok_or_else(|| ValidationError::new_err("GSI missing 'index_name'"))?
+            .ok_or_else(|| ValidationException::new_err("GSI missing 'index_name'"))?
             .extract()?;
 
         // Try multi-attribute format first (hash_keys), then fall back to single (hash_key)
@@ -72,14 +72,14 @@ pub fn parse_gsi_definitions(
             let (name, attr_type): (String, String) = key.extract()?;
             vec![GsiKeyAttribute { name, attr_type }]
         } else {
-            return Err(ValidationError::new_err(
+            return Err(ValidationException::new_err(
                 "GSI missing 'hash_key' or 'hash_keys'",
             ));
         };
 
         // Validate hash key count (1-4)
         if hash_keys.is_empty() || hash_keys.len() > 4 {
-            return Err(ValidationError::new_err(format!(
+            return Err(ValidationException::new_err(format!(
                 "GSI '{}': hash_keys must have 1-4 attributes, got {}",
                 index_name,
                 hash_keys.len()
@@ -99,7 +99,7 @@ pub fn parse_gsi_definitions(
 
         // Validate range key count (0-4)
         if range_keys.len() > 4 {
-            return Err(ValidationError::new_err(format!(
+            return Err(ValidationException::new_err(format!(
                 "GSI '{}': range_keys must have 0-4 attributes, got {}",
                 index_name,
                 range_keys.len()
@@ -137,7 +137,7 @@ fn parse_key_attributes(
     field_name: &str,
 ) -> PyResult<Vec<GsiKeyAttribute>> {
     let list: Vec<(String, String)> = obj.extract().map_err(|_| {
-        ValidationError::new_err(format!(
+        ValidationException::new_err(format!(
             "'{}' must be a list of tuples: [(name, type), ...]",
             field_name
         ))

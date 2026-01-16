@@ -9,7 +9,7 @@ Add a `VersionAttribute` to your model. pydynox handles the rest:
 1. First save sets version to 1
 2. Each save increments version by 1
 3. Before saving, pydynox checks that the version in DynamoDB matches the local version
-4. If versions don't match, save fails with `ConditionCheckFailedError`
+4. If versions don't match, save fails with `ConditionalCheckFailedException`
 
 ## Basic usage
 

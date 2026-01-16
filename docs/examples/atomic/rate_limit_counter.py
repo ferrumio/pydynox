@@ -2,7 +2,7 @@
 
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class ApiUsage(Model):
@@ -39,7 +39,7 @@ def track_request(user_id: str, date: str, daily_limit: int = 1000) -> int:
         # Fetch updated count
         updated = ApiUsage.get(pk=user_id, sk=date)
         return updated.requests
-    except ConditionCheckFailedError:
+    except ConditionalCheckFailedException:
         raise RateLimitExceeded(f"User {user_id} exceeded {daily_limit} requests/day")
 
 

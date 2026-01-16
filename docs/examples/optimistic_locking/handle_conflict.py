@@ -1,6 +1,6 @@
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute, VersionAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class Counter(Model):
@@ -23,7 +23,7 @@ def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
         try:
             counter.save()
             return counter
-        except ConditionCheckFailedError:
+        except ConditionalCheckFailedException:
             if attempt == max_retries - 1:
                 raise
             print(f"Conflict on attempt {attempt + 1}, retrying...")

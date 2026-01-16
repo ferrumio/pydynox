@@ -137,17 +137,17 @@ All operations happen atomically. Either all succeed or none do.
 
 ## Error handling
 
-When a condition fails, you get `ConditionCheckFailedError`:
+When a condition fails, you get `ConditionalCheckFailedException`:
 
 ```python
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 try:
     account.update(
         atomic=[Account.balance.add(-100)],
         condition=Account.balance >= 100,
     )
-except ConditionCheckFailedError:
+except ConditionalCheckFailedException:
     print("Insufficient balance")
 ```
 

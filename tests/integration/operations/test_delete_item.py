@@ -1,7 +1,7 @@
 """Integration tests for delete_item operation."""
 
 import pytest
-from pydynox.exceptions import ConditionCheckFailedError, TableNotFoundError
+from pydynox.exceptions import ConditionalCheckFailedException, ResourceNotFoundException
 
 
 def test_delete_item_removes_item(dynamo):
@@ -54,8 +54,8 @@ def test_delete_item_with_condition_fails(dynamo):
     dynamo.put_item("test_table", item)
 
     # WHEN deleting with condition status=inactive
-    # THEN ConditionCheckFailedError is raised
-    with pytest.raises(ConditionCheckFailedError):
+    # THEN ConditionalCheckFailedException is raised
+    with pytest.raises(ConditionalCheckFailedException):
         dynamo.delete_item(
             "test_table",
             {"pk": "USER#DEL3", "sk": "PROFILE"},
@@ -92,6 +92,6 @@ def test_delete_item_with_attribute_exists_condition(dynamo):
 def test_delete_item_table_not_found(dynamo):
     """Test delete from non-existent table raises error."""
     # WHEN deleting from a non-existent table
-    # THEN TableNotFoundError is raised
-    with pytest.raises(TableNotFoundError):
+    # THEN ResourceNotFoundException is raised
+    with pytest.raises(ResourceNotFoundException):
         dynamo.delete_item("nonexistent_table", {"pk": "X", "sk": "Y"})

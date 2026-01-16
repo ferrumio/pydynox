@@ -1,0 +1,20 @@
+"""pydynox: Conditional write to DynamoDB."""
+
+from pydynox import Model, ModelConfig
+from pydynox.attributes import StringAttribute
+from pydynox.exceptions import ConditionalCheckFailedException
+
+
+class User(Model):
+    model_config = ModelConfig(table="users")
+    pk = StringAttribute(hash_key=True)
+    sk = StringAttribute(range_key=True)
+    name = StringAttribute()
+
+
+try:
+    user = User(pk="USER#123", sk="PROFILE", name="John")
+    user.save(condition=User.pk.not_exists())
+    print("User created")
+except ConditionalCheckFailedException:
+    print("User already exists")

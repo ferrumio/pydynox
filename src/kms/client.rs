@@ -4,7 +4,7 @@
 //! This removes the 4KB limit and reduces KMS API calls.
 
 use crate::client_internal::{build_credential_provider, ClientConfig, CredentialProvider};
-use crate::errors::EncryptionError;
+use crate::errors::EncryptionException;
 use crate::kms::operations::{
     async_decrypt, async_encrypt, sync_decrypt, sync_encrypt, DecryptResult, EncryptResult,
 };
@@ -97,10 +97,9 @@ impl KmsEncryptor {
             proxy_url,
         };
 
-        let runtime =
-            Arc::new(Runtime::new().map_err(|e| {
-                EncryptionError::new_err(format!("Failed to create runtime: {}", e))
-            })?);
+        let runtime = Arc::new(Runtime::new().map_err(|e| {
+            EncryptionException::new_err(format!("Failed to create runtime: {}", e))
+        })?);
 
         // Use endpoint_url from config or AWS_ENDPOINT_URL env var
         let effective_endpoint = endpoint_url.or_else(|| {

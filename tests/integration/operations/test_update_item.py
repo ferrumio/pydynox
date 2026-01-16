@@ -1,7 +1,7 @@
 """Integration tests for update_item operation."""
 
 import pytest
-from pydynox.exceptions import ConditionCheckFailedError, TableNotFoundError
+from pydynox.exceptions import ConditionalCheckFailedException, ResourceNotFoundException
 
 
 def test_update_item_simple_set(dynamo):
@@ -150,8 +150,8 @@ def test_update_item_with_condition_fails(dynamo):
     dynamo.put_item("test_table", item)
 
     # WHEN updating with condition status=pending
-    # THEN ConditionCheckFailedError is raised
-    with pytest.raises(ConditionCheckFailedError):
+    # THEN ConditionalCheckFailedException is raised
+    with pytest.raises(ConditionalCheckFailedException):
         dynamo.update_item(
             "test_table",
             {"pk": "USER#UPD5", "sk": "PROFILE"},
@@ -212,8 +212,8 @@ def test_update_item_nonexistent_creates_item(dynamo):
 def test_update_item_table_not_found(dynamo):
     """Test update on non-existent table raises error."""
     # WHEN updating on a non-existent table
-    # THEN TableNotFoundError is raised
-    with pytest.raises(TableNotFoundError):
+    # THEN ResourceNotFoundException is raised
+    with pytest.raises(ResourceNotFoundException):
         dynamo.update_item(
             "nonexistent_table",
             {"pk": "X", "sk": "Y"},

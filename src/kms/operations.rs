@@ -9,7 +9,7 @@
 //! - KMS Encrypt has 4KB limit, but DynamoDB fields can be 400KB
 //! - Reduces KMS calls (one per operation instead of one per field)
 
-use crate::errors::{map_kms_error, EncryptionError};
+use crate::errors::{map_kms_error, EncryptionException};
 use crate::kms::ENCRYPTED_PREFIX;
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -97,7 +97,7 @@ pub struct DecryptResult {
 /// Returns: nonce (12 bytes) + ciphertext
 fn encrypt_local(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, PyErr> {
     let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| EncryptionError::new_err(format!("Invalid key: {}", e)))?;
+        .map_err(|e| EncryptionException::new_err(format!("Invalid key: {}", e)))?;
 
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_SIZE];
@@ -107,7 +107,7 @@ fn encrypt_local(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, PyErr> {
     // Encrypt
     let ciphertext = cipher
         .encrypt(nonce, plaintext)
-        .map_err(|e| EncryptionError::new_err(format!("Encryption failed: {}", e)))?;
+        .map_err(|e| EncryptionException::new_err(format!("Encryption failed: {}", e)))?;
 
     // Prepend nonce to ciphertext
     let mut result = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
@@ -121,18 +121,20 @@ fn encrypt_local(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, PyErr> {
 /// Expects: nonce (12 bytes) + ciphertext
 fn decrypt_local(data: &[u8], key: &[u8]) -> Result<Vec<u8>, PyErr> {
     if data.len() < NONCE_SIZE {
-        return Err(EncryptionError::new_err("Data too short for decryption"));
+        return Err(EncryptionException::new_err(
+            "Data too short for decryption",
+        ));
     }
 
     let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|e| EncryptionError::new_err(format!("Invalid key: {}", e)))?;
+        .map_err(|e| EncryptionException::new_err(format!("Invalid key: {}", e)))?;
 
     let (nonce_bytes, ciphertext) = data.split_at(NONCE_SIZE);
     let nonce = Nonce::from_slice(nonce_bytes);
 
     cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|e| EncryptionError::new_err(format!("Decryption failed: {}", e)))
+        .map_err(|e| EncryptionException::new_err(format!("Decryption failed: {}", e)))
 }
 
 // ========== STORAGE FORMAT ==========
@@ -155,12 +157,12 @@ fn pack_envelope(encrypted_dek: &[u8], encrypted_data: &[u8]) -> Vec<u8> {
 /// Returns: (encrypted_dek, encrypted_data)
 fn unpack_envelope(data: &[u8]) -> Result<(&[u8], &[u8]), PyErr> {
     if data.len() < 3 {
-        return Err(EncryptionError::new_err("Invalid envelope: too short"));
+        return Err(EncryptionException::new_err("Invalid envelope: too short"));
     }
 
     let version = data[0];
     if version != FORMAT_VERSION {
-        return Err(EncryptionError::new_err(format!(
+        return Err(EncryptionException::new_err(format!(
             "Unsupported envelope version: {}",
             version
         )));
@@ -168,7 +170,9 @@ fn unpack_envelope(data: &[u8]) -> Result<(&[u8], &[u8]), PyErr> {
 
     let dek_len = u16::from_be_bytes([data[1], data[2]]) as usize;
     if data.len() < 3 + dek_len {
-        return Err(EncryptionError::new_err("Invalid envelope: truncated DEK"));
+        return Err(EncryptionException::new_err(
+            "Invalid envelope: truncated DEK",
+        ));
     }
 
     let encrypted_dek = &data[3..3 + dek_len];
@@ -210,12 +214,12 @@ pub async fn execute_encrypt(
             // Get plaintext key (for local encryption)
             let plaintext_key = output
                 .plaintext()
-                .ok_or_else(|| EncryptionError::new_err("No plaintext key from KMS"))?;
+                .ok_or_else(|| EncryptionException::new_err("No plaintext key from KMS"))?;
 
             // Get encrypted key (to store with data)
             let encrypted_key = output
                 .ciphertext_blob()
-                .ok_or_else(|| EncryptionError::new_err("No encrypted key from KMS"))?;
+                .ok_or_else(|| EncryptionException::new_err("No encrypted key from KMS"))?;
 
             // Encrypt data locally with plaintext key
             let encrypted_data = encrypt_local(plaintext.as_bytes(), plaintext_key.as_ref())?;
@@ -285,7 +289,7 @@ pub async fn execute_decrypt(
         Ok(output) => {
             let plaintext_key = output
                 .plaintext()
-                .ok_or_else(|| EncryptionError::new_err("No plaintext key from KMS"))?;
+                .ok_or_else(|| EncryptionException::new_err("No plaintext key from KMS"))?;
 
             // Decrypt data locally
             let plaintext_bytes = decrypt_local(encrypted_data, plaintext_key.as_ref())?;

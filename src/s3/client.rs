@@ -1,7 +1,7 @@
 //! S3 client that inherits config from DynamoDB client.
 
 use crate::client_internal::{build_credential_provider, ClientConfig, CredentialProvider};
-use crate::errors::S3AttributeError;
+use crate::errors::S3AttributeException;
 use crate::s3::operations::{
     async_delete_object, async_download_bytes, async_head_object, async_presigned_url,
     async_save_to_file, async_upload_bytes, delete_object, download_bytes, head_object,
@@ -86,10 +86,9 @@ impl S3Client {
             proxy_url,
         };
 
-        let runtime =
-            Arc::new(Runtime::new().map_err(|e| {
-                S3AttributeError::new_err(format!("Failed to create runtime: {}", e))
-            })?);
+        let runtime = Arc::new(Runtime::new().map_err(|e| {
+            S3AttributeException::new_err(format!("Failed to create runtime: {}", e))
+        })?);
 
         // Use endpoint_url from config or AWS_ENDPOINT_URL env var
         let effective_endpoint = endpoint_url.or_else(|| {

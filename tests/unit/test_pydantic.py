@@ -77,7 +77,7 @@ def test_model_validates_with_pydantic():
         age: int = 0
 
     # WHEN we try to create with invalid type
-    # THEN Pydantic ValidationError should be raised
+    # THEN Pydantic ValidationException should be raised
     with pytest.raises(Exception):
         User(pk="USER#1", sk="PROFILE", name="John", age="not a number")
 

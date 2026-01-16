@@ -144,9 +144,9 @@ def test_wrong_context_fails(localstack_endpoint, kms_key_id):
     encrypted = encryptor1.encrypt("secret")
 
     # THEN decrypting with different context fails
-    from pydynox.exceptions import EncryptionError
+    from pydynox.exceptions import EncryptionException
 
-    with pytest.raises(EncryptionError):
+    with pytest.raises(EncryptionException):
         encryptor2.decrypt(encrypted)
 
 
@@ -210,8 +210,8 @@ def test_invalid_key_id(localstack_endpoint):
     )
 
     # WHEN we try to encrypt
-    # THEN EncryptionError is raised
-    from pydynox.exceptions import EncryptionError
+    # THEN EncryptionException is raised
+    from pydynox.exceptions import EncryptionException
 
-    with pytest.raises(EncryptionError):
+    with pytest.raises(EncryptionException):
         encryptor.encrypt("test")

@@ -79,7 +79,7 @@ class ConditionPath:
     def exists(self) -> ConditionExists:
         return ConditionExists(self)
 
-    def does_not_exist(self) -> ConditionNotExists:
+    def not_exists(self) -> ConditionNotExists:
         return ConditionNotExists(self)
 
     def begins_with(self, prefix: str) -> ConditionBeginsWith:

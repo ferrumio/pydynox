@@ -168,12 +168,12 @@ def test_calculate_item_size_nested():
 
 
 def test_item_too_large_error_on_save(monkeypatch):
-    """Model.save() raises ItemTooLargeError when item exceeds max_size."""
+    """Model.save() raises ItemTooLargeException when item exceeds max_size."""
     from unittest.mock import MagicMock
 
     from pydynox import Model, ModelConfig
     from pydynox.attributes import StringAttribute
-    from pydynox.exceptions import ItemTooLargeError
+    from pydynox.exceptions import ItemTooLargeException
 
     # GIVEN a model with max_size=100 and an item larger than that
     mock_client = MagicMock()
@@ -187,8 +187,8 @@ def test_item_too_large_error_on_save(monkeypatch):
     user = User(pk="USER#123", bio="x" * 200)
 
     # WHEN saving the item
-    # THEN ItemTooLargeError is raised with size details
-    with pytest.raises(ItemTooLargeError) as exc_info:
+    # THEN ItemTooLargeException is raised with size details
+    with pytest.raises(ItemTooLargeException) as exc_info:
         user.save()
 
     assert exc_info.value.size > 100

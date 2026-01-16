@@ -1,6 +1,6 @@
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
-from pydynox.exceptions import ConditionCheckFailedError
+from pydynox.exceptions import ConditionalCheckFailedException
 
 
 class Document(Model):
@@ -31,5 +31,5 @@ print(process_a.version)  # 2
 process_b.content = "Updated by B"
 try:
     process_b.save()
-except ConditionCheckFailedError:
+except ConditionalCheckFailedException:
     print("Conflict! Someone else updated the document.")

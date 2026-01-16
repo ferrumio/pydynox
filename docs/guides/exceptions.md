@@ -13,22 +13,22 @@ pydynox maps AWS SDK errors to Python exceptions. This makes error handling easi
 
 ### Exception hierarchy
 
-All pydynox exceptions inherit from `PydynoxError`. You can catch specific errors or use the base class:
+All pydynox exceptions inherit from `PydynoxException`. You can catch specific errors or use the base class:
 
 | Exception | When it happens |
 |-----------|-----------------|
-| `PydynoxError` | Base exception for all pydynox errors |
-| `TableNotFoundError` | Table does not exist |
-| `TableAlreadyExistsError` | Table already exists |
-| `ValidationError` | Invalid input (bad key, wrong type, etc.) |
-| `ConditionCheckFailedError` | Condition expression returned false |
-| `TransactionCanceledError` | Transaction failed |
-| `ThrottlingError` | Request rate too high |
-| `AccessDeniedError` | IAM permission denied |
-| `CredentialsError` | AWS credentials missing or invalid |
-| `SerializationError` | Cannot convert data to/from DynamoDB format |
-| `ConnectionError` | Cannot connect to DynamoDB |
-| `EncryptionError` | KMS encryption/decryption failed |
+| `PydynoxException` | Base exception for all pydynox errors |
+| `ResourceNotFoundException` | Table does not exist |
+| `ResourceInUseException` | Table already exists |
+| `ValidationException` | Invalid input (bad key, wrong type, etc.) |
+| `ConditionalCheckFailedException` | Condition expression returned false |
+| `TransactionCanceledException` | Transaction failed |
+| `ProvisionedThroughputExceededException` | Request rate too high |
+| `AccessDeniedException` | IAM permission denied |
+| `CredentialsException` | AWS credentials missing or invalid |
+| `SerializationException` | Cannot convert data to/from DynamoDB format |
+| `ConnectionException` | Cannot connect to DynamoDB |
+| `EncryptionException` | KMS encryption/decryption failed |
 
 ### Basic error handling
 
@@ -41,7 +41,7 @@ Import exceptions from `pydynox.pydynox_core`:
 
 ### Condition check errors
 
-When using conditional writes, catch `ConditionCheckFailedError`:
+When using conditional writes, catch `ConditionalCheckFailedException`:
 
 === "condition_check.py"
     ```python
@@ -52,7 +52,7 @@ When using conditional writes, catch `ConditionCheckFailedError`:
 
 ### Connection errors
 
-`ConnectionError` happens when pydynox cannot reach DynamoDB. Common causes:
+`ConnectionException` happens when pydynox cannot reach DynamoDB. Common causes:
 
 - DynamoDB Local is not running
 - Wrong endpoint URL
@@ -60,26 +60,26 @@ When using conditional writes, catch `ConditionCheckFailedError`:
 - Firewall blocking the connection
 
 ```python
-from pydynox.pydynox_core import ConnectionError
+from pydynox.pydynox_core import ConnectionException
 
 try:
     client = DynamoDBClient(endpoint_url="http://localhost:8000")
     client.ping()
-except ConnectionError:
+except ConnectionException:
     print("Start DynamoDB Local first: docker run -p 8000:8000 amazon/dynamodb-local")
 ```
 
 ### Credential errors
 
-`CredentialsError` happens when AWS credentials are missing or invalid:
+`CredentialsException` happens when AWS credentials are missing or invalid:
 
 ```python
-from pydynox.pydynox_core import CredentialsError
+from pydynox.pydynox_core import CredentialsException
 
 try:
     client = DynamoDBClient()
     client.ping()
-except CredentialsError as e:
+except CredentialsException as e:
     print(f"Fix your credentials: {e}")
 ```
 
@@ -91,10 +91,10 @@ Common causes:
 
 ### Throttling errors
 
-`ThrottlingError` happens when you exceed your table's capacity:
+`ProvisionedThroughputExceededException` happens when you exceed your table's capacity:
 
 ```python
-from pydynox.pydynox_core import ThrottlingError
+from pydynox.pydynox_core import ProvisionedThroughputExceededException
 import time
 
 def save_with_retry(client, table, item, max_retries=3):
@@ -102,7 +102,7 @@ def save_with_retry(client, table, item, max_retries=3):
         try:
             client.put_item(table, item)
             return
-        except ThrottlingError:
+        except ProvisionedThroughputExceededException:
             if attempt < max_retries - 1:
                 wait_time = 2 ** attempt  # Exponential backoff
                 time.sleep(wait_time)
@@ -115,11 +115,11 @@ def save_with_retry(client, table, item, max_retries=3):
 
 ### Transaction errors
 
-`TransactionCanceledError` includes details about why the transaction failed:
+`TransactionCanceledException` includes details about why the transaction failed:
 
 ```python
 from pydynox import Transaction
-from pydynox.exceptions import TransactionCanceledError
+from pydynox.exceptions import TransactionCanceledException
 
 try:
     with Transaction() as tx:
@@ -130,21 +130,21 @@ try:
             updates={"balance": 200},
             condition_expression="attribute_exists(pk)",
         )
-except TransactionCanceledError as e:
+except TransactionCanceledException as e:
     print(f"Transaction failed: {e}")
     # e.g., "Transaction was canceled: Condition check failed"
 ```
 
 ### Encryption errors
 
-`EncryptionError` happens when KMS encryption or decryption fails:
+`EncryptionException` happens when KMS encryption or decryption fails:
 
 ```python
-from pydynox.exceptions import EncryptionError
+from pydynox.exceptions import EncryptionException
 
 try:
     user.save()  # Has an EncryptedAttribute
-except EncryptionError as e:
+except EncryptionException as e:
     print(f"Encryption failed: {e}")
 ```
 
@@ -158,7 +158,7 @@ Common causes:
 
 ### Best practices
 
-1. **Catch specific exceptions first** - Put specific handlers before the base `PydynoxError`
+1. **Catch specific exceptions first** - Put specific handlers before the base `PydynoxException`
 
 2. **Log the full error** - Exception messages include useful details from AWS
 

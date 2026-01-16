@@ -7,7 +7,7 @@ Check item sizes before saving to avoid DynamoDB's 400KB limit.
 - Calculate item size in bytes, KB, and percent of limit
 - Get per-field breakdown to find large fields
 - Auto-check on save with `max_size` config
-- Raises `ItemTooLargeError` before hitting DynamoDB
+- Raises `ItemTooLargeException` before hitting DynamoDB
 
 ## Getting started
 
@@ -104,14 +104,14 @@ Attribute names also count. A field named `description` adds 11 bytes just for t
 
 ## Error handling
 
-Catch `ItemTooLargeError` to handle oversized items:
+Catch `ItemTooLargeException` to handle oversized items:
 
 ```python
-from pydynox.exceptions import ItemTooLargeError
+from pydynox.exceptions import ItemTooLargeException
 
 try:
     user.save()
-except ItemTooLargeError as e:
+except ItemTooLargeException as e:
     print(f"Item is {e.size} bytes, max is {e.max_size}")
     # Maybe compress the data or split into multiple items
 ```

@@ -12,7 +12,7 @@ use tokio::runtime::Runtime;
 
 use super::gsi::GsiDefinition;
 use super::wait::wait_for_table_active;
-use crate::errors::{map_sdk_error, ValidationError};
+use crate::errors::{map_sdk_error, ValidationException};
 
 /// Create a new DynamoDB table.
 ///
@@ -61,7 +61,9 @@ pub fn create_table(
         .attribute_name(hash_key_name)
         .attribute_type(hash_attr_type)
         .build()
-        .map_err(|e| ValidationError::new_err(format!("Invalid attribute definition: {}", e)))?];
+        .map_err(|e| {
+            ValidationException::new_err(format!("Invalid attribute definition: {}", e))
+        })?];
     defined_attrs.insert(hash_key_name.to_string());
 
     // Build key schema
@@ -69,7 +71,7 @@ pub fn create_table(
         .attribute_name(hash_key_name)
         .key_type(KeyType::Hash)
         .build()
-        .map_err(|e| ValidationError::new_err(format!("Invalid key schema: {}", e)))?];
+        .map_err(|e| ValidationException::new_err(format!("Invalid key schema: {}", e)))?];
 
     // Add range key if provided
     if let (Some(rk_name), Some(rk_type)) = (range_key_name, range_key_type) {
@@ -81,7 +83,7 @@ pub fn create_table(
                 .attribute_type(range_attr_type)
                 .build()
                 .map_err(|e| {
-                    ValidationError::new_err(format!("Invalid attribute definition: {}", e))
+                    ValidationException::new_err(format!("Invalid attribute definition: {}", e))
                 })?,
         );
         defined_attrs.insert(rk_name.to_string());
@@ -91,7 +93,7 @@ pub fn create_table(
                 .attribute_name(rk_name)
                 .key_type(KeyType::Range)
                 .build()
-                .map_err(|e| ValidationError::new_err(format!("Invalid key schema: {}", e)))?,
+                .map_err(|e| ValidationException::new_err(format!("Invalid key schema: {}", e)))?,
         );
     }
 
@@ -112,7 +114,10 @@ pub fn create_table(
                             .attribute_type(attr_type)
                             .build()
                             .map_err(|e| {
-                                ValidationError::new_err(format!("Invalid GSI attribute: {}", e))
+                                ValidationException::new_err(format!(
+                                    "Invalid GSI attribute: {}",
+                                    e
+                                ))
                             })?,
                     );
                     defined_attrs.insert(key_attr.name.clone());
@@ -125,7 +130,7 @@ pub fn create_table(
                         .key_type(KeyType::Hash)
                         .build()
                         .map_err(|e| {
-                            ValidationError::new_err(format!("Invalid GSI key schema: {}", e))
+                            ValidationException::new_err(format!("Invalid GSI key schema: {}", e))
                         })?,
                 );
             }
@@ -141,7 +146,10 @@ pub fn create_table(
                             .attribute_type(attr_type)
                             .build()
                             .map_err(|e| {
-                                ValidationError::new_err(format!("Invalid GSI attribute: {}", e))
+                                ValidationException::new_err(format!(
+                                    "Invalid GSI attribute: {}",
+                                    e
+                                ))
                             })?,
                     );
                     defined_attrs.insert(key_attr.name.clone());
@@ -154,7 +162,7 @@ pub fn create_table(
                         .key_type(KeyType::Range)
                         .build()
                         .map_err(|e| {
-                            ValidationError::new_err(format!("Invalid GSI key schema: {}", e))
+                            ValidationException::new_err(format!("Invalid GSI key schema: {}", e))
                         })?,
                 );
             }
@@ -168,7 +176,7 @@ pub fn create_table(
                 .set_key_schema(Some(gsi_key_schema))
                 .projection(projection)
                 .build()
-                .map_err(|e| ValidationError::new_err(format!("Invalid GSI: {}", e)))?;
+                .map_err(|e| ValidationException::new_err(format!("Invalid GSI: {}", e)))?;
 
             gsi_list.push(gsi_builder);
         }
@@ -204,7 +212,10 @@ pub fn create_table(
                     .write_capacity_units(wcu)
                     .build()
                     .map_err(|e| {
-                        ValidationError::new_err(format!("Invalid provisioned throughput: {}", e))
+                        ValidationException::new_err(format!(
+                            "Invalid provisioned throughput: {}",
+                            e
+                        ))
                     })?,
             );
         }
@@ -251,14 +262,16 @@ fn build_projection(
             .build()),
         "INCLUDE" => {
             let attrs = non_key_attributes.ok_or_else(|| {
-                ValidationError::new_err("non_key_attributes required when projection is 'INCLUDE'")
+                ValidationException::new_err(
+                    "non_key_attributes required when projection is 'INCLUDE'",
+                )
             })?;
             Ok(Projection::builder()
                 .projection_type(ProjectionType::Include)
                 .set_non_key_attributes(Some(attrs.to_vec()))
                 .build())
         }
-        _ => Err(ValidationError::new_err(format!(
+        _ => Err(ValidationException::new_err(format!(
             "Invalid projection: '{}'. Use 'ALL', 'KEYS_ONLY', or 'INCLUDE'",
             projection_type
         ))),
@@ -271,7 +284,7 @@ fn parse_attribute_type(type_str: &str) -> PyResult<ScalarAttributeType> {
         "S" | "STRING" => Ok(ScalarAttributeType::S),
         "N" | "NUMBER" => Ok(ScalarAttributeType::N),
         "B" | "BINARY" => Ok(ScalarAttributeType::B),
-        _ => Err(ValidationError::new_err(format!(
+        _ => Err(ValidationException::new_err(format!(
             "Invalid attribute type: '{}'. Use 'S' (string), 'N' (number), or 'B' (binary)",
             type_str
         ))),
@@ -283,7 +296,7 @@ fn parse_billing_mode(mode_str: &str) -> PyResult<BillingMode> {
     match mode_str.to_uppercase().as_str() {
         "PAY_PER_REQUEST" => Ok(BillingMode::PayPerRequest),
         "PROVISIONED" => Ok(BillingMode::Provisioned),
-        _ => Err(ValidationError::new_err(format!(
+        _ => Err(ValidationException::new_err(format!(
             "Invalid billing_mode: '{}'. Use 'PAY_PER_REQUEST' or 'PROVISIONED'",
             mode_str
         ))),
@@ -295,7 +308,7 @@ fn parse_table_class(class_str: &str) -> PyResult<TableClass> {
     match class_str.to_uppercase().as_str() {
         "STANDARD" => Ok(TableClass::Standard),
         "STANDARD_INFREQUENT_ACCESS" | "STANDARD_IA" => Ok(TableClass::StandardInfrequentAccess),
-        _ => Err(ValidationError::new_err(format!(
+        _ => Err(ValidationException::new_err(format!(
             "Invalid table_class: '{}'. Use 'STANDARD' or 'STANDARD_INFREQUENT_ACCESS'",
             class_str
         ))),
@@ -315,7 +328,7 @@ fn build_sse_specification(
             .build()),
         "CUSTOMER_MANAGED" => {
             let key_id = kms_key_id.ok_or_else(|| {
-                ValidationError::new_err(
+                ValidationException::new_err(
                     "kms_key_id is required when encryption is 'CUSTOMER_MANAGED'",
                 )
             })?;
@@ -325,7 +338,7 @@ fn build_sse_specification(
                 .kms_master_key_id(key_id)
                 .build())
         }
-        _ => Err(ValidationError::new_err(format!(
+        _ => Err(ValidationException::new_err(format!(
             "Invalid encryption: '{}'. Use 'AWS_OWNED', 'AWS_MANAGED', or 'CUSTOMER_MANAGED'",
             encryption
         ))),

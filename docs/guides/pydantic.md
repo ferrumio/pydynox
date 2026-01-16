@@ -52,7 +52,7 @@ class User(BaseModel):
 
 ### Pydantic validation
 
-All Pydantic validation works. Invalid data raises `ValidationError` before anything is saved:
+All Pydantic validation works. Invalid data raises `ValidationException` before anything is saved:
 
 ```python
 from pydantic import BaseModel, EmailStr, Field
@@ -64,7 +64,7 @@ class User(BaseModel):
     email: EmailStr
     age: int = Field(ge=0, le=150)
 
-# This raises ValidationError - email is invalid
+# This raises ValidationException - email is invalid
 user = User(pk="USER#1", name="", email="not-an-email", age=-1)
 ```
 

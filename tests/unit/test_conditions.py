@@ -145,7 +145,7 @@ def test_does_not_exist():
     deleted = make_attr(StringAttribute, "deleted_at")
 
     # WHEN we create a does_not_exist condition
-    cond = deleted.does_not_exist()
+    cond = deleted.not_exists()
 
     # THEN serialization should produce correct expression
     names: dict = {}
