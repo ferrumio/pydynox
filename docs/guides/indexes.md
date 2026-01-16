@@ -1,4 +1,11 @@
-# Global secondary indexes
+# Indexes
+
+DynamoDB supports two types of secondary indexes:
+
+- **Global secondary index (GSI)** - Query by any attribute with a different hash key
+- **Local secondary index (LSI)** - Query by the same hash key with a different sort key
+
+## Global secondary indexes
 
 GSIs let you query by attributes other than the table's primary key. Define them as class attributes on your Model.
 
@@ -184,15 +191,101 @@ Control which attributes are copied to the index:
 }
 ```
 
-## Limitations
+## GSI limitations
 
 - GSIs are read-only. To update data, update the main table.
 - GSI queries are eventually consistent by default.
 - Each table can have up to 20 GSIs.
 - Multi-attribute keys: max 4 attributes per partition key, 4 per sort key.
 
+---
+
+## Local secondary indexes
+
+LSIs let you query by the same hash key but with a different sort key. They must be created when the table is created and cannot be added later.
+
+### Key features
+
+- Same hash key as the table, different sort key
+- Supports strongly consistent reads (unlike GSIs)
+- Must be defined at table creation time
+- Maximum 5 LSIs per table
+
+### When to use LSI vs GSI
+
+| Feature | LSI | GSI |
+|---------|-----|-----|
+| Hash key | Same as table | Any attribute |
+| Sort key | Different from table | Any attribute |
+| Consistent reads | Yes | No |
+| Add after table creation | No | Yes |
+| Max per table | 5 | 20 |
+
+Use LSI when:
+
+- You need to query by the same hash key with different sort orders
+- You need strongly consistent reads on the index
+- You know the access patterns at table creation time
+
+### Define an LSI
+
+=== "basic_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/basic_lsi.py"
+    ```
+
+### Query an LSI
+
+LSI queries require the hash key (same as the table's hash key):
+
+=== "query_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/query_lsi.py"
+    ```
+
+### Consistent reads
+
+LSIs support strongly consistent reads. This is a key difference from GSIs.
+
+=== "lsi_consistent_read.py"
+    ```python
+    --8<-- "docs/examples/indexes/lsi_consistent_read.py"
+    ```
+
+### LSI projections
+
+Like GSIs, LSIs support different projection types:
+
+=== "lsi_with_projection.py"
+    ```python
+    --8<-- "docs/examples/indexes/lsi_with_projection.py"
+    ```
+
+### Create table with LSI
+
+Using `DynamoDBClient`:
+
+=== "create_table_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/create_table_lsi.py"
+    ```
+
+Using `Model.create_table()`:
+
+=== "model_create_table_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/model_create_table_lsi.py"
+    ```
+
+### LSI limitations
+
+- Must be created with the table (cannot add later)
+- Maximum 5 LSIs per table
+- Hash key must be the same as the table's hash key
+- Table must have a range key to use LSIs
+
 ## Next steps
 
 - [Conditions](conditions.md) - Filter and conditional writes
 - [Query](query.md) - Query items by hash key with conditions
-- [Tables](tables.md) - Create tables with GSIs
+- [Tables](tables.md) - Create tables with indexes

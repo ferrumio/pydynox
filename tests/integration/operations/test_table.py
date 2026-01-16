@@ -242,3 +242,153 @@ def test_create_table_with_gsi_keys_only_projection(client):
 
     assert client.table_exists("gsi_keys_only_table")
     client.delete_table("gsi_keys_only_table")
+
+
+# ============ LSI Tests ============
+
+
+def test_create_table_with_lsi(client):
+    """Create a table with a Local Secondary Index."""
+    # GIVEN LSI definition with status as alternate sort key
+
+    # WHEN we create the table with LSI
+    client.create_table(
+        "lsi_table",
+        hash_key=("pk", "S"),
+        range_key=("sk", "S"),
+        local_secondary_indexes=[
+            {
+                "index_name": "status-index",
+                "range_key": ("status", "S"),
+                "projection": "ALL",
+            }
+        ],
+    )
+
+    # THEN the table should exist
+    assert client.table_exists("lsi_table")
+
+    # AND we can write and query using the LSI
+    client.put_item(
+        "lsi_table",
+        {"pk": "USER#1", "sk": "PROFILE#1", "status": "active"},
+    )
+
+    client.delete_table("lsi_table")
+
+
+def test_create_table_with_lsi_keys_only_projection(client):
+    """Create a table with LSI using KEYS_ONLY projection."""
+    # GIVEN LSI with KEYS_ONLY projection
+
+    # WHEN we create the table
+    client.create_table(
+        "lsi_keys_only_table",
+        hash_key=("pk", "S"),
+        range_key=("sk", "S"),
+        local_secondary_indexes=[
+            {
+                "index_name": "age-index",
+                "range_key": ("age", "N"),
+                "projection": "KEYS_ONLY",
+            }
+        ],
+    )
+
+    # THEN the table should exist
+    assert client.table_exists("lsi_keys_only_table")
+    client.delete_table("lsi_keys_only_table")
+
+
+def test_create_table_with_lsi_include_projection(client):
+    """Create a table with LSI using INCLUDE projection."""
+    # GIVEN LSI with INCLUDE projection
+
+    # WHEN we create the table
+    client.create_table(
+        "lsi_include_table",
+        hash_key=("pk", "S"),
+        range_key=("sk", "S"),
+        local_secondary_indexes=[
+            {
+                "index_name": "status-index",
+                "range_key": ("status", "S"),
+                "projection": "INCLUDE",
+                "non_key_attributes": ["email", "name"],
+            }
+        ],
+    )
+
+    # THEN the table should exist
+    assert client.table_exists("lsi_include_table")
+    client.delete_table("lsi_include_table")
+
+
+def test_create_table_with_multiple_lsis(client):
+    """Create a table with multiple Local Secondary Indexes."""
+    # GIVEN multiple LSI definitions
+
+    # WHEN we create the table with multiple LSIs
+    client.create_table(
+        "multi_lsi_table",
+        hash_key=("pk", "S"),
+        range_key=("sk", "S"),
+        local_secondary_indexes=[
+            {
+                "index_name": "status-index",
+                "range_key": ("status", "S"),
+                "projection": "ALL",
+            },
+            {
+                "index_name": "age-index",
+                "range_key": ("age", "N"),
+                "projection": "KEYS_ONLY",
+            },
+        ],
+    )
+
+    # THEN the table should exist
+    assert client.table_exists("multi_lsi_table")
+    client.delete_table("multi_lsi_table")
+
+
+def test_create_table_with_gsi_and_lsi(client):
+    """Create a table with both GSI and LSI."""
+    # GIVEN both GSI and LSI definitions
+
+    # WHEN we create the table with both index types
+    client.create_table(
+        "gsi_lsi_table",
+        hash_key=("pk", "S"),
+        range_key=("sk", "S"),
+        global_secondary_indexes=[
+            {
+                "index_name": "email-index",
+                "hash_key": ("email", "S"),
+                "projection": "ALL",
+            }
+        ],
+        local_secondary_indexes=[
+            {
+                "index_name": "status-index",
+                "range_key": ("status", "S"),
+                "projection": "ALL",
+            }
+        ],
+    )
+
+    # THEN the table should exist
+    assert client.table_exists("gsi_lsi_table")
+
+    # AND we can write data
+    client.put_item(
+        "gsi_lsi_table",
+        {
+            "pk": "USER#1",
+            "sk": "PROFILE",
+            "email": "test@example.com",
+            "status": "active",
+        },
+    )
+
+    client.delete_table("gsi_lsi_table")

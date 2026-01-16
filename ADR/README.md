@@ -26,6 +26,7 @@ An ADR is a short document that describes a decision, why it was made, and what 
 | 014 | [as_dict parameter](014-as-dict-parameter.md) | Accepted |
 | 015 | [Metrics API redesign](015-metrics-api-redesign.md) | Accepted |
 | 016 | [Unified AWS client config](016-unified-aws-client-config.md) | Accepted |
+| 017 | [Direct AttributeValue conversion](017-direct-attribute-conversion.md) | Accepted |
 
 ## Adding a new ADR
 

@@ -510,7 +510,7 @@ impl DynamoDBClient {
     }
 
     /// Create a new DynamoDB table.
-    #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, wait=false))]
+    #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, local_secondary_indexes=None, wait=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn create_table(
         &self,
@@ -525,6 +525,7 @@ impl DynamoDBClient {
         encryption: Option<&str>,
         kms_key_id: Option<&str>,
         global_secondary_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
+        local_secondary_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
         wait: bool,
     ) -> PyResult<()> {
         let (range_key_name, range_key_type) = match range_key {
@@ -534,6 +535,11 @@ impl DynamoDBClient {
 
         let gsis = match global_secondary_indexes {
             Some(list) => Some(table_operations::parse_gsi_definitions(py, list)?),
+            None => None,
+        };
+
+        let lsis = match local_secondary_indexes {
+            Some(list) => Some(table_operations::parse_lsi_definitions(py, list)?),
             None => None,
         };
 
@@ -552,6 +558,7 @@ impl DynamoDBClient {
             encryption,
             kms_key_id,
             gsis,
+            lsis,
             wait,
         )
     }

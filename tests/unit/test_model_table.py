@@ -81,6 +81,7 @@ def test_create_table_basic(mock_client: MagicMock) -> None:
         encryption=None,
         kms_key_id=None,
         global_secondary_indexes=None,
+        local_secondary_indexes=None,
         wait=False,
     )
 
@@ -166,6 +167,7 @@ def test_create_table_with_options(mock_client: MagicMock) -> None:
         encryption="CUSTOMER_MANAGED",
         kms_key_id="arn:aws:kms:us-east-1:123456789012:key/abc",
         global_secondary_indexes=None,
+        local_secondary_indexes=None,
         wait=True,
     )
 

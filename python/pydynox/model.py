@@ -743,7 +743,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         """Create the DynamoDB table for this model.
 
         Uses the model's schema to build the table definition, including
-        hash key, range key, and any GSIs defined on the model.
+        hash key, range key, GSIs, and LSIs defined on the model.
 
         Args:
             billing_mode: "PAY_PER_REQUEST" (default) or "PROVISIONED".
@@ -764,10 +764,16 @@ class Model(ModelBase, metaclass=ModelMeta):
             ...     pk = StringAttribute(hash_key=True)
             ...     sk = StringAttribute(range_key=True)
             ...     email = StringAttribute()
+            ...     status = StringAttribute()
             ...
             ...     email_index = GlobalSecondaryIndex(
             ...         index_name="email-index",
             ...         hash_key="email",
+            ...     )
+            ...
+            ...     status_index = LocalSecondaryIndex(
+            ...         index_name="status-index",
+            ...         range_key="status",
             ...     )
             >>>
             >>> User.create_table(wait=True)
@@ -793,6 +799,11 @@ class Model(ModelBase, metaclass=ModelMeta):
         if cls._indexes:
             gsis = [idx.to_create_table_definition(cls) for idx in cls._indexes.values()]
 
+        # Build LSI definitions
+        lsis = None
+        if cls._local_indexes:
+            lsis = [idx.to_create_table_definition(cls) for idx in cls._local_indexes.values()]
+
         client.create_table(
             table,
             hash_key=hash_key,
@@ -804,6 +815,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             encryption=encryption,
             kms_key_id=kms_key_id,
             global_secondary_indexes=gsis,
+            local_secondary_indexes=lsis,
             wait=wait,
         )
 
