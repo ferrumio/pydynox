@@ -73,17 +73,41 @@ if result.last_evaluated_key:
     print("More results available")
 ```
 
+## Async queries
+
+Use `async_query` for async/await support:
+
+```python
+async for user in User.email_index.async_query(email="john@example.com"):
+    print(user.name)
+
+# With filter
+async for user in User.status_index.async_query(
+    status="active",
+    filter_condition=User.age >= 18,
+):
+    print(user.email)
+
+# Get first result
+user = await User.email_index.async_query(email="john@example.com").first()
+```
+
 ## Metrics
 
-Access query metrics after iteration:
+Access query metrics using class methods:
 
 ```python
 result = User.email_index.query(email="john@example.com")
 users = list(result)
 
-print(f"Duration: {result.metrics.duration_ms}ms")
-print(f"RCU consumed: {result.metrics.consumed_rcu}")
+# Get last operation metrics
+last = User.get_last_metrics()
+if last:
+    print(f"Duration: {last.duration_ms}ms")
+    print(f"RCU consumed: {last.consumed_rcu}")
 ```
+
+For more details, see [Observability](observability.md).
 
 ## Multi-attribute composite keys
 

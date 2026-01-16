@@ -1,7 +1,6 @@
 """Using boto3 and pydynox together during migration."""
 
 import boto3
-
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 

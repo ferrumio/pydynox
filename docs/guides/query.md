@@ -120,16 +120,24 @@ class Order(Model):
 
 ### Metrics
 
-Access query metrics after iteration:
+Access query metrics using class methods:
 
 ```python
 result = Order.query(hash_key="CUSTOMER#123")
 orders = list(result)
 
-print(f"Duration: {result.metrics.duration_ms}ms")
-print(f"RCU consumed: {result.metrics.consumed_rcu}")
-print(f"Items returned: {result.metrics.items_count}")
+# Get last operation metrics
+last = Order.get_last_metrics()
+if last:
+    print(f"Duration: {last.duration_ms}ms")
+    print(f"RCU consumed: {last.consumed_rcu}")
+
+# Get total metrics across all operations
+total = Order.get_total_metrics()
+print(f"Total RCU: {total.total_rcu}")
 ```
+
+For more details, see [Observability](observability.md).
 
 ### Async queries
 

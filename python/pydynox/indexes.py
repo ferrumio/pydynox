@@ -242,6 +242,56 @@ class GlobalSecondaryIndex(Generic[M]):
             scan_index_forward=scan_index_forward,
         )
 
+    def async_query(
+        self,
+        range_key_condition: Condition | None = None,
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        **key_values: Any,
+    ) -> AsyncGSIQueryResult[M]:
+        """Async version of query.
+
+        For multi-attribute keys:
+        - All hash key attributes are required
+        - Sort key attributes are optional (left-to-right prefix)
+
+        Args:
+            range_key_condition: Optional condition on the GSI range key.
+            filter_condition: Optional filter on non-key attributes.
+            limit: Max items per page (not total).
+            scan_index_forward: Sort order. True = ascending (default), False = descending.
+            **key_values: The GSI key values. Must include all hash_key attributes.
+
+        Returns:
+            AsyncGSIQueryResult that can be async iterated.
+
+        Example:
+            >>> async for user in User.email_index.async_query(email="john@example.com"):
+            ...     print(user.name)
+        """
+        model_class = self._get_model_class()
+
+        # Validate all hash key attributes are provided
+        missing_hash_keys = [k for k in self.hash_keys if k not in key_values]
+        if missing_hash_keys:
+            raise ValueError(
+                f"GSI async_query requires all hash key attributes: {self.hash_keys}. "
+                f"Missing: {missing_hash_keys}"
+            )
+
+        return AsyncGSIQueryResult(
+            model_class=model_class,
+            index_name=self.index_name,
+            hash_keys=self.hash_keys,
+            hash_key_values={k: key_values[k] for k in self.hash_keys},
+            range_keys=self.range_keys,
+            range_key_condition=range_key_condition,
+            filter_condition=filter_condition,
+            limit=limit,
+            scan_index_forward=scan_index_forward,
+        )
+
     def to_dynamodb_definition(self) -> dict[str, Any]:
         """Convert to DynamoDB GSI definition format.
 
@@ -487,3 +537,126 @@ class GSIQueryResult(Generic[M]):
             instance._run_hooks(HookType.AFTER_LOAD)
 
         return instance
+
+
+class AsyncGSIQueryResult(Generic[M]):
+    """Async result of a GSI query with automatic pagination.
+
+    Async iterate over results to get model instances.
+
+    Example:
+        >>> async for user in User.email_index.async_query(email="john@example.com"):
+        ...     print(user.name)
+    """
+
+    def __init__(
+        self,
+        model_class: type[M],
+        index_name: str,
+        hash_keys: list[str],
+        hash_key_values: dict[str, Any],
+        range_keys: list[str] | None = None,
+        range_key_condition: Condition | None = None,
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        last_evaluated_key: dict[str, Any] | None = None,
+    ) -> None:
+        self._model_class = model_class
+        self._index_name = index_name
+        self._hash_keys = hash_keys
+        self._hash_key_values = hash_key_values
+        self._range_keys = range_keys or []
+        self._range_key_condition = range_key_condition
+        self._filter_condition = filter_condition
+        self._limit = limit
+        self._scan_index_forward = scan_index_forward
+        self._start_key = last_evaluated_key
+
+        # Iteration state
+        self._query_result: Any = None
+        self._initialized = False
+
+    def _build_query(self) -> Any:
+        """Build the underlying AsyncQueryResult."""
+        from pydynox.query import AsyncQueryResult
+
+        client = self._model_class._get_client()
+        table = self._model_class._get_table()
+
+        # Build key condition expression
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+
+        # Build hash key conditions (all required)
+        key_conditions: list[str] = []
+        for i, attr_name in enumerate(self._hash_keys):
+            name_placeholder = f"#gsi_hk{i}"
+            value_placeholder = f":gsi_hkv{i}"
+            names[attr_name] = name_placeholder
+            values[value_placeholder] = self._hash_key_values[attr_name]
+            key_conditions.append(f"{name_placeholder} = {value_placeholder}")
+
+        key_condition = " AND ".join(key_conditions)
+
+        # Add range key condition if provided
+        if self._range_key_condition is not None:
+            rk_expr = self._range_key_condition.serialize(names, values)
+            key_condition = f"{key_condition} AND {rk_expr}"
+
+        # Build filter expression if provided
+        filter_expr = None
+        if self._filter_condition is not None:
+            filter_expr = self._filter_condition.serialize(names, values)
+
+        # Convert names to DynamoDB format: {placeholder: attr_name}
+        attr_names = {placeholder: attr_name for attr_name, placeholder in names.items()}
+
+        return AsyncQueryResult(
+            client._client,
+            table,
+            key_condition,
+            filter_expression=filter_expr,
+            expression_attribute_names=attr_names if attr_names else None,
+            expression_attribute_values=values if values else None,
+            limit=self._limit,
+            scan_index_forward=self._scan_index_forward,
+            index_name=self._index_name,
+            last_evaluated_key=self._start_key,
+            acquire_rcu=client._acquire_rcu,
+        )
+
+    def __aiter__(self) -> AsyncGSIQueryResult[M]:
+        return self
+
+    async def __anext__(self) -> M:
+        # Initialize on first iteration
+        if not self._initialized:
+            self._query_result = self._build_query()
+            self._initialized = True
+
+        # Get next item from underlying query
+        item = await self._query_result.__anext__()
+
+        # Convert to model instance
+        instance = self._model_class.from_dict(item)
+
+        # Run after_load hooks
+        skip = (
+            self._model_class.model_config.skip_hooks
+            if hasattr(self._model_class, "model_config")
+            else False
+        )
+        if not skip:
+            from pydynox.hooks import HookType
+
+            instance._run_hooks(HookType.AFTER_LOAD)
+
+        return instance
+
+    async def first(self) -> M | None:
+        """Get the first result or None."""
+        try:
+            return await self.__anext__()
+        except StopAsyncIteration:
+            return None
