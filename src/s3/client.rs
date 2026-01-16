@@ -1,26 +1,30 @@
-//! S3 client that inherits config from DynamoDB client.
+//! S3 client that uses shared config from DynamoDBClient.
+//!
+//! This module provides S3 operations that can be used standalone or
+//! through the DynamoDBClient's lazy S3 client.
 
-use crate::client_internal::{build_credential_provider, ClientConfig, CredentialProvider};
-use crate::errors::S3AttributeException;
+use crate::client_internal::{build_s3_client, AwsConfig};
+use crate::errors::S3Exception;
 use crate::s3::operations::{
     async_delete_object, async_download_bytes, async_head_object, async_presigned_url,
     async_save_to_file, async_upload_bytes, delete_object, download_bytes, head_object,
     presigned_url, save_to_file, upload_bytes, S3Metadata, S3Metrics,
 };
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::retry::RetryConfig;
-use aws_config::timeout::TimeoutConfig;
-use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client;
+use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::runtime::Runtime;
 
-/// S3 client that inherits all config from DynamoDB client.
+/// Global shared Tokio runtime (same as DynamoDBClient).
+static RUNTIME: Lazy<Arc<Runtime>> =
+    Lazy::new(|| Arc::new(Runtime::new().expect("Failed to create global Tokio runtime")));
+
+/// S3 client for standalone use.
 ///
-/// Only region can be overridden (S3 bucket may be in different region).
+/// For most cases, use DynamoDBClient.get_s3_client() instead.
+/// This class is for cases where you need S3 without DynamoDB.
 #[pyclass(name = "S3Operations")]
 pub struct S3Client {
     client: Client,
@@ -29,10 +33,7 @@ pub struct S3Client {
 
 #[pymethods]
 impl S3Client {
-    /// Create S3Client from DynamoDB client config.
-    ///
-    /// All parameters are inherited from DynamoDB client config.
-    /// Only region can be overridden (S3 bucket may be in different region).
+    /// Create S3Client with the same config options as DynamoDBClient.
     #[new]
     #[pyo3(signature = (
         region=None,
@@ -70,7 +71,7 @@ impl S3Client {
             std::env::set_var("HTTPS_PROXY", proxy);
         }
 
-        let config = ClientConfig {
+        let config = AwsConfig {
             region,
             access_key,
             secret_key,
@@ -79,25 +80,17 @@ impl S3Client {
             role_arn,
             role_session_name,
             external_id,
-            endpoint_url: endpoint_url.clone(),
+            endpoint_url,
             connect_timeout,
             read_timeout,
             max_retries,
             proxy_url,
         };
 
-        let runtime = Arc::new(Runtime::new().map_err(|e| {
-            S3AttributeException::new_err(format!("Failed to create runtime: {}", e))
-        })?);
-
-        // Use endpoint_url from config or AWS_ENDPOINT_URL env var
-        let effective_endpoint = endpoint_url.or_else(|| {
-            std::env::var("AWS_ENDPOINT_URL_S3")
-                .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
-                .ok()
-        });
-
-        let client = runtime.block_on(build_s3_client(config, effective_endpoint))?;
+        let runtime = RUNTIME.clone();
+        let client = runtime
+            .block_on(build_s3_client(&config, None))
+            .map_err(|e| S3Exception::new_err(format!("Failed to create S3 client: {}", e)))?;
 
         Ok(Self { client, runtime })
     }
@@ -234,8 +227,6 @@ impl S3Client {
 
     /// Save S3 object directly to file (streaming, memory efficient).
     /// Returns (bytes_written, S3Metrics).
-    ///
-    /// Use this for large files to avoid loading into memory.
     pub fn save_to_file(&self, bucket: &str, key: &str, path: &str) -> PyResult<(u64, S3Metrics)> {
         save_to_file(&self.client, &self.runtime, bucket, key, path)
     }
@@ -256,57 +247,4 @@ impl S3Client {
             path.to_string(),
         )
     }
-}
-
-/// Build S3 client from config.
-async fn build_s3_client(config: ClientConfig, endpoint_url: Option<String>) -> PyResult<Client> {
-    let region_provider =
-        RegionProviderChain::first_try(config.region.clone().map(aws_sdk_s3::config::Region::new))
-            .or_default_provider()
-            .or_else("us-east-1");
-
-    let mut config_loader = aws_config::defaults(BehaviorVersion::latest()).region(region_provider);
-
-    // Configure timeouts
-    if config.connect_timeout.is_some() || config.read_timeout.is_some() {
-        let mut timeout_builder = TimeoutConfig::builder();
-        if let Some(ct) = config.connect_timeout {
-            timeout_builder = timeout_builder.connect_timeout(Duration::from_secs_f64(ct));
-        }
-        if let Some(rt) = config.read_timeout {
-            timeout_builder = timeout_builder.read_timeout(Duration::from_secs_f64(rt));
-        }
-        config_loader = config_loader.timeout_config(timeout_builder.build());
-    }
-
-    // Configure retries
-    if let Some(retries) = config.max_retries {
-        let retry_config = RetryConfig::standard().with_max_attempts(retries);
-        config_loader = config_loader.retry_config(retry_config);
-    }
-
-    // Configure credentials
-    let cred_provider = build_credential_provider(&config).await;
-    match cred_provider {
-        CredentialProvider::Static(creds) => {
-            config_loader = config_loader.credentials_provider(creds);
-        }
-        CredentialProvider::Profile(provider) => {
-            config_loader = config_loader.credentials_provider(provider);
-        }
-        CredentialProvider::AssumeRole(provider) => {
-            config_loader = config_loader.credentials_provider(*provider);
-        }
-        CredentialProvider::Default => {}
-    }
-
-    let sdk_config = config_loader.load().await;
-    let mut s3_config = aws_sdk_s3::config::Builder::from(&sdk_config);
-
-    // Configure endpoint override (for localstack)
-    if let Some(url) = endpoint_url {
-        s3_config = s3_config.endpoint_url(url).force_path_style(true);
-    }
-
-    Ok(Client::from_conf(s3_config.build()))
 }

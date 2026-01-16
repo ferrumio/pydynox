@@ -1,31 +1,31 @@
-//! KMS client for envelope encryption.
+//! KMS client that uses shared config from DynamoDBClient.
 //!
-//! Uses GenerateDataKey + local AES instead of direct KMS Encrypt/Decrypt.
-//! This removes the 4KB limit and reduces KMS API calls.
+//! Uses envelope encryption pattern:
+//! 1. GenerateDataKey gets a plaintext + encrypted data key
+//! 2. Plaintext key encrypts data locally with AES-256-GCM
+//! 3. Encrypted key is stored alongside the encrypted data
 
-use crate::client_internal::{build_credential_provider, ClientConfig, CredentialProvider};
+use crate::client_internal::{build_kms_client, AwsConfig};
 use crate::errors::EncryptionException;
 use crate::kms::operations::{
     async_decrypt, async_encrypt, sync_decrypt, sync_encrypt, DecryptResult, EncryptResult,
 };
 use crate::kms::ENCRYPTED_PREFIX;
-use aws_config::meta::region::RegionProviderChain;
-use aws_config::retry::RetryConfig;
-use aws_config::timeout::TimeoutConfig;
-use aws_config::BehaviorVersion;
 use aws_sdk_kms::Client;
+use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::runtime::Runtime;
+
+/// Global shared Tokio runtime (same as DynamoDBClient).
+static RUNTIME: Lazy<Arc<Runtime>> =
+    Lazy::new(|| Arc::new(Runtime::new().expect("Failed to create global Tokio runtime")));
 
 /// KMS encryptor using envelope encryption.
 ///
 /// Uses GenerateDataKey + local AES-256-GCM instead of direct KMS Encrypt.
 /// This removes the 4KB size limit and reduces KMS API calls.
-///
-/// Inherits all config from DynamoDB client, only allows region override.
 #[pyclass]
 pub struct KmsEncryptor {
     client: Client,
@@ -36,10 +36,7 @@ pub struct KmsEncryptor {
 
 #[pymethods]
 impl KmsEncryptor {
-    /// Create a new KMS encryptor.
-    ///
-    /// All parameters except key_id and context are inherited from DynamoDB client.
-    /// Only region can be overridden (KMS key may be in different region).
+    /// Create a new KMS encryptor with the same config options as DynamoDBClient.
     #[new]
     #[pyo3(signature = (
         key_id,
@@ -81,7 +78,7 @@ impl KmsEncryptor {
             std::env::set_var("HTTPS_PROXY", proxy);
         }
 
-        let config = ClientConfig {
+        let config = AwsConfig {
             region,
             access_key,
             secret_key,
@@ -90,25 +87,19 @@ impl KmsEncryptor {
             role_arn,
             role_session_name,
             external_id,
-            endpoint_url: endpoint_url.clone(),
+            endpoint_url,
             connect_timeout,
             read_timeout,
             max_retries,
             proxy_url,
         };
 
-        let runtime = Arc::new(Runtime::new().map_err(|e| {
-            EncryptionException::new_err(format!("Failed to create runtime: {}", e))
-        })?);
-
-        // Use endpoint_url from config or AWS_ENDPOINT_URL env var
-        let effective_endpoint = endpoint_url.or_else(|| {
-            std::env::var("AWS_ENDPOINT_URL_KMS")
-                .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
-                .ok()
-        });
-
-        let client = runtime.block_on(build_kms_client(config, effective_endpoint))?;
+        let runtime = RUNTIME.clone();
+        let client = runtime
+            .block_on(build_kms_client(&config, None))
+            .map_err(|e| {
+                EncryptionException::new_err(format!("Failed to create KMS client: {}", e))
+            })?;
 
         Ok(Self {
             client,
@@ -121,14 +112,6 @@ impl KmsEncryptor {
     // ========== SYNC METHODS ==========
 
     /// Encrypt a plaintext string using envelope encryption.
-    ///
-    /// 1. Calls KMS GenerateDataKey once
-    /// 2. Encrypts data locally with AES-256-GCM
-    /// 3. Returns base64-encoded envelope with "ENC:" prefix
-    ///
-    /// The envelope contains the encrypted data key + encrypted data.
-    /// Returns the ciphertext string (for backward compatibility).
-    /// Use encrypt_with_metrics() to get metrics.
     pub fn encrypt(&self, plaintext: &str) -> PyResult<String> {
         let (ciphertext, _metrics) = sync_encrypt(
             &self.client,
@@ -141,8 +124,6 @@ impl KmsEncryptor {
     }
 
     /// Encrypt with metrics.
-    ///
-    /// Returns EncryptResult with ciphertext and KmsMetrics.
     pub fn encrypt_with_metrics(&self, plaintext: &str) -> PyResult<EncryptResult> {
         let (ciphertext, metrics) = sync_encrypt(
             &self.client,
@@ -158,14 +139,6 @@ impl KmsEncryptor {
     }
 
     /// Decrypt a ciphertext string using envelope encryption.
-    ///
-    /// 1. Unpacks the envelope to get encrypted DEK + encrypted data
-    /// 2. Calls KMS Decrypt to get plaintext DEK
-    /// 3. Decrypts data locally with AES-256-GCM
-    ///
-    /// Expects base64-encoded envelope with "ENC:" prefix.
-    /// Returns the plaintext string (for backward compatibility).
-    /// Use decrypt_with_metrics() to get metrics.
     pub fn decrypt(&self, ciphertext: &str) -> PyResult<String> {
         let (plaintext, _metrics) =
             sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)?;
@@ -173,8 +146,6 @@ impl KmsEncryptor {
     }
 
     /// Decrypt with metrics.
-    ///
-    /// Returns DecryptResult with plaintext and KmsMetrics.
     pub fn decrypt_with_metrics(&self, ciphertext: &str) -> PyResult<DecryptResult> {
         let (plaintext, metrics) =
             sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)?;
@@ -184,7 +155,6 @@ impl KmsEncryptor {
     // ========== ASYNC METHODS ==========
 
     /// Async encrypt a plaintext string.
-    /// Returns EncryptResult with ciphertext and metrics.
     pub fn async_encrypt<'py>(
         &self,
         py: Python<'py>,
@@ -200,7 +170,6 @@ impl KmsEncryptor {
     }
 
     /// Async decrypt a ciphertext string.
-    /// Returns DecryptResult with plaintext and metrics.
     pub fn async_decrypt<'py>(
         &self,
         py: Python<'py>,
@@ -227,57 +196,4 @@ impl KmsEncryptor {
     pub fn key_id(&self) -> &str {
         &self.key_id
     }
-}
-
-/// Build KMS client from config.
-async fn build_kms_client(config: ClientConfig, endpoint_url: Option<String>) -> PyResult<Client> {
-    let region_provider =
-        RegionProviderChain::first_try(config.region.clone().map(aws_sdk_kms::config::Region::new))
-            .or_default_provider()
-            .or_else("us-east-1");
-
-    let mut config_loader = aws_config::defaults(BehaviorVersion::latest()).region(region_provider);
-
-    // Configure timeouts
-    if config.connect_timeout.is_some() || config.read_timeout.is_some() {
-        let mut timeout_builder = TimeoutConfig::builder();
-        if let Some(ct) = config.connect_timeout {
-            timeout_builder = timeout_builder.connect_timeout(Duration::from_secs_f64(ct));
-        }
-        if let Some(rt) = config.read_timeout {
-            timeout_builder = timeout_builder.read_timeout(Duration::from_secs_f64(rt));
-        }
-        config_loader = config_loader.timeout_config(timeout_builder.build());
-    }
-
-    // Configure retries
-    if let Some(retries) = config.max_retries {
-        let retry_config = RetryConfig::standard().with_max_attempts(retries);
-        config_loader = config_loader.retry_config(retry_config);
-    }
-
-    // Configure credentials
-    let cred_provider = build_credential_provider(&config).await;
-    match cred_provider {
-        CredentialProvider::Static(creds) => {
-            config_loader = config_loader.credentials_provider(creds);
-        }
-        CredentialProvider::Profile(provider) => {
-            config_loader = config_loader.credentials_provider(provider);
-        }
-        CredentialProvider::AssumeRole(provider) => {
-            config_loader = config_loader.credentials_provider(*provider);
-        }
-        CredentialProvider::Default => {}
-    }
-
-    let sdk_config = config_loader.load().await;
-    let mut kms_config = aws_sdk_kms::config::Builder::from(&sdk_config);
-
-    // Configure endpoint override (for localstack)
-    if let Some(url) = endpoint_url {
-        kms_config = kms_config.endpoint_url(url);
-    }
-
-    Ok(Client::from_conf(kms_config.build()))
 }
