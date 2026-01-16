@@ -738,7 +738,11 @@ wheels = [
 
 [[package]]
 name = "pydynox"
+<<<<<<< HEAD
 version = "0.17.0"
+=======
+version = "0.19.0"
+>>>>>>> 842f80e (fix: fix pagination in models)
 source = { editable = "." }
 
 [package.optional-dependencies]

@@ -67,9 +67,9 @@ Filter results by any attribute:
 !!! warning
     Filter conditions are applied after DynamoDB reads the items. You still pay for the read capacity of filtered-out items.
 
-### Sorting and limit
+### Sorting
 
-Control sort order and page size:
+Control sort order:
 
 === "sorting_and_limit.py"
     ```python
@@ -79,13 +79,48 @@ Control sort order and page size:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `scan_index_forward` | `True` | `True` = ascending, `False` = descending |
-| `limit` | None | Items per page (iterator fetches all pages) |
 
-## Advanced
+## Pagination
 
-### Pagination
+### Understanding limit vs page_size
 
-By default, the iterator fetches all pages automatically. For manual control:
+pydynox has two parameters that control pagination:
+
+| Parameter | What it does | DynamoDB behavior |
+|-----------|--------------|-------------------|
+| `limit` | Max total items to return | Stops iteration after N items |
+| `page_size` | Items per DynamoDB request | Passed as `Limit` to DynamoDB API |
+
+This is a common pattern in DynamoDB libraries.
+
+**Key behaviors:**
+
+- `limit=10` → Returns exactly 10 items (or less if table has fewer)
+- `page_size=25` → Fetches 25 items per request, returns ALL items
+- `limit=100, page_size=25` → Returns 100 items, fetching 25 per request (4 requests)
+- Neither set → Returns all items, DynamoDB decides page size
+
+=== "limit_vs_page_size.py"
+    ```python
+    --8<-- "docs/examples/query/limit_vs_page_size.py"
+    ```
+
+!!! warning "Common mistake"
+    If you only set `limit`, it also controls the DynamoDB page size. This means `limit=10` will fetch 10 items per request AND stop after 10 total. If you want to fetch more items per request but still limit the total, use both `limit` and `page_size`.
+
+### Automatic pagination
+
+By default, the iterator fetches all pages automatically:
+
+```python
+# This fetches ALL orders, automatically handling pagination
+for order in Order.query(hash_key="CUSTOMER#123"):
+    print(order.sk)
+```
+
+### Manual pagination
+
+For "load more" buttons or batch processing, use `last_evaluated_key`:
 
 === "pagination.py"
     ```python
@@ -97,6 +132,8 @@ Use `last_evaluated_key` to:
 - Implement "load more" buttons
 - Process large datasets in batches
 - Resume interrupted queries
+
+## Advanced
 
 ### Consistent reads
 
@@ -188,7 +225,8 @@ Use `as_dict=True` to skip Model instantiation and get plain dicts:
 | `hash_key` | Any | Required | Hash key value |
 | `range_key_condition` | Condition | None | Condition on sort key |
 | `filter_condition` | Condition | None | Filter on any attribute |
-| `limit` | int | None | Items per page |
+| `limit` | int | None | Max total items to return |
+| `page_size` | int | None | Items per DynamoDB request |
 | `scan_index_forward` | bool | True | Sort order |
 | `consistent_read` | bool | None | Strongly consistent read |
 | `last_evaluated_key` | dict | None | Start key for pagination |

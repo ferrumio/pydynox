@@ -220,7 +220,7 @@ def test_gsi_query_with_filter(gsi_client):
 
 
 def test_gsi_query_with_limit(gsi_client):
-    """Test GSI query with limit."""
+    """Test GSI query with limit returns only N items total."""
     # GIVEN multiple users
     for i in range(5):
         User(
@@ -232,11 +232,11 @@ def test_gsi_query_with_limit(gsi_client):
             age=20 + i,
         ).save()
 
-    # WHEN we query with limit
+    # WHEN we query with limit=2
     results = list(User.status_index.query(status="active", limit=2))
 
-    # THEN all items are returned (limit is per page, iterator fetches all)
-    assert len(results) == 5
+    # THEN only 2 items are returned (limit stops iteration)
+    assert len(results) == 2
 
 
 def test_gsi_query_descending(gsi_client):

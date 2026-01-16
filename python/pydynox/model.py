@@ -331,6 +331,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
@@ -343,7 +344,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             hash_key: The hash key value to query.
             range_key_condition: Optional condition on range key.
             filter_condition: Optional filter applied after query.
-            limit: Maximum items to return.
+            limit: Max total items to return across all pages.
+            page_size: Items per page (passed as Limit to DynamoDB).
             scan_index_forward: True for ascending, False for descending.
             consistent_read: Use strongly consistent read.
             last_evaluated_key: Start key for pagination.
@@ -374,15 +376,16 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return query(
             cls,
-            hash_key,
-            range_key_condition,
-            filter_condition,
-            limit,
-            scan_index_forward,
-            consistent_read,
-            last_evaluated_key,
-            as_dict,
-            fields,
+            hash_key=hash_key,
+            range_key_condition=range_key_condition,
+            filter_condition=filter_condition,
+            limit=limit,
+            page_size=page_size,
+            scan_index_forward=scan_index_forward,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            as_dict=as_dict,
+            fields=fields,
         )
 
     @classmethod
@@ -390,6 +393,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         cls: type[M],
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
@@ -401,7 +405,8 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         Args:
             filter_condition: Optional filter applied after scan.
-            limit: Maximum items to return.
+            limit: Max total items to return across all pages.
+            page_size: Items per page (passed as Limit to DynamoDB).
             consistent_read: Use strongly consistent read.
             last_evaluated_key: Start key for pagination.
             segment: Segment number for parallel scan.
@@ -430,14 +435,15 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return scan(
             cls,
-            filter_condition,
-            limit,
-            consistent_read,
-            last_evaluated_key,
-            segment,
-            total_segments,
-            as_dict,
-            fields,
+            filter_condition=filter_condition,
+            limit=limit,
+            page_size=page_size,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            segment=segment,
+            total_segments=total_segments,
+            as_dict=as_dict,
+            fields=fields,
         )
 
     @classmethod
@@ -496,6 +502,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
@@ -518,15 +525,16 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return async_query(
             cls,
-            hash_key,
-            range_key_condition,
-            filter_condition,
-            limit,
-            scan_index_forward,
-            consistent_read,
-            last_evaluated_key,
-            as_dict,
-            fields,
+            hash_key=hash_key,
+            range_key_condition=range_key_condition,
+            filter_condition=filter_condition,
+            limit=limit,
+            page_size=page_size,
+            scan_index_forward=scan_index_forward,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            as_dict=as_dict,
+            fields=fields,
         )
 
     @classmethod
@@ -534,6 +542,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         cls: type[M],
         filter_condition: Condition | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
@@ -557,14 +566,15 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return async_scan(
             cls,
-            filter_condition,
-            limit,
-            consistent_read,
-            last_evaluated_key,
-            segment,
-            total_segments,
-            as_dict,
-            fields,
+            filter_condition=filter_condition,
+            limit=limit,
+            page_size=page_size,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            segment=segment,
+            total_segments=total_segments,
+            as_dict=as_dict,
+            fields=fields,
         )
 
     @classmethod

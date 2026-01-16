@@ -1771,7 +1771,11 @@ dependencies = [
 
 [[package]]
 name = "pydynox"
+<<<<<<< HEAD
 version = "0.18.0"
+=======
+version = "0.20.0"
+>>>>>>> 842f80e (fix: fix pagination in models)
 dependencies = [
  "aes-gcm",
  "aws-config",

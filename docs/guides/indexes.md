@@ -60,17 +60,47 @@ users = User.status_index.query(status="active", scan_index_forward=False)
 
 ## Pagination
 
-Use `limit` to control page size:
+### Understanding limit vs page_size
+
+GSI queries support the same pagination parameters as table queries:
+
+| Parameter | What it does | DynamoDB behavior |
+|-----------|--------------|-------------------|
+| `limit` | Max total items to return | Stops iteration after N items |
+| `page_size` | Items per DynamoDB request | Passed as `Limit` to DynamoDB API |
+
+**Key behaviors:**
+
+- `limit=10` → Returns exactly 10 items (or less if fewer match)
+- `page_size=50` → Fetches 50 items per request, returns ALL items
+- `limit=100, page_size=25` → Returns 100 items, fetching 25 per request (4 requests)
+
+=== "gsi_pagination.py"
+    ```python
+    --8<-- "docs/examples/indexes/gsi_pagination.py"
+    ```
+
+!!! warning "Common mistake"
+    If you only set `limit`, it also controls the DynamoDB page size. Use both `limit` and `page_size` when you want to control them separately.
+
+### Manual pagination
+
+For "load more" buttons:
 
 ```python
-result = User.status_index.query(status="active", limit=10)
+result = User.status_index.query(status="active", limit=10, page_size=10)
 
 for user in result:
     print(user.email)
 
 # Check if there are more results
 if result.last_evaluated_key:
-    print("More results available")
+    next_result = User.status_index.query(
+        status="active",
+        limit=10,
+        page_size=10,
+        last_evaluated_key=result.last_evaluated_key,
+    )
 ```
 
 ## Async queries
@@ -190,6 +220,106 @@ Control which attributes are copied to the index:
 - GSI queries are eventually consistent by default.
 - Each table can have up to 20 GSIs.
 - Multi-attribute keys: max 4 attributes per partition key, 4 per sort key.
+
+---
+
+## Local secondary indexes
+
+LSIs let you query by the same hash key but with a different sort key. They must be created when the table is created and cannot be added later.
+
+### Key features
+
+- Same hash key as the table, different sort key
+- Supports strongly consistent reads (unlike GSIs)
+- Must be defined at table creation time
+- Maximum 5 LSIs per table
+
+### When to use LSI vs GSI
+
+| Feature | LSI | GSI |
+|---------|-----|-----|
+| Hash key | Same as table | Any attribute |
+| Sort key | Different from table | Any attribute |
+| Consistent reads | Yes | No |
+| Add after table creation | No | Yes |
+| Max per table | 5 | 20 |
+
+Use LSI when:
+
+- You need to query by the same hash key with different sort orders
+- You need strongly consistent reads on the index
+- You know the access patterns at table creation time
+
+### Define an LSI
+
+=== "basic_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/basic_lsi.py"
+    ```
+
+### Query an LSI
+
+LSI queries require the hash key (same as the table's hash key):
+
+=== "query_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/query_lsi.py"
+    ```
+
+### Consistent reads
+
+LSIs support strongly consistent reads. This is a key difference from GSIs.
+
+=== "lsi_consistent_read.py"
+    ```python
+    --8<-- "docs/examples/indexes/lsi_consistent_read.py"
+    ```
+
+### Pagination
+
+LSI queries support the same pagination parameters as table queries and GSI queries:
+
+| Parameter | What it does | DynamoDB behavior |
+|-----------|--------------|-------------------|
+| `limit` | Max total items to return | Stops iteration after N items |
+| `page_size` | Items per DynamoDB request | Passed as `Limit` to DynamoDB API |
+
+=== "lsi_pagination.py"
+    ```python
+    --8<-- "docs/examples/indexes/lsi_pagination.py"
+    ```
+
+### LSI projections
+
+Like GSIs, LSIs support different projection types:
+
+=== "lsi_with_projection.py"
+    ```python
+    --8<-- "docs/examples/indexes/lsi_with_projection.py"
+    ```
+
+### Create table with LSI
+
+Using `DynamoDBClient`:
+
+=== "create_table_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/create_table_lsi.py"
+    ```
+
+Using `Model.create_table()`:
+
+=== "model_create_table_lsi.py"
+    ```python
+    --8<-- "docs/examples/indexes/model_create_table_lsi.py"
+    ```
+
+### LSI limitations
+
+- Must be created with the table (cannot add later)
+- Maximum 5 LSIs per table
+- Hash key must be the same as the table's hash key
+- Table must have a range key to use LSIs
 
 ## Next steps
 

@@ -26,6 +26,7 @@ def query(
     range_key_condition: Condition | None = None,
     filter_condition: Condition | None = None,
     limit: int | None = None,
+    page_size: int | None = None,
     scan_index_forward: bool = True,
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
@@ -38,7 +39,8 @@ def query(
         hash_key: The hash key value to query.
         range_key_condition: Optional condition on the range key.
         filter_condition: Optional filter on non-key attributes.
-        limit: Max items per page.
+        limit: Max total items to return across all pages.
+        page_size: Items per page (passed as Limit to DynamoDB).
         scan_index_forward: Sort order. True = ascending, False = descending.
         consistent_read: If True, use strongly consistent read.
         last_evaluated_key: Start key for pagination.
@@ -54,6 +56,7 @@ def query(
         range_key_condition=range_key_condition,
         filter_condition=filter_condition,
         limit=limit,
+        page_size=page_size,
         scan_index_forward=scan_index_forward,
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
@@ -66,6 +69,7 @@ def scan(
     cls: type[M],
     filter_condition: Condition | None = None,
     limit: int | None = None,
+    page_size: int | None = None,
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
     segment: int | None = None,
@@ -79,7 +83,8 @@ def scan(
 
     Args:
         filter_condition: Optional filter on attributes.
-        limit: Max items per page.
+        limit: Max total items to return across all pages.
+        page_size: Items per page (passed as Limit to DynamoDB).
         consistent_read: If True, use strongly consistent read.
         last_evaluated_key: Start key for pagination.
         segment: Segment number for parallel scan (0 to total_segments-1).
@@ -102,6 +107,7 @@ def scan(
         model_class=cls,
         filter_condition=filter_condition,
         limit=limit,
+        page_size=page_size,
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
         segment=segment,
@@ -181,6 +187,7 @@ def async_query(
     range_key_condition: Condition | None = None,
     filter_condition: Condition | None = None,
     limit: int | None = None,
+    page_size: int | None = None,
     scan_index_forward: bool = True,
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
@@ -194,6 +201,7 @@ def async_query(
         range_key_condition=range_key_condition,
         filter_condition=filter_condition,
         limit=limit,
+        page_size=page_size,
         scan_index_forward=scan_index_forward,
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
@@ -206,6 +214,7 @@ def async_scan(
     cls: type[M],
     filter_condition: Condition | None = None,
     limit: int | None = None,
+    page_size: int | None = None,
     consistent_read: bool | None = None,
     last_evaluated_key: dict[str, Any] | None = None,
     segment: int | None = None,
@@ -218,6 +227,7 @@ def async_scan(
         model_class=cls,
         filter_condition=filter_condition,
         limit=limit,
+        page_size=page_size,
         consistent_read=consistent_read,
         last_evaluated_key=last_evaluated_key,
         segment=segment,

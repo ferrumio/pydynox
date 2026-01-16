@@ -129,10 +129,11 @@ def test_model_query_descending_order(populated_orders):
 
 
 def test_model_query_with_limit(populated_orders):
-    """Test Model.query with limit (auto-paginates)."""
+    """Test Model.query with limit returns only N items total."""
     Order = populated_orders
 
-    # limit is per page, but iterator fetches all
+    # GIVEN 4 items for CUSTOMER#1
+    # WHEN we query with limit=2
     orders = list(
         Order.query(
             hash_key="CUSTOMER#1",
@@ -140,7 +141,8 @@ def test_model_query_with_limit(populated_orders):
         )
     )
 
-    assert len(orders) == 4
+    # THEN only 2 items are returned (limit stops iteration)
+    assert len(orders) == 2
 
 
 def test_model_query_first(populated_orders):
