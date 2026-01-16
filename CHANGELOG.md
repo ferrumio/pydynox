@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.19.0] - 2026-01-16
+
+
+### Documentation
+
+- update changelog for v0.18.0 (#174)
+
+
+### Features
+
+- add support for LSI (#175)
 ## [0.18.0] - 2026-01-16
 
 
