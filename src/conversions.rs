@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
 
-use crate::serialization::{dynamo_to_py, py_to_dynamo};
+use crate::serialization::py_to_dynamo;
 
 /// Convert a Python value to a DynamoDB AttributeValue.
 ///
@@ -148,6 +148,8 @@ pub fn py_dict_to_attribute_value(
 }
 
 /// Convert a HashMap of DynamoDB AttributeValues to a Python dict.
+///
+/// Uses direct conversion for better performance.
 pub fn attribute_values_to_py_dict(
     py: Python<'_>,
     item: HashMap<String, AttributeValue>,
@@ -155,57 +157,69 @@ pub fn attribute_values_to_py_dict(
     let result = PyDict::new(py);
 
     for (key, value) in item {
-        let py_value = attribute_value_to_py(py, value)?;
+        let py_value = attribute_value_to_py_direct(py, value)?;
         result.set_item(key, py_value)?;
     }
 
     Ok(result)
 }
 
-/// Convert a single DynamoDB AttributeValue to a Python object.
-pub fn attribute_value_to_py(py: Python<'_>, value: AttributeValue) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-
+/// Convert a DynamoDB AttributeValue directly to a native Python object.
+///
+/// This is the fast path - converts directly without intermediate dict.
+/// Used for query/scan results where we want native Python values.
+fn attribute_value_to_py_direct(py: Python<'_>, value: AttributeValue) -> PyResult<Py<PyAny>> {
     match value {
-        AttributeValue::S(s) => {
-            dict.set_item("S", s)?;
-        }
+        AttributeValue::S(s) => Ok(s.into_pyobject(py)?.unbind().into_any()),
         AttributeValue::N(n) => {
-            dict.set_item("N", n)?;
+            // Parse number - int or float
+            if n.contains('.') || n.contains('e') || n.contains('E') {
+                let f: f64 = n.parse().map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Invalid number: {}",
+                        n
+                    ))
+                })?;
+                Ok(f.into_pyobject(py)?.unbind().into_any())
+            } else {
+                let i: i64 = n.parse().map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Invalid number: {}",
+                        n
+                    ))
+                })?;
+                Ok(i.into_pyobject(py)?.unbind().into_any())
+            }
         }
-        AttributeValue::Bool(b) => {
-            dict.set_item("BOOL", b)?;
-        }
-        AttributeValue::Null(_) => {
-            dict.set_item("NULL", true)?;
-        }
+        AttributeValue::Bool(b) => Ok(b.into_pyobject(py)?.to_owned().unbind().into_any()),
+        AttributeValue::Null(_) => Ok(py.None()),
         AttributeValue::B(b) => {
-            use base64::Engine;
-            let encoded = base64::engine::general_purpose::STANDARD.encode(b.as_ref());
-            dict.set_item("B", encoded)?;
+            // Return bytes directly
+            let bytes = pyo3::types::PyBytes::new(py, b.as_ref());
+            Ok(bytes.into_any().unbind())
         }
         AttributeValue::L(list) => {
             let py_list = pyo3::types::PyList::empty(py);
             for item in list {
-                let nested = attribute_value_to_py(py, item)?;
+                let nested = attribute_value_to_py_direct(py, item)?;
                 py_list.append(nested)?;
             }
-            return Ok(py_list.into_any().unbind());
+            Ok(py_list.into_any().unbind())
         }
         AttributeValue::M(map) => {
             let py_map = PyDict::new(py);
             for (k, v) in map {
-                let nested = attribute_value_to_py(py, v)?;
+                let nested = attribute_value_to_py_direct(py, v)?;
                 py_map.set_item(k, nested)?;
             }
-            return Ok(py_map.into_any().unbind());
+            Ok(py_map.into_any().unbind())
         }
         AttributeValue::Ss(ss) => {
             let py_set = pyo3::types::PySet::empty(py)?;
             for s in ss {
                 py_set.add(s)?;
             }
-            return Ok(py_set.into_any().unbind());
+            Ok(py_set.into_any().unbind())
         }
         AttributeValue::Ns(ns) => {
             let py_set = pyo3::types::PySet::empty(py)?;
@@ -228,7 +242,7 @@ pub fn attribute_value_to_py(py: Python<'_>, value: AttributeValue) -> PyResult<
                     py_set.add(i)?;
                 }
             }
-            return Ok(py_set.into_any().unbind());
+            Ok(py_set.into_any().unbind())
         }
         AttributeValue::Bs(bs) => {
             let py_set = pyo3::types::PySet::empty(py)?;
@@ -236,14 +250,10 @@ pub fn attribute_value_to_py(py: Python<'_>, value: AttributeValue) -> PyResult<
                 let bytes = pyo3::types::PyBytes::new(py, b.as_ref());
                 py_set.add(bytes)?;
             }
-            return Ok(py_set.into_any().unbind());
+            Ok(py_set.into_any().unbind())
         }
-        _ => {
-            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Unknown DynamoDB AttributeValue type",
-            ));
-        }
+        _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "Unknown DynamoDB AttributeValue type",
+        )),
     }
-
-    dynamo_to_py(py, &dict)
 }

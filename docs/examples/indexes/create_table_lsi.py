@@ -1,0 +1,25 @@
+"""Create table with LSI using DynamoDBClient."""
+
+from pydynox import DynamoDBClient
+
+client = DynamoDBClient()
+
+# Create table with LSI (skip if already exists)
+if not client.table_exists("orders_with_lsi"):
+    client.create_table(
+        "orders_with_lsi",
+        hash_key=("customer_id", "S"),
+        range_key=("order_id", "S"),
+        local_secondary_indexes=[
+            {
+                "index_name": "status-index",
+                "range_key": ("status", "S"),
+                "projection": "ALL",
+            },
+            {
+                "index_name": "created-index",
+                "range_key": ("created_at", "S"),
+                "projection": "KEYS_ONLY",
+            },
+        ],
+    )

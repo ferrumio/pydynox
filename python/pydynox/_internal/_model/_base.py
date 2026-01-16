@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
+from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox.attributes import Attribute
 from pydynox.client import DynamoDBClient
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
-from pydynox.indexes import GlobalSecondaryIndex
 from pydynox.size import ItemSize, calculate_item_size
 
 if TYPE_CHECKING:
@@ -26,6 +26,7 @@ class ModelMeta(type):
     _range_key: str | None
     _hooks: dict[HookType, list[Any]]
     _indexes: dict[str, GlobalSecondaryIndex[Any]]
+    _local_indexes: dict[str, LocalSecondaryIndex[Any]]
     _metrics_storage: "MetricsStorage"
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> ModelMeta:
@@ -34,6 +35,7 @@ class ModelMeta(type):
         range_key: str | None = None
         hooks: dict[HookType, list[Any]] = {hook_type: [] for hook_type in HookType}
         indexes: dict[str, GlobalSecondaryIndex[Any]] = {}
+        local_indexes: dict[str, LocalSecondaryIndex[Any]] = {}
 
         for base in bases:
             base_attrs = getattr(base, "_attributes", None)
@@ -52,6 +54,9 @@ class ModelMeta(type):
             base_indexes = getattr(base, "_indexes", None)
             if base_indexes is not None:
                 indexes.update(base_indexes)
+            base_local_indexes = getattr(base, "_local_indexes", None)
+            if base_local_indexes is not None:
+                local_indexes.update(base_local_indexes)
 
         for attr_name, attr_value in namespace.items():
             if isinstance(attr_value, Attribute):
@@ -69,6 +74,9 @@ class ModelMeta(type):
             if isinstance(attr_value, GlobalSecondaryIndex):
                 indexes[attr_name] = attr_value
 
+            if isinstance(attr_value, LocalSecondaryIndex):
+                local_indexes[attr_name] = attr_value
+
         cls = super().__new__(mcs, name, bases, namespace)
 
         cls._attributes = attributes
@@ -76,6 +84,7 @@ class ModelMeta(type):
         cls._range_key = range_key
         cls._hooks = hooks
         cls._indexes = indexes
+        cls._local_indexes = local_indexes
 
         # Each Model class gets its own metrics storage
         from pydynox._internal._metrics import MetricsStorage
@@ -83,6 +92,9 @@ class ModelMeta(type):
         cls._metrics_storage = MetricsStorage()
 
         for idx in indexes.values():
+            idx._bind_to_model(cls)
+
+        for idx in local_indexes.values():
             idx._bind_to_model(cls)
 
         return cls
@@ -100,6 +112,7 @@ class ModelBase(metaclass=ModelMeta):
     _range_key: ClassVar[str | None]
     _hooks: ClassVar[dict[HookType, list[Any]]]
     _indexes: ClassVar[dict[str, GlobalSecondaryIndex[Any]]]
+    _local_indexes: ClassVar[dict[str, LocalSecondaryIndex[Any]]]
     _client_instance: ClassVar[DynamoDBClient | None] = None
     _metrics_storage: ClassVar["MetricsStorage"]
 
