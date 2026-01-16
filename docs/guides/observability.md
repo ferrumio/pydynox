@@ -207,10 +207,17 @@ RUST_LOG=aws_sdk_dynamodb=trace,aws_smithy_runtime=trace python app.py
 Track capacity consumption per operation:
 
 ```python
-result = client.get_item("users", {"pk": "USER#123"})
-print(f"This read cost {result.metrics.consumed_rcu} RCU")
+# For Model operations
+user = User.get(pk="USER#123", sk="PROFILE")
+last = User.get_last_metrics()
+if last:
+    print(f"This read cost {last.consumed_rcu} RCU")
 
-# Over time, aggregate these to understand costs
+# For client operations
+client.get_item("users", {"pk": "USER#123"})
+last = client.get_last_metrics()
+if last:
+    print(f"This read cost {last.consumed_rcu} RCU")
 ```
 
 ### Performance debugging
@@ -218,9 +225,12 @@ print(f"This read cost {result.metrics.consumed_rcu} RCU")
 Find slow operations:
 
 ```python
-result = client.query(...)
-if result.metrics.duration_ms > 100:
-    logger.warning(f"Slow query: {result.metrics.duration_ms}ms")
+for order in Order.query(hash_key="CUSTOMER#123"):
+    print(order.total)
+
+last = Order.get_last_metrics()
+if last and last.duration_ms > 100:
+    logger.warning(f"Slow query: {last.duration_ms}ms")
 ```
 
 ### Lambda optimization

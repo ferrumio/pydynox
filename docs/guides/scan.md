@@ -156,17 +156,24 @@ users = list(User.scan(consistent_read=True))
 
 ### Metrics
 
-Access scan metrics after iteration:
+Access scan metrics using class methods:
 
 ```python
 result = User.scan()
 users = list(result)
 
-print(f"Duration: {result.metrics.duration_ms}ms")
-print(f"Items returned: {result.metrics.items_count}")
-print(f"Items scanned: {result.metrics.scanned_count}")
-print(f"RCU consumed: {result.metrics.consumed_rcu}")
+# Get last operation metrics
+last = User.get_last_metrics()
+if last:
+    print(f"Duration: {last.duration_ms}ms")
+    print(f"RCU consumed: {last.consumed_rcu}")
+
+# Get total metrics
+total = User.get_total_metrics()
+print(f"Total scans: {total.scan_count}")
 ```
+
+For more details, see [Observability](observability.md).
 
 ### Return dicts instead of models
 

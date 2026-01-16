@@ -307,3 +307,116 @@ def test_gsi_query_empty_result(gsi_client):
     results = list(User.email_index.query(email="nonexistent@example.com"))
 
     assert len(results) == 0
+
+
+# ========== ASYNC TESTS ==========
+
+
+@pytest.mark.asyncio
+async def test_async_gsi_query_by_email(gsi_client):
+    """Test async querying GSI by email."""
+    # GIVEN a user saved with email attribute
+    User(
+        pk="ASYNC#1",
+        sk="PROFILE",
+        email="async@example.com",
+        status="active",
+        name="Async User",
+        age=25,
+    ).save()
+
+    # WHEN querying by email using async_query
+    results = []
+    async for user in User.email_index.async_query(email="async@example.com"):
+        results.append(user)
+
+    # THEN we get the user
+    assert len(results) == 1
+    assert results[0].name == "Async User"
+    assert results[0].pk == "ASYNC#1"
+
+
+@pytest.mark.asyncio
+async def test_async_gsi_query_with_filter(gsi_client):
+    """Test async GSI query with filter condition."""
+    # GIVEN users with different ages
+    for i in range(3):
+        User(
+            pk=f"ASYNC_FILTER#{i}",
+            sk="PROFILE",
+            email="filter_async@example.com",
+            status="active",
+            name=f"User {i}",
+            age=20 + i * 10,  # 20, 30, 40
+        ).save()
+
+    # WHEN querying with age filter
+    results = []
+    async for user in User.email_index.async_query(
+        email="filter_async@example.com",
+        filter_condition=User.age >= 30,
+    ):
+        results.append(user)
+
+    # THEN we get only users with age >= 30
+    assert len(results) == 2
+    ages = {u.age for u in results}
+    assert ages == {30, 40}
+
+
+@pytest.mark.asyncio
+async def test_async_gsi_query_first(gsi_client):
+    """Test async GSI query first() method."""
+    # GIVEN a user
+    User(
+        pk="ASYNC_FIRST#1",
+        sk="PROFILE",
+        email="first_async@example.com",
+        status="active",
+        name="First User",
+        age=30,
+    ).save()
+
+    # WHEN using first()
+    user = await User.email_index.async_query(email="first_async@example.com").first()
+
+    # THEN we get the user
+    assert user is not None
+    assert user.name == "First User"
+
+
+@pytest.mark.asyncio
+async def test_async_gsi_query_first_empty(gsi_client):
+    """Test async GSI query first() with no results."""
+    # WHEN querying for non-existent email
+    user = await User.email_index.async_query(email="nonexistent_async@example.com").first()
+
+    # THEN we get None
+    assert user is None
+
+
+@pytest.mark.asyncio
+async def test_async_gsi_query_with_range_key_condition(gsi_client):
+    """Test async GSI query with range key condition."""
+    # GIVEN users with different pk prefixes
+    for prefix in ["A", "B", "C"]:
+        User(
+            pk=f"{prefix}#ASYNC_RANGE",
+            sk="PROFILE",
+            email=f"range_async_{prefix}@example.com",
+            status="range_async_test",
+            name=f"User {prefix}",
+            age=25,
+        ).save()
+
+    # WHEN querying with range key condition (pk begins_with "B")
+    results = []
+    async for user in User.status_index.async_query(
+        status="range_async_test",
+        range_key_condition=User.pk.begins_with("B"),
+    ):
+        results.append(user)
+
+    # THEN we get only user B
+    assert len(results) == 1
+    assert results[0].pk == "B#ASYNC_RANGE"
