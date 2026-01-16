@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, overload
 
 from pydynox._internal._atomic import (
     AtomicAdd,
@@ -25,6 +25,7 @@ from pydynox._internal._conditions import (
 )
 
 T = TypeVar("T")
+_A = TypeVar("_A", bound="Attribute[Any]")
 
 
 class Attribute(Generic[T]):
@@ -63,6 +64,31 @@ class Attribute(Generic[T]):
         self.default = default
         self.null = null
         self.attr_name: str | None = None
+
+    def __set__(self, instance: Any, value: T | None) -> None:
+        """Set the attribute value on the model instance."""
+        if instance is not None and self.attr_name is not None:
+            instance.__dict__[self.attr_name] = value
+
+    @overload
+    def __get__(self: _A, instance: None, owner: type[Any]) -> _A: ...
+
+    @overload
+    def __get__(self, instance: Any, owner: type[Any]) -> T | None: ...
+
+    def __get__(self: _A, instance: Any, owner: type[Any]) -> _A | T | None:
+        """Get the attribute value from the model instance.
+
+        When accessed on the class (User.pk), returns the Attribute itself.
+        When accessed on an instance (user.pk), returns the actual value.
+        """
+        if instance is None:
+            # Accessed on class, return the attribute for conditions
+            return self
+        # Accessed on instance, return the value
+        if self.attr_name is not None:
+            return instance.__dict__.get(self.attr_name)
+        return None
 
     def serialize(self, value: T | None) -> Any:
         """Convert Python value to DynamoDB format."""
