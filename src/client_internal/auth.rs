@@ -26,7 +26,7 @@ use aws_config::sts::AssumeRoleProvider;
 use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::config::Credentials;
 
-use super::config::ClientConfig;
+use super::config::AwsConfig;
 
 /// Credential provider type for the client.
 pub enum CredentialProvider {
@@ -47,7 +47,7 @@ pub enum CredentialProvider {
 /// 2. AssumeRole (if role_arn is set)
 /// 3. AWS profile (supports SSO profiles)
 /// 4. Default chain (env vars, instance profile, container, EKS IRSA, GitHub OIDC, etc.)
-pub async fn build_credential_provider(config: &ClientConfig) -> CredentialProvider {
+pub async fn build_credential_provider(config: &AwsConfig) -> CredentialProvider {
     // 1. Static credentials
     if let (Some(ak), Some(sk)) = (&config.access_key, &config.secret_key) {
         let creds = Credentials::new(

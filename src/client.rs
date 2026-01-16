@@ -13,9 +13,12 @@
 //! - Proxy
 //!
 //! The main struct is [`DynamoDBClient`], which wraps the AWS SDK client.
+//! S3 and KMS clients are created lazily when needed, sharing the same config.
 
 use aws_sdk_dynamodb::Client;
-use once_cell::sync::Lazy;
+use aws_sdk_kms::Client as KmsClient;
+use aws_sdk_s3::Client as S3Client;
+use once_cell::sync::{Lazy, OnceCell};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::sync::Arc;
@@ -23,7 +26,7 @@ use tokio::runtime::Runtime;
 
 use crate::basic_operations;
 use crate::batch_operations;
-use crate::client_internal::{build_client, ClientConfig};
+use crate::client_internal::{build_client, build_kms_client, build_s3_client, AwsConfig};
 use crate::metrics::OperationMetrics;
 use crate::table_operations;
 use crate::transaction_operations;
@@ -31,7 +34,7 @@ use crate::transaction_operations;
 /// Global shared Tokio runtime.
 ///
 /// Using a single runtime avoids deadlocks on Windows when multiple
-/// DynamoDBClient instances are created.
+/// DynamoDBClient instances are created. Also shared by S3/KMS clients.
 static RUNTIME: Lazy<Arc<Runtime>> =
     Lazy::new(|| Arc::new(Runtime::new().expect("Failed to create global Tokio runtime")));
 
@@ -49,6 +52,9 @@ static RUNTIME: Lazy<Arc<Runtime>> =
 /// - read_timeout: Read timeout in seconds
 /// - max_retries: Maximum number of retries
 /// - proxy_url: HTTP/HTTPS proxy
+///
+/// S3 and KMS clients are created lazily when needed (e.g., S3Attribute, EncryptedAttribute).
+/// They share the same configuration as the DynamoDB client.
 ///
 /// # Examples
 ///
@@ -84,9 +90,18 @@ static RUNTIME: Lazy<Arc<Runtime>> =
 /// ```
 #[pyclass]
 pub struct DynamoDBClient {
+    /// DynamoDB client (always created)
     client: Client,
+    /// Shared runtime for all AWS operations
     runtime: Arc<Runtime>,
+    /// Effective region
     region: String,
+    /// Shared config for lazy S3/KMS client creation
+    config: Arc<AwsConfig>,
+    /// S3 client (lazy, created on first S3 operation)
+    s3_client: OnceCell<S3Client>,
+    /// KMS client (lazy, created on first KMS operation)
+    kms_client: OnceCell<KmsClient>,
 }
 
 #[pymethods]
@@ -160,7 +175,7 @@ impl DynamoDBClient {
             std::env::set_var("HTTPS_PROXY", proxy);
         }
 
-        let config = ClientConfig {
+        let config = AwsConfig {
             region: region.clone(),
             access_key,
             secret_key,
@@ -179,17 +194,22 @@ impl DynamoDBClient {
         let runtime = RUNTIME.clone();
         let final_region = config.effective_region();
 
-        let client = runtime.block_on(build_client(config)).map_err(|e| {
-            PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
-                "Failed to create DynamoDB client: {}",
-                e
-            ))
-        })?;
+        let client = runtime
+            .block_on(build_client(config.clone()))
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                    "Failed to create DynamoDB client: {}",
+                    e
+                ))
+            })?;
 
         Ok(DynamoDBClient {
             client,
             runtime,
             region: final_region,
+            config: Arc::new(config),
+            s3_client: OnceCell::new(),
+            kms_client: OnceCell::new(),
         })
     }
 
@@ -213,7 +233,6 @@ impl DynamoDBClient {
             Err(_) => Ok(false),
         }
     }
-
     /// Put an item into a DynamoDB table.
     #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
     pub fn put_item(
@@ -865,5 +884,53 @@ impl DynamoDBClient {
             consistent_read,
             next_token,
         )
+    }
+}
+
+// ========== INTERNAL METHODS (not exposed to Python) ==========
+
+impl DynamoDBClient {
+    /// Get or create the S3 client (lazy initialization).
+    ///
+    /// The S3 client shares the same config as DynamoDB.
+    /// Created on first use to avoid overhead when S3 is not needed.
+    pub fn get_s3_client(&self) -> PyResult<&S3Client> {
+        self.s3_client.get_or_try_init(|| {
+            self.runtime
+                .block_on(build_s3_client(&self.config, None))
+                .map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "Failed to create S3 client: {}",
+                        e
+                    ))
+                })
+        })
+    }
+
+    /// Get or create the KMS client (lazy initialization).
+    ///
+    /// The KMS client shares the same config as DynamoDB.
+    /// Created on first use to avoid overhead when KMS is not needed.
+    pub fn get_kms_client(&self) -> PyResult<&KmsClient> {
+        self.kms_client.get_or_try_init(|| {
+            self.runtime
+                .block_on(build_kms_client(&self.config, None))
+                .map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!(
+                        "Failed to create KMS client: {}",
+                        e
+                    ))
+                })
+        })
+    }
+
+    /// Get the shared runtime.
+    pub fn get_runtime(&self) -> &Arc<Runtime> {
+        &self.runtime
+    }
+
+    /// Get the shared config.
+    pub fn get_config(&self) -> &Arc<AwsConfig> {
+        &self.config
     }
 }

@@ -22,6 +22,10 @@ An ADR is a short document that describes a decision, why it was made, and what 
 | 010 | [GenAI in development](010-genai-in-development.md) | Accepted |
 | 011 | [Prepare/Execute pattern](011-prepare-execute-pattern.md) | Accepted |
 | 012 | [Envelope encryption with KMS](012-envelope-encryption-kms.md) | Accepted |
+| 013 | [OpenTelemetry tracing](013-opentelemetry-tracing.md) | Accepted |
+| 014 | [as_dict parameter](014-as-dict-parameter.md) | Accepted |
+| 015 | [Metrics API redesign](015-metrics-api-redesign.md) | Accepted |
+| 016 | [Unified AWS client config](016-unified-aws-client-config.md) | Accepted |
 
 ## Adding a new ADR
 

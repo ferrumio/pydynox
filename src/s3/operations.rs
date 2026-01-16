@@ -1,6 +1,6 @@
 //! S3 operations - upload, download, presigned URLs, delete.
 
-use crate::errors::S3AttributeException;
+use crate::errors::{map_s3_error, S3Exception};
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
@@ -11,32 +11,25 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
+/// Threshold for using multipart upload (10MB).
+const MULTIPART_THRESHOLD: usize = 10 * 1024 * 1024;
+
 /// Minimum part size for multipart upload (5MB).
 const MIN_PART_SIZE: usize = 5 * 1024 * 1024;
 
 /// Default part size for multipart upload (10MB).
 const DEFAULT_PART_SIZE: usize = 10 * 1024 * 1024;
 
-/// Threshold for using multipart upload (10MB).
-const MULTIPART_THRESHOLD: usize = 10 * 1024 * 1024;
-
 /// Metrics from an S3 operation.
 #[pyclass]
 #[derive(Clone, Debug, Default)]
 pub struct S3Metrics {
-    /// Total duration in milliseconds.
     #[pyo3(get)]
     pub duration_ms: f64,
-
-    /// Number of S3 API calls made.
     #[pyo3(get)]
     pub calls: u32,
-
-    /// Bytes uploaded to S3.
     #[pyo3(get)]
     pub bytes_uploaded: u64,
-
-    /// Bytes downloaded from S3.
     #[pyo3(get)]
     pub bytes_downloaded: u64,
 }
@@ -62,41 +55,6 @@ impl S3Metrics {
     }
 }
 
-/// Result of an upload operation with metrics.
-pub struct UploadResult {
-    pub metadata: S3Metadata,
-    pub metrics: S3Metrics,
-}
-
-/// Result of a download operation with metrics.
-pub struct DownloadResult {
-    pub data: Vec<u8>,
-    pub metrics: S3Metrics,
-}
-
-/// Result of a save-to-file operation with metrics.
-pub struct SaveToFileResult {
-    pub bytes_written: u64,
-    pub metrics: S3Metrics,
-}
-
-/// Result of a delete operation with metrics.
-pub struct DeleteResult {
-    pub metrics: S3Metrics,
-}
-
-/// Result of a presigned URL operation with metrics.
-pub struct PresignedUrlResult {
-    pub url: String,
-    pub metrics: S3Metrics,
-}
-
-/// Result of a head operation with metrics.
-pub struct HeadResult {
-    pub metadata: S3Metadata,
-    pub metrics: S3Metrics,
-}
-
 /// S3 file metadata returned after upload.
 #[pyclass]
 #[derive(Clone)]
@@ -116,7 +74,7 @@ pub struct S3Metadata {
     #[pyo3(get)]
     pub version_id: Option<String>,
     #[pyo3(get)]
-    pub metadata: Option<std::collections::HashMap<String, String>>,
+    pub metadata: Option<HashMap<String, String>>,
 }
 
 #[pymethods]
@@ -128,7 +86,6 @@ impl S3Metadata {
         )
     }
 
-    /// Convert to dict for DynamoDB storage.
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
         dict.set_item("bucket", &self.bucket)?;
@@ -151,9 +108,40 @@ impl S3Metadata {
     }
 }
 
+// ========== RESULT TYPES ==========
+
+pub struct UploadResult {
+    pub metadata: S3Metadata,
+    pub metrics: S3Metrics,
+}
+
+pub struct DownloadResult {
+    pub data: Vec<u8>,
+    pub metrics: S3Metrics,
+}
+
+pub struct SaveToFileResult {
+    pub bytes_written: u64,
+    pub metrics: S3Metrics,
+}
+
+pub struct DeleteResult {
+    pub metrics: S3Metrics,
+}
+
+pub struct PresignedUrlResult {
+    pub url: String,
+    pub metrics: S3Metrics,
+}
+
+pub struct HeadResult {
+    pub metadata: S3Metadata,
+    pub metrics: S3Metrics,
+}
+
 // ========== CORE ASYNC OPERATIONS ==========
 
-/// Core async upload operation with metrics.
+/// Core async upload operation.
 pub async fn execute_upload(
     client: Client,
     bucket: String,
@@ -166,10 +154,26 @@ pub async fn execute_upload(
     let size = data.len();
 
     let (result, calls) = if size > MULTIPART_THRESHOLD {
-        execute_multipart_upload(client, bucket, key, data, content_type, metadata).await?
+        execute_multipart_upload(
+            client,
+            &bucket,
+            &key,
+            data,
+            content_type.clone(),
+            metadata.clone(),
+        )
+        .await?
     } else {
-        let meta = execute_simple_upload(client, bucket, key, data, content_type, metadata).await?;
-        (meta, 1u32) // Simple upload = 1 API call
+        let meta = execute_simple_upload(
+            client,
+            &bucket,
+            &key,
+            data,
+            content_type.clone(),
+            metadata.clone(),
+        )
+        .await?;
+        (meta, 1u32)
     };
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
@@ -185,11 +189,10 @@ pub async fn execute_upload(
     })
 }
 
-/// Simple single-part upload for small files.
 async fn execute_simple_upload(
     client: Client,
-    bucket: String,
-    key: String,
+    bucket: &str,
+    key: &str,
     data: Vec<u8>,
     content_type: Option<String>,
     metadata: Option<HashMap<String, String>>,
@@ -198,8 +201,8 @@ async fn execute_simple_upload(
 
     let mut req = client
         .put_object()
-        .bucket(&bucket)
-        .key(&key)
+        .bucket(bucket)
+        .key(key)
         .body(ByteStream::from(data));
 
     if let Some(ct) = &content_type {
@@ -212,36 +215,34 @@ async fn execute_simple_upload(
         }
     }
 
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| format!("Failed to upload to S3: {}", e))?;
+    let resp = req.send().await.map_err(|e| {
+        let py_err = map_s3_error(e, Some(bucket), Some(key));
+        format!("{}", py_err)
+    })?;
 
     Ok(S3Metadata {
-        bucket,
-        key,
+        bucket: bucket.to_string(),
+        key: key.to_string(),
         size,
         etag: resp.e_tag().unwrap_or("").trim_matches('"').to_string(),
         content_type,
-        last_modified: None, // Not returned on upload
+        last_modified: None,
         version_id: resp.version_id().map(|s| s.to_string()),
         metadata,
     })
 }
 
-/// Multipart upload for large files. Returns (metadata, api_calls).
 async fn execute_multipart_upload(
     client: Client,
-    bucket: String,
-    key: String,
+    bucket: &str,
+    key: &str,
     data: Vec<u8>,
     content_type: Option<String>,
     metadata: Option<HashMap<String, String>>,
 ) -> Result<(S3Metadata, u32), String> {
     let size = data.len() as u64;
 
-    // Start multipart upload
-    let mut create_req = client.create_multipart_upload().bucket(&bucket).key(&key);
+    let mut create_req = client.create_multipart_upload().bucket(bucket).key(key);
 
     if let Some(ct) = &content_type {
         create_req = create_req.content_type(ct);
@@ -253,35 +254,33 @@ async fn execute_multipart_upload(
         }
     }
 
-    let create_resp = create_req
-        .send()
-        .await
-        .map_err(|e| format!("Failed to start multipart upload: {}", e))?;
+    let create_resp = create_req.send().await.map_err(|e| {
+        let py_err = map_s3_error(e, Some(bucket), Some(key));
+        format!("{}", py_err)
+    })?;
 
     let upload_id = create_resp
         .upload_id()
         .ok_or("No upload ID returned")?
         .to_string();
 
-    // Calculate part size
     let part_size = calculate_part_size(data.len());
     let mut parts = Vec::new();
     let mut part_number = 1;
-    let mut api_calls: u32 = 1; // CreateMultipartUpload = 1 call
+    let mut api_calls: u32 = 1;
 
-    // Upload parts
     for chunk in data.chunks(part_size) {
         let upload_result = client
             .upload_part()
-            .bucket(&bucket)
-            .key(&key)
+            .bucket(bucket)
+            .key(key)
             .upload_id(&upload_id)
             .part_number(part_number)
             .body(ByteStream::from(chunk.to_vec()))
             .send()
             .await;
 
-        api_calls += 1; // Each UploadPart = 1 call
+        api_calls += 1;
 
         match upload_result {
             Ok(resp) => {
@@ -293,42 +292,44 @@ async fn execute_multipart_upload(
                 );
             }
             Err(e) => {
-                // Abort on failure
                 let _ = client
                     .abort_multipart_upload()
-                    .bucket(&bucket)
-                    .key(&key)
+                    .bucket(bucket)
+                    .key(key)
                     .upload_id(&upload_id)
                     .send()
                     .await;
-                return Err(format!("Failed to upload part {}: {}", part_number, e));
+                let py_err = map_s3_error(e, Some(bucket), Some(key));
+                return Err(format!("Failed to upload part {}: {}", part_number, py_err));
             }
         }
 
         part_number += 1;
     }
 
-    // Complete multipart upload
     let completed = aws_sdk_s3::types::CompletedMultipartUpload::builder()
         .set_parts(Some(parts))
         .build();
 
     let complete_resp = client
         .complete_multipart_upload()
-        .bucket(&bucket)
-        .key(&key)
+        .bucket(bucket)
+        .key(key)
         .upload_id(&upload_id)
         .multipart_upload(completed)
         .send()
         .await
-        .map_err(|e| format!("Failed to complete multipart upload: {}", e))?;
+        .map_err(|e| {
+            let py_err = map_s3_error(e, Some(bucket), Some(key));
+            format!("{}", py_err)
+        })?;
 
-    api_calls += 1; // CompleteMultipartUpload = 1 call
+    api_calls += 1;
 
     Ok((
         S3Metadata {
-            bucket,
-            key,
+            bucket: bucket.to_string(),
+            key: key.to_string(),
             size,
             etag: complete_resp
                 .e_tag()
@@ -336,7 +337,7 @@ async fn execute_multipart_upload(
                 .trim_matches('"')
                 .to_string(),
             content_type,
-            last_modified: None, // Not returned on upload
+            last_modified: None,
             version_id: complete_resp.version_id().map(|s| s.to_string()),
             metadata,
         },
@@ -344,7 +345,6 @@ async fn execute_multipart_upload(
     ))
 }
 
-/// Core async download operation with metrics.
 pub async fn execute_download(
     client: Client,
     bucket: String,
@@ -358,7 +358,10 @@ pub async fn execute_download(
         .key(&key)
         .send()
         .await
-        .map_err(|e| format!("Failed to download from S3: {}", e))?;
+        .map_err(|e| {
+            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
+            format!("{}", py_err)
+        })?;
 
     let data = resp
         .body
@@ -381,7 +384,6 @@ pub async fn execute_download(
     })
 }
 
-/// Core async save to file (streaming, memory efficient) with metrics.
 pub async fn execute_save_to_file(
     client: Client,
     bucket: String,
@@ -398,7 +400,10 @@ pub async fn execute_save_to_file(
         .key(&key)
         .send()
         .await
-        .map_err(|e| format!("Failed to download from S3: {}", e))?;
+        .map_err(|e| {
+            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
+            format!("{}", py_err)
+        })?;
 
     let mut file = tokio::fs::File::create(&path)
         .await
@@ -435,7 +440,6 @@ pub async fn execute_save_to_file(
     })
 }
 
-/// Core async presigned URL generation with metrics.
 pub async fn execute_presigned_url(
     client: Client,
     bucket: String,
@@ -461,14 +465,13 @@ pub async fn execute_presigned_url(
         url: presigned.uri().to_string(),
         metrics: S3Metrics {
             duration_ms,
-            calls: 0, // Presigned URL doesn't make an API call
+            calls: 0,
             bytes_uploaded: 0,
             bytes_downloaded: 0,
         },
     })
 }
 
-/// Core async delete operation with metrics.
 pub async fn execute_delete(
     client: Client,
     bucket: String,
@@ -482,7 +485,10 @@ pub async fn execute_delete(
         .key(&key)
         .send()
         .await
-        .map_err(|e| format!("Failed to delete from S3: {}", e))?;
+        .map_err(|e| {
+            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
+            format!("{}", py_err)
+        })?;
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -496,7 +502,6 @@ pub async fn execute_delete(
     })
 }
 
-/// Core async head operation with metrics.
 pub async fn execute_head(
     client: Client,
     bucket: String,
@@ -510,14 +515,14 @@ pub async fn execute_head(
         .key(&key)
         .send()
         .await
-        .map_err(|e| format!("Failed to get S3 metadata: {}", e))?;
+        .map_err(|e| {
+            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
+            format!("{}", py_err)
+        })?;
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-    // Convert last_modified to ISO 8601 string
     let last_modified = resp.last_modified().map(|dt| dt.to_string());
-
-    // Convert metadata HashMap
     let metadata = resp.metadata().map(|m| {
         m.iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -546,7 +551,6 @@ pub async fn execute_head(
 
 // ========== SYNC WRAPPERS ==========
 
-/// Sync upload bytes - returns (S3Metadata, S3Metrics).
 #[allow(clippy::too_many_arguments)]
 pub fn upload_bytes(
     _py: Python<'_>,
@@ -572,12 +576,11 @@ pub fn upload_bytes(
             content_type,
             metadata,
         ))
-        .map_err(S3AttributeException::new_err)?;
+        .map_err(S3Exception::new_err)?;
 
     Ok((result.metadata, result.metrics))
 }
 
-/// Sync download bytes - returns (bytes, S3Metrics).
 pub fn download_bytes<'py>(
     py: Python<'py>,
     client: &Client,
@@ -591,12 +594,11 @@ pub fn download_bytes<'py>(
 
     let result = runtime
         .block_on(execute_download(client, bucket, key))
-        .map_err(S3AttributeException::new_err)?;
+        .map_err(S3Exception::new_err)?;
 
     Ok((PyBytes::new(py, &result.data), result.metrics))
 }
 
-/// Sync presigned URL - returns (url, S3Metrics).
 pub fn presigned_url(
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -610,12 +612,11 @@ pub fn presigned_url(
 
     let result = runtime
         .block_on(execute_presigned_url(client, bucket, key, expires_secs))
-        .map_err(S3AttributeException::new_err)?;
+        .map_err(S3Exception::new_err)?;
 
     Ok((result.url, result.metrics))
 }
 
-/// Sync delete object - returns S3Metrics.
 pub fn delete_object(
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -628,12 +629,11 @@ pub fn delete_object(
 
     let result = runtime
         .block_on(execute_delete(client, bucket, key))
-        .map_err(S3AttributeException::new_err)?;
+        .map_err(S3Exception::new_err)?;
 
     Ok(result.metrics)
 }
 
-/// Sync head object - returns (S3Metadata, S3Metrics).
 pub fn head_object(
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -646,12 +646,11 @@ pub fn head_object(
 
     let result = runtime
         .block_on(execute_head(client, bucket, key))
-        .map_err(S3AttributeException::new_err)?;
+        .map_err(S3Exception::new_err)?;
 
     Ok((result.metadata, result.metrics))
 }
 
-/// Sync save to file (streaming, memory efficient) - returns (bytes_written, S3Metrics).
 pub fn save_to_file(
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -666,14 +665,13 @@ pub fn save_to_file(
 
     let result = runtime
         .block_on(execute_save_to_file(client, bucket, key, path))
-        .map_err(S3AttributeException::new_err)?;
+        .map_err(S3Exception::new_err)?;
 
     Ok((result.bytes_written, result.metrics))
 }
 
 // ========== ASYNC WRAPPERS ==========
 
-/// Async upload bytes - returns Python awaitable with (S3Metadata, S3Metrics).
 pub fn async_upload_bytes<'py>(
     py: Python<'py>,
     client: Client,
@@ -695,12 +693,11 @@ pub fn async_upload_bytes<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((meta, metrics))
             }
-            Err(e) => Err(S3AttributeException::new_err(e)),
+            Err(e) => Err(S3Exception::new_err(e)),
         })
     })
 }
 
-/// Async download bytes - returns Python awaitable with (bytes, S3Metrics).
 pub fn async_download_bytes<'py>(
     py: Python<'py>,
     client: Client,
@@ -717,12 +714,11 @@ pub fn async_download_bytes<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((bytes, metrics))
             }
-            Err(e) => Err(S3AttributeException::new_err(e)),
+            Err(e) => Err(S3Exception::new_err(e)),
         })
     })
 }
 
-/// Async presigned URL - returns Python awaitable with (url, S3Metrics).
 pub fn async_presigned_url<'py>(
     py: Python<'py>,
     client: Client,
@@ -739,12 +735,11 @@ pub fn async_presigned_url<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((r.url, metrics))
             }
-            Err(e) => Err(S3AttributeException::new_err(e)),
+            Err(e) => Err(S3Exception::new_err(e)),
         })
     })
 }
 
-/// Async delete object - returns Python awaitable with S3Metrics.
 pub fn async_delete_object<'py>(
     py: Python<'py>,
     client: Client,
@@ -757,12 +752,11 @@ pub fn async_delete_object<'py>(
         #[allow(deprecated)]
         Python::with_gil(|py| match result {
             Ok(r) => Ok(r.metrics.into_pyobject(py)?.into_any().unbind()),
-            Err(e) => Err(S3AttributeException::new_err(e)),
+            Err(e) => Err(S3Exception::new_err(e)),
         })
     })
 }
 
-/// Async head object - returns Python awaitable with (S3Metadata, S3Metrics).
 pub fn async_head_object<'py>(
     py: Python<'py>,
     client: Client,
@@ -779,12 +773,11 @@ pub fn async_head_object<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((meta, metrics))
             }
-            Err(e) => Err(S3AttributeException::new_err(e)),
+            Err(e) => Err(S3Exception::new_err(e)),
         })
     })
 }
 
-/// Async save to file - returns Python awaitable with (bytes_written, S3Metrics).
 pub fn async_save_to_file<'py>(
     py: Python<'py>,
     client: Client,
@@ -801,19 +794,16 @@ pub fn async_save_to_file<'py>(
                 let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
                 Ok((r.bytes_written, metrics))
             }
-            Err(e) => Err(S3AttributeException::new_err(e)),
+            Err(e) => Err(S3Exception::new_err(e)),
         })
     })
 }
 
-/// Calculate optimal part size for multipart upload.
 fn calculate_part_size(total_size: usize) -> usize {
-    // S3 allows max 10,000 parts
     let min_parts = total_size.div_ceil(MIN_PART_SIZE);
     if min_parts <= 10_000 {
         DEFAULT_PART_SIZE.max(MIN_PART_SIZE)
     } else {
-        // Need larger parts
         total_size.div_ceil(10_000)
     }
 }

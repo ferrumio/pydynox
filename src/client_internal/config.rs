@@ -1,8 +1,16 @@
-//! Client configuration options.
+//! Shared AWS configuration for all clients (DynamoDB, S3, KMS).
+//!
+//! This module provides a single configuration struct that all AWS clients use.
+//! This avoids code duplication and ensures consistent behavior across services.
 
-/// Configuration for creating a DynamoDB client.
+use std::sync::Arc;
+
+/// Shared configuration for all AWS clients.
+///
+/// Created once by DynamoDBClient, then shared with S3 and KMS clients
+/// when they are lazily initialized.
 #[derive(Default, Clone)]
-pub struct ClientConfig {
+pub struct AwsConfig {
     // Region
     pub region: Option<String>,
 
@@ -34,7 +42,7 @@ pub struct ClientConfig {
     pub proxy_url: Option<String>,
 }
 
-impl ClientConfig {
+impl AwsConfig {
     /// Get the effective region (from config, env, or default).
     pub fn effective_region(&self) -> String {
         self.region.clone().unwrap_or_else(|| {
@@ -44,13 +52,35 @@ impl ClientConfig {
         })
     }
 
-    /// Get the effective endpoint URL (from config or env).
-    /// Checks AWS_ENDPOINT_URL and AWS_ENDPOINT_URL_DYNAMODB env vars.
-    pub fn effective_endpoint_url(&self) -> Option<String> {
+    /// Get the effective endpoint URL for DynamoDB.
+    pub fn dynamodb_endpoint(&self) -> Option<String> {
         self.endpoint_url.clone().or_else(|| {
             std::env::var("AWS_ENDPOINT_URL_DYNAMODB")
                 .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
                 .ok()
         })
+    }
+
+    /// Get the effective endpoint URL for S3.
+    pub fn s3_endpoint(&self) -> Option<String> {
+        self.endpoint_url.clone().or_else(|| {
+            std::env::var("AWS_ENDPOINT_URL_S3")
+                .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
+                .ok()
+        })
+    }
+
+    /// Get the effective endpoint URL for KMS.
+    pub fn kms_endpoint(&self) -> Option<String> {
+        self.endpoint_url.clone().or_else(|| {
+            std::env::var("AWS_ENDPOINT_URL_KMS")
+                .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
+                .ok()
+        })
+    }
+
+    /// Create a shareable Arc wrapper.
+    pub fn into_arc(self) -> Arc<AwsConfig> {
+        Arc::new(self)
     }
 }
