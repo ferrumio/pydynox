@@ -1,6 +1,39 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.18.0] - 2026-01-16
+
+
+### CI/CD
+
+- bump CodSpeedHQ/action from 4.5.2 to 4.7.0 (#169)
+
+
+### Docs
+
+- add boto3 migration (#165)
+- add annoucement (#167)
+
+
+### Documentation
+
+- update changelog for v0.17.0 (#163)
+
+
+### Feat
+
+- add async gsi query (#168)
+
+
+### Refactoring
+
+- fix type check issues (#171)
+- unify all aws config clients (#173)
+
+
+### Deps
+
+- bump the rust-dependencies group across 1 directory with 8 updates (#170)
 ## [0.17.0] - 2026-01-15
 
 
