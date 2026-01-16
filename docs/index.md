@@ -4,6 +4,9 @@ A fast DynamoDB ORM for Python with a Rust core.
 
 pydynox lets you work with DynamoDB using Python classes instead of raw dictionaries. The heavy lifting (serialization, deserialization) happens in Rust, so it's fast.
 
+!!! info "📢 Stable Release: March 2-6, 2026"
+    We're in the final stretch! The API is stabilizing, performance is being polished, and we're building the remaining features. We might release earlier if everything goes well. Stay tuned!
+
 ## Key features
 
 - **Fast serialization** - Rust handles the heavy lifting

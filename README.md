@@ -9,7 +9,7 @@
 
 A fast DynamoDB ORM for Python with a Rust core.
 
-> **Pre-release**: The core features are working and tested. We're adding features, polishing the API, receiving ideas, and testing performance and edge cases before v1.0. Feel free to try it out and share feedback!
+> 📢 **Stable Release: March 2-6, 2026** - We're in the final stretch! The API is stabilizing, performance is being polished, and we're building the remaining features. We might release earlier if everything goes well. Stay tuned!
 
 ## Why "pydynox"?
 
