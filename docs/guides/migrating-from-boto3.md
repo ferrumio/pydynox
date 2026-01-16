@@ -140,17 +140,15 @@ pydynox has two APIs:
 
 | Operation | boto3 | pydynox Model |
 |-----------|-------|---------------|
-| Get item | `table.get_item(Key={...})` | `Model.get(pk=...)` |
+| Get item | `table.get_item(Key={...})` | `Model.get(pk=..., sk=...)` |
 | Put item | `table.put_item(Item={...})` | `model.save()` |
 | Delete item | `table.delete_item(Key={...})` | `model.delete()` |
-| Update item | `table.update_item(UpdateExpression=...)` | `model.update(field=value)` |
-| Query | `table.query(KeyConditionExpression=...)` | `Model.query(pk=...).exec()` |
-| Scan | `table.scan()` | `Model.scan().exec()` |
-| Batch write | `table.batch_writer()` | `Model.batch_writer()` |
-| Batch get | `dynamodb.batch_get_item(...)` | `Model.batch_get([...])` |
-| Transaction | `client.transact_write_items(...)` | `Transaction().save(m1).delete(m2).commit()` |
-| Conditional | `ConditionExpression=...` | `condition=Model.field.not_exists()` |
-| Projection | `ProjectionExpression=...` | `Model.get(..., projection=["field"])` |
+| Update item | `table.update_item(...)` | `model.update(name="new")` |
+| Query | `table.query(...)` | `for item in Model.query(hash_key=...):` |
+| Scan | `table.scan()` | `for item in Model.scan():` |
+| Batch get | `dynamodb.batch_get_item(...)` | `Model.batch_get([keys])` |
+| Conditional | `ConditionExpression=...` | `model.save(condition=Model.pk.not_exists())` |
+| Projection | `ProjectionExpression=...` | `Model.get(..., fields=["name"])` |
 | Consistent read | `ConsistentRead=True` | `Model.get(..., consistent_read=True)` |
 | Create table | `client.create_table(...)` | `Model.create_table()` |
 | Async | `aioboto3` | `await Model.async_get(...)` |
@@ -166,6 +164,8 @@ For cases where you need full control or don't want to define models:
 | Delete item | `table.delete_item(Key={...})` | `client.delete_item("table", {"pk": "123"})` |
 | Query | `table.query(...)` | `client.query("table", key_condition=...)` |
 | Scan | `table.scan()` | `client.scan("table")` |
+| Batch write | `table.batch_writer()` | `client.batch_write("table", put_items=[...])` |
+| Transaction | `client.transact_write_items(...)` | `with Transaction(client) as txn:` |
 | Create table | `client.create_table(...)` | `client.create_table("table", ...)` |
 | Delete table | `client.delete_table(...)` | `client.delete_table("table")` |
 
