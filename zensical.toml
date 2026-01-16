@@ -60,6 +60,7 @@ nav = [
     { "Troubleshooting" = [
         "guides/exceptions.md",
         "guides/iam-permissions.md",
+        "guides/type-checking.md",
         "guides/benchmarks.md",
     ] },
 ]

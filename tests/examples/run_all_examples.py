@@ -50,6 +50,10 @@ SKIP_FILES = {
     # Client projection examples - need specific table setup
     "client_projection.py",
     "nested_projection.py",
+    # Type checking examples - TYPE_CHECKING blocks, not runnable
+    "basic_types.py",
+    "crud_types.py",
+    "handle_none.py",
 }
 
 
