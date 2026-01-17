@@ -397,15 +397,20 @@ class ScanResult:
         if self._exhausted:
             raise StopIteration
 
-        self._fetch_next_page()
+        # Keep fetching pages until we get items or exhaust all pages
+        while True:
+            self._fetch_next_page()
 
-        if not self._current_page:
-            raise StopIteration
+            if self._current_page:
+                # Got items, return the first one
+                item = self._current_page[self._page_index]
+                self._page_index += 1
+                self._total_returned += 1
+                return item
 
-        item = self._current_page[self._page_index]
-        self._page_index += 1
-        self._total_returned += 1
-        return item
+            if self._exhausted:
+                # No more pages to fetch
+                raise StopIteration
 
     def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
@@ -530,15 +535,20 @@ class AsyncScanResult:
         if self._exhausted:
             raise StopAsyncIteration
 
-        await self._fetch_next_page()
+        # Keep fetching pages until we get items or exhaust all pages
+        while True:
+            await self._fetch_next_page()
 
-        if not self._current_page:
-            raise StopAsyncIteration
+            if self._current_page:
+                # Got items, return the first one
+                item = self._current_page[self._page_index]
+                self._page_index += 1
+                self._total_returned += 1
+                return item
 
-        item = self._current_page[self._page_index]
-        self._page_index += 1
-        self._total_returned += 1
-        return item
+            if self._exhausted:
+                # No more pages to fetch
+                raise StopAsyncIteration
 
     async def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
