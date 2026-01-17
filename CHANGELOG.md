@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.20.0] - 2026-01-17
+
+
+### Bug Fixes
+
+- query pagination bug + add page_size parameter (#178)
+
+
+### Documentation
+
+- update changelog for v0.19.0 (#176)
 ## [0.19.0] - 2026-01-16
 
 
