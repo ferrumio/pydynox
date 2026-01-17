@@ -67,17 +67,47 @@ users = User.status_index.query(status="active", scan_index_forward=False)
 
 ## Pagination
 
-Use `limit` to control page size:
+### Understanding limit vs page_size
+
+GSI queries support the same pagination parameters as table queries:
+
+| Parameter | What it does | DynamoDB behavior |
+|-----------|--------------|-------------------|
+| `limit` | Max total items to return | Stops iteration after N items |
+| `page_size` | Items per DynamoDB request | Passed as `Limit` to DynamoDB API |
+
+**Key behaviors:**
+
+- `limit=10` → Returns exactly 10 items (or less if fewer match)
+- `page_size=50` → Fetches 50 items per request, returns ALL items
+- `limit=100, page_size=25` → Returns 100 items, fetching 25 per request (4 requests)
+
+=== "gsi_pagination.py"
+    ```python
+    --8<-- "docs/examples/indexes/gsi_pagination.py"
+    ```
+
+!!! warning "Common mistake"
+    If you only set `limit`, it also controls the DynamoDB page size. Use both `limit` and `page_size` when you want to control them separately.
+
+### Manual pagination
+
+For "load more" buttons:
 
 ```python
-result = User.status_index.query(status="active", limit=10)
+result = User.status_index.query(status="active", limit=10, page_size=10)
 
 for user in result:
     print(user.email)
 
 # Check if there are more results
 if result.last_evaluated_key:
-    print("More results available")
+    next_result = User.status_index.query(
+        status="active",
+        limit=10,
+        page_size=10,
+        last_evaluated_key=result.last_evaluated_key,
+    )
 ```
 
 ## Async queries
@@ -250,6 +280,20 @@ LSIs support strongly consistent reads. This is a key difference from GSIs.
 === "lsi_consistent_read.py"
     ```python
     --8<-- "docs/examples/indexes/lsi_consistent_read.py"
+    ```
+
+### Pagination
+
+LSI queries support the same pagination parameters as table queries and GSI queries:
+
+| Parameter | What it does | DynamoDB behavior |
+|-----------|--------------|-------------------|
+| `limit` | Max total items to return | Stops iteration after N items |
+| `page_size` | Items per DynamoDB request | Passed as `Limit` to DynamoDB API |
+
+=== "lsi_pagination.py"
+    ```python
+    --8<-- "docs/examples/indexes/lsi_pagination.py"
     ```
 
 ### LSI projections

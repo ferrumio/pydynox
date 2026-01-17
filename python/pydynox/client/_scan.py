@@ -22,6 +22,7 @@ class ScanOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
@@ -36,7 +37,8 @@ class ScanOperations:
             projection_expression: Optional projection expression (saves RCU).
             expression_attribute_names: Attribute name placeholders.
             expression_attribute_values: Attribute value placeholders.
-            limit: Max items per page.
+            limit: Max total items to return.
+            page_size: Items per page (passed as Limit to DynamoDB).
             index_name: GSI or LSI name.
             last_evaluated_key: Start key for pagination.
             consistent_read: Use strongly consistent read.
@@ -54,6 +56,7 @@ class ScanOperations:
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             limit=limit,
+            page_size=page_size,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
             acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]
@@ -70,6 +73,7 @@ class ScanOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
@@ -84,7 +88,8 @@ class ScanOperations:
             projection_expression: Optional projection expression (saves RCU).
             expression_attribute_names: Attribute name placeholders.
             expression_attribute_values: Attribute value placeholders.
-            limit: Max items per page.
+            limit: Max total items to return.
+            page_size: Items per page (passed as Limit to DynamoDB).
             index_name: GSI or LSI name.
             last_evaluated_key: Start key for pagination.
             consistent_read: Use strongly consistent read.
@@ -102,6 +107,7 @@ class ScanOperations:
             expression_attribute_names=expression_attribute_names,
             expression_attribute_values=expression_attribute_values,
             limit=limit,
+            page_size=page_size,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
             acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]

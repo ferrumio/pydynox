@@ -81,11 +81,11 @@ def test_query_with_filter_expression(populated_table):
 
 
 def test_query_with_limit(populated_table):
-    """Test querying with a limit per page."""
-    # GIVEN a populated table
+    """Test querying with a limit returns exactly that many items."""
+    # GIVEN a populated table with 4 items for USER#1
     dynamo = populated_table
 
-    # WHEN querying with limit (auto-pagination fetches all)
+    # WHEN querying with limit=2
     count = 0
     for _ in dynamo.query(
         "test_table",
@@ -96,8 +96,8 @@ def test_query_with_limit(populated_table):
     ):
         count += 1
 
-    # THEN all items are returned via auto-pagination
-    assert count == 4
+    # THEN exactly 2 items are returned (limit is total, not per-page)
+    assert count == 2
 
 
 def test_query_descending_order(populated_table):
@@ -188,18 +188,17 @@ def large_table(dynamo):
 
 
 def test_query_automatic_pagination(large_table):
-    """Test that iterator automatically paginates through all results."""
+    """Test that iterator automatically paginates when no limit is set."""
     # GIVEN a table with 15 items
     dynamo = large_table
 
-    # WHEN querying with limit=4
+    # WHEN querying without limit
     sort_keys = []
     for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
         expression_attribute_values={":pk": "USER#LARGE"},
-        limit=4,
     ):
         sort_keys.append(item["sk"])
 
@@ -214,13 +213,13 @@ def test_query_manual_pagination(large_table):
     dynamo = large_table
     all_items = []
 
-    # WHEN getting first page of 4 items
+    # WHEN getting first page using page_size=4
     results = dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
         expression_attribute_values={":pk": "USER#LARGE"},
-        limit=4,
+        page_size=4,
     )
 
     for item in results:
@@ -237,7 +236,6 @@ def test_query_manual_pagination(large_table):
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
         expression_attribute_values={":pk": "USER#LARGE"},
-        limit=4,
         last_evaluated_key=results.last_evaluated_key,
     ):
         all_items.append(item)

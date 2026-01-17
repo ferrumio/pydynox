@@ -64,6 +64,66 @@ Count items without returning them:
 !!! note
     Count still scans the entire table. It just doesn't return the items.
 
+## Pagination
+
+### Understanding limit vs page_size
+
+pydynox has two parameters that control pagination:
+
+| Parameter | What it does | DynamoDB behavior |
+|-----------|--------------|-------------------|
+| `limit` | Max total items to return | Stops iteration after N items |
+| `page_size` | Items per DynamoDB request | Passed as `Limit` to DynamoDB API |
+
+This is a common pattern in DynamoDB libraries.
+
+**Key behaviors:**
+
+- `limit=50` → Returns exactly 50 items (or less if table has fewer)
+- `page_size=100` → Fetches 100 items per request, returns ALL items
+- `limit=500, page_size=100` → Returns 500 items, fetching 100 per request (5 requests)
+- Neither set → Returns all items, DynamoDB decides page size
+
+=== "limit_vs_page_size.py"
+    ```python
+    --8<-- "docs/examples/scan/limit_vs_page_size.py"
+    ```
+
+!!! warning "Common mistake"
+    If you only set `limit`, it also controls the DynamoDB page size. This means `limit=50` will fetch 50 items per request AND stop after 50 total. If you want to fetch more items per request but still limit the total, use both `limit` and `page_size`.
+
+!!! note "Filters and pagination"
+    When using `filter_condition`, remember that `page_size` controls how many items DynamoDB reads per request, not how many items pass the filter. If your filter is very selective, you may need many requests to get enough matching items.
+
+### Automatic pagination
+
+By default, the iterator fetches all pages automatically:
+
+```python
+# This fetches ALL users, automatically handling pagination
+for user in User.scan():
+    print(user.name)
+```
+
+### Manual pagination
+
+For "load more" buttons or batch processing:
+
+```python
+result = User.scan(limit=100, page_size=100)
+users = list(result)
+
+# Get the last key for next page
+last_key = result.last_evaluated_key
+
+if last_key:
+    next_result = User.scan(
+        limit=100,
+        page_size=100,
+        last_evaluated_key=last_key,
+    )
+```
+
 ## Advanced
 
 ### Why scan is expensive
@@ -130,21 +190,6 @@ Async parallel scan:
     ```python
     --8<-- "docs/examples/scan/async_parallel_scan.py"
     ```
-
-### Pagination
-
-By default, the iterator fetches all pages automatically. For manual control:
-
-```python
-result = User.scan(limit=100)
-users = list(result)
-
-# Get the last key for next page
-last_key = result.last_evaluated_key
-
-if last_key:
-    next_result = User.scan(limit=100, last_evaluated_key=last_key)
-```
 
 ### Consistent reads
 
@@ -213,7 +258,8 @@ Use `as_dict=True` to skip Model instantiation and get plain dicts:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `filter_condition` | Condition | None | Filter on any attribute |
-| `limit` | int | None | Items per page |
+| `limit` | int | None | Max total items to return |
+| `page_size` | int | None | Items per DynamoDB request |
 | `consistent_read` | bool | None | Strongly consistent read |
 | `last_evaluated_key` | dict | None | Start key for pagination |
 | `segment` | int | None | Segment number for parallel scan |

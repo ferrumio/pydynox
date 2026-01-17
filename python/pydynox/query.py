@@ -20,9 +20,17 @@ class QueryResult:
 
     Iterate over results and access `last_evaluated_key` for manual pagination.
 
+    Args:
+        limit: Max total items to return across all pages.
+        page_size: Items per page (passed as Limit to DynamoDB).
+
     Example:
-        >>> results = client.query("users", key_condition_expression="pk = :pk", ...)
-        >>> for item in results:
+        >>> # Get first 10 items total
+        >>> for item in client.query("users", ..., limit=10):
+        ...     print(item["name"])
+        >>>
+        >>> # Get all items, fetching 25 per page
+        >>> for item in client.query("users", ..., page_size=25):
         ...     print(item["name"])
     """
 
@@ -36,6 +44,7 @@ class QueryResult:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
@@ -50,6 +59,7 @@ class QueryResult:
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._index_name = index_name
         self._start_key = last_evaluated_key
@@ -62,6 +72,7 @@ class QueryResult:
         self._exhausted = False
         self._first_fetch = True
         self._metrics: OperationMetrics | None = None
+        self._total_returned = 0
 
     @property
     def last_evaluated_key(self) -> dict[str, Any] | None:
@@ -76,10 +87,15 @@ class QueryResult:
         return self
 
     def __next__(self) -> dict[str, Any]:
+        # Check if we've hit the total limit
+        if self._limit is not None and self._total_returned >= self._limit:
+            raise StopIteration
+
         # If we have items in current page, return next one
         if self._page_index < len(self._current_page):
             item = self._current_page[self._page_index]
             self._page_index += 1
+            self._total_returned += 1
             return item
 
         # If exhausted, stop
@@ -95,6 +111,7 @@ class QueryResult:
 
         item = self._current_page[self._page_index]
         self._page_index += 1
+        self._total_returned += 1
         return item
 
     def _fetch_next_page(self) -> None:
@@ -108,10 +125,13 @@ class QueryResult:
         start_key = self._start_key if self._first_fetch else self._last_evaluated_key
         self._first_fetch = False
 
-        # Acquire RCU before fetching (estimate based on limit or default)
+        # Acquire RCU before fetching (estimate based on page_size or default)
         if self._acquire_rcu is not None:
-            rcu_estimate = float(self._limit) if self._limit else 1.0
+            rcu_estimate = float(self._page_size or self._limit or 1)
             self._acquire_rcu(rcu_estimate)
+
+        # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
+        dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
         items, self._last_evaluated_key, self._metrics = self._client.query_page(
             self._table,
@@ -120,7 +140,7 @@ class QueryResult:
             projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
-            limit=self._limit,
+            limit=dynamo_limit,
             exclusive_start_key=start_key,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
@@ -151,8 +171,12 @@ class AsyncQueryResult:
 
     Use `async for` to iterate over results.
 
+    Args:
+        limit: Max total items to return across all pages.
+        page_size: Items per page (passed as Limit to DynamoDB).
+
     Example:
-        >>> async for item in client.async_query("users", ...):
+        >>> async for item in client.async_query("users", ..., limit=10):
         ...     print(item["name"])
     """
 
@@ -166,6 +190,7 @@ class AsyncQueryResult:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
@@ -180,6 +205,7 @@ class AsyncQueryResult:
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
+        self._page_size = page_size
         self._scan_index_forward = scan_index_forward
         self._index_name = index_name
         self._start_key = last_evaluated_key
@@ -192,6 +218,7 @@ class AsyncQueryResult:
         self._exhausted = False
         self._first_fetch = True
         self._metrics: OperationMetrics | None = None
+        self._total_returned = 0
 
     @property
     def last_evaluated_key(self) -> dict[str, Any] | None:
@@ -202,10 +229,15 @@ class AsyncQueryResult:
         return self
 
     async def __anext__(self) -> dict[str, Any]:
+        # Check if we've hit the total limit
+        if self._limit is not None and self._total_returned >= self._limit:
+            raise StopAsyncIteration
+
         # If we have items in current page, return next one
         if self._page_index < len(self._current_page):
             item = self._current_page[self._page_index]
             self._page_index += 1
+            self._total_returned += 1
             return item
 
         # If exhausted, stop
@@ -221,6 +253,7 @@ class AsyncQueryResult:
 
         item = self._current_page[self._page_index]
         self._page_index += 1
+        self._total_returned += 1
         return item
 
     async def _fetch_next_page(self) -> None:
@@ -236,8 +269,11 @@ class AsyncQueryResult:
 
         # Acquire RCU before fetching
         if self._acquire_rcu is not None:
-            rcu_estimate = float(self._limit) if self._limit else 1.0
+            rcu_estimate = float(self._page_size or self._limit or 1)
             self._acquire_rcu(rcu_estimate)
+
+        # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
+        dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
         result = await self._client.async_query_page(
             self._table,
@@ -246,7 +282,7 @@ class AsyncQueryResult:
             projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
-            limit=self._limit,
+            limit=dynamo_limit,
             exclusive_start_key=start_key,
             scan_index_forward=self._scan_index_forward,
             index_name=self._index_name,
@@ -290,9 +326,12 @@ class ScanResult:
 
     Iterate over results and access `last_evaluated_key` for manual pagination.
 
+    Args:
+        limit: Max total items to return across all pages.
+        page_size: Items per page (passed as Limit to DynamoDB).
+
     Example:
-        >>> results = client.scan("users")
-        >>> for item in results:
+        >>> for item in client.scan("users", limit=100):
         ...     print(item["name"])
     """
 
@@ -305,6 +344,7 @@ class ScanResult:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         acquire_rcu: Callable[[float], None] | None = None,
@@ -319,6 +359,7 @@ class ScanResult:
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
+        self._page_size = page_size
         self._index_name = index_name
         self._start_key = last_evaluated_key
         self._acquire_rcu = acquire_rcu
@@ -332,6 +373,7 @@ class ScanResult:
         self._exhausted = False
         self._first_fetch = True
         self._metrics: OperationMetrics | None = None
+        self._total_returned = 0
 
     @property
     def last_evaluated_key(self) -> dict[str, Any] | None:
@@ -342,22 +384,33 @@ class ScanResult:
         return self
 
     def __next__(self) -> dict[str, Any]:
+        # Check if we've hit the total limit
+        if self._limit is not None and self._total_returned >= self._limit:
+            raise StopIteration
+
         if self._page_index < len(self._current_page):
             item = self._current_page[self._page_index]
             self._page_index += 1
+            self._total_returned += 1
             return item
 
         if self._exhausted:
             raise StopIteration
 
-        self._fetch_next_page()
+        # Keep fetching pages until we get items or exhaust all pages
+        while True:
+            self._fetch_next_page()
 
-        if not self._current_page:
-            raise StopIteration
+            if self._current_page:
+                # Got items, return the first one
+                item = self._current_page[self._page_index]
+                self._page_index += 1
+                self._total_returned += 1
+                return item
 
-        item = self._current_page[self._page_index]
-        self._page_index += 1
-        return item
+            if self._exhausted:
+                # No more pages to fetch
+                raise StopIteration
 
     def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
@@ -369,8 +422,11 @@ class ScanResult:
         self._first_fetch = False
 
         if self._acquire_rcu is not None:
-            rcu_estimate = float(self._limit) if self._limit else 1.0
+            rcu_estimate = float(self._page_size or self._limit or 1)
             self._acquire_rcu(rcu_estimate)
+
+        # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
+        dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
         items, self._last_evaluated_key, self._metrics = self._client.scan_page(
             self._table,
@@ -378,7 +434,7 @@ class ScanResult:
             projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
-            limit=self._limit,
+            limit=dynamo_limit,
             exclusive_start_key=start_key,
             index_name=self._index_name,
             consistent_read=self._consistent_read,
@@ -408,8 +464,12 @@ class AsyncScanResult:
 
     Use `async for` to iterate over results.
 
+    Args:
+        limit: Max total items to return across all pages.
+        page_size: Items per page (passed as Limit to DynamoDB).
+
     Example:
-        >>> async for item in client.async_scan("users"):
+        >>> async for item in client.async_scan("users", limit=100):
         ...     print(item["name"])
     """
 
@@ -422,6 +482,7 @@ class AsyncScanResult:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         limit: int | None = None,
+        page_size: int | None = None,
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         acquire_rcu: Callable[[float], None] | None = None,
@@ -436,6 +497,7 @@ class AsyncScanResult:
         self._expression_attribute_names = expression_attribute_names
         self._expression_attribute_values = expression_attribute_values
         self._limit = limit
+        self._page_size = page_size
         self._index_name = index_name
         self._start_key = last_evaluated_key
         self._acquire_rcu = acquire_rcu
@@ -449,6 +511,7 @@ class AsyncScanResult:
         self._exhausted = False
         self._first_fetch = True
         self._metrics: OperationMetrics | None = None
+        self._total_returned = 0
 
     @property
     def last_evaluated_key(self) -> dict[str, Any] | None:
@@ -459,22 +522,33 @@ class AsyncScanResult:
         return self
 
     async def __anext__(self) -> dict[str, Any]:
+        # Check if we've hit the total limit
+        if self._limit is not None and self._total_returned >= self._limit:
+            raise StopAsyncIteration
+
         if self._page_index < len(self._current_page):
             item = self._current_page[self._page_index]
             self._page_index += 1
+            self._total_returned += 1
             return item
 
         if self._exhausted:
             raise StopAsyncIteration
 
-        await self._fetch_next_page()
+        # Keep fetching pages until we get items or exhaust all pages
+        while True:
+            await self._fetch_next_page()
 
-        if not self._current_page:
-            raise StopAsyncIteration
+            if self._current_page:
+                # Got items, return the first one
+                item = self._current_page[self._page_index]
+                self._page_index += 1
+                self._total_returned += 1
+                return item
 
-        item = self._current_page[self._page_index]
-        self._page_index += 1
-        return item
+            if self._exhausted:
+                # No more pages to fetch
+                raise StopAsyncIteration
 
     async def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
@@ -486,8 +560,11 @@ class AsyncScanResult:
         self._first_fetch = False
 
         if self._acquire_rcu is not None:
-            rcu_estimate = float(self._limit) if self._limit else 1.0
+            rcu_estimate = float(self._page_size or self._limit or 1)
             self._acquire_rcu(rcu_estimate)
+
+        # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
+        dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
         result = await self._client.async_scan_page(
             self._table,
@@ -495,7 +572,7 @@ class AsyncScanResult:
             projection_expression=self._projection_expression,
             expression_attribute_names=self._expression_attribute_names,
             expression_attribute_values=self._expression_attribute_values,
-            limit=self._limit,
+            limit=dynamo_limit,
             exclusive_start_key=start_key,
             index_name=self._index_name,
             consistent_read=self._consistent_read,
