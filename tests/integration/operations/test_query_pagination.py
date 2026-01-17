@@ -1,17 +1,28 @@
 """Integration tests for query pagination behavior."""
 
+import uuid
+
 import pytest
 
 
 @pytest.fixture
 def pagination_table(dynamo):
-    """Create a table with 25 items for pagination tests."""
+    """Create a table with 25 items for pagination tests.
+
+    Uses a unique pk per test run to avoid conflicts with other tests.
+    """
+    # Use unique pk to avoid conflicts with other tests
+    unique_id = uuid.uuid4().hex[:8]
+    pk = f"PAGE#{unique_id}"
+
     for i in range(25):
         dynamo.put_item(
             "test_table",
-            {"pk": "PAGE#1", "sk": f"ITEM#{i:03d}", "value": i},
+            {"pk": pk, "sk": f"ITEM#{i:03d}", "value": i},
         )
-    return dynamo
+
+    # Return both client and pk for tests to use
+    return dynamo, pk
 
 
 def test_query_limit_stops_after_n_items(pagination_table):
@@ -21,14 +32,14 @@ def test_query_limit_stops_after_n_items(pagination_table):
     WHEN querying with limit=10
     THEN exactly 10 items are returned (not all 25)
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
             limit=10,
         )
     )
@@ -43,14 +54,14 @@ def test_query_page_size_controls_dynamo_limit(pagination_table):
     WHEN querying with page_size=5 (no limit)
     THEN all 25 items are returned (auto-pagination)
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
             page_size=5,
         )
     )
@@ -65,14 +76,14 @@ def test_query_limit_and_page_size_together(pagination_table):
     WHEN querying with limit=12 and page_size=5
     THEN exactly 12 items are returned (fetching 5 per page)
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
             limit=12,
             page_size=5,
         )
@@ -91,14 +102,14 @@ def test_query_no_limit_returns_all(pagination_table):
     WHEN querying without limit
     THEN all 25 items are returned
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
         )
     )
 
@@ -112,14 +123,14 @@ def test_query_limit_greater_than_total(pagination_table):
     WHEN querying with limit=100
     THEN all 25 items are returned
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
             limit=100,
         )
     )
@@ -134,14 +145,14 @@ def test_query_limit_one(pagination_table):
     WHEN querying with limit=1
     THEN exactly 1 item is returned
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
             limit=1,
         )
     )
@@ -157,7 +168,7 @@ def test_query_manual_pagination_with_limit(pagination_table):
     WHEN querying with limit=10 and using last_evaluated_key
     THEN can paginate through all items in chunks of 10
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
     all_items = []
 
     # First page
@@ -165,7 +176,7 @@ def test_query_manual_pagination_with_limit(pagination_table):
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
-        expression_attribute_values={":pk": "PAGE#1"},
+        expression_attribute_values={":pk": pk},
         limit=10,
     )
     for item in result:
@@ -179,7 +190,7 @@ def test_query_manual_pagination_with_limit(pagination_table):
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
-        expression_attribute_values={":pk": "PAGE#1"},
+        expression_attribute_values={":pk": pk},
         limit=10,
         last_evaluated_key=result.last_evaluated_key,
     )
@@ -193,7 +204,7 @@ def test_query_manual_pagination_with_limit(pagination_table):
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
-        expression_attribute_values={":pk": "PAGE#1"},
+        expression_attribute_values={":pk": pk},
         limit=10,
         last_evaluated_key=result.last_evaluated_key,
     )
@@ -207,15 +218,18 @@ def test_query_manual_pagination_with_limit(pagination_table):
 def test_scan_limit_stops_after_n_items(pagination_table):
     """Scan with limit=10 returns exactly 10 items.
 
-    GIVEN a table with 25 items
+    GIVEN a table with items
     WHEN scanning with limit=10
     THEN exactly 10 items are returned
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.scan(
             "test_table",
+            filter_expression="#pk = :pk",
+            expression_attribute_names={"#pk": "pk"},
+            expression_attribute_values={":pk": pk},
             limit=10,
         )
     )
@@ -226,19 +240,18 @@ def test_scan_limit_stops_after_n_items(pagination_table):
 def test_scan_page_size_returns_all(pagination_table):
     """Scan with page_size (no limit) returns all items matching filter.
 
-    GIVEN a table with 25 items with pk=PAGE#1
-    WHEN scanning with page_size=100 and filter for pk=PAGE#1
+    GIVEN a table with 25 items with unique pk
+    WHEN scanning with page_size=100 and filter for that pk
     THEN all 25 items are returned
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
-    # Use larger page_size to ensure we get all items in reasonable number of pages
     items = list(
         dynamo.scan(
             "test_table",
             filter_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
             page_size=100,
         )
     )
@@ -249,18 +262,18 @@ def test_scan_page_size_returns_all(pagination_table):
 def test_scan_no_limit_returns_all(pagination_table):
     """Scan without limit returns all items matching filter.
 
-    GIVEN a table with 25 items with pk=PAGE#1
-    WHEN scanning without limit and filter for pk=PAGE#1
+    GIVEN a table with 25 items with unique pk
+    WHEN scanning without limit and filter for that pk
     THEN all 25 items are returned
     """
-    dynamo = pagination_table
+    dynamo, pk = pagination_table
 
     items = list(
         dynamo.scan(
             "test_table",
             filter_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
-            expression_attribute_values={":pk": "PAGE#1"},
+            expression_attribute_values={":pk": pk},
         )
     )
 
