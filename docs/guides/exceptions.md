@@ -48,6 +48,17 @@ When using conditional writes, catch `ConditionalCheckFailedException`:
     --8<-- "docs/examples/exceptions/condition_check.py"
     ```
 
+### Get the item that caused the failure
+
+When a condition fails, you often need to see what's in DynamoDB. Instead of making an extra GET call, use `return_values_on_condition_check_failure=True`. The existing item is attached to the exception:
+
+=== "return_item_on_failure.py"
+    ```python
+    --8<-- "docs/examples/exceptions/return_item_on_failure.py"
+    ```
+
+This works with `put_item`, `update_item`, and `delete_item`. The `item` attribute is `None` if you don't set the flag.
+
 ## Advanced
 
 ### Connection errors

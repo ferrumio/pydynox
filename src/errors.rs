@@ -4,9 +4,13 @@
 //! Uses unified error mapping for DynamoDB, S3, and KMS.
 
 use aws_sdk_dynamodb::error::SdkError;
+use aws_sdk_dynamodb::types::AttributeValue;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
+use std::collections::HashMap;
+
+use crate::conversions::attribute_values_to_py_dict;
 
 // Create Python exception classes
 create_exception!(pydynox, PydynoxException, PyException);
@@ -263,6 +267,46 @@ where
             PydynoxException::new_err(msg)
         }
     }
+}
+
+/// Map DynamoDB errors with optional item data for ConditionalCheckFailedException.
+///
+/// When a conditional check fails and the item is available, this creates an exception
+/// with the item attached so users can see what caused the failure.
+pub fn map_sdk_error_with_item<E, R>(
+    py: Python<'_>,
+    err: SdkError<E, R>,
+    table: Option<&str>,
+    item: Option<HashMap<String, AttributeValue>>,
+) -> PyErr
+where
+    E: std::fmt::Debug + std::fmt::Display,
+    R: std::fmt::Debug,
+{
+    let err_debug = format!("{:?}", err);
+    let error_code = extract_error_code(&err_debug);
+
+    // Only handle ConditionalCheckFailedException with item specially
+    if error_code.as_deref() == Some("ConditionalCheckFailedException") {
+        if let Some(item_data) = item {
+            // Convert item to Python dict
+            if let Ok(py_item) = attribute_values_to_py_dict(py, item_data) {
+                // Create exception with item attribute
+                let exc = ConditionalCheckFailedException::new_err(
+                    "The condition expression evaluated to false",
+                );
+                // Set the item attribute on the exception
+                if let Ok(exc_val) = exc.value(py).getattr("__class__") {
+                    let _ = exc.value(py).setattr("item", py_item);
+                    let _ = exc_val; // suppress unused warning
+                }
+                return exc;
+            }
+        }
+    }
+
+    // Fall back to regular error mapping
+    map_sdk_error(err, table)
 }
 
 /// Map S3 SDK errors to Python exceptions.

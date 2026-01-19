@@ -157,14 +157,23 @@ Most of the time you'll use Models instead of these methods directly. But they'r
 |--------|-------------|
 | `ping()` | Check if the client can connect to DynamoDB. Returns `True` or `False`. |
 | `get_region()` | Get the AWS region this client is configured for. |
-| `put_item(table, item)` | Save an item to a table. Overwrites if the key exists. |
+| `put_item(table, item, ...)` | Save an item to a table. Overwrites if the key exists. |
 | `get_item(table, key)` | Get a single item by its primary key. Returns `None` if not found. |
-| `delete_item(table, key)` | Delete an item by its primary key. |
-| `update_item(table, key, updates)` | Update specific attributes without replacing the whole item. |
+| `delete_item(table, key, ...)` | Delete an item by its primary key. |
+| `update_item(table, key, updates, ...)` | Update specific attributes without replacing the whole item. |
 | `query(table, key_condition, ...)` | Find items by partition key. Supports filtering and pagination. |
 | `batch_write(table, put_items, delete_keys)` | Write up to 25 items in one request. Faster than individual puts. |
 | `batch_get(table, keys)` | Get up to 100 items in one request. Faster than individual gets. |
 | `transact_write(operations)` | Write multiple items atomically. All succeed or all fail. |
+
+Write methods (`put_item`, `update_item`, `delete_item`) support these optional parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `condition_expression` | Condition that must be true for the write to succeed |
+| `expression_attribute_names` | Placeholders for reserved words |
+| `expression_attribute_values` | Placeholders for values |
+| `return_values_on_condition_check_failure` | If `True`, get the existing item on `ConditionalCheckFailedException` |
 
 ### Async methods
 

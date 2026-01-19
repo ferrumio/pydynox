@@ -36,6 +36,29 @@ When a save fails due to version mismatch, reload the item and retry:
     --8<-- "docs/examples/optimistic_locking/handle_conflict.py"
     ```
 
+### Get the current item without extra GET
+
+Use `return_values_on_condition_check_failure=True` to get the current item directly from the exception. This saves a round trip:
+
+```python
+from pydynox.pydynox_core import ConditionalCheckFailedException
+
+try:
+    client.update_item(
+        "users",
+        {"pk": "USER#123"},
+        updates={"name": "Alice", "version": 2},
+        condition_expression="#v = :expected",
+        expression_attribute_names={"#v": "version"},
+        expression_attribute_values={":expected": 1},
+        return_values_on_condition_check_failure=True,
+    )
+except ConditionalCheckFailedException as e:
+    # No extra GET needed
+    current_version = e.item["version"]
+    print(f"Version conflict! Current version is {current_version}")
+```
+
 ## Async with high concurrency
 
 For async code with many concurrent operations, always use retry with backoff:
