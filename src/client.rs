@@ -234,7 +234,8 @@ impl DynamoDBClient {
         }
     }
     /// Put an item into a DynamoDB table.
-    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
+    #[allow(clippy::too_many_arguments)]
     pub fn put_item(
         &self,
         py: Python<'_>,
@@ -243,6 +244,7 @@ impl DynamoDBClient {
         condition_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
     ) -> PyResult<OperationMetrics> {
         basic_operations::put_item(
             py,
@@ -253,6 +255,7 @@ impl DynamoDBClient {
             condition_expression,
             expression_attribute_names,
             expression_attribute_values,
+            return_values_on_condition_check_failure,
         )
     }
 
@@ -292,7 +295,8 @@ impl DynamoDBClient {
     }
 
     /// Delete an item from a DynamoDB table.
-    #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
+    #[allow(clippy::too_many_arguments)]
     pub fn delete_item(
         &self,
         py: Python<'_>,
@@ -301,6 +305,7 @@ impl DynamoDBClient {
         condition_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
     ) -> PyResult<OperationMetrics> {
         basic_operations::delete_item(
             py,
@@ -311,11 +316,12 @@ impl DynamoDBClient {
             condition_expression,
             expression_attribute_names,
             expression_attribute_values,
+            return_values_on_condition_check_failure,
         )
     }
 
     /// Update an item in a DynamoDB table.
-    #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn update_item(
         &self,
@@ -327,6 +333,7 @@ impl DynamoDBClient {
         condition_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
     ) -> PyResult<OperationMetrics> {
         basic_operations::update_item(
             py,
@@ -339,6 +346,7 @@ impl DynamoDBClient {
             condition_expression,
             expression_attribute_names,
             expression_attribute_values,
+            return_values_on_condition_check_failure,
         )
     }
 
@@ -613,7 +621,8 @@ impl DynamoDBClient {
     }
 
     /// Async version of put_item.
-    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
+    #[allow(clippy::too_many_arguments)]
     pub fn async_put_item<'py>(
         &self,
         py: Python<'py>,
@@ -622,6 +631,7 @@ impl DynamoDBClient {
         condition_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::async_put_item(
             py,
@@ -631,11 +641,13 @@ impl DynamoDBClient {
             condition_expression,
             expression_attribute_names,
             expression_attribute_values,
+            return_values_on_condition_check_failure,
         )
     }
 
     /// Async version of delete_item.
-    #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
+    #[allow(clippy::too_many_arguments)]
     pub fn async_delete_item<'py>(
         &self,
         py: Python<'py>,
@@ -644,6 +656,7 @@ impl DynamoDBClient {
         condition_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::async_delete_item(
             py,
@@ -653,11 +666,12 @@ impl DynamoDBClient {
             condition_expression,
             expression_attribute_names,
             expression_attribute_values,
+            return_values_on_condition_check_failure,
         )
     }
 
     /// Async version of update_item.
-    #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None))]
+    #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
     #[allow(clippy::too_many_arguments)]
     pub fn async_update_item<'py>(
         &self,
@@ -669,6 +683,7 @@ impl DynamoDBClient {
         condition_expression: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::async_update_item(
             py,
@@ -680,6 +695,7 @@ impl DynamoDBClient {
             condition_expression,
             expression_attribute_names,
             expression_attribute_values,
+            return_values_on_condition_check_failure,
         )
     }
 

@@ -1,6 +1,8 @@
 //! Delete item operation.
 
-use aws_sdk_dynamodb::types::{AttributeValue, ReturnConsumedCapacity};
+use aws_sdk_dynamodb::types::{
+    AttributeValue, ReturnConsumedCapacity, ReturnValuesOnConditionCheckFailure,
+};
 use aws_sdk_dynamodb::Client;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -10,7 +12,7 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 
 use crate::conversions::py_dict_to_attribute_values;
-use crate::errors::map_sdk_error;
+use crate::errors::map_sdk_error_with_item;
 use crate::metrics::OperationMetrics;
 
 /// Prepared delete_item data.
@@ -20,6 +22,7 @@ pub struct PreparedDeleteItem {
     pub condition_expression: Option<String>,
     pub expression_attribute_names: Option<HashMap<String, String>>,
     pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
+    pub return_values_on_condition_check_failure: Option<ReturnValuesOnConditionCheckFailure>,
 }
 
 /// Prepare delete_item by converting Python data to Rust.
@@ -31,6 +34,7 @@ pub fn prepare_delete_item(
     condition_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    return_values_on_condition_check_failure: bool,
 ) -> PyResult<PreparedDeleteItem> {
     let dynamo_key = py_dict_to_attribute_values(py, key)?;
 
@@ -50,12 +54,19 @@ pub fn prepare_delete_item(
         None => None,
     };
 
+    let return_on_failure = if return_values_on_condition_check_failure {
+        Some(ReturnValuesOnConditionCheckFailure::AllOld)
+    } else {
+        None
+    };
+
     Ok(PreparedDeleteItem {
         table: table.to_string(),
         key: dynamo_key,
         condition_expression,
         expression_attribute_names: names,
         expression_attribute_values: values,
+        return_values_on_condition_check_failure: return_on_failure,
     })
 }
 
@@ -70,6 +81,7 @@ pub async fn execute_delete_item(
             aws_sdk_dynamodb::operation::delete_item::DeleteItemError,
         >,
         String,
+        Option<HashMap<String, AttributeValue>>,
     ),
 > {
     let mut request = client
@@ -91,6 +103,9 @@ pub async fn execute_delete_item(
             request = request.expression_attribute_values(placeholder, attr_value);
         }
     }
+    if let Some(return_on_failure) = prepared.return_values_on_condition_check_failure {
+        request = request.return_values_on_condition_check_failure(return_on_failure);
+    }
 
     let start = Instant::now();
     let result = request.send().await;
@@ -106,8 +121,27 @@ pub async fn execute_delete_item(
                 None,
             ))
         }
-        Err(e) => Err((e, prepared.table)),
+        Err(e) => {
+            let item = extract_item_from_delete_error(&e);
+            Err((e, prepared.table, item))
+        }
     }
+}
+
+/// Extract the item from a ConditionalCheckFailedException.
+fn extract_item_from_delete_error(
+    err: &aws_sdk_dynamodb::error::SdkError<
+        aws_sdk_dynamodb::operation::delete_item::DeleteItemError,
+    >,
+) -> Option<HashMap<String, AttributeValue>> {
+    use aws_sdk_dynamodb::operation::delete_item::DeleteItemError;
+
+    if let aws_sdk_dynamodb::error::SdkError::ServiceError(service_err) = err {
+        if let DeleteItemError::ConditionalCheckFailedException(ccf) = service_err.err() {
+            return ccf.item().cloned();
+        }
+    }
+    None
 }
 
 /// Sync delete_item - blocks until complete.
@@ -121,6 +155,7 @@ pub fn delete_item(
     condition_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    return_values_on_condition_check_failure: bool,
 ) -> PyResult<OperationMetrics> {
     let prepared = prepare_delete_item(
         py,
@@ -129,13 +164,14 @@ pub fn delete_item(
         condition_expression,
         expression_attribute_names,
         expression_attribute_values,
+        return_values_on_condition_check_failure,
     )?;
 
     let result = runtime.block_on(execute_delete_item(client.clone(), prepared));
 
     match result {
         Ok(metrics) => Ok(metrics),
-        Err((e, tbl)) => Err(map_sdk_error(e, Some(&tbl))),
+        Err((e, tbl, item)) => Err(map_sdk_error_with_item(py, e, Some(&tbl), item)),
     }
 }
 
@@ -149,6 +185,7 @@ pub fn async_delete_item<'py>(
     condition_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
+    return_values_on_condition_check_failure: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_delete_item(
         py,
@@ -157,13 +194,16 @@ pub fn async_delete_item<'py>(
         condition_expression,
         expression_attribute_names,
         expression_attribute_values,
+        return_values_on_condition_check_failure,
     )?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_delete_item(client, prepared).await;
         match result {
             Ok(metrics) => Ok(metrics),
-            Err((e, tbl)) => Err(map_sdk_error(e, Some(&tbl))),
+            Err((e, tbl, item)) => {
+                Python::attach(|py| Err(map_sdk_error_with_item(py, e, Some(&tbl), item)))
+            }
         }
     })
 }

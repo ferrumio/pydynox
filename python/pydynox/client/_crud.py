@@ -80,8 +80,28 @@ class CrudOperations:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Put an item into a DynamoDB table."""
+        """Put an item into a DynamoDB table.
+
+        Args:
+            table: Table name.
+            item: Item to put.
+            condition_expression: Condition that must be true for the write.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            return_values_on_condition_check_failure: If True and condition fails,
+                the ConditionalCheckFailedException will have an 'item' attribute
+                with the existing item. Saves an extra GET call.
+
+        Returns:
+            Operation metrics.
+
+        Raises:
+            ConditionalCheckFailedException: If condition fails. When
+                return_values_on_condition_check_failure=True, the exception
+                has an 'item' attribute with the existing item.
+        """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(item)
         if pk:
@@ -94,6 +114,7 @@ class CrudOperations:
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
+                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -112,8 +133,22 @@ class CrudOperations:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Async version of put_item."""
+        """Async version of put_item.
+
+        Args:
+            table: Table name.
+            item: Item to put.
+            condition_expression: Condition that must be true for the write.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            return_values_on_condition_check_failure: If True and condition fails,
+                the ConditionalCheckFailedException will have an 'item' attribute.
+
+        Returns:
+            Operation metrics.
+        """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(item)
         if pk:
@@ -126,6 +161,7 @@ class CrudOperations:
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
+                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -241,8 +277,22 @@ class CrudOperations:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Delete an item from a DynamoDB table."""
+        """Delete an item from a DynamoDB table.
+
+        Args:
+            table: Table name.
+            key: Key attributes.
+            condition_expression: Condition that must be true for the delete.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            return_values_on_condition_check_failure: If True and condition fails,
+                the ConditionalCheckFailedException will have an 'item' attribute.
+
+        Returns:
+            Operation metrics.
+        """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
         if pk:
@@ -255,6 +305,7 @@ class CrudOperations:
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
+                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -273,8 +324,22 @@ class CrudOperations:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Async version of delete_item."""
+        """Async version of delete_item.
+
+        Args:
+            table: Table name.
+            key: Key attributes.
+            condition_expression: Condition that must be true for the delete.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            return_values_on_condition_check_failure: If True and condition fails,
+                the ConditionalCheckFailedException will have an 'item' attribute.
+
+        Returns:
+            Operation metrics.
+        """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
         if pk:
@@ -287,6 +352,7 @@ class CrudOperations:
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
+                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -309,8 +375,24 @@ class CrudOperations:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Update an item in a DynamoDB table."""
+        """Update an item in a DynamoDB table.
+
+        Args:
+            table: Table name.
+            key: Key attributes.
+            updates: Dict of field:value pairs to update (simple mode).
+            update_expression: Raw update expression (advanced mode).
+            condition_expression: Condition that must be true for the update.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            return_values_on_condition_check_failure: If True and condition fails,
+                the ConditionalCheckFailedException will have an 'item' attribute.
+
+        Returns:
+            Operation metrics.
+        """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
         if pk:
@@ -325,6 +407,7 @@ class CrudOperations:
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
+                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -345,8 +428,24 @@ class CrudOperations:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Async version of update_item."""
+        """Async version of update_item.
+
+        Args:
+            table: Table name.
+            key: Key attributes.
+            updates: Dict of field:value pairs to update (simple mode).
+            update_expression: Raw update expression (advanced mode).
+            condition_expression: Condition that must be true for the update.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            return_values_on_condition_check_failure: If True and condition fails,
+                the ConditionalCheckFailedException will have an 'item' attribute.
+
+        Returns:
+            Operation metrics.
+        """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
         if pk:
@@ -361,6 +460,7 @@ class CrudOperations:
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
+                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id

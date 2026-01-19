@@ -144,6 +144,24 @@ except ConditionalCheckFailedException:
     print("User already exists")
 ```
 
+### Get the existing item on failure
+
+Use `return_values_on_condition_check_failure=True` to get the existing item without an extra GET call:
+
+```python
+try:
+    client.put_item(
+        "users",
+        {"pk": "USER#123", "name": "Bob"},
+        condition_expression="attribute_not_exists(pk)",
+        return_values_on_condition_check_failure=True,
+    )
+except ConditionalCheckFailedException as e:
+    print(f"User already exists: {e.item}")
+```
+
+This works with `put_item`, `update_item`, and `delete_item`.
+
 ## Type hints
 
 Use `Condition` for type hints:
