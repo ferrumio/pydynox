@@ -1,6 +1,33 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.21.0] - 2026-01-22
+
+
+### CI/CD
+
+- bump actions/cache from 5.0.1 to 5.0.2 (#180)
+
+
+### Documentation
+
+- update changelog for v0.20.0 (#179)
+
+
+### Features
+
+- adding return values on failure (#181)
+- adding transaction (#184)
+
+
+### Refactoring
+
+- Add `last_evaluated_key` parameter to GSI and LSI query (#185)
+
+
+### Deps
+
+- bump thiserror in the rust-dependencies group (#182)
 ## [0.20.0] - 2026-01-17
 
 
