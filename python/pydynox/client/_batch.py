@@ -56,3 +56,53 @@ class BatchOperations:
         All operations run atomically. Either all succeed or all fail.
         """
         self._client.transact_write(operations)  # type: ignore[attr-defined]
+
+    # ========== TRANSACT GET ==========
+
+    def transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+        """Execute a transactional get operation.
+
+        Reads multiple items atomically. Either all reads succeed or all fail.
+        Use this when you need a consistent snapshot of multiple items.
+
+        Args:
+            gets: List of get dicts, each with:
+                - table: Table name
+                - key: Key dict (pk and optional sk)
+                - projection_expression: Optional projection (saves RCU)
+                - expression_attribute_names: Optional name placeholders
+
+        Returns:
+            List of items (or None for items that don't exist).
+
+        Example:
+            items = client.transact_get([
+                {"table": "users", "key": {"pk": "USER#1"}},
+                {"table": "orders", "key": {"pk": "ORDER#1", "sk": "ITEM#1"}},
+            ])
+        """
+        return self._client.transact_get(gets)  # type: ignore[attr-defined, no-any-return]
+
+    # ========== ASYNC TRANSACT WRITE ==========
+
+    async def async_transact_write(self, operations: list[dict[str, Any]]) -> None:
+        """Async version of transact_write.
+
+        All operations run atomically. Either all succeed or all fail.
+        """
+        await self._client.async_transact_write(operations)  # type: ignore[attr-defined]
+
+    # ========== ASYNC TRANSACT GET ==========
+
+    async def async_transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+        """Async version of transact_get.
+
+        Reads multiple items atomically. Either all reads succeed or all fail.
+
+        Args:
+            gets: List of get dicts (same format as transact_get).
+
+        Returns:
+            List of items (or None for items that don't exist).
+        """
+        return await self._client.async_transact_get(gets)  # type: ignore[attr-defined, no-any-return]

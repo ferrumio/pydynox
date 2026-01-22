@@ -205,3 +205,141 @@ class Transaction:
 
         # Clear operations after successful commit
         self._operations = []
+
+
+class AsyncTransaction:
+    """Async context manager for transactional write operations.
+
+    Same as Transaction but for async code.
+
+    Example:
+        >>> async with AsyncTransaction(client) as txn:
+        ...     txn.put("users", {"pk": "USER#1", "sk": "PROFILE", "name": "Alice"})
+        ...     txn.delete("users", {"pk": "USER#2", "sk": "PROFILE"})
+    """
+
+    def __init__(self, client: DynamoDBClient):
+        """Create an AsyncTransaction.
+
+        Args:
+            client: The DynamoDBClient to use.
+        """
+        self._client = client
+        self._operations: list[dict[str, Any]] = []
+
+    async def __aenter__(self) -> AsyncTransaction:
+        """Enter the async context manager."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: Any,
+    ) -> None:
+        """Exit the async context manager and execute the transaction."""
+        if exc_type is None:
+            await self.commit()
+
+    def put(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a put operation to the transaction."""
+        op: dict[str, Any] = {
+            "type": "put",
+            "table": table,
+            "item": item,
+        }
+        if condition_expression:
+            op["condition_expression"] = condition_expression
+        if expression_attribute_names:
+            op["expression_attribute_names"] = expression_attribute_names
+        if expression_attribute_values:
+            op["expression_attribute_values"] = expression_attribute_values
+        self._operations.append(op)
+
+    def delete(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a delete operation to the transaction."""
+        op: dict[str, Any] = {
+            "type": "delete",
+            "table": table,
+            "key": key,
+        }
+        if condition_expression:
+            op["condition_expression"] = condition_expression
+        if expression_attribute_names:
+            op["expression_attribute_names"] = expression_attribute_names
+        if expression_attribute_values:
+            op["expression_attribute_values"] = expression_attribute_values
+        self._operations.append(op)
+
+    def update(
+        self,
+        table: str,
+        key: dict[str, Any],
+        update_expression: str,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
+        """Add an update operation to the transaction."""
+        op: dict[str, Any] = {
+            "type": "update",
+            "table": table,
+            "key": key,
+            "update_expression": update_expression,
+        }
+        if condition_expression:
+            op["condition_expression"] = condition_expression
+        if expression_attribute_names:
+            op["expression_attribute_names"] = expression_attribute_names
+        if expression_attribute_values:
+            op["expression_attribute_values"] = expression_attribute_values
+        self._operations.append(op)
+
+    def condition_check(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a condition check to the transaction."""
+        op: dict[str, Any] = {
+            "type": "condition_check",
+            "table": table,
+            "key": key,
+            "condition_expression": condition_expression,
+        }
+        if expression_attribute_names:
+            op["expression_attribute_names"] = expression_attribute_names
+        if expression_attribute_values:
+            op["expression_attribute_values"] = expression_attribute_values
+        self._operations.append(op)
+
+    async def commit(self) -> None:
+        """Execute all collected operations atomically.
+
+        Called automatically when exiting the async context manager.
+        Can also be called manually to execute operations early.
+        """
+        if not self._operations:
+            return
+
+        await self._client.async_transact_write(self._operations)
+
+        # Clear operations after successful commit
+        self._operations = []
