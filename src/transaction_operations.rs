@@ -1,16 +1,18 @@
 //! Transaction operations module for DynamoDB.
 //!
-//! Handles transactional write operations with all-or-nothing semantics.
+//! Handles transactional read and write operations with all-or-nothing semantics.
 //! All operations in a transaction either succeed together or fail together.
 
-use aws_sdk_dynamodb::types::{ConditionCheck, Delete, Put, TransactWriteItem, Update};
+use aws_sdk_dynamodb::types::{
+    ConditionCheck, Delete, Get, Put, TransactGetItem, TransactWriteItem, Update,
+};
 use aws_sdk_dynamodb::Client;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use crate::conversions::py_dict_to_attribute_values;
+use crate::conversions::{attribute_values_to_py_dict, py_dict_to_attribute_values};
 use crate::errors::map_sdk_error;
 
 /// Maximum items per transaction (DynamoDB limit).
@@ -308,4 +310,229 @@ fn build_condition_check(
     })?;
 
     Ok(TransactWriteItem::builder().condition_check(check).build())
+}
+
+// ========== TRANSACT GET ==========
+
+/// Execute a transactional get operation.
+///
+/// Reads multiple items atomically. Either all reads succeed or all fail.
+/// Use this when you need a consistent snapshot of multiple items.
+///
+/// # Arguments
+///
+/// * `py` - Python interpreter reference
+/// * `client` - DynamoDB client
+/// * `runtime` - Tokio runtime
+/// * `gets` - List of get dicts, each with:
+///   - `table`: Table name
+///   - `key`: Key dict (pk and optional sk)
+///   - `projection_expression`: Optional projection (saves RCU)
+///   - `expression_attribute_names`: Optional name placeholders
+///
+/// # Returns
+///
+/// List of items (or None for items that don't exist).
+pub fn transact_get(
+    py: Python<'_>,
+    client: &Client,
+    runtime: &Arc<Runtime>,
+    gets: &Bound<'_, PyList>,
+) -> PyResult<Vec<Option<Py<PyAny>>>> {
+    if gets.is_empty() {
+        return Ok(vec![]);
+    }
+
+    if gets.len() > TRANSACTION_MAX_ITEMS {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "Transaction exceeds maximum of {} items (got {})",
+            TRANSACTION_MAX_ITEMS,
+            gets.len()
+        )));
+    }
+
+    let mut transact_items: Vec<TransactGetItem> = Vec::new();
+
+    for get in gets.iter() {
+        let get_dict = get.cast::<PyDict>()?;
+        let transact_item = build_transact_get_item(py, get_dict)?;
+        transact_items.push(transact_item);
+    }
+
+    let client = client.clone();
+
+    let result = runtime.block_on(async {
+        client
+            .transact_get_items()
+            .set_transact_items(Some(transact_items))
+            .send()
+            .await
+    });
+
+    match result {
+        Ok(output) => {
+            let responses = output.responses.unwrap_or_default();
+            let mut items: Vec<Option<Py<PyAny>>> = Vec::with_capacity(responses.len());
+
+            for response in responses {
+                if let Some(item) = response.item {
+                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    items.push(Some(py_dict.into_any().unbind()));
+                } else {
+                    items.push(None);
+                }
+            }
+
+            Ok(items)
+        }
+        Err(e) => Err(map_sdk_error(e, None)),
+    }
+}
+
+/// Build a TransactGetItem from a Python dict.
+fn build_transact_get_item(
+    py: Python<'_>,
+    get_dict: &Bound<'_, PyDict>,
+) -> PyResult<TransactGetItem> {
+    let table: String = get_dict
+        .get_item("table")?
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>("Get operation missing 'table' field")
+        })?
+        .extract()?;
+
+    let key_obj = get_dict.get_item("key")?.ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>("Get operation missing 'key' field")
+    })?;
+    let key_dict = key_obj.cast::<PyDict>()?;
+    let dynamo_key = py_dict_to_attribute_values(py, key_dict)?;
+
+    let mut get_builder = Get::builder().table_name(table).set_key(Some(dynamo_key));
+
+    if let Some(projection) = get_dict.get_item("projection_expression")? {
+        let projection_str: String = projection.extract()?;
+        get_builder = get_builder.projection_expression(projection_str);
+    }
+
+    if let Some(names_obj) = get_dict.get_item("expression_attribute_names")? {
+        let names_dict = names_obj.cast::<PyDict>()?;
+        for (k, v) in names_dict.iter() {
+            let placeholder: String = k.extract()?;
+            let attr_name: String = v.extract()?;
+            get_builder = get_builder.expression_attribute_names(placeholder, attr_name);
+        }
+    }
+
+    let get = get_builder.build().map_err(|e| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Failed to build Get: {}", e))
+    })?;
+
+    Ok(TransactGetItem::builder().get(get).build())
+}
+
+// ========== ASYNC VERSIONS ==========
+
+/// Async version of transact_write.
+///
+/// Returns a Python awaitable that executes the transaction.
+pub fn async_transact_write<'py>(
+    py: Python<'py>,
+    client: Client,
+    operations: &Bound<'_, PyList>,
+) -> PyResult<Bound<'py, PyAny>> {
+    if operations.is_empty() {
+        return pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            Ok(Python::attach(|py| py.None()))
+        });
+    }
+
+    if operations.len() > TRANSACTION_MAX_ITEMS {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "Transaction exceeds maximum of {} items (got {})",
+            TRANSACTION_MAX_ITEMS,
+            operations.len()
+        )));
+    }
+
+    let mut transact_items: Vec<TransactWriteItem> = Vec::new();
+
+    for op in operations.iter() {
+        let op_dict = op.cast::<PyDict>()?;
+        let transact_item = build_transact_write_item(py, op_dict)?;
+        transact_items.push(transact_item);
+    }
+
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = client
+            .transact_write_items()
+            .set_transact_items(Some(transact_items))
+            .send()
+            .await;
+
+        match result {
+            Ok(_) => Ok(Python::attach(|py| py.None())),
+            Err(e) => Err(map_sdk_error(e, None)),
+        }
+    })
+}
+
+/// Async version of transact_get.
+///
+/// Returns a Python awaitable that reads multiple items atomically.
+pub fn async_transact_get<'py>(
+    py: Python<'py>,
+    client: Client,
+    gets: &Bound<'_, PyList>,
+) -> PyResult<Bound<'py, PyAny>> {
+    if gets.is_empty() {
+        return pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            Ok(Python::attach(|py| {
+                let list = pyo3::types::PyList::empty(py);
+                list.into_any().unbind()
+            }))
+        });
+    }
+
+    if gets.len() > TRANSACTION_MAX_ITEMS {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+            "Transaction exceeds maximum of {} items (got {})",
+            TRANSACTION_MAX_ITEMS,
+            gets.len()
+        )));
+    }
+
+    let mut transact_items: Vec<TransactGetItem> = Vec::new();
+
+    for get in gets.iter() {
+        let get_dict = get.cast::<PyDict>()?;
+        let transact_item = build_transact_get_item(py, get_dict)?;
+        transact_items.push(transact_item);
+    }
+
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = client
+            .transact_get_items()
+            .set_transact_items(Some(transact_items))
+            .send()
+            .await;
+
+        match result {
+            Ok(output) => Python::attach(|py| {
+                let responses = output.responses.unwrap_or_default();
+                let py_list = pyo3::types::PyList::empty(py);
+
+                for response in responses {
+                    if let Some(item) = response.item {
+                        let py_dict = attribute_values_to_py_dict(py, item)?;
+                        py_list.append(py_dict)?;
+                    } else {
+                        py_list.append(py.None())?;
+                    }
+                }
+
+                Ok(py_list.into_any().unbind())
+            }),
+            Err(e) => Err(map_sdk_error(e, None)),
+        }
+    })
 }

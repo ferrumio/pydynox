@@ -509,12 +509,60 @@ impl DynamoDBClient {
     }
 
     /// Execute a transactional write operation.
+    ///
+    /// All operations run atomically. Either all succeed or all fail.
     pub fn transact_write(
         &self,
         py: Python<'_>,
         operations: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<()> {
         transaction_operations::transact_write(py, &self.client, &self.runtime, operations)
+    }
+
+    /// Execute a transactional get operation.
+    ///
+    /// Reads multiple items atomically. Either all reads succeed or all fail.
+    /// Use this when you need a consistent snapshot of multiple items.
+    ///
+    /// # Arguments
+    ///
+    /// * `gets` - List of get dicts, each with:
+    ///   - `table`: Table name
+    ///   - `key`: Key dict (pk and optional sk)
+    ///   - `projection_expression`: Optional projection (saves RCU)
+    ///   - `expression_attribute_names`: Optional name placeholders
+    ///
+    /// # Returns
+    ///
+    /// List of items (or None for items that don't exist).
+    pub fn transact_get(
+        &self,
+        py: Python<'_>,
+        gets: &Bound<'_, pyo3::types::PyList>,
+    ) -> PyResult<Vec<Option<Py<PyAny>>>> {
+        transaction_operations::transact_get(py, &self.client, &self.runtime, gets)
+    }
+
+    /// Async version of transact_write.
+    ///
+    /// Returns a Python awaitable that executes the transaction.
+    pub fn async_transact_write<'py>(
+        &self,
+        py: Python<'py>,
+        operations: &Bound<'_, pyo3::types::PyList>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        transaction_operations::async_transact_write(py, self.client.clone(), operations)
+    }
+
+    /// Async version of transact_get.
+    ///
+    /// Returns a Python awaitable that reads multiple items atomically.
+    pub fn async_transact_get<'py>(
+        &self,
+        py: Python<'py>,
+        gets: &Bound<'_, pyo3::types::PyList>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        transaction_operations::async_transact_get(py, self.client.clone(), gets)
     }
 
     /// Create a new DynamoDB table.
