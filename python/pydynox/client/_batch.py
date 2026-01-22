@@ -106,3 +106,39 @@ class BatchOperations:
             List of items (or None for items that don't exist).
         """
         return await self._client.async_transact_get(gets)  # type: ignore[attr-defined, no-any-return]
+
+    # ========== ASYNC BATCH WRITE ==========
+
+    async def async_batch_write(
+        self,
+        table: str,
+        put_items: list[dict[str, Any]] | None = None,
+        delete_keys: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Async batch write items to a DynamoDB table.
+
+        Writes multiple items in a single request. Handles:
+        - Splitting requests to respect the 25-item limit per batch
+        - Retrying unprocessed items with exponential backoff
+        """
+        await self._client.async_batch_write(  # type: ignore[attr-defined]
+            table,
+            put_items or [],
+            delete_keys or [],
+        )
+
+    # ========== ASYNC BATCH GET ==========
+
+    async def async_batch_get(
+        self,
+        table: str,
+        keys: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Async batch get items from a DynamoDB table.
+
+        Gets multiple items in a single request. Handles:
+        - Splitting requests to respect the 100-item limit per batch
+        - Retrying unprocessed keys with exponential backoff
+        - Combining results from multiple requests
+        """
+        return await self._client.async_batch_get(table, keys)  # type: ignore[attr-defined, no-any-return]

@@ -82,6 +82,9 @@ Fetch user and their orders at the same time:
 | `model.save()` | `model.async_save()` |
 | `model.delete()` | `model.async_delete()` |
 | `model.update()` | `model.async_update()` |
+| `Model.batch_get()` | `Model.async_batch_get()` |
+| `Model.query()` | `Model.async_query()` |
+| `Model.scan()` | `Model.async_scan()` |
 
 ### DynamoDBClient
 
@@ -92,6 +95,14 @@ Fetch user and their orders at the same time:
 | `delete_item()` | `async_delete_item()` |
 | `update_item()` | `async_update_item()` |
 | `query()` | `async_query()` |
+| `batch_get()` | `async_batch_get()` |
+| `batch_write()` | `async_batch_write()` |
+
+### Batch operations
+
+| Sync | Async |
+|------|-------|
+| `BatchWriter` | `AsyncBatchWriter` |
 
 ## Notes
 

@@ -1,15 +1,30 @@
 # Batch operations
 
-Work with multiple items at once. Instead of making 100 separate API calls, batch operations let you send items in groups of 25 (the DynamoDB limit).
+Work with multiple items at once. Instead of making 100 separate API calls, batch operations let you send items in groups.
 
 ## Key features
 
-- Auto-batching in groups of 25
+- `batch_get` - Fetch up to 100 items per request (auto-splits larger batches)
+- `BatchWriter` - Write up to 25 items per request (auto-splits larger batches)
 - Automatic retry for failed items
 - Mix puts and deletes in one batch
+- Full async support with `AsyncBatchWriter` and `async_batch_get`
 - Metrics on every operation (see [observability](observability.md))
 
 ## Getting started
+
+### Batch get
+
+Fetch multiple items by their keys. DynamoDB limits batch gets to 100 items per request, but pydynox handles larger batches automatically.
+
+=== "batch_get.py"
+    ```python
+    --8<-- "docs/examples/batch/batch_get.py"
+    ```
+
+Items are returned in any order (not guaranteed to match input order). Missing items are silently skipped.
+
+### Batch write
 
 Use `BatchWriter` to save or delete many items. The batch writer handles all the complexity for you: it groups items into batches, sends them to DynamoDB, and retries any items that fail.
 
@@ -62,13 +77,26 @@ except Exception as e:
 !!! tip
     If you're seeing frequent failures, consider using [rate limiting](rate-limiting.md) to stay within your provisioned capacity.
 
+### Async batch operations
+
+All batch operations have async versions. Use `AsyncBatchWriter` for writes and `async_batch_get` for reads:
+
+=== "async_batch.py"
+    ```python
+    --8<-- "docs/examples/batch/async_batch.py"
+    ```
+
+The async versions work the same as sync, but use `async with` and `await`.
+
 ### Performance tips
 
 1. **Use batch operations for bulk work** - If you're saving more than a few items, batching is faster than individual `put_item` calls.
 
-2. **Don't batch single items** - For one or two items, use regular `put_item`. The overhead of batching isn't worth it.
+2. **Use `as_dict=True` for read-heavy workloads** - Skip model instantiation when you just need the data.
 
-3. **Consider rate limiting** - If you're writing a lot of data, combine batch operations with rate limiting to avoid throttling.
+3. **Don't batch single items** - For one or two items, use regular `put_item` or `get_item`. The overhead of batching isn't worth it.
+
+4. **Consider rate limiting** - If you're writing a lot of data, combine batch operations with rate limiting to avoid throttling.
 
 
 ## Testing your code

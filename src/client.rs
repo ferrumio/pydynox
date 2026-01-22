@@ -565,6 +565,31 @@ impl DynamoDBClient {
         transaction_operations::async_transact_get(py, self.client.clone(), gets)
     }
 
+    /// Async version of batch_write.
+    ///
+    /// Returns a Python awaitable that writes items in batch.
+    pub fn async_batch_write<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        put_items: &Bound<'_, pyo3::types::PyList>,
+        delete_keys: &Bound<'_, pyo3::types::PyList>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        batch_operations::async_batch_write(py, self.client.clone(), table, put_items, delete_keys)
+    }
+
+    /// Async version of batch_get.
+    ///
+    /// Returns a Python awaitable that gets items in batch.
+    pub fn async_batch_get<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        keys: &Bound<'_, pyo3::types::PyList>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        batch_operations::async_batch_get(py, self.client.clone(), table, keys)
+    }
+
     /// Create a new DynamoDB table.
     #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, local_secondary_indexes=None, wait=false))]
     #[allow(clippy::too_many_arguments)]

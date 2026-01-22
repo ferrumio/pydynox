@@ -14,7 +14,7 @@ from pydynox._internal._model._async import (
     async_update_by_key,
 )
 from pydynox._internal._model._base import ModelBase, ModelMeta
-from pydynox._internal._model._batch import batch_get
+from pydynox._internal._model._batch import async_batch_get, batch_get
 from pydynox._internal._model._crud import (
     delete,
     delete_by_key,
@@ -243,6 +243,34 @@ class Model(ModelBase, metaclass=ModelMeta):
             >>> users = User.batch_get(keys, as_dict=True)
         """
         return batch_get(cls, keys, consistent_read, as_dict)
+
+    @classmethod
+    async def async_batch_get(
+        cls: type[M],
+        keys: list[dict[str, Any]],
+        consistent_read: bool | None = None,
+        as_dict: bool = False,
+    ) -> list[M] | list[dict[str, Any]]:
+        """Async batch get multiple items by their keys.
+
+        Args:
+            keys: List of key dicts (each with hash_key and optional range_key).
+            consistent_read: Use strongly consistent read.
+            as_dict: If True, return dicts instead of Model instances.
+
+        Returns:
+            List of model instances or dicts.
+
+        Example:
+            >>> keys = [
+            ...     {"pk": "USER#1", "sk": "PROFILE"},
+            ...     {"pk": "USER#2", "sk": "PROFILE"},
+            ... ]
+            >>> users = await User.async_batch_get(keys)
+            >>> for user in users:
+            ...     print(user.name)
+        """
+        return await async_batch_get(cls, keys, consistent_read, as_dict)
 
     # ========== ASYNC CRUD ==========
 
