@@ -112,6 +112,7 @@ class GlobalSecondaryIndex(Generic[M]):
         limit: int | None = None,
         page_size: int | None = None,
         scan_index_forward: bool = True,
+        last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> GSIQueryResult[M]:
         """Query the GSI."""
@@ -135,6 +136,7 @@ class GlobalSecondaryIndex(Generic[M]):
             limit=limit,
             page_size=page_size,
             scan_index_forward=scan_index_forward,
+            last_evaluated_key=last_evaluated_key,
         )
 
     def async_query(
@@ -144,6 +146,7 @@ class GlobalSecondaryIndex(Generic[M]):
         limit: int | None = None,
         page_size: int | None = None,
         scan_index_forward: bool = True,
+        last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> AsyncGSIQueryResult[M]:
         """Async version of query."""
@@ -167,6 +170,7 @@ class GlobalSecondaryIndex(Generic[M]):
             limit=limit,
             page_size=page_size,
             scan_index_forward=scan_index_forward,
+            last_evaluated_key=last_evaluated_key,
         )
 
     def to_dynamodb_definition(self) -> dict[str, Any]:
@@ -544,6 +548,7 @@ class LocalSecondaryIndex(Generic[M]):
         page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool = False,
+        last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> LSIQueryResult[M]:
         """Query the LSI."""
@@ -571,6 +576,7 @@ class LocalSecondaryIndex(Generic[M]):
             page_size=page_size,
             scan_index_forward=scan_index_forward,
             consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
         )
 
     def async_query(
@@ -581,6 +587,7 @@ class LocalSecondaryIndex(Generic[M]):
         page_size: int | None = None,
         scan_index_forward: bool = True,
         consistent_read: bool = False,
+        last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> AsyncLSIQueryResult[M]:
         """Async version of query."""
@@ -608,6 +615,7 @@ class LocalSecondaryIndex(Generic[M]):
             page_size=page_size,
             scan_index_forward=scan_index_forward,
             consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
         )
 
     def to_create_table_definition(self, model_class: type[M]) -> dict[str, Any]:
