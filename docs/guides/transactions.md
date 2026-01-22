@@ -5,8 +5,9 @@ Run multiple operations that succeed or fail together. If any operation fails, D
 ## Key features
 
 - All-or-nothing operations
-- Put, delete, and update in one transaction
+- Put, delete, update, and read in one transaction
 - Max 100 items per transaction
+- Async support for high-concurrency apps
 - Metrics on every operation (see [observability](observability.md))
 
 ## Getting started
@@ -26,6 +27,31 @@ If any of these fails, you don't want partial data. Transactions guarantee all o
 
 When you use `Transaction` as a context manager, it automatically commits when the block ends. If an exception occurs inside the block, the transaction is not committed.
 
+## Reading multiple items
+
+Use `transact_get` to read multiple items atomically. This gives you a consistent snapshot - all items are read at the same point in time.
+
+=== "transact_get.py"
+    ```python
+    --8<-- "docs/examples/transactions/transact_get.py"
+    ```
+
+This is useful when you need to read related data that must be consistent. For example, reading a user and their orders together.
+
+## Async transactions
+
+For async code, use `AsyncTransaction` and the async methods:
+
+=== "async_transaction.py"
+    ```python
+    --8<-- "docs/examples/transactions/async_transaction.py"
+    ```
+
+=== "async_transact_get.py"
+    ```python
+    --8<-- "docs/examples/transactions/async_transact_get.py"
+    ```
+
 ## Advanced
 
 ### Transaction operations
@@ -37,6 +63,7 @@ You can mix different operations in one transaction:
 | `tx.put(table, item)` | Add or replace an item |
 | `tx.delete(table, key)` | Remove an item |
 | `tx.update(table, key, updates)` | Update specific attributes |
+| `tx.condition_check(table, key, condition)` | Check a condition without modifying |
 
 ```python
 with Transaction(client) as tx:
@@ -49,6 +76,17 @@ with Transaction(client) as tx:
     # Delete item
     tx.delete("temp", {"pk": "TEMP#1"})
 ```
+
+### Client methods
+
+You can also use the client directly without the context manager:
+
+| Method | Description |
+|--------|-------------|
+| `client.transact_write(operations)` | Write multiple items atomically |
+| `client.transact_get(gets)` | Read multiple items atomically |
+| `client.async_transact_write(operations)` | Async write |
+| `client.async_transact_get(gets)` | Async read |
 
 ### Limits
 
@@ -69,6 +107,7 @@ If you exceed these limits, the transaction fails before any operation runs.
 - You need all-or-nothing behavior
 - You're updating related data that must stay consistent
 - You need to check conditions before writing (like "only update if version matches")
+- You need a consistent snapshot of multiple items
 
 **Don't use transactions for:**
 

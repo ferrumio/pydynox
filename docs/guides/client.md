@@ -165,6 +165,7 @@ Most of the time you'll use Models instead of these methods directly. But they'r
 | `batch_write(table, put_items, delete_keys)` | Write up to 25 items in one request. Faster than individual puts. |
 | `batch_get(table, keys)` | Get up to 100 items in one request. Faster than individual gets. |
 | `transact_write(operations)` | Write multiple items atomically. All succeed or all fail. |
+| `transact_get(gets)` | Read multiple items atomically. Consistent snapshot. |
 
 Write methods (`put_item`, `update_item`, `delete_item`) support these optional parameters:
 
@@ -184,6 +185,8 @@ Write methods (`put_item`, `update_item`, `delete_item`) support these optional 
 | `async_delete_item(table, key)` | Async version of delete_item. |
 | `async_update_item(table, key, updates)` | Async version of update_item. |
 | `async_query(table, key_condition, ...)` | Async version of query. |
+| `async_transact_write(operations)` | Async version of transact_write. |
+| `async_transact_get(gets)` | Async version of transact_get. |
 
 See [async operations](async.md) for examples and best practices.
 
