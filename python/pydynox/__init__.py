@@ -20,7 +20,7 @@ from __future__ import annotations
 from pydynox import pydynox_core  # noqa: F401
 from pydynox._internal._logging import set_correlation_id, set_logger
 from pydynox._internal._tracing import disable_tracing, enable_tracing
-from pydynox.batch_operations import BatchWriter
+from pydynox.batch_operations import AsyncBatchWriter, BatchWriter
 from pydynox.client import DynamoDBClient
 from pydynox.conditions import Condition
 from pydynox.config import (
@@ -44,6 +44,7 @@ __all__ = [
     "Model",
     "ModelConfig",
     # Operations
+    "AsyncBatchWriter",
     "AsyncTransaction",
     "BatchWriter",
     "Condition",
