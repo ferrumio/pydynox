@@ -9,6 +9,7 @@ nav = [
         "index.md",
         "getting-started.md",
     ] },
+    { "We are async-first" = "guides/async-first.md" },
     { "API Reference" = "api/pydynox/index.html" },
     { "Core" = [
         "guides/client.md",
