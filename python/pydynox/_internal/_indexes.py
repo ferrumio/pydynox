@@ -403,6 +403,14 @@ class AsyncGSIQueryResult(Generic[M]):
         self._query_result: Any = None
         self._initialized = False
 
+    @property
+    def last_evaluated_key(self) -> dict[str, Any] | None:
+        """Get the last evaluated key for pagination."""
+        if self._query_result is None:
+            return None
+        result: dict[str, Any] | None = self._query_result.last_evaluated_key
+        return result
+
     def _build_query(self) -> Any:
         from pydynox.query import AsyncQueryResult
 
@@ -471,6 +479,7 @@ class AsyncGSIQueryResult(Generic[M]):
         return instance
 
     async def first(self) -> M | None:
+        """Get the first item or None."""
         try:
             return await self.__anext__()
         except StopAsyncIteration:
@@ -797,6 +806,14 @@ class AsyncLSIQueryResult(Generic[M]):
         self._query_result: Any = None
         self._initialized = False
 
+    @property
+    def last_evaluated_key(self) -> dict[str, Any] | None:
+        """Get the last evaluated key for pagination."""
+        if self._query_result is None:
+            return None
+        result: dict[str, Any] | None = self._query_result.last_evaluated_key
+        return result
+
     def _build_query(self) -> Any:
         from pydynox.query import AsyncQueryResult
 
@@ -862,6 +879,7 @@ class AsyncLSIQueryResult(Generic[M]):
         return instance
 
     async def first(self) -> M | None:
+        """Get the first item or None."""
         try:
             return await self.__anext__()
         except StopAsyncIteration:
