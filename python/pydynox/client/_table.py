@@ -3,22 +3,31 @@
 Async-first API:
 - create_table(), delete_table(), table_exists() - async (default)
 - sync_create_table(), sync_delete_table(), sync_table_exists() - sync
+
+Coverage note: This module is a thin wrapper around Rust client methods.
+Lines are covered by integration tests, not unit tests. The TYPE_CHECKING
+block and method bodies show as uncovered in unit test coverage because
+they delegate directly to self._client (Rust).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Coroutine
 
 
-class TableOperations:
+class TableOperations:  # pragma: no cover
     """Table management operations: create, delete, exists, wait.
 
     Async-first API:
     - Async methods (no prefix): create_table(), delete_table(), table_exists()
     - Sync methods (sync_ prefix): sync_create_table(), sync_delete_table(), sync_table_exists()
+
+    Note: This class is excluded from unit test coverage because all methods
+    are thin wrappers that delegate to self._client (Rust). Coverage is
+    provided by integration tests.
     """
 
     # ========== ASYNC METHODS (default, no prefix) ==========

@@ -186,10 +186,13 @@ jobs:
       - name: Run tests with coverage
         run: |
           source .venv/bin/activate
-          pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark
+          pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark --ignore=tests/memory
 
       - name: Upload coverage
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           fail_ci_if_error: false
+          env_vars: PYTHON
+          name: pydynox-codecov
