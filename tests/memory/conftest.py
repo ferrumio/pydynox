@@ -46,8 +46,8 @@ def memory_table(client):
     """Create a table for memory tests."""
     table_name = "memory_test_table"
 
-    if not client.table_exists(table_name):
-        client.create_table(
+    if not client.sync_table_exists(table_name):
+        client.sync_create_table(
             table_name,
             hash_key=("pk", "S"),
             range_key=("sk", "S"),

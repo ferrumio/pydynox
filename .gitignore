@@ -4,6 +4,8 @@
 
 site/
 
+coverage.xml
+
 # Python
 __pycache__/
 *.py[cod]
