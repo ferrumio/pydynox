@@ -19,11 +19,11 @@ def lsi_pagination_client(dynamodb_endpoint):
     table_name = "lsi_pagination_table"
 
     # Clean up if exists
-    if client.table_exists(table_name):
-        client.delete_table(table_name)
+    if client.sync_table_exists(table_name):
+        client.sync_delete_table(table_name)
 
     # Create table with LSI
-    client.create_table(
+    client.sync_create_table(
         table_name,
         hash_key=("pk", "S"),
         range_key=("sk", "S"),

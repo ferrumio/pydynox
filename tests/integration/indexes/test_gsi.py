@@ -17,11 +17,11 @@ def gsi_client(dynamodb_endpoint):
     )
 
     # Delete if exists
-    if client.table_exists("gsi_test_table"):
-        client.delete_table("gsi_test_table")
+    if client.sync_table_exists("gsi_test_table"):
+        client.sync_delete_table("gsi_test_table")
 
     # Create table with GSIs
-    client.create_table(
+    client.sync_create_table(
         "gsi_test_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),

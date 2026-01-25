@@ -1,4 +1,8 @@
-"""Integration tests for table management operations."""
+"""Integration tests for DynamoDBClient table operations (sync).
+
+Full test coverage using sync_* methods. Async API is validated separately
+in test_client_table_async.py with minimal tests.
+"""
 
 import pytest
 from pydynox import DynamoDBClient
@@ -20,32 +24,34 @@ def client(dynamodb_endpoint):
     )
 
 
-def test_create_table_with_hash_key_only(client):
+# ============ Basic Table Operations ============
+
+
+def test_create_table_hash_key_only(client):
     """Test creating a table with only a hash key."""
-    # WHEN we create a table with hash key only
-    client.create_table("hash_only_table", hash_key=("pk", "S"))
+    client.sync_create_table("hash_only_table", hash_key=("pk", "S"))
 
-    # THEN the table exists
-    assert client.table_exists("hash_only_table")
-    client.delete_table("hash_only_table")
+    assert client.sync_table_exists("hash_only_table")
+    client.sync_delete_table("hash_only_table")
 
 
-def test_create_table_with_hash_and_range_key(client):
+def test_create_table_hash_and_range_key(client):
     """Test creating a table with hash and range key."""
-    client.create_table(
+    client.sync_create_table(
         "hash_range_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
     )
 
-    assert client.table_exists("hash_range_table")
+    assert client.sync_table_exists("hash_range_table")
 
     # Verify we can write to it
     client.put_item("hash_range_table", {"pk": "test", "sk": "item", "data": "value"})
     result = client.get_item("hash_range_table", {"pk": "test", "sk": "item"})
+    assert result is not None
     assert result["data"] == "value"
 
-    client.delete_table("hash_range_table")
+    client.sync_delete_table("hash_range_table")
 
 
 @pytest.mark.parametrize(
@@ -55,18 +61,18 @@ def test_create_table_with_hash_and_range_key(client):
         pytest.param("N", id="number"),
     ],
 )
-def test_create_table_with_different_key_types(client, key_type):
+def test_create_table_different_key_types(client, key_type):
     """Test creating tables with different key types."""
     table_name = f"key_type_{key_type}_table"
 
-    client.create_table(table_name, hash_key=("pk", key_type))
-    assert client.table_exists(table_name)
-    client.delete_table(table_name)
+    client.sync_create_table(table_name, hash_key=("pk", key_type))
+    assert client.sync_table_exists(table_name)
+    client.sync_delete_table(table_name)
 
 
-def test_create_table_with_provisioned_billing(client):
+def test_create_table_provisioned_billing(client):
     """Test creating a table with provisioned capacity."""
-    client.create_table(
+    client.sync_create_table(
         "provisioned_table",
         hash_key=("pk", "S"),
         billing_mode="PROVISIONED",
@@ -74,91 +80,90 @@ def test_create_table_with_provisioned_billing(client):
         write_capacity=5,
     )
 
-    assert client.table_exists("provisioned_table")
-    client.delete_table("provisioned_table")
+    assert client.sync_table_exists("provisioned_table")
+    client.sync_delete_table("provisioned_table")
 
 
 def test_create_table_with_wait(client):
     """Test creating a table and waiting for it to be active."""
-    client.create_table("wait_table", hash_key=("pk", "S"), wait=True)
+    client.sync_create_table("wait_table", hash_key=("pk", "S"), wait=True)
 
     # Table should be immediately usable
     client.put_item("wait_table", {"pk": "test", "data": "value"})
     result = client.get_item("wait_table", {"pk": "test"})
+    assert result is not None
     assert result["data"] == "value"
 
-    client.delete_table("wait_table")
+    client.sync_delete_table("wait_table")
 
 
 def test_table_exists_returns_false_for_nonexistent(client):
-    """Test that table_exists returns False for non-existent tables."""
-    assert client.table_exists("nonexistent_table_12345") is False
+    """Test that sync_table_exists returns False for non-existent tables."""
+    assert client.sync_table_exists("nonexistent_table_12345") is False
 
 
 def test_delete_table(client):
     """Test deleting a table."""
-    # GIVEN an existing table
-    client.create_table("to_delete_table", hash_key=("pk", "S"))
-    assert client.table_exists("to_delete_table")
+    client.sync_create_table("to_delete_table", hash_key=("pk", "S"))
+    assert client.sync_table_exists("to_delete_table")
 
-    # WHEN we delete it
-    client.delete_table("to_delete_table")
+    client.sync_delete_table("to_delete_table")
 
-    # THEN it no longer exists
-    assert client.table_exists("to_delete_table") is False
+    assert client.sync_table_exists("to_delete_table") is False
+
+
+def test_wait_for_table_active(client):
+    """Test waiting for a table to become active."""
+    client.sync_create_table("wait_active_table", hash_key=("pk", "S"))
+    client.sync_wait_for_table_active("wait_active_table")
+
+    # Table should be usable
+    client.put_item("wait_active_table", {"pk": "test"})
+
+    client.sync_delete_table("wait_active_table")
+
+
+# ============ Error Cases ============
 
 
 def test_delete_nonexistent_table_raises_error(client):
     """Test that deleting a non-existent table raises ResourceNotFoundException."""
-    # WHEN we try to delete a non-existent table
-    # THEN ResourceNotFoundException is raised
     with pytest.raises(ResourceNotFoundException):
-        client.delete_table("nonexistent_table_12345")
+        client.sync_delete_table("nonexistent_table_12345")
 
 
 def test_create_duplicate_table_raises_error(client):
     """Test that creating a duplicate table raises ResourceInUseException."""
-    # GIVEN an existing table
-    client.create_table("duplicate_table", hash_key=("pk", "S"))
+    client.sync_create_table("duplicate_table", hash_key=("pk", "S"))
 
-    # WHEN we try to create it again
-    # THEN ResourceInUseException is raised
     with pytest.raises(ResourceInUseException):
-        client.create_table("duplicate_table", hash_key=("pk", "S"))
+        client.sync_create_table("duplicate_table", hash_key=("pk", "S"))
 
-    client.delete_table("duplicate_table")
+    client.sync_delete_table("duplicate_table")
 
 
-def test_create_table_with_invalid_key_type_raises_error(client):
+def test_create_table_invalid_key_type_raises_error(client):
     """Test that invalid key type raises ValidationException."""
     with pytest.raises(ValidationException):
-        client.create_table("invalid_table", hash_key=("pk", "INVALID"))
+        client.sync_create_table("invalid_table", hash_key=("pk", "INVALID"))
 
 
-def test_create_table_with_invalid_billing_mode_raises_error(client):
+def test_create_table_invalid_billing_mode_raises_error(client):
     """Test that invalid billing mode raises ValidationException."""
     with pytest.raises(ValidationException):
-        client.create_table(
+        client.sync_create_table(
             "invalid_billing_table",
             hash_key=("pk", "S"),
             billing_mode="INVALID",
         )
 
 
-def test_wait_for_table_active(client):
-    """Test waiting for a table to become active."""
-    client.create_table("wait_active_table", hash_key=("pk", "S"))
-    client.wait_for_table_active("wait_active_table")
-
-    # Table should be usable
-    client.put_item("wait_active_table", {"pk": "test"})
-
-    client.delete_table("wait_active_table")
+# ============ GSI Tests ============
 
 
 def test_create_table_with_gsi_hash_only(client):
     """Test creating a table with a GSI that has only a hash key."""
-    client.create_table(
+    client.sync_create_table(
         "gsi_hash_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -171,19 +176,19 @@ def test_create_table_with_gsi_hash_only(client):
         ],
     )
 
-    assert client.table_exists("gsi_hash_table")
+    assert client.sync_table_exists("gsi_hash_table")
 
-    # Verify we can write and query
+    # Verify we can write
     client.put_item(
         "gsi_hash_table", {"pk": "USER#1", "sk": "PROFILE", "email": "test@example.com"}
     )
 
-    client.delete_table("gsi_hash_table")
+    client.sync_delete_table("gsi_hash_table")
 
 
 def test_create_table_with_gsi_hash_and_range(client):
     """Test creating a table with a GSI that has hash and range keys."""
-    client.create_table(
+    client.sync_create_table(
         "gsi_range_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -197,13 +202,13 @@ def test_create_table_with_gsi_hash_and_range(client):
         ],
     )
 
-    assert client.table_exists("gsi_range_table")
-    client.delete_table("gsi_range_table")
+    assert client.sync_table_exists("gsi_range_table")
+    client.sync_delete_table("gsi_range_table")
 
 
 def test_create_table_with_multiple_gsis(client):
     """Test creating a table with multiple GSIs."""
-    client.create_table(
+    client.sync_create_table(
         "multi_gsi_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -222,13 +227,13 @@ def test_create_table_with_multiple_gsis(client):
         ],
     )
 
-    assert client.table_exists("multi_gsi_table")
-    client.delete_table("multi_gsi_table")
+    assert client.sync_table_exists("multi_gsi_table")
+    client.sync_delete_table("multi_gsi_table")
 
 
 def test_create_table_with_gsi_keys_only_projection(client):
     """Test creating a table with a GSI using KEYS_ONLY projection."""
-    client.create_table(
+    client.sync_create_table(
         "gsi_keys_only_table",
         hash_key=("pk", "S"),
         global_secondary_indexes=[
@@ -240,8 +245,8 @@ def test_create_table_with_gsi_keys_only_projection(client):
         ],
     )
 
-    assert client.table_exists("gsi_keys_only_table")
-    client.delete_table("gsi_keys_only_table")
+    assert client.sync_table_exists("gsi_keys_only_table")
+    client.sync_delete_table("gsi_keys_only_table")
 
 
 # ============ LSI Tests ============
@@ -249,10 +254,7 @@ def test_create_table_with_gsi_keys_only_projection(client):
 
 def test_create_table_with_lsi(client):
     """Create a table with a Local Secondary Index."""
-    # GIVEN LSI definition with status as alternate sort key
-
-    # WHEN we create the table with LSI
-    client.create_table(
+    client.sync_create_table(
         "lsi_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -265,24 +267,20 @@ def test_create_table_with_lsi(client):
         ],
     )
 
-    # THEN the table should exist
-    assert client.table_exists("lsi_table")
+    assert client.sync_table_exists("lsi_table")
 
-    # AND we can write and query using the LSI
+    # Verify we can write
     client.put_item(
         "lsi_table",
         {"pk": "USER#1", "sk": "PROFILE#1", "status": "active"},
     )
 
-    client.delete_table("lsi_table")
+    client.sync_delete_table("lsi_table")
 
 
 def test_create_table_with_lsi_keys_only_projection(client):
     """Create a table with LSI using KEYS_ONLY projection."""
-    # GIVEN LSI with KEYS_ONLY projection
-
-    # WHEN we create the table
-    client.create_table(
+    client.sync_create_table(
         "lsi_keys_only_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -295,17 +293,13 @@ def test_create_table_with_lsi_keys_only_projection(client):
         ],
     )
 
-    # THEN the table should exist
-    assert client.table_exists("lsi_keys_only_table")
-    client.delete_table("lsi_keys_only_table")
+    assert client.sync_table_exists("lsi_keys_only_table")
+    client.sync_delete_table("lsi_keys_only_table")
 
 
 def test_create_table_with_lsi_include_projection(client):
     """Create a table with LSI using INCLUDE projection."""
-    # GIVEN LSI with INCLUDE projection
-
-    # WHEN we create the table
-    client.create_table(
+    client.sync_create_table(
         "lsi_include_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -319,17 +313,13 @@ def test_create_table_with_lsi_include_projection(client):
         ],
     )
 
-    # THEN the table should exist
-    assert client.table_exists("lsi_include_table")
-    client.delete_table("lsi_include_table")
+    assert client.sync_table_exists("lsi_include_table")
+    client.sync_delete_table("lsi_include_table")
 
 
 def test_create_table_with_multiple_lsis(client):
     """Create a table with multiple Local Secondary Indexes."""
-    # GIVEN multiple LSI definitions
-
-    # WHEN we create the table with multiple LSIs
-    client.create_table(
+    client.sync_create_table(
         "multi_lsi_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -347,17 +337,13 @@ def test_create_table_with_multiple_lsis(client):
         ],
     )
 
-    # THEN the table should exist
-    assert client.table_exists("multi_lsi_table")
-    client.delete_table("multi_lsi_table")
+    assert client.sync_table_exists("multi_lsi_table")
+    client.sync_delete_table("multi_lsi_table")
 
 
 def test_create_table_with_gsi_and_lsi(client):
     """Create a table with both GSI and LSI."""
-    # GIVEN both GSI and LSI definitions
-
-    # WHEN we create the table with both index types
-    client.create_table(
+    client.sync_create_table(
         "gsi_lsi_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -377,10 +363,9 @@ def test_create_table_with_gsi_and_lsi(client):
         ],
     )
 
-    # THEN the table should exist
-    assert client.table_exists("gsi_lsi_table")
+    assert client.sync_table_exists("gsi_lsi_table")
 
-    # AND we can write data
+    # Verify we can write
     client.put_item(
         "gsi_lsi_table",
         {
@@ -391,4 +376,4 @@ def test_create_table_with_gsi_and_lsi(client):
         },
     )
 
-    client.delete_table("gsi_lsi_table")
+    client.sync_delete_table("gsi_lsi_table")

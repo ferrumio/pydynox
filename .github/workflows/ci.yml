@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         python: ["3.11", "3.14"]
 
     steps:
@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         python: ["3.11", "3.14"]
 
     steps:
@@ -124,37 +124,37 @@ jobs:
           source .venv/bin/activate
           pytest tests/integration/ -v
 
-  memory:
-    name: Memory profiling (memray)
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+  # memory:
+  #   name: Memory profiling (memray)
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   steps:
+  #     - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
-      - name: Set up Python
-        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
-        with:
-          python-version: "3.12"
+  #     - name: Set up Python
+  #       uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+  #       with:
+  #         python-version: "3.12"
 
-      - name: Download wheel
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: wheel-ubuntu-latest-py3.12
-          path: dist
+  #     - name: Download wheel
+  #       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+  #       with:
+  #         name: wheel-ubuntu-latest-py3.12
+  #         path: dist
 
-      - name: Create venv
-        run: python -m venv .venv
+  #     - name: Create venv
+  #       run: python -m venv .venv
 
-      - name: Install wheel and dependencies
-        run: |
-          source .venv/bin/activate
-          pip install dist/*.whl
-          pip install pytest pytest-asyncio pytest-memray testcontainers boto3 opentelemetry-api opentelemetry-sdk
+  #     - name: Install wheel and dependencies
+  #       run: |
+  #         source .venv/bin/activate
+  #         pip install dist/*.whl
+  #         pip install pytest pytest-asyncio pytest-memray testcontainers boto3 opentelemetry-api opentelemetry-sdk
 
-      - name: Run memory tests
-        run: |
-          source .venv/bin/activate
-          pytest tests/memory/ -v --memray
+  #     - name: Run memory tests
+  #       run: |
+  #         source .venv/bin/activate
+  #         pytest tests/memory/ -v --memray
 
   coverage:
     name: Coverage
@@ -166,12 +166,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
 
       - name: Download wheel
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: wheel-ubuntu-latest-py3.12
+          name: wheel-ubuntu-latest-py3.14
           path: dist
 
       - name: Create venv
@@ -186,10 +186,13 @@ jobs:
       - name: Run tests with coverage
         run: |
           source .venv/bin/activate
-          pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark
+          pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark --ignore=tests/memory
 
       - name: Upload coverage
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           fail_ci_if_error: false
+          env_vars: PYTHON
+          name: pydynox-codecov

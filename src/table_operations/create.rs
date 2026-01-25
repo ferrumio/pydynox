@@ -13,33 +13,27 @@ use tokio::runtime::Runtime;
 
 use super::gsi::GsiDefinition;
 use super::lsi::LsiDefinition;
-use super::wait::wait_for_table_active;
+use super::wait::{execute_wait_for_table_active, sync_wait_for_table_active};
 use crate::errors::{map_sdk_error, ValidationException};
 
-/// Create a new DynamoDB table.
-///
-/// # Arguments
-///
-/// * `client` - The DynamoDB client
-/// * `runtime` - The Tokio runtime
-/// * `table_name` - Name of the table to create
-/// * `hash_key_name` - Name of the hash key attribute
-/// * `hash_key_type` - Type of the hash key ("S", "N", or "B")
-/// * `range_key_name` - Optional name of the range key attribute
-/// * `range_key_type` - Optional type of the range key
-/// * `billing_mode` - "PAY_PER_REQUEST" or "PROVISIONED"
-/// * `read_capacity` - Read capacity units (only for PROVISIONED)
-/// * `write_capacity` - Write capacity units (only for PROVISIONED)
-/// * `table_class` - "STANDARD" or "STANDARD_INFREQUENT_ACCESS"
-/// * `encryption` - "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED"
-/// * `kms_key_id` - KMS key ARN (required when encryption is "CUSTOMER_MANAGED")
-/// * `gsis` - Optional list of GSI definitions
-/// * `lsis` - Optional list of LSI definitions
-/// * `wait` - Wait for table to become active
+/// Prepared create table request (converted before async).
+pub struct PreparedCreateTable {
+    pub table_name: String,
+    pub attribute_definitions: Vec<AttributeDefinition>,
+    pub key_schema: Vec<KeySchemaElement>,
+    pub billing: BillingMode,
+    pub read_capacity: Option<i64>,
+    pub write_capacity: Option<i64>,
+    pub table_class: Option<TableClass>,
+    pub sse_spec: Option<SseSpecification>,
+    pub gsi_list: Vec<GlobalSecondaryIndex>,
+    pub lsi_list: Vec<LocalSecondaryIndex>,
+    pub wait: bool,
+}
+
+/// Prepare create table request - validates and builds all AWS types.
 #[allow(clippy::too_many_arguments)]
-pub fn create_table(
-    client: &Client,
-    runtime: &Arc<Runtime>,
+pub fn prepare_create_table(
     table_name: &str,
     hash_key_name: &str,
     hash_key_type: &str,
@@ -54,7 +48,7 @@ pub fn create_table(
     gsis: Option<Vec<GsiDefinition>>,
     lsis: Option<Vec<LsiDefinition>>,
     wait: bool,
-) -> PyResult<()> {
+) -> PyResult<PreparedCreateTable> {
     let hash_attr_type = parse_attribute_type(hash_key_type)?;
 
     // Track all attribute names to avoid duplicates
@@ -109,7 +103,6 @@ pub fn create_table(
 
             // Add all hash key attributes
             for key_attr in &gsi.hash_keys {
-                // Add attribute definition if not already defined
                 if !defined_attrs.contains(&key_attr.name) {
                     let attr_type = parse_attribute_type(&key_attr.attr_type)?;
                     attribute_definitions.push(
@@ -127,7 +120,6 @@ pub fn create_table(
                     defined_attrs.insert(key_attr.name.clone());
                 }
 
-                // Add to key schema
                 gsi_key_schema.push(
                     KeySchemaElement::builder()
                         .attribute_name(&key_attr.name)
@@ -141,7 +133,6 @@ pub fn create_table(
 
             // Add all range key attributes
             for key_attr in &gsi.range_keys {
-                // Add attribute definition if not already defined
                 if !defined_attrs.contains(&key_attr.name) {
                     let attr_type = parse_attribute_type(&key_attr.attr_type)?;
                     attribute_definitions.push(
@@ -159,7 +150,6 @@ pub fn create_table(
                     defined_attrs.insert(key_attr.name.clone());
                 }
 
-                // Add to key schema
                 gsi_key_schema.push(
                     KeySchemaElement::builder()
                         .attribute_name(&key_attr.name)
@@ -171,10 +161,8 @@ pub fn create_table(
                 );
             }
 
-            // Build projection
             let projection = build_projection(&gsi.projection, gsi.non_key_attributes.as_deref())?;
 
-            // Build GSI
             let gsi_builder = GlobalSecondaryIndex::builder()
                 .index_name(&gsi.index_name)
                 .set_key_schema(Some(gsi_key_schema))
@@ -190,10 +178,9 @@ pub fn create_table(
     let mut lsi_list: Vec<LocalSecondaryIndex> = Vec::new();
     if let Some(lsi_defs) = lsis {
         for lsi in lsi_defs {
-            // LSI key schema: table's hash key + LSI's range key
             let mut lsi_key_schema: Vec<KeySchemaElement> = Vec::new();
 
-            // Add table's hash key (LSIs share the table's hash key)
+            // LSI shares table's hash key
             lsi_key_schema.push(
                 KeySchemaElement::builder()
                     .attribute_name(hash_key_name)
@@ -205,7 +192,6 @@ pub fn create_table(
             );
 
             // Add LSI's range key
-            // Add attribute definition if not already defined
             if !defined_attrs.contains(&lsi.range_key_name) {
                 let attr_type = parse_attribute_type(&lsi.range_key_type)?;
                 attribute_definitions.push(
@@ -230,10 +216,8 @@ pub fn create_table(
                     })?,
             );
 
-            // Build projection
             let projection = build_projection(&lsi.projection, lsi.non_key_attributes.as_deref())?;
 
-            // Build LSI
             let lsi_builder = LocalSecondaryIndex::builder()
                 .index_name(&lsi.index_name)
                 .set_key_schema(Some(lsi_key_schema))
@@ -245,78 +229,179 @@ pub fn create_table(
         }
     }
 
-    // Parse billing mode
     let billing = parse_billing_mode(billing_mode)?;
 
-    let client_clone = client.clone();
-    let table_name_owned = table_name.to_string();
+    let tc = match table_class {
+        Some(tc) => Some(parse_table_class(tc)?),
+        None => None,
+    };
 
-    runtime.block_on(async {
-        let mut request = client_clone
-            .create_table()
-            .table_name(&table_name_owned)
-            .set_attribute_definitions(Some(attribute_definitions))
-            .set_key_schema(Some(key_schema))
-            .billing_mode(billing.clone());
+    let sse_spec = match encryption {
+        Some(enc) => Some(build_sse_specification(enc, kms_key_id)?),
+        None => None,
+    };
 
-        // Add GSIs if any
-        if !gsi_list.is_empty() {
-            request = request.set_global_secondary_indexes(Some(gsi_list));
-        }
+    Ok(PreparedCreateTable {
+        table_name: table_name.to_string(),
+        attribute_definitions,
+        key_schema,
+        billing,
+        read_capacity,
+        write_capacity,
+        table_class: tc,
+        sse_spec,
+        gsi_list,
+        lsi_list,
+        wait,
+    })
+}
 
-        // Add LSIs if any
-        if !lsi_list.is_empty() {
-            request = request.set_local_secondary_indexes(Some(lsi_list));
-        }
+/// Execute create table asynchronously.
+pub async fn execute_create_table(client: Client, prepared: PreparedCreateTable) -> PyResult<()> {
+    let mut request = client
+        .create_table()
+        .table_name(&prepared.table_name)
+        .set_attribute_definitions(Some(prepared.attribute_definitions))
+        .set_key_schema(Some(prepared.key_schema))
+        .billing_mode(prepared.billing.clone());
 
-        // Add provisioned throughput if using PROVISIONED billing
-        if billing == BillingMode::Provisioned {
-            let rcu = read_capacity.unwrap_or(5);
-            let wcu = write_capacity.unwrap_or(5);
+    if !prepared.gsi_list.is_empty() {
+        request = request.set_global_secondary_indexes(Some(prepared.gsi_list));
+    }
 
-            request = request.provisioned_throughput(
-                aws_sdk_dynamodb::types::ProvisionedThroughput::builder()
-                    .read_capacity_units(rcu)
-                    .write_capacity_units(wcu)
-                    .build()
-                    .map_err(|e| {
-                        ValidationException::new_err(format!(
-                            "Invalid provisioned throughput: {}",
-                            e
-                        ))
-                    })?,
-            );
-        }
+    if !prepared.lsi_list.is_empty() {
+        request = request.set_local_secondary_indexes(Some(prepared.lsi_list));
+    }
 
-        // Add table class if specified
-        if let Some(tc) = table_class {
-            let class = parse_table_class(tc)?;
-            request = request.table_class(class);
-        }
+    if prepared.billing == BillingMode::Provisioned {
+        let rcu = prepared.read_capacity.unwrap_or(5);
+        let wcu = prepared.write_capacity.unwrap_or(5);
 
-        // Add encryption if specified
-        if let Some(enc) = encryption {
-            let sse_spec = build_sse_specification(enc, kms_key_id)?;
-            request = request.sse_specification(sse_spec);
-        }
+        request = request.provisioned_throughput(
+            aws_sdk_dynamodb::types::ProvisionedThroughput::builder()
+                .read_capacity_units(rcu)
+                .write_capacity_units(wcu)
+                .build()
+                .map_err(|e| {
+                    ValidationException::new_err(format!("Invalid provisioned throughput: {}", e))
+                })?,
+        );
+    }
 
-        request
-            .send()
-            .await
-            .map_err(|e| map_sdk_error(e, Some(&table_name_owned)))?;
+    if let Some(class) = prepared.table_class {
+        request = request.table_class(class);
+    }
 
-        Ok::<(), PyErr>(())
-    })?;
+    if let Some(sse) = prepared.sse_spec {
+        request = request.sse_specification(sse);
+    }
+
+    request
+        .send()
+        .await
+        .map_err(|e| map_sdk_error(e, Some(&prepared.table_name)))?;
 
     // Wait for table to become active if requested
-    if wait {
-        wait_for_table_active(client, runtime, table_name, None)?;
+    if prepared.wait {
+        execute_wait_for_table_active(client, &prepared.table_name, None).await?;
     }
 
     Ok(())
 }
 
-/// Build projection for GSI.
+/// Async create_table - returns a Python awaitable.
+#[allow(clippy::too_many_arguments)]
+pub fn create_table<'py>(
+    py: Python<'py>,
+    client: Client,
+    table_name: &str,
+    hash_key_name: &str,
+    hash_key_type: &str,
+    range_key_name: Option<&str>,
+    range_key_type: Option<&str>,
+    billing_mode: &str,
+    read_capacity: Option<i64>,
+    write_capacity: Option<i64>,
+    table_class: Option<&str>,
+    encryption: Option<&str>,
+    kms_key_id: Option<&str>,
+    gsis: Option<Vec<GsiDefinition>>,
+    lsis: Option<Vec<LsiDefinition>>,
+    wait: bool,
+) -> PyResult<Bound<'py, PyAny>> {
+    let prepared = prepare_create_table(
+        table_name,
+        hash_key_name,
+        hash_key_type,
+        range_key_name,
+        range_key_type,
+        billing_mode,
+        read_capacity,
+        write_capacity,
+        table_class,
+        encryption,
+        kms_key_id,
+        gsis,
+        lsis,
+        wait,
+    )?;
+
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        execute_create_table(client, prepared).await
+    })
+}
+
+/// Sync create_table - blocks until complete.
+#[allow(clippy::too_many_arguments)]
+pub fn sync_create_table(
+    client: &Client,
+    runtime: &Arc<Runtime>,
+    table_name: &str,
+    hash_key_name: &str,
+    hash_key_type: &str,
+    range_key_name: Option<&str>,
+    range_key_type: Option<&str>,
+    billing_mode: &str,
+    read_capacity: Option<i64>,
+    write_capacity: Option<i64>,
+    table_class: Option<&str>,
+    encryption: Option<&str>,
+    kms_key_id: Option<&str>,
+    gsis: Option<Vec<GsiDefinition>>,
+    lsis: Option<Vec<LsiDefinition>>,
+    wait: bool,
+) -> PyResult<()> {
+    let prepared = prepare_create_table(
+        table_name,
+        hash_key_name,
+        hash_key_type,
+        range_key_name,
+        range_key_type,
+        billing_mode,
+        read_capacity,
+        write_capacity,
+        table_class,
+        encryption,
+        kms_key_id,
+        gsis,
+        lsis,
+        false, // Don't wait in the async part
+    )?;
+
+    let client_clone = client.clone();
+    let table_name_owned = table_name.to_string();
+
+    runtime.block_on(async { execute_create_table(client_clone, prepared).await })?;
+
+    // Wait for table to become active if requested (sync version)
+    if wait {
+        sync_wait_for_table_active(client, runtime, &table_name_owned, None)?;
+    }
+
+    Ok(())
+}
+
+/// Build projection for GSI/LSI.
 fn build_projection(
     projection_type: &str,
     non_key_attributes: Option<&[String]>,

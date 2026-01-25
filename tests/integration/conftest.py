@@ -61,8 +61,8 @@ def _create_table(_session_client):
     """Create the test table once per session."""
     table_name = "test_table"
 
-    if not _session_client.table_exists(table_name):
-        _session_client.create_table(
+    if not _session_client.sync_table_exists(table_name):
+        _session_client.sync_create_table(
             table_name,
             hash_key=("pk", "S"),
             range_key=("sk", "S"),
