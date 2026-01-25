@@ -1,5 +1,7 @@
 """GSI pagination - limit vs page_size behavior."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.indexes import GlobalSecondaryIndex
@@ -26,71 +28,71 @@ class User(Model):
     )
 
 
-# Create table with GSI
-if not client.table_exists("users_gsi_pagination"):
-    client.create_table(
-        "users_gsi_pagination",
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
-        global_secondary_indexes=[
-            {
-                "index_name": "status-index",
-                "hash_key": ("status", "S"),
-                "range_key": ("created_at", "S"),
-                "projection": "ALL",
-            }
-        ],
+async def main():
+    # Create table with GSI
+    if not await client.table_exists("users_gsi_pagination"):
+        await client.create_table(
+            "users_gsi_pagination",
+            hash_key=("pk", "S"),
+            range_key=("sk", "S"),
+            global_secondary_indexes=[
+                {
+                    "index_name": "status-index",
+                    "hash_key": ("status", "S"),
+                    "range_key": ("created_at", "S"),
+                    "projection": "ALL",
+                }
+            ],
+        )
+
+    # Create 25 active users
+    for i in range(25):
+        User(
+            pk=f"USER#{i:03d}",
+            sk="PROFILE",
+            email=f"user{i}@example.com",
+            status="active",
+            created_at=f"2024-01-{i + 1:02d}",
+            age=20 + i,
+        ).save()
+
+    # limit = total items to return (stops after N items)
+    # page_size = items per DynamoDB request (controls pagination)
+
+    # Example 1: Get exactly 10 active users
+    users = list(User.status_index.query(status="active", limit=10))
+    print(f"limit=10: Got {len(users)} users")
+
+    # Example 2: Get all active users, fetching 5 per page
+    count = 0
+    for user in User.status_index.query(status="active", page_size=5):
+        count += 1
+    print(f"page_size=5 (no limit): Got {count} users")
+
+    # Example 3: Get 15 active users, fetching 5 per page (3 requests)
+    users = list(
+        User.status_index.query(
+            status="active",
+            limit=15,
+            page_size=5,
+        )
     )
+    print(f"limit=15, page_size=5: Got {len(users)} users")
 
-# Create 25 active users
-for i in range(25):
-    User(
-        pk=f"USER#{i:03d}",
-        sk="PROFILE",
-        email=f"user{i}@example.com",
-        status="active",
-        created_at=f"2024-01-{i + 1:02d}",
-        age=20 + i,
-    ).save()
+    # Example 4: Manual pagination for "load more" UI
+    result = User.status_index.query(status="active", limit=10, page_size=10)
+    first_page = list(result)
+    print(f"First page: {len(first_page)} items")
 
-
-# limit = total items to return (stops after N items)
-# page_size = items per DynamoDB request (controls pagination)
-
-# Example 1: Get exactly 10 active users
-users = list(User.status_index.query(status="active", limit=10))
-print(f"limit=10: Got {len(users)} users")
+    if result.last_evaluated_key:
+        result = User.status_index.query(
+            status="active",
+            limit=10,
+            page_size=10,
+            last_evaluated_key=result.last_evaluated_key,
+        )
+        second_page = list(result)
+        print(f"Second page: {len(second_page)} items")
 
 
-# Example 2: Get all active users, fetching 5 per page
-count = 0
-for user in User.status_index.query(status="active", page_size=5):
-    count += 1
-print(f"page_size=5 (no limit): Got {count} users")
-
-
-# Example 3: Get 15 active users, fetching 5 per page (3 requests)
-users = list(
-    User.status_index.query(
-        status="active",
-        limit=15,
-        page_size=5,
-    )
-)
-print(f"limit=15, page_size=5: Got {len(users)} users")
-
-
-# Example 4: Manual pagination for "load more" UI
-result = User.status_index.query(status="active", limit=10, page_size=10)
-first_page = list(result)
-print(f"First page: {len(first_page)} items")
-
-if result.last_evaluated_key:
-    result = User.status_index.query(
-        status="active",
-        limit=10,
-        page_size=10,
-        last_evaluated_key=result.last_evaluated_key,
-    )
-    second_page = list(result)
-    print(f"Second page: {len(second_page)} items")
+asyncio.run(main())

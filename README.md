@@ -337,41 +337,43 @@ doc.delete()
 
 ## Table Management
 
+Table operations follow the async-first pattern. Async methods have no prefix, sync methods have `sync_` prefix.
+
 ```python
 from pydynox import DynamoDBClient
 
 client = DynamoDBClient()
 
-# Create table
-client.create_table(
+# Async (default)
+await client.create_table(
     "users",
     hash_key=("pk", "S"),
     range_key=("sk", "S"),
     wait=True,
 )
 
-# Create with on-demand billing (default)
-client.create_table(
-    "users",
-    hash_key=("pk", "S"),
-    billing_mode="PAY_PER_REQUEST",
-)
+if await client.table_exists("users"):
+    print("Table exists")
 
-# Create with provisioned capacity
-client.create_table(
-    "users",
-    hash_key=("pk", "S"),
-    billing_mode="PROVISIONED",
-    read_capacity=10,
-    write_capacity=5,
-)
+await client.delete_table("users")
 
-# Check if table exists
-if not client.table_exists("users"):
-    client.create_table("users", hash_key=("pk", "S"))
+# From Model
+await User.create_table(wait=True)
+if await User.table_exists():
+    print("Table exists")
+```
 
-# Delete table
-client.delete_table("users")
+For sync code, use the `sync_` prefix:
+
+```python
+# Sync (use sync_ prefix)
+client.sync_create_table("users", hash_key=("pk", "S"), wait=True)
+client.sync_table_exists("users")
+client.sync_delete_table("users")
+
+# From Model
+User.sync_create_table(wait=True)
+User.sync_table_exists()
 ```
 
 ## Documentation

@@ -1,4 +1,4 @@
-"""Example: Create table from Model schema."""
+"""Example: Create table from Model schema (sync version)."""
 
 from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
@@ -28,11 +28,11 @@ class User(Model):
 
 
 # Create table from model schema (includes hash key, range key, and GSIs)
-if not User.table_exists():
-    User.create_table(wait=True)
+if not User.sync_table_exists():
+    User.sync_create_table(wait=True)
 
 # Verify table exists
-assert User.table_exists()
+assert User.sync_table_exists()
 
 # Save and query to verify GSI works
 user = User(pk="USER#1", sk="PROFILE", email="test@example.com", status="active", age=30)
@@ -44,4 +44,4 @@ assert len(results) == 1
 assert results[0].pk == "USER#1"
 
 # Cleanup
-User.delete_table()
+User.sync_delete_table()

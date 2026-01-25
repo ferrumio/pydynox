@@ -151,6 +151,19 @@ See [rate limiting](rate-limiting.md) for details.
 
 Most of the time you'll use Models instead of these methods directly. But they're useful for quick operations or when you need more control.
 
+### Table operations
+
+Table operations follow the async-first pattern. Async methods have no prefix, sync methods have `sync_` prefix.
+
+| Async (default) | Sync | Description |
+|-----------------|------|-------------|
+| `create_table(...)` | `sync_create_table(...)` | Create a new table |
+| `table_exists(table)` | `sync_table_exists(table)` | Check if table exists |
+| `delete_table(table)` | `sync_delete_table(table)` | Delete a table |
+| `wait_for_table_active(table)` | `sync_wait_for_table_active(table)` | Wait for table to be ready |
+
+See [table operations](tables.md) for details.
+
 ### Sync methods
 
 | Method | Description |

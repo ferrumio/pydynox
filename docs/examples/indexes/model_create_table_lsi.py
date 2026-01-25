@@ -1,5 +1,7 @@
 """Create table with LSI using Model.create_table()."""
 
+import asyncio
+
 from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.indexes import LocalSecondaryIndex
@@ -26,20 +28,24 @@ class Order(Model):
     )
 
 
-# Create table from model definition
-# LSIs are automatically included!
-if not Order.table_exists():
-    Order.create_table(wait=True)
-    print("Table created with LSI")
+async def main():
+    # Create table from model definition
+    # LSIs are automatically included!
+    if not await Order.table_exists():
+        await Order.create_table(wait=True)
+        print("Table created with LSI")
 
-# Use the model
-Order(
-    customer_id="CUST#1",
-    order_id="ORD#001",
-    status="pending",
-    total=100,
-).save()
+    # Use the model
+    Order(
+        customer_id="CUST#1",
+        order_id="ORD#001",
+        status="pending",
+        total=100,
+    ).save()
 
-# Query using LSI
-for order in Order.status_index.query(customer_id="CUST#1"):
-    print(f"Order: {order.order_id} - {order.status}")
+    # Query using LSI
+    for order in Order.status_index.query(customer_id="CUST#1"):
+        print(f"Order: {order.order_id} - {order.status}")
+
+
+asyncio.run(main())

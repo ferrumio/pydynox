@@ -1,12 +1,12 @@
-"""Example: Table creation with different options."""
+"""Example: Table creation with different options (sync version)."""
 
 from pydynox import DynamoDBClient
 
 client = DynamoDBClient()
 
 # Provisioned capacity (fixed cost, predictable performance)
-if not client.table_exists("example_provisioned"):
-    client.create_table(
+if not client.sync_table_exists("example_provisioned"):
+    client.sync_create_table(
         "example_provisioned",
         hash_key=("pk", "S"),
         billing_mode="PROVISIONED",
@@ -16,8 +16,8 @@ if not client.table_exists("example_provisioned"):
     )
 
 # Infrequent access class (cheaper storage, higher read cost)
-if not client.table_exists("example_archive"):
-    client.create_table(
+if not client.sync_table_exists("example_archive"):
+    client.sync_create_table(
         "example_archive",
         hash_key=("pk", "S"),
         table_class="STANDARD_INFREQUENT_ACCESS",
@@ -25,9 +25,9 @@ if not client.table_exists("example_archive"):
     )
 
 # Verify tables exist
-assert client.table_exists("example_provisioned")
-assert client.table_exists("example_archive")
+assert client.sync_table_exists("example_provisioned")
+assert client.sync_table_exists("example_archive")
 
 # Cleanup
-client.delete_table("example_provisioned")
-client.delete_table("example_archive")
+client.sync_delete_table("example_provisioned")
+client.sync_delete_table("example_archive")
