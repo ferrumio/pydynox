@@ -10,8 +10,8 @@ PARALLEL_SCAN_TABLE = "parallel_scan_test_table"
 @pytest.fixture
 def parallel_scan_table(dynamo):
     """Create a dedicated table for parallel scan tests."""
-    if not dynamo.table_exists(PARALLEL_SCAN_TABLE):
-        dynamo.create_table(
+    if not dynamo.sync_table_exists(PARALLEL_SCAN_TABLE):
+        dynamo.sync_create_table(
             PARALLEL_SCAN_TABLE,
             hash_key=("pk", "S"),
             range_key=("sk", "S"),

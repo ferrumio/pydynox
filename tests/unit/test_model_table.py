@@ -1,4 +1,7 @@
-"""Unit tests for Model table operations (create_table, table_exists, delete_table)."""
+"""Unit tests for Model table operations (sync_create_table, sync_table_exists, sync_delete_table).
+
+Tests the sync versions of table operations. Async versions are tested in integration tests.
+"""
 
 from __future__ import annotations
 
@@ -62,15 +65,15 @@ def mock_client() -> MagicMock:
     return client
 
 
-def test_create_table_basic(mock_client: MagicMock) -> None:
-    """Test create_table with basic model."""
+def test_sync_create_table_basic(mock_client: MagicMock) -> None:
+    """Test sync_create_table with basic model."""
     # GIVEN a simple model with mock client
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
         # WHEN we create the table
-        SimpleModel.create_table()
+        SimpleModel.sync_create_table()
 
-    # THEN create_table should be called with correct params
-    mock_client.create_table.assert_called_once_with(
+    # THEN sync_create_table should be called with correct params
+    mock_client.sync_create_table.assert_called_once_with(
         "simple",
         hash_key=("pk", "S"),
         range_key=None,
@@ -86,8 +89,8 @@ def test_create_table_basic(mock_client: MagicMock) -> None:
     )
 
 
-def test_create_table_with_range_key(mock_client: MagicMock) -> None:
-    """Test create_table with hash and range key."""
+def test_sync_create_table_with_range_key(mock_client: MagicMock) -> None:
+    """Test sync_create_table with hash and range key."""
 
     # GIVEN a model with range key
     class WithRange(Model):
@@ -97,26 +100,26 @@ def test_create_table_with_range_key(mock_client: MagicMock) -> None:
 
     with patch.object(WithRange, "_get_client", return_value=mock_client):
         # WHEN we create the table
-        WithRange.create_table()
+        WithRange.sync_create_table()
 
     # THEN both hash and range key should be included
-    mock_client.create_table.assert_called_once()
-    call_args = mock_client.create_table.call_args
+    mock_client.sync_create_table.assert_called_once()
+    call_args = mock_client.sync_create_table.call_args
     assert call_args[0][0] == "with_range"
     assert call_args[1]["hash_key"] == ("pk", "S")
     assert call_args[1]["range_key"] == ("sk", "N")
 
 
-def test_create_table_with_gsis(mock_client: MagicMock) -> None:
-    """Test create_table includes GSI definitions."""
+def test_sync_create_table_with_gsis(mock_client: MagicMock) -> None:
+    """Test sync_create_table includes GSI definitions."""
     # GIVEN a model with GSIs
     with patch.object(User, "_get_client", return_value=mock_client):
         # WHEN we create the table
-        User.create_table()
+        User.sync_create_table()
 
     # THEN GSIs should be included
-    mock_client.create_table.assert_called_once()
-    call_args = mock_client.create_table.call_args
+    mock_client.sync_create_table.assert_called_once()
+    call_args = mock_client.sync_create_table.call_args
 
     gsis = call_args[1]["global_secondary_indexes"]
     assert gsis is not None
@@ -140,12 +143,12 @@ def test_create_table_with_gsis(mock_client: MagicMock) -> None:
     assert location_gsi["hash_keys"] == [("tenant_id", "S"), ("region", "S")]
 
 
-def test_create_table_with_options(mock_client: MagicMock) -> None:
-    """Test create_table with all options."""
+def test_sync_create_table_with_options(mock_client: MagicMock) -> None:
+    """Test sync_create_table with all options."""
     # GIVEN a model with mock client
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
         # WHEN we create the table with all options
-        SimpleModel.create_table(
+        SimpleModel.sync_create_table(
             billing_mode="PROVISIONED",
             read_capacity=10,
             write_capacity=5,
@@ -156,7 +159,7 @@ def test_create_table_with_options(mock_client: MagicMock) -> None:
         )
 
     # THEN all options should be passed
-    mock_client.create_table.assert_called_once_with(
+    mock_client.sync_create_table.assert_called_once_with(
         "simple",
         hash_key=("pk", "S"),
         range_key=None,
@@ -172,8 +175,8 @@ def test_create_table_with_options(mock_client: MagicMock) -> None:
     )
 
 
-def test_create_table_no_hash_key_raises() -> None:
-    """Test create_table raises error if no hash key defined."""
+def test_sync_create_table_no_hash_key_raises() -> None:
+    """Test sync_create_table raises error if no hash key defined."""
     # GIVEN a model without hash key
     mock_client = MagicMock(spec=DynamoDBClient)
 
@@ -181,45 +184,45 @@ def test_create_table_no_hash_key_raises() -> None:
         # WHEN we try to create the table
         # THEN ValueError should be raised
         with pytest.raises(ValueError, match="has no hash_key defined"):
-            NoKeyModel.create_table()
+            NoKeyModel.sync_create_table()
 
 
-def test_table_exists(mock_client: MagicMock) -> None:
-    """Test table_exists calls client correctly."""
+def test_sync_table_exists(mock_client: MagicMock) -> None:
+    """Test sync_table_exists calls client correctly."""
     # GIVEN a mock client that returns True
-    mock_client.table_exists.return_value = True
+    mock_client.sync_table_exists.return_value = True
 
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
         # WHEN we check if table exists
-        result = SimpleModel.table_exists()
+        result = SimpleModel.sync_table_exists()
 
     # THEN it should return True
     assert result is True
-    mock_client.table_exists.assert_called_once_with("simple")
+    mock_client.sync_table_exists.assert_called_once_with("simple")
 
 
-def test_table_exists_false(mock_client: MagicMock) -> None:
-    """Test table_exists returns False when table doesn't exist."""
+def test_sync_table_exists_false(mock_client: MagicMock) -> None:
+    """Test sync_table_exists returns False when table doesn't exist."""
     # GIVEN a mock client that returns False
-    mock_client.table_exists.return_value = False
+    mock_client.sync_table_exists.return_value = False
 
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
         # WHEN we check if table exists
-        result = SimpleModel.table_exists()
+        result = SimpleModel.sync_table_exists()
 
     # THEN it should return False
     assert result is False
 
 
-def test_delete_table(mock_client: MagicMock) -> None:
-    """Test delete_table calls client correctly."""
+def test_sync_delete_table(mock_client: MagicMock) -> None:
+    """Test sync_delete_table calls client correctly."""
     # GIVEN a model with mock client
     with patch.object(SimpleModel, "_get_client", return_value=mock_client):
         # WHEN we delete the table
-        SimpleModel.delete_table()
+        SimpleModel.sync_delete_table()
 
-    # THEN delete_table should be called
-    mock_client.delete_table.assert_called_once_with("simple")
+    # THEN sync_delete_table should be called
+    mock_client.sync_delete_table.assert_called_once_with("simple")
 
 
 def test_gsi_to_create_table_definition_single_attr() -> None:

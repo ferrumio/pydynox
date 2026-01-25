@@ -19,7 +19,7 @@ def projection_table(localstack_endpoint):
 
     table_name = f"projection_test_{uuid.uuid4().hex[:8]}"
 
-    client.create_table(
+    client.sync_create_table(
         table_name,
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -29,7 +29,7 @@ def projection_table(localstack_endpoint):
     yield client, table_name
 
     # Cleanup
-    client.delete_table(table_name)
+    client.sync_delete_table(table_name)
 
 
 def test_get_item_with_projection(projection_table):
@@ -166,11 +166,11 @@ def user_model(localstack_endpoint):
         age = NumberAttribute()
         city = StringAttribute()
 
-    User.create_table(wait=True)
+    User.sync_create_table(wait=True)
 
     yield User
 
-    client.delete_table(table_name)
+    client.sync_delete_table(table_name)
 
 
 def test_model_query_with_fields(user_model):

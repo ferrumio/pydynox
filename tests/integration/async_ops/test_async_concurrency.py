@@ -14,8 +14,8 @@ TABLE_NAME = "async_concurrency_test"
 def async_table(dynamo: DynamoDBClient):
     """Create a test table for async tests."""
     set_default_client(dynamo)
-    if not dynamo.table_exists(TABLE_NAME):
-        dynamo.create_table(
+    if not dynamo.sync_table_exists(TABLE_NAME):
+        dynamo.sync_create_table(
             TABLE_NAME,
             hash_key=("pk", "S"),
             range_key=("sk", "S"),

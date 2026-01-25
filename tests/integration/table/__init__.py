@@ -1,0 +1,1 @@
+"""Table operations integration tests."""

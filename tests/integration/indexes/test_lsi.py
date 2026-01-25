@@ -45,12 +45,12 @@ def user_table(client):
         )
 
     # Create table with LSIs
-    User.create_table(wait=True)
+    User.sync_create_table(wait=True)
 
     yield User
 
     # Cleanup
-    client.delete_table(table_name)
+    client.sync_delete_table(table_name)
 
 
 def test_lsi_query_basic(user_table):

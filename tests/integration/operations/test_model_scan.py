@@ -14,8 +14,8 @@ SCAN_TABLE = "scan_test_table"
 @pytest.fixture
 def scan_table(dynamo):
     """Create a dedicated table for scan tests."""
-    if not dynamo.table_exists(SCAN_TABLE):
-        dynamo.create_table(
+    if not dynamo.sync_table_exists(SCAN_TABLE):
+        dynamo.sync_create_table(
             SCAN_TABLE,
             hash_key=("pk", "S"),
             range_key=("sk", "S"),
@@ -162,7 +162,7 @@ def test_model_scan_empty_result(scan_table, user_model):
     EmptyUser._client_instance = None
 
     # Create the empty table
-    scan_table.create_table(
+    scan_table.sync_create_table(
         "empty_test_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -173,7 +173,7 @@ def test_model_scan_empty_result(scan_table, user_model):
     assert users == []
 
     # Cleanup
-    scan_table.delete_table("empty_test_table")
+    scan_table.sync_delete_table("empty_test_table")
 
 
 def test_model_scan_last_evaluated_key(populated_users):
@@ -268,7 +268,7 @@ def test_model_count_empty_table(scan_table, user_model):
     EmptyUser._client_instance = None
 
     # Create the empty table
-    scan_table.create_table(
+    scan_table.sync_create_table(
         "empty_count_table",
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -279,7 +279,7 @@ def test_model_count_empty_table(scan_table, user_model):
     assert count == 0
 
     # Cleanup
-    scan_table.delete_table("empty_count_table")
+    scan_table.sync_delete_table("empty_count_table")
 
 
 def test_model_count_no_matches(populated_users):

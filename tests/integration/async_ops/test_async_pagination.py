@@ -12,10 +12,10 @@ TABLE_NAME = "async_pagination_test"
 def pagination_table(dynamo: DynamoDBClient):
     """Create a test table with indexes for pagination tests."""
     set_default_client(dynamo)
-    if dynamo.table_exists(TABLE_NAME):
-        dynamo.delete_table(TABLE_NAME)
+    if dynamo.sync_table_exists(TABLE_NAME):
+        dynamo.sync_delete_table(TABLE_NAME)
 
-    dynamo.create_table(
+    dynamo.sync_create_table(
         TABLE_NAME,
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
