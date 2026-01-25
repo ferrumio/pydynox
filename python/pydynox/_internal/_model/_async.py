@@ -57,7 +57,7 @@ async def async_save(
     _start_s3_metrics_collection()
 
     # S3 upload before prepare (needs to happen before to_dict)
-    await self._async_upload_s3_files()
+    await self._upload_s3_files()
 
     # Collect S3 metrics from uploads
     s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
@@ -120,7 +120,7 @@ async def async_delete(
     _start_s3_metrics_collection()
 
     # S3 cleanup after successful delete
-    await self._async_delete_s3_files()
+    await self._delete_s3_files()
 
     # Collect S3 metrics from deletes
     s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()

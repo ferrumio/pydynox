@@ -103,13 +103,13 @@ def test_s3value_properties():
     assert v.metadata == {"key": "value"}
 
 
-def test_s3value_get_bytes():
-    """S3Value.get_bytes() calls s3_ops.download_bytes."""
+def test_s3value_sync_get_bytes():
+    """S3Value.sync_get_bytes() calls s3_ops.sync_download_bytes."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
-    # download_bytes now returns (bytes, S3Metrics)
+    # sync_download_bytes returns (bytes, S3Metrics)
     mock_metrics = MagicMock()
-    mock_ops.download_bytes.return_value = (b"downloaded data", mock_metrics)
+    mock_ops.sync_download_bytes.return_value = (b"downloaded data", mock_metrics)
 
     v = S3Value(
         bucket="bucket",
@@ -120,16 +120,16 @@ def test_s3value_get_bytes():
         s3_ops=mock_ops,
     )
 
-    # WHEN we call get_bytes
-    result = v.get_bytes()
+    # WHEN we call sync_get_bytes
+    result = v.sync_get_bytes()
 
-    # THEN download_bytes should be called
+    # THEN sync_download_bytes should be called
     assert result == b"downloaded data"
-    mock_ops.download_bytes.assert_called_once_with("bucket", "key")
+    mock_ops.sync_download_bytes.assert_called_once_with("bucket", "key")
 
 
-def test_s3value_save_to():
-    """S3Value.save_to() calls s3_ops.save_to_file."""
+def test_s3value_sync_save_to():
+    """S3Value.sync_save_to() calls s3_ops.sync_save_to_file."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
     v = S3Value(
@@ -141,15 +141,15 @@ def test_s3value_save_to():
         s3_ops=mock_ops,
     )
 
-    # WHEN we call save_to
-    v.save_to("/tmp/output.txt")
+    # WHEN we call sync_save_to
+    v.sync_save_to("/tmp/output.txt")
 
-    # THEN save_to_file should be called
-    mock_ops.save_to_file.assert_called_once_with("bucket", "key", "/tmp/output.txt")
+    # THEN sync_save_to_file should be called
+    mock_ops.sync_save_to_file.assert_called_once_with("bucket", "key", "/tmp/output.txt")
 
 
-def test_s3value_save_to_path_object():
-    """S3Value.save_to() accepts Path object."""
+def test_s3value_sync_save_to_path_object():
+    """S3Value.sync_save_to() accepts Path object."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
     v = S3Value(
@@ -161,20 +161,20 @@ def test_s3value_save_to_path_object():
         s3_ops=mock_ops,
     )
 
-    # WHEN we call save_to with Path
-    v.save_to(Path("/tmp/output.txt"))
+    # WHEN we call sync_save_to with Path
+    v.sync_save_to(Path("/tmp/output.txt"))
 
-    # THEN save_to_file should be called with string path
-    mock_ops.save_to_file.assert_called_once_with("bucket", "key", "/tmp/output.txt")
+    # THEN sync_save_to_file should be called with string path
+    mock_ops.sync_save_to_file.assert_called_once_with("bucket", "key", "/tmp/output.txt")
 
 
-def test_s3value_presigned_url():
-    """S3Value.presigned_url() calls s3_ops.presigned_url."""
+def test_s3value_sync_presigned_url():
+    """S3Value.sync_presigned_url() calls s3_ops.sync_presigned_url."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
-    # presigned_url now returns (url, S3Metrics)
+    # sync_presigned_url returns (url, S3Metrics)
     mock_metrics = MagicMock()
-    mock_ops.presigned_url.return_value = ("https://presigned.url", mock_metrics)
+    mock_ops.sync_presigned_url.return_value = ("https://presigned.url", mock_metrics)
 
     v = S3Value(
         bucket="bucket",
@@ -185,21 +185,21 @@ def test_s3value_presigned_url():
         s3_ops=mock_ops,
     )
 
-    # WHEN we call presigned_url
-    result = v.presigned_url(7200)
+    # WHEN we call sync_presigned_url
+    result = v.sync_presigned_url(7200)
 
-    # THEN presigned_url should be called with expiry
+    # THEN sync_presigned_url should be called with expiry
     assert result == "https://presigned.url"
-    mock_ops.presigned_url.assert_called_once_with("bucket", "key", 7200)
+    mock_ops.sync_presigned_url.assert_called_once_with("bucket", "key", 7200)
 
 
-def test_s3value_presigned_url_default_expiry():
-    """S3Value.presigned_url() defaults to 3600 seconds."""
+def test_s3value_sync_presigned_url_default_expiry():
+    """S3Value.sync_presigned_url() defaults to 3600 seconds."""
     # GIVEN an S3Value with mock ops
     mock_ops = MagicMock()
-    # presigned_url now returns (url, S3Metrics)
+    # sync_presigned_url returns (url, S3Metrics)
     mock_metrics = MagicMock()
-    mock_ops.presigned_url.return_value = ("https://presigned.url", mock_metrics)
+    mock_ops.sync_presigned_url.return_value = ("https://presigned.url", mock_metrics)
 
     v = S3Value(
         bucket="bucket",
@@ -210,11 +210,11 @@ def test_s3value_presigned_url_default_expiry():
         s3_ops=mock_ops,
     )
 
-    # WHEN we call presigned_url without expiry
-    v.presigned_url()
+    # WHEN we call sync_presigned_url without expiry
+    v.sync_presigned_url()
 
     # THEN default expiry should be 3600
-    mock_ops.presigned_url.assert_called_once_with("bucket", "key", 3600)
+    mock_ops.sync_presigned_url.assert_called_once_with("bucket", "key", 3600)
 
 
 def test_s3value_repr():
@@ -412,3 +412,250 @@ def test_s3attribute_region_override():
 
     # THEN region should be set
     assert attr.region == "eu-west-1"
+
+
+# ========== ASYNC TESTS ==========
+
+
+@pytest.mark.asyncio
+async def test_s3value_get_bytes_async():
+    """S3Value.get_bytes() async calls s3_ops.download_bytes."""
+    # GIVEN an S3Value with mock ops
+    mock_ops = MagicMock()
+    mock_metrics = MagicMock()
+
+    # Mock the async method
+    async def mock_download_bytes(bucket, key):
+        return (b"async downloaded data", mock_metrics)
+
+    mock_ops.download_bytes = mock_download_bytes
+
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+
+    # WHEN we call get_bytes (async)
+    result = await v.get_bytes()
+
+    # THEN data should be returned
+    assert result == b"async downloaded data"
+
+
+@pytest.mark.asyncio
+async def test_s3value_save_to_async():
+    """S3Value.save_to() async calls s3_ops.save_to_file."""
+    # GIVEN an S3Value with mock ops
+    mock_ops = MagicMock()
+    called_with = {}
+
+    async def mock_save_to_file(bucket, key, path):
+        called_with["bucket"] = bucket
+        called_with["key"] = key
+        called_with["path"] = path
+
+    mock_ops.save_to_file = mock_save_to_file
+
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+
+    # WHEN we call save_to (async)
+    await v.save_to("/tmp/output.txt")
+
+    # THEN save_to_file should be called
+    assert called_with == {"bucket": "bucket", "key": "key", "path": "/tmp/output.txt"}
+
+
+@pytest.mark.asyncio
+async def test_s3value_save_to_async_path_object():
+    """S3Value.save_to() async accepts Path object."""
+    # GIVEN an S3Value with mock ops
+    mock_ops = MagicMock()
+    called_with = {}
+
+    async def mock_save_to_file(bucket, key, path):
+        called_with["path"] = path
+
+    mock_ops.save_to_file = mock_save_to_file
+
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+
+    # WHEN we call save_to with Path (async)
+    await v.save_to(Path("/tmp/output.txt"))
+
+    # THEN path should be converted to string
+    assert called_with["path"] == "/tmp/output.txt"
+
+
+@pytest.mark.asyncio
+async def test_s3value_presigned_url_async():
+    """S3Value.presigned_url() async calls s3_ops.presigned_url."""
+    # GIVEN an S3Value with mock ops
+    mock_ops = MagicMock()
+    mock_metrics = MagicMock()
+
+    async def mock_presigned_url(bucket, key, expires):
+        return ("https://async.presigned.url", mock_metrics)
+
+    mock_ops.presigned_url = mock_presigned_url
+
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+
+    # WHEN we call presigned_url (async)
+    result = await v.presigned_url(7200)
+
+    # THEN URL should be returned
+    assert result == "https://async.presigned.url"
+
+
+@pytest.mark.asyncio
+async def test_s3value_presigned_url_async_default_expiry():
+    """S3Value.presigned_url() async defaults to 3600 seconds."""
+    # GIVEN an S3Value with mock ops
+    mock_ops = MagicMock()
+    mock_metrics = MagicMock()
+    called_with = {}
+
+    async def mock_presigned_url(bucket, key, expires):
+        called_with["expires"] = expires
+        return ("https://presigned.url", mock_metrics)
+
+    mock_ops.presigned_url = mock_presigned_url
+
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+
+    # WHEN we call presigned_url without expiry (async)
+    await v.presigned_url()
+
+    # THEN default expiry should be 3600
+    assert called_with["expires"] == 3600
+
+
+# ========== ADDITIONAL PROPERTY TESTS ==========
+
+
+def test_s3file_content_type_none():
+    """S3File content_type defaults to None."""
+    f = S3File(b"data", name="test.txt")
+    assert f.content_type is None
+
+
+def test_s3file_metadata_none():
+    """S3File metadata defaults to None."""
+    f = S3File(b"data", name="test.txt")
+    assert f.metadata is None
+
+
+def test_s3value_etag_property():
+    """S3Value.etag returns the etag."""
+    mock_ops = MagicMock()
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="abc123def",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+    assert v.etag == "abc123def"
+
+
+def test_s3value_size_property():
+    """S3Value.size returns the size."""
+    mock_ops = MagicMock()
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=999,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+    assert v.size == 999
+
+
+def test_s3value_content_type_none():
+    """S3Value.content_type can be None."""
+    mock_ops = MagicMock()
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+    assert v.content_type is None
+
+
+def test_s3value_last_modified_none():
+    """S3Value.last_modified defaults to None."""
+    mock_ops = MagicMock()
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+    assert v.last_modified is None
+
+
+def test_s3value_version_id_none():
+    """S3Value.version_id defaults to None."""
+    mock_ops = MagicMock()
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+    assert v.version_id is None
+
+
+def test_s3value_metadata_none():
+    """S3Value.metadata defaults to None."""
+    mock_ops = MagicMock()
+    v = S3Value(
+        bucket="bucket",
+        key="key",
+        size=100,
+        etag="etag",
+        content_type=None,
+        s3_ops=mock_ops,
+    )
+    assert v.metadata is None

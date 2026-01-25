@@ -139,7 +139,7 @@ pub struct HeadResult {
     pub metrics: S3Metrics,
 }
 
-// ========== CORE ASYNC OPERATIONS ==========
+// ========== CORE ASYNC OPERATIONS (execute_*) ==========
 
 /// Core async upload operation.
 pub async fn execute_upload(
@@ -549,11 +549,136 @@ pub async fn execute_head(
     })
 }
 
-// ========== SYNC WRAPPERS ==========
+// ========== HELPER FUNCTIONS ==========
 
+/// Calculate optimal part size for multipart upload.
+pub fn calculate_part_size(total_size: usize) -> usize {
+    if total_size <= MULTIPART_THRESHOLD {
+        return total_size;
+    }
+
+    // Target ~100 parts for large files
+    let target_parts = 100;
+    let calculated = total_size / target_parts;
+
+    if calculated < MIN_PART_SIZE {
+        MIN_PART_SIZE
+    } else if calculated > DEFAULT_PART_SIZE * 10 {
+        DEFAULT_PART_SIZE * 10
+    } else {
+        calculated
+    }
+}
+
+// ========== ASYNC WRAPPERS (no prefix) - return Python awaitable ==========
+
+/// Async upload bytes - returns Python awaitable.
 #[allow(clippy::too_many_arguments)]
-pub fn upload_bytes(
-    _py: Python<'_>,
+pub fn upload_bytes<'py>(
+    py: Python<'py>,
+    client: Client,
+    bucket: String,
+    key: String,
+    data: &Bound<'_, PyBytes>,
+    content_type: Option<String>,
+    metadata: Option<HashMap<String, String>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let data_vec = data.as_bytes().to_vec();
+
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = execute_upload(client, bucket, key, data_vec, content_type, metadata)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok((result.metadata, result.metrics))
+    })
+}
+
+/// Async download bytes - returns Python awaitable.
+pub fn download_bytes(
+    py: Python<'_>,
+    client: Client,
+    bucket: String,
+    key: String,
+) -> PyResult<Bound<'_, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = execute_download(client, bucket, key)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Python::attach(|py| {
+            let bytes = PyBytes::new(py, &result.data);
+            Ok((bytes.unbind(), result.metrics))
+        })
+    })
+}
+
+/// Async presigned URL - returns Python awaitable.
+pub fn presigned_url(
+    py: Python<'_>,
+    client: Client,
+    bucket: String,
+    key: String,
+    expires_secs: u64,
+) -> PyResult<Bound<'_, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = execute_presigned_url(client, bucket, key, expires_secs)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok((result.url, result.metrics))
+    })
+}
+
+/// Async delete object - returns Python awaitable.
+pub fn delete_object(
+    py: Python<'_>,
+    client: Client,
+    bucket: String,
+    key: String,
+) -> PyResult<Bound<'_, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = execute_delete(client, bucket, key)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok(result.metrics)
+    })
+}
+
+/// Async head object - returns Python awaitable.
+pub fn head_object(
+    py: Python<'_>,
+    client: Client,
+    bucket: String,
+    key: String,
+) -> PyResult<Bound<'_, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = execute_head(client, bucket, key)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok((result.metadata, result.metrics))
+    })
+}
+
+/// Async save to file - returns Python awaitable.
+pub fn save_to_file(
+    py: Python<'_>,
+    client: Client,
+    bucket: String,
+    key: String,
+    path: String,
+) -> PyResult<Bound<'_, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
+        let result = execute_save_to_file(client, bucket, key, path)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok((result.bytes_written, result.metrics))
+    })
+}
+
+// ========== SYNC WRAPPERS (sync_ prefix) - block until complete ==========
+
+/// Sync upload bytes - blocks until complete.
+#[allow(clippy::too_many_arguments)]
+pub fn sync_upload_bytes(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
@@ -562,248 +687,120 @@ pub fn upload_bytes(
     content_type: Option<String>,
     metadata: Option<HashMap<String, String>>,
 ) -> PyResult<(S3Metadata, S3Metrics)> {
-    let bytes = data.as_bytes().to_vec();
+    let data_vec = data.as_bytes().to_vec();
+    let client = client.clone();
     let bucket = bucket.to_string();
     let key = key.to_string();
-    let client = client.clone();
 
-    let result = runtime
-        .block_on(execute_upload(
-            client,
-            bucket,
-            key,
-            bytes,
-            content_type,
-            metadata,
-        ))
-        .map_err(S3Exception::new_err)?;
-
-    Ok((result.metadata, result.metrics))
+    py.detach(|| {
+        runtime.block_on(async {
+            let result = execute_upload(client, bucket, key, data_vec, content_type, metadata)
+                .await
+                .map_err(S3Exception::new_err)?;
+            Ok((result.metadata, result.metrics))
+        })
+    })
 }
 
-pub fn download_bytes<'py>(
+/// Sync download bytes - blocks until complete.
+pub fn sync_download_bytes<'py>(
     py: Python<'py>,
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
     key: &str,
 ) -> PyResult<(Bound<'py, PyBytes>, S3Metrics)> {
+    let client = client.clone();
     let bucket = bucket.to_string();
     let key = key.to_string();
-    let client = client.clone();
 
-    let result = runtime
-        .block_on(execute_download(client, bucket, key))
-        .map_err(S3Exception::new_err)?;
+    let result = py.detach(|| {
+        runtime.block_on(async {
+            execute_download(client, bucket, key)
+                .await
+                .map_err(S3Exception::new_err)
+        })
+    })?;
 
-    Ok((PyBytes::new(py, &result.data), result.metrics))
+    let bytes = PyBytes::new(py, &result.data);
+    Ok((bytes, result.metrics))
 }
 
-pub fn presigned_url(
+/// Sync presigned URL - blocks until complete.
+pub fn sync_presigned_url(
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
     key: &str,
     expires_secs: u64,
 ) -> PyResult<(String, S3Metrics)> {
+    let client = client.clone();
     let bucket = bucket.to_string();
     let key = key.to_string();
-    let client = client.clone();
 
-    let result = runtime
-        .block_on(execute_presigned_url(client, bucket, key, expires_secs))
-        .map_err(S3Exception::new_err)?;
-
-    Ok((result.url, result.metrics))
+    runtime.block_on(async {
+        let result = execute_presigned_url(client, bucket, key, expires_secs)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok((result.url, result.metrics))
+    })
 }
 
-pub fn delete_object(
+/// Sync delete object - blocks until complete.
+pub fn sync_delete_object(
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
     key: &str,
 ) -> PyResult<S3Metrics> {
+    let client = client.clone();
     let bucket = bucket.to_string();
     let key = key.to_string();
-    let client = client.clone();
 
-    let result = runtime
-        .block_on(execute_delete(client, bucket, key))
-        .map_err(S3Exception::new_err)?;
-
-    Ok(result.metrics)
+    runtime.block_on(async {
+        let result = execute_delete(client, bucket, key)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok(result.metrics)
+    })
 }
 
-pub fn head_object(
+/// Sync head object - blocks until complete.
+pub fn sync_head_object(
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
     key: &str,
 ) -> PyResult<(S3Metadata, S3Metrics)> {
+    let client = client.clone();
     let bucket = bucket.to_string();
     let key = key.to_string();
-    let client = client.clone();
 
-    let result = runtime
-        .block_on(execute_head(client, bucket, key))
-        .map_err(S3Exception::new_err)?;
-
-    Ok((result.metadata, result.metrics))
+    runtime.block_on(async {
+        let result = execute_head(client, bucket, key)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok((result.metadata, result.metrics))
+    })
 }
 
-pub fn save_to_file(
+/// Sync save to file - blocks until complete.
+pub fn sync_save_to_file(
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
     key: &str,
     path: &str,
 ) -> PyResult<(u64, S3Metrics)> {
+    let client = client.clone();
     let bucket = bucket.to_string();
     let key = key.to_string();
     let path = path.to_string();
-    let client = client.clone();
 
-    let result = runtime
-        .block_on(execute_save_to_file(client, bucket, key, path))
-        .map_err(S3Exception::new_err)?;
-
-    Ok((result.bytes_written, result.metrics))
-}
-
-// ========== ASYNC WRAPPERS ==========
-
-pub fn async_upload_bytes<'py>(
-    py: Python<'py>,
-    client: Client,
-    bucket: String,
-    key: String,
-    data: &Bound<'_, PyBytes>,
-    content_type: Option<String>,
-    metadata: Option<HashMap<String, String>>,
-) -> PyResult<Bound<'py, PyAny>> {
-    let bytes = data.as_bytes().to_vec();
-
-    pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_upload(client, bucket, key, bytes, content_type, metadata).await;
-
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
-            Ok(r) => {
-                let meta = r.metadata.into_pyobject(py)?.into_any().unbind();
-                let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
-                Ok((meta, metrics))
-            }
-            Err(e) => Err(S3Exception::new_err(e)),
-        })
+    runtime.block_on(async {
+        let result = execute_save_to_file(client, bucket, key, path)
+            .await
+            .map_err(S3Exception::new_err)?;
+        Ok((result.bytes_written, result.metrics))
     })
-}
-
-pub fn async_download_bytes<'py>(
-    py: Python<'py>,
-    client: Client,
-    bucket: String,
-    key: String,
-) -> PyResult<Bound<'py, PyAny>> {
-    pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_download(client, bucket, key).await;
-
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
-            Ok(r) => {
-                let bytes = PyBytes::new(py, &r.data).into_any().unbind();
-                let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
-                Ok((bytes, metrics))
-            }
-            Err(e) => Err(S3Exception::new_err(e)),
-        })
-    })
-}
-
-pub fn async_presigned_url<'py>(
-    py: Python<'py>,
-    client: Client,
-    bucket: String,
-    key: String,
-    expires_secs: u64,
-) -> PyResult<Bound<'py, PyAny>> {
-    pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_presigned_url(client, bucket, key, expires_secs).await;
-
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
-            Ok(r) => {
-                let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
-                Ok((r.url, metrics))
-            }
-            Err(e) => Err(S3Exception::new_err(e)),
-        })
-    })
-}
-
-pub fn async_delete_object<'py>(
-    py: Python<'py>,
-    client: Client,
-    bucket: String,
-    key: String,
-) -> PyResult<Bound<'py, PyAny>> {
-    pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_delete(client, bucket, key).await;
-
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
-            Ok(r) => Ok(r.metrics.into_pyobject(py)?.into_any().unbind()),
-            Err(e) => Err(S3Exception::new_err(e)),
-        })
-    })
-}
-
-pub fn async_head_object<'py>(
-    py: Python<'py>,
-    client: Client,
-    bucket: String,
-    key: String,
-) -> PyResult<Bound<'py, PyAny>> {
-    pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_head(client, bucket, key).await;
-
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
-            Ok(r) => {
-                let meta = r.metadata.into_pyobject(py)?.into_any().unbind();
-                let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
-                Ok((meta, metrics))
-            }
-            Err(e) => Err(S3Exception::new_err(e)),
-        })
-    })
-}
-
-pub fn async_save_to_file<'py>(
-    py: Python<'py>,
-    client: Client,
-    bucket: String,
-    key: String,
-    path: String,
-) -> PyResult<Bound<'py, PyAny>> {
-    pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_save_to_file(client, bucket, key, path).await;
-
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
-            Ok(r) => {
-                let metrics = r.metrics.into_pyobject(py)?.into_any().unbind();
-                Ok((r.bytes_written, metrics))
-            }
-            Err(e) => Err(S3Exception::new_err(e)),
-        })
-    })
-}
-
-fn calculate_part_size(total_size: usize) -> usize {
-    let min_parts = total_size.div_ceil(MIN_PART_SIZE);
-    if min_parts <= 10_000 {
-        DEFAULT_PART_SIZE.max(MIN_PART_SIZE)
-    } else {
-        total_size.div_ceil(10_000)
-    }
 }

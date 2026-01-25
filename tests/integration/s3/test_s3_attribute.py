@@ -70,7 +70,7 @@ def test_get_returns_s3value(document_model):
 
 
 def test_s3value_get_bytes(document_model):
-    """S3Value.get_bytes() downloads file content."""
+    """S3Value.sync_get_bytes() downloads file content."""
     doc_id = str(uuid.uuid4())
     content = b"File content for download test"
 
@@ -89,12 +89,12 @@ def test_s3value_get_bytes(document_model):
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
     loaded.content._s3_ops = loaded._attributes["content"]._s3_ops
 
-    downloaded = loaded.content.get_bytes()
+    downloaded = loaded.content.sync_get_bytes()
     assert downloaded == content
 
 
 def test_s3value_presigned_url(document_model):
-    """S3Value.presigned_url() generates URL."""
+    """S3Value.sync_presigned_url() generates URL."""
     doc_id = str(uuid.uuid4())
 
     doc = document_model(
@@ -111,13 +111,13 @@ def test_s3value_presigned_url(document_model):
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
     loaded.content._s3_ops = loaded._attributes["content"]._s3_ops
 
-    url = loaded.content.presigned_url(3600)
+    url = loaded.content.sync_presigned_url(3600)
 
     assert url.startswith("http")
 
 
 def test_s3value_save_to_file(document_model, tmp_path):
-    """S3Value.save_to() streams to file."""
+    """S3Value.sync_save_to() streams to file."""
     doc_id = str(uuid.uuid4())
     content = b"Large file content " * 100
 
@@ -136,7 +136,7 @@ def test_s3value_save_to_file(document_model, tmp_path):
     loaded.content._s3_ops = loaded._attributes["content"]._s3_ops
 
     output_path = tmp_path / "downloaded.bin"
-    loaded.content.save_to(output_path)
+    loaded.content.sync_save_to(output_path)
 
     assert output_path.read_bytes() == content
 
@@ -219,4 +219,4 @@ def test_update_s3file(document_model):
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
     loaded.content._s3_ops = loaded._attributes["content"]._s3_ops
 
-    assert loaded.content.get_bytes() == b"version 2"
+    assert loaded.content.sync_get_bytes() == b"version 2"

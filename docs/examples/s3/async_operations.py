@@ -20,7 +20,7 @@ class Document(Model):
 
 
 async def main():
-    # Async upload
+    # Async upload (default)
     doc = Document(pk="DOC#async", sk="v1", name="async.txt")
     doc.content = S3File(b"Async content", name="async.txt")
     await doc.async_save()
@@ -29,15 +29,15 @@ async def main():
     # Async get
     loaded = await Document.async_get(pk="DOC#async", sk="v1")
     if loaded and loaded.content:
-        # Async download
-        data = await loaded.content.async_get_bytes()
+        # Async download (default, no prefix)
+        data = await loaded.content.get_bytes()
         print(f"Downloaded: {len(data)} bytes")
 
-        # Async save to file
-        await loaded.content.async_save_to("/tmp/async_download.txt")
+        # Async save to file (default, no prefix)
+        await loaded.content.save_to("/tmp/async_download.txt")
 
-        # Async presigned URL
-        url = await loaded.content.async_presigned_url(3600)
+        # Async presigned URL (default, no prefix)
+        url = await loaded.content.presigned_url(3600)
         print(f"URL: {url}")
 
     # Async delete
