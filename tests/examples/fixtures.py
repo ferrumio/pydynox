@@ -37,9 +37,9 @@ TABLE_SCHEMAS = {
 def create_tables(client: DynamoDBClient) -> None:
     """Create all test tables."""
     for name, (hash_key, range_key) in TABLE_SCHEMAS.items():
-        if client.table_exists(name):
+        if client.sync_table_exists(name):
             continue
-        client.create_table(
+        client.sync_create_table(
             name,
             hash_key=(hash_key, "S"),
             range_key=(range_key, "S") if range_key else None,
