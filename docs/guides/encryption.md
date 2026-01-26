@@ -1,6 +1,6 @@
 # Field encryption
 
-Encrypt sensitive fields like SSN or credit cards using AWS KMS.
+Protect sensitive data like SSN, credit cards, or API keys at rest. pydynox encrypts fields before saving to DynamoDB and decrypts them when reading back. Uses AWS KMS for key management.
 
 ## Key features
 
@@ -108,8 +108,7 @@ Values without the `ENC:` prefix are treated as plaintext. This means you can ad
 
 ## Limitations
 
-- **AWS credentials from environment** - Uses the default credential chain (env vars, IAM role, etc.). You cannot pass credentials directly.
-- **Region from environment** - Uses `AWS_REGION` or `AWS_DEFAULT_REGION` env var by default. You can override with the `region` parameter.
+- **Inherits credentials from DynamoDBClient** - Uses the same AWS credentials configured in your `DynamoDBClient`. No need to configure separately.
 - **Strings only** - Only encrypts string values. For other types, convert to string first.
 - **No key rotation** - If you rotate your KMS key, old data still decrypts (KMS handles this), but you need to re-encrypt to use the new key.
 

@@ -313,6 +313,9 @@ Modes:
 | `WriteOnly` | ✓ | ✗ | Ingest service |
 | `ReadOnly` | ✗ | ✓ | Report service |
 
+!!! tip
+    See [Encryption guide](encryption.md) for full documentation on modes, encryption context, and how it works.
+
 ### S3Attribute
 
 Store large files in S3 with metadata in DynamoDB. Use when files exceed DynamoDB's 400KB limit.
