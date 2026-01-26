@@ -24,25 +24,53 @@ When you delete a model:
 2. The file is deleted from S3
 
 !!! warning "Partial failure and orphan objects"
-    The write order is S3 first, then DynamoDB. If S3 upload succeeds but DynamoDB write fails, an orphan object is left in S3. This is a known limitation that we may address in a future release.
+    The write order is S3 first, then DynamoDB. If S3 upload succeeds but DynamoDB write fails, an orphan object is left in S3. This is a known limitation.
 
-    - S3 success + DynamoDB fail = orphan S3 object
-    - S3 fail = no DynamoDB write attempted (clean)
+    Orphans are harmless (just storage cost). To clean them up, set up an [S3 lifecycle rule](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html) to delete objects older than a certain age.
 
-    Orphans are harmless (just storage cost). To clean them up, set up an [S3 lifecycle rule](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html) to delete objects older than a certain age, or use S3 Inventory to find and remove orphans.
+## S3Value methods
+
+S3Value methods follow the async-first pattern. Async is the default (no prefix), sync has `sync_` prefix.
+
+| Operation | Async (default) | Sync |
+|-----------|-----------------|------|
+| Download to memory | `await value.get_bytes()` | `value.sync_get_bytes()` |
+| Save to file | `await value.save_to(path)` | `value.sync_save_to(path)` |
+| Presigned URL | `await value.presigned_url(expires)` | `value.sync_presigned_url(expires)` |
 
 ## Basic usage
 
-=== "basic_upload.py"
-    ```python
-    --8<-- "docs/examples/s3/basic_upload.py"
-    ```
+```python
+from pydynox import Model, ModelConfig
+from pydynox.attributes import S3Attribute, S3File, StringAttribute
+
+class Document(Model):
+    model_config = ModelConfig(table="documents")
+    pk = StringAttribute(hash_key=True)
+    content = S3Attribute(bucket="my-bucket", prefix="docs/")
+
+# Upload
+doc = Document(pk="DOC#1")
+doc.content = S3File(b"file content", name="report.pdf")
+doc.save()
+
+# Download (async)
+doc = Document.get(pk="DOC#1")
+data = await doc.content.get_bytes()
+await doc.content.save_to("/tmp/report.pdf")
+url = await doc.content.presigned_url(3600)
+
+# Download (sync alternative)
+data = doc.content.sync_get_bytes()
+doc.content.sync_save_to("/tmp/report.pdf")
+url = doc.content.sync_presigned_url(3600)
+```
 
 ## Uploading files
 
 ### From bytes
 
-Use `S3File` to wrap your data. The `name` parameter is required when uploading bytes.
+Use `S3File` to wrap your data. The `name` parameter is required.
 
 ```python
 doc.content = S3File(b"file content here", name="report.pdf")
@@ -70,7 +98,6 @@ doc.content = S3File(
     name="report.pdf",
     content_type="application/pdf"
 )
-doc.save()
 ```
 
 ### With custom metadata
@@ -83,39 +110,23 @@ doc.content = S3File(
     name="report.pdf",
     metadata={"author": "John", "version": "1.0"}
 )
-doc.save()
 ```
 
 ## Downloading files
 
-After loading a model, `content` is an `S3Value` with methods to download.
-
-### To memory
-
-Downloads the entire file to memory. Be careful with large files.
+After loading a model, `content` is an `S3Value`. Use async methods by default.
 
 ```python
 doc = Document.get(pk="DOC#1")
-data = doc.content.get_bytes()
-```
 
-### To file (streaming)
+# Download to memory (careful with large files)
+data = await doc.content.get_bytes()
 
-Streams directly to disk. Memory efficient for large files.
+# Stream to file (memory efficient)
+await doc.content.save_to("/path/to/output.pdf")
 
-```python
-doc = Document.get(pk="DOC#1")
-doc.content.save_to("/path/to/output.pdf")
-```
-
-### Presigned URL
-
-Generate a temporary URL for sharing. The URL expires after the specified seconds.
-
-```python
-doc = Document.get(pk="DOC#1")
-url = doc.content.presigned_url(expires=3600)  # 1 hour
-print(url)  # https://my-bucket.s3.amazonaws.com/docs/DOC/1/report.pdf?...
+# Generate presigned URL for sharing
+url = await doc.content.presigned_url(expires=3600)
 ```
 
 Use presigned URLs when:
@@ -151,30 +162,11 @@ doc = Document.get(pk="DOC#1")
 doc.delete()  # Deletes from DynamoDB AND S3
 ```
 
-If you only want to remove the file reference without deleting from S3, set the attribute to `None` and save:
+To remove the file reference without deleting from S3:
 
 ```python
 doc.content = None
 doc.save()  # Updates DynamoDB, S3 file remains
-```
-
-## Async operations
-
-All operations have async versions.
-
-```python
-# Upload
-doc.content = S3File(b"...", name="file.txt")
-await doc.async_save()
-
-# Download
-doc = await Document.async_get(pk="DOC#1")
-data = await doc.content.async_get_bytes()
-await doc.content.async_save_to("/path/to/file.txt")
-url = await doc.content.async_presigned_url(3600)
-
-# Delete
-await doc.async_delete()
 ```
 
 ## S3 region
@@ -305,15 +297,17 @@ Don't use S3Attribute when:
 - You need to query by file content
 - You need atomic updates of file + metadata
 
+
 ## Example: document management
 
 ```python
+from pathlib import Path
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, S3Attribute, DatetimeAttribute, AutoGenerate
 from pydynox._internal._s3 import S3File
 
 class Document(Model):
-    model_config = ModelConfig(table="documents", client=client)
+    model_config = ModelConfig(table="documents")
     
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True, default="v1")
@@ -334,7 +328,7 @@ doc.save()
 for doc in Document.query(hash_key="DOC#invoice-2024-001"):
     print(f"{doc.name}: {doc.content.size} bytes")
 
-# Generate download link
-url = doc.content.presigned_url(expires=3600)
+# Generate download link (async)
+url = await doc.content.presigned_url(expires=3600)
 print(f"Download: {url}")
 ```

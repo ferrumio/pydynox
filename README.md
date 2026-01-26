@@ -301,14 +301,13 @@ user.save()
 user = User.get(pk="USER#123", sk="PROFILE")
 ```
 
-### S3 Attribute (Large Files)
+### S3 attribute (large files)
 
 DynamoDB has a 400KB item limit. `S3Attribute` stores files in S3 and keeps metadata in DynamoDB. Upload on save, download on demand, delete when the item is deleted.
 
 ```python
 from pydynox import Model, ModelConfig
-from pydynox.attributes import StringAttribute, S3Attribute
-from pydynox._internal._s3 import S3File
+from pydynox.attributes import StringAttribute, S3Attribute, S3File
 
 class Document(Model):
     model_config = ModelConfig(table="documents")
@@ -316,26 +315,31 @@ class Document(Model):
     pk = StringAttribute(hash_key=True)
     content = S3Attribute(bucket="my-bucket", prefix="docs/")
 
-# Upload
+# Upload (async)
 doc = Document(pk="DOC#1")
 doc.content = S3File(b"...", name="report.pdf", content_type="application/pdf")
-doc.save()
+await doc.save()
 
-# Download
-doc = Document.get(pk="DOC#1")
-data = doc.content.get_bytes()           # Load to memory
-doc.content.save_to("/path/to/file.pdf") # Stream to file
-url = doc.content.presigned_url(3600)    # Share via URL
+# Download (async)
+doc = await Document.get(pk="DOC#1")
+data = await doc.content.get_bytes()           # Load to memory
+await doc.content.save_to("/path/to/file.pdf") # Stream to file
+url = await doc.content.presigned_url(3600)    # Share via URL
+
+# Sync versions (with sync_ prefix)
+doc.content.sync_get_bytes()
+doc.content.sync_save_to("/path/to/file.pdf")
+doc.content.sync_presigned_url(3600)
 
 # Metadata (no S3 call)
 print(doc.content.size)
 print(doc.content.content_type)
 
 # Delete - removes from both DynamoDB and S3
-doc.delete()
+await doc.delete()
 ```
 
-## Table Management
+## Table management
 
 Table operations follow the async-first pattern. Async methods have no prefix, sync methods have `sync_` prefix.
 

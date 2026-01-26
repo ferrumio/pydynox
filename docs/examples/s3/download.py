@@ -1,4 +1,4 @@
-"""Download S3 content."""
+"""Sync S3 download operations (with sync_ prefix)."""
 
 from pydynox import Model, ModelConfig
 from pydynox.attributes import S3Attribute, S3File, StringAttribute
@@ -15,20 +15,20 @@ class Document(Model):
 # First create a document with S3 content
 doc = Document(pk="DOC#DOWNLOAD", name="report.pdf")
 doc.content = S3File(b"PDF content here", name="report.pdf", content_type="application/pdf")
-doc.save()
+doc.save()  # Model.save() is sync
 
-# Get document
+# Get document (sync)
 doc = Document.get(pk="DOC#DOWNLOAD")
 
 if doc and doc.content:
-    # Download to memory (careful with large files)
+    # Download to memory (sync, with prefix)
     data = doc.content.sync_get_bytes()
     print(f"Downloaded {len(data)} bytes")
 
-    # Stream to file (memory efficient for large files)
+    # Stream to file (sync, with prefix)
     doc.content.sync_save_to("/tmp/downloaded.pdf")
     print("Saved to /tmp/downloaded.pdf")
 
-    # Get presigned URL for sharing
+    # Get presigned URL (sync, with prefix)
     url = doc.content.sync_presigned_url(expires=3600)  # 1 hour
     print(f"Presigned URL: {url}")
