@@ -8,7 +8,7 @@
 use crate::client_internal::{build_kms_client, AwsConfig};
 use crate::errors::EncryptionException;
 use crate::kms::operations::{
-    async_decrypt, async_encrypt, sync_decrypt, sync_encrypt, DecryptResult, EncryptResult,
+    decrypt_impl, encrypt_impl, sync_decrypt_impl, sync_encrypt_impl, DecryptResult, EncryptResult,
 };
 use crate::kms::ENCRYPTED_PREFIX;
 use aws_sdk_kms::Client;
@@ -109,11 +109,71 @@ impl KmsEncryptor {
         })
     }
 
+    // ========== ASYNC METHODS (default) ==========
+
+    /// Encrypt a plaintext string (async).
+    ///
+    /// Returns an awaitable that resolves to EncryptResult.
+    pub fn encrypt<'py>(&self, py: Python<'py>, plaintext: &str) -> PyResult<Bound<'py, PyAny>> {
+        encrypt_impl(
+            py,
+            self.client.clone(),
+            self.key_id.clone(),
+            self.context.clone(),
+            plaintext.to_string(),
+        )
+    }
+
+    /// Encrypt with metrics (async).
+    ///
+    /// Returns an awaitable that resolves to EncryptResult.
+    pub fn encrypt_with_metrics<'py>(
+        &self,
+        py: Python<'py>,
+        plaintext: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        encrypt_impl(
+            py,
+            self.client.clone(),
+            self.key_id.clone(),
+            self.context.clone(),
+            plaintext.to_string(),
+        )
+    }
+
+    /// Decrypt a ciphertext string (async).
+    ///
+    /// Returns an awaitable that resolves to DecryptResult.
+    pub fn decrypt<'py>(&self, py: Python<'py>, ciphertext: &str) -> PyResult<Bound<'py, PyAny>> {
+        decrypt_impl(
+            py,
+            self.client.clone(),
+            self.context.clone(),
+            ciphertext.to_string(),
+        )
+    }
+
+    /// Decrypt with metrics (async).
+    ///
+    /// Returns an awaitable that resolves to DecryptResult.
+    pub fn decrypt_with_metrics<'py>(
+        &self,
+        py: Python<'py>,
+        ciphertext: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        decrypt_impl(
+            py,
+            self.client.clone(),
+            self.context.clone(),
+            ciphertext.to_string(),
+        )
+    }
+
     // ========== SYNC METHODS ==========
 
-    /// Encrypt a plaintext string using envelope encryption.
-    pub fn encrypt(&self, plaintext: &str) -> PyResult<String> {
-        let (ciphertext, _metrics) = sync_encrypt(
+    /// Encrypt a plaintext string (sync).
+    pub fn sync_encrypt(&self, plaintext: &str) -> PyResult<String> {
+        let (ciphertext, _metrics) = sync_encrypt_impl(
             &self.client,
             &self.runtime,
             &self.key_id,
@@ -123,9 +183,9 @@ impl KmsEncryptor {
         Ok(ciphertext)
     }
 
-    /// Encrypt with metrics.
-    pub fn encrypt_with_metrics(&self, plaintext: &str) -> PyResult<EncryptResult> {
-        let (ciphertext, metrics) = sync_encrypt(
+    /// Encrypt with metrics (sync).
+    pub fn sync_encrypt_with_metrics(&self, plaintext: &str) -> PyResult<EncryptResult> {
+        let (ciphertext, metrics) = sync_encrypt_impl(
             &self.client,
             &self.runtime,
             &self.key_id,
@@ -138,49 +198,18 @@ impl KmsEncryptor {
         })
     }
 
-    /// Decrypt a ciphertext string using envelope encryption.
-    pub fn decrypt(&self, ciphertext: &str) -> PyResult<String> {
+    /// Decrypt a ciphertext string (sync).
+    pub fn sync_decrypt(&self, ciphertext: &str) -> PyResult<String> {
         let (plaintext, _metrics) =
-            sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)?;
+            sync_decrypt_impl(&self.client, &self.runtime, &self.context, ciphertext)?;
         Ok(plaintext)
     }
 
-    /// Decrypt with metrics.
-    pub fn decrypt_with_metrics(&self, ciphertext: &str) -> PyResult<DecryptResult> {
+    /// Decrypt with metrics (sync).
+    pub fn sync_decrypt_with_metrics(&self, ciphertext: &str) -> PyResult<DecryptResult> {
         let (plaintext, metrics) =
-            sync_decrypt(&self.client, &self.runtime, &self.context, ciphertext)?;
+            sync_decrypt_impl(&self.client, &self.runtime, &self.context, ciphertext)?;
         Ok(DecryptResult { plaintext, metrics })
-    }
-
-    // ========== ASYNC METHODS ==========
-
-    /// Async encrypt a plaintext string.
-    pub fn async_encrypt<'py>(
-        &self,
-        py: Python<'py>,
-        plaintext: &str,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        async_encrypt(
-            py,
-            self.client.clone(),
-            self.key_id.clone(),
-            self.context.clone(),
-            plaintext.to_string(),
-        )
-    }
-
-    /// Async decrypt a ciphertext string.
-    pub fn async_decrypt<'py>(
-        &self,
-        py: Python<'py>,
-        ciphertext: &str,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        async_decrypt(
-            py,
-            self.client.clone(),
-            self.context.clone(),
-            ciphertext.to_string(),
-        )
     }
 
     // ========== UTILITY METHODS ==========

@@ -116,7 +116,7 @@ class EncryptedAttribute(Attribute[str]):
         if not self._can_encrypt():
             return value  # ReadOnly mode: store as-is
 
-        result = self.encryptor.encrypt_with_metrics(value)
+        result = self.encryptor.sync_encrypt_with_metrics(value)
         _record_kms_metrics(result.metrics.duration_ms, result.metrics.kms_calls)
         return result.ciphertext
 
@@ -143,6 +143,6 @@ class EncryptedAttribute(Attribute[str]):
         if not self._can_decrypt():
             return value  # WriteOnly mode: return encrypted value
 
-        result = self.encryptor.decrypt_with_metrics(value)
+        result = self.encryptor.sync_decrypt_with_metrics(value)
         _record_kms_metrics(result.metrics.duration_ms, result.metrics.kms_calls)
         return result.plaintext

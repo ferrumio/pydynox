@@ -96,7 +96,7 @@ class Attribute(Generic[T]):
 
     def deserialize(self, value: Any) -> T | None:
         """Convert DynamoDB value to Python format."""
-        return value  # type: ignore[no-any-return]
+        return value
 
     # Condition operators
     def _get_path(self) -> ConditionPath:
