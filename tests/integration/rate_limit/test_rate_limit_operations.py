@@ -111,14 +111,14 @@ def test_update_item_tracks_wcu(client_with_fixed_rate):
 
 
 def test_batch_write_tracks_wcu(client_with_fixed_rate):
-    """Test that batch_write tracks WCU for all items."""
+    """Test that sync_batch_write tracks WCU for all items."""
     client = client_with_fixed_rate
     pk1, pk2, pk3 = _unique_pk(), _unique_pk(), _unique_pk()
 
     initial_wcu = client.rate_limit.consumed_wcu
 
-    # Batch write 3 items
-    client.batch_write(
+    # Sync batch write 3 items
+    client.sync_batch_write(
         "test_table",
         put_items=[
             {"pk": pk1, "sk": "PROFILE", "name": "Alice"},
@@ -132,12 +132,12 @@ def test_batch_write_tracks_wcu(client_with_fixed_rate):
 
 
 def test_batch_get_tracks_rcu(client_with_fixed_rate):
-    """Test that batch_get tracks RCU for all keys."""
+    """Test that sync_batch_get tracks RCU for all keys."""
     client = client_with_fixed_rate
     pk1, pk2 = _unique_pk(), _unique_pk()
 
     # Put items first
-    client.batch_write(
+    client.sync_batch_write(
         "test_table",
         put_items=[
             {"pk": pk1, "sk": "PROFILE", "name": "Alice"},
@@ -147,8 +147,8 @@ def test_batch_get_tracks_rcu(client_with_fixed_rate):
 
     initial_rcu = client.rate_limit.consumed_rcu
 
-    # Batch get 2 items
-    client.batch_get(
+    # Sync batch get 2 items
+    client.sync_batch_get(
         "test_table",
         keys=[
             {"pk": pk1, "sk": "PROFILE"},
@@ -166,7 +166,7 @@ def test_query_tracks_rcu(client_with_fixed_rate):
     pk = _unique_pk("QUERY")
 
     # Put items first - use unique pk so we only get our items
-    client.batch_write(
+    client.sync_batch_write(
         "test_table",
         put_items=[
             {"pk": pk, "sk": "PROFILE", "name": "Alice"},

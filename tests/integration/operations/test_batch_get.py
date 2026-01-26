@@ -1,4 +1,4 @@
-"""Integration tests for batch_get operation."""
+"""Integration tests for sync_batch_get operation."""
 
 import uuid
 
@@ -7,8 +7,8 @@ from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
 
-def test_batch_get_returns_items(dynamo):
-    """Test batch get with a few items."""
+def test_sync_batch_get_returns_items(dynamo):
+    """Test sync batch get with a few items."""
     # GIVEN existing items
     items = [
         {"pk": "BGET#1", "sk": "ITEM#1", "name": "Alice"},
@@ -18,9 +18,9 @@ def test_batch_get_returns_items(dynamo):
     for item in items:
         dynamo.put_item("test_table", item)
 
-    # WHEN batch getting them
+    # WHEN sync batch getting them
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    results = dynamo.batch_get("test_table", keys)
+    results = dynamo.sync_batch_get("test_table", keys)
 
     # THEN all items are returned
     assert len(results) == 3
@@ -28,34 +28,34 @@ def test_batch_get_returns_items(dynamo):
     assert names == {"Alice", "Bob", "Charlie"}
 
 
-def test_batch_get_missing_items_not_returned(dynamo):
-    """Test batch get with some missing items."""
+def test_sync_batch_get_missing_items_not_returned(dynamo):
+    """Test sync batch get with some missing items."""
     # GIVEN only one existing item
     dynamo.put_item("test_table", {"pk": "MISS#1", "sk": "EXISTS", "name": "Found"})
 
-    # WHEN batch getting two items (one exists, one doesn't)
+    # WHEN sync batch getting two items (one exists, one doesn't)
     keys = [
         {"pk": "MISS#1", "sk": "EXISTS"},
         {"pk": "MISS#1", "sk": "NOTEXISTS"},
     ]
-    results = dynamo.batch_get("test_table", keys)
+    results = dynamo.sync_batch_get("test_table", keys)
 
     # THEN only the existing item is returned
     assert len(results) == 1
     assert results[0]["name"] == "Found"
 
 
-def test_batch_get_empty_keys_returns_empty(dynamo):
-    """Test batch get with empty keys list."""
-    # WHEN batch getting with empty keys
-    results = dynamo.batch_get("test_table", [])
+def test_sync_batch_get_empty_keys_returns_empty(dynamo):
+    """Test sync batch get with empty keys list."""
+    # WHEN sync batch getting with empty keys
+    results = dynamo.sync_batch_get("test_table", [])
 
     # THEN empty list is returned
     assert results == []
 
 
-def test_batch_get_more_than_100_items(dynamo):
-    """Test batch get with more than 100 items.
+def test_sync_batch_get_more_than_100_items(dynamo):
+    """Test sync batch get with more than 100 items.
 
     DynamoDB limits batch gets to 100 items per request.
     The client should split the request into multiple batches.
@@ -66,11 +66,11 @@ def test_batch_get_more_than_100_items(dynamo):
         {"pk": "LARGE#1", "sk": f"ITEM#{i:03d}", "index": i, "data": f"value_{i}"}
         for i in range(120)
     ]
-    dynamo.batch_write("test_table", put_items=items)
+    dynamo.sync_batch_write("test_table", put_items=items)
 
-    # WHEN batch getting all 120 items
+    # WHEN sync batch getting all 120 items
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    results = dynamo.batch_get("test_table", keys)
+    results = dynamo.sync_batch_get("test_table", keys)
 
     # THEN all 120 items are returned
     assert len(results) == 120
@@ -78,15 +78,15 @@ def test_batch_get_more_than_100_items(dynamo):
     assert indices == set(range(120))
 
 
-def test_batch_get_exactly_100_items(dynamo):
-    """Test batch get with exactly 100 items (the limit)."""
+def test_sync_batch_get_exactly_100_items(dynamo):
+    """Test sync batch get with exactly 100 items (the limit)."""
     # GIVEN exactly 100 items
     items = [{"pk": "EXACT#1", "sk": f"ITEM#{i:02d}", "value": i} for i in range(100)]
-    dynamo.batch_write("test_table", put_items=items)
+    dynamo.sync_batch_write("test_table", put_items=items)
 
-    # WHEN batch getting them
+    # WHEN sync batch getting them
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    results = dynamo.batch_get("test_table", keys)
+    results = dynamo.sync_batch_get("test_table", keys)
 
     # THEN all 100 items are returned
     assert len(results) == 100
@@ -94,15 +94,15 @@ def test_batch_get_exactly_100_items(dynamo):
     assert values == set(range(100))
 
 
-def test_batch_get_150_items(dynamo):
-    """Test batch get with 150 items (requires 2 batches)."""
+def test_sync_batch_get_150_items(dynamo):
+    """Test sync batch get with 150 items (requires 2 batches)."""
     # GIVEN 150 items
     items = [{"pk": "ONEFIFTY#1", "sk": f"ITEM#{i:03d}", "num": i} for i in range(150)]
-    dynamo.batch_write("test_table", put_items=items)
+    dynamo.sync_batch_write("test_table", put_items=items)
 
-    # WHEN batch getting them
+    # WHEN sync batch getting them
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    results = dynamo.batch_get("test_table", keys)
+    results = dynamo.sync_batch_get("test_table", keys)
 
     # THEN all 150 items are returned
     assert len(results) == 150
@@ -110,8 +110,8 @@ def test_batch_get_150_items(dynamo):
     assert nums == set(range(150))
 
 
-def test_batch_get_with_various_types(dynamo):
-    """Test batch get with items containing various data types."""
+def test_sync_batch_get_with_various_types(dynamo):
+    """Test sync batch get with items containing various data types."""
     # GIVEN items with various data types
     items = [
         {
@@ -135,11 +135,11 @@ def test_batch_get_with_various_types(dynamo):
             "map": {"key": 123},
         },
     ]
-    dynamo.batch_write("test_table", put_items=items)
+    dynamo.sync_batch_write("test_table", put_items=items)
 
-    # WHEN batch getting them
+    # WHEN sync batch getting them
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    results = dynamo.batch_get("test_table", keys)
+    results = dynamo.sync_batch_get("test_table", keys)
 
     # THEN all types are preserved
     assert len(results) == 2
@@ -150,12 +150,12 @@ def test_batch_get_with_various_types(dynamo):
             assert result[field] == value
 
 
-# ========== Model.batch_get tests ==========
+# ========== Model.sync_batch_get tests ==========
 
 
 @pytest.fixture
 def user_model(dynamo):
-    """Create a User model for batch_get tests."""
+    """Create a User model for sync_batch_get tests."""
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
@@ -168,8 +168,8 @@ def user_model(dynamo):
     return User
 
 
-def test_model_batch_get_returns_model_instances(dynamo, user_model):
-    """Model.batch_get returns Model instances by default."""
+def test_model_sync_batch_get_returns_model_instances(dynamo, user_model):
+    """Model.sync_batch_get returns Model instances by default."""
     # GIVEN existing items
     uid = str(uuid.uuid4())
     items = [
@@ -180,9 +180,9 @@ def test_model_batch_get_returns_model_instances(dynamo, user_model):
     for item in items:
         dynamo.put_item("test_table", item)
 
-    # WHEN batch getting them
+    # WHEN sync batch getting them
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    users = user_model.batch_get(keys)
+    users = user_model.sync_batch_get(keys)
 
     # THEN Model instances are returned
     assert len(users) == 3
@@ -192,8 +192,8 @@ def test_model_batch_get_returns_model_instances(dynamo, user_model):
     assert names == {"Alice", "Bob", "Charlie"}
 
 
-def test_model_batch_get_as_dict_returns_dicts(dynamo, user_model):
-    """Model.batch_get(as_dict=True) returns plain dicts."""
+def test_model_sync_batch_get_as_dict_returns_dicts(dynamo, user_model):
+    """Model.sync_batch_get(as_dict=True) returns plain dicts."""
     # GIVEN existing items
     uid = str(uuid.uuid4())
     items = [
@@ -203,9 +203,9 @@ def test_model_batch_get_as_dict_returns_dicts(dynamo, user_model):
     for item in items:
         dynamo.put_item("test_table", item)
 
-    # WHEN batch getting with as_dict=True
+    # WHEN sync batch getting with as_dict=True
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    users = user_model.batch_get(keys, as_dict=True)
+    users = user_model.sync_batch_get(keys, as_dict=True)
 
     # THEN plain dicts are returned
     assert len(users) == 2
@@ -215,17 +215,17 @@ def test_model_batch_get_as_dict_returns_dicts(dynamo, user_model):
     assert names == {"Alice", "Bob"}
 
 
-def test_model_batch_get_empty_keys(user_model):
-    """Model.batch_get with empty keys returns empty list."""
-    # WHEN batch getting with empty keys
-    users = user_model.batch_get([])
+def test_model_sync_batch_get_empty_keys(user_model):
+    """Model.sync_batch_get with empty keys returns empty list."""
+    # WHEN sync batch getting with empty keys
+    users = user_model.sync_batch_get([])
 
     # THEN empty list is returned
     assert users == []
 
 
-def test_model_batch_get_missing_items(dynamo, user_model):
-    """Model.batch_get only returns existing items."""
+def test_model_sync_batch_get_missing_items(dynamo, user_model):
+    """Model.sync_batch_get only returns existing items."""
     # GIVEN only one existing item
     uid = str(uuid.uuid4())
     dynamo.put_item(
@@ -233,12 +233,12 @@ def test_model_batch_get_missing_items(dynamo, user_model):
         {"pk": f"MBGETM#{uid}", "sk": "EXISTS", "name": "Found", "age": 20},
     )
 
-    # WHEN batch getting two items (one exists, one doesn't)
+    # WHEN sync batch getting two items (one exists, one doesn't)
     keys = [
         {"pk": f"MBGETM#{uid}", "sk": "EXISTS"},
         {"pk": f"MBGETM#{uid}", "sk": "NOTEXISTS"},
     ]
-    users = user_model.batch_get(keys)
+    users = user_model.sync_batch_get(keys)
 
     # THEN only the existing item is returned
     assert len(users) == 1

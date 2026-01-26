@@ -1,9 +1,9 @@
-"""Tests for async batch operations."""
+"""Tests for async batch operations (default, no prefix)."""
 
 import uuid
 
 import pytest
-from pydynox import AsyncBatchWriter, DynamoDBClient, Model, ModelConfig, set_default_client
+from pydynox import BatchWriter, DynamoDBClient, Model, ModelConfig, set_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 
 TABLE_NAME = "async_test_users"
@@ -31,11 +31,11 @@ class AsyncUser(Model):
     age = NumberAttribute(null=True)
 
 
-# ========== Client async_batch_get tests ==========
+# ========== Client batch_get tests (async default) ==========
 
 
 @pytest.mark.asyncio
-async def test_async_batch_get_returns_items(async_table: DynamoDBClient):
+async def test_batch_get_returns_items(async_table: DynamoDBClient):
     """Test async batch get with a few items."""
     uid = str(uuid.uuid4())[:8]
     items = [
@@ -47,7 +47,7 @@ async def test_async_batch_get_returns_items(async_table: DynamoDBClient):
         await async_table.async_put_item(TABLE_NAME, item)
 
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    results = await async_table.async_batch_get(TABLE_NAME, keys)
+    results = await async_table.batch_get(TABLE_NAME, keys)
 
     assert len(results) == 3
     names = {r["name"] for r in results}
@@ -55,7 +55,7 @@ async def test_async_batch_get_returns_items(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_batch_get_missing_items(async_table: DynamoDBClient):
+async def test_batch_get_missing_items(async_table: DynamoDBClient):
     """Test async batch get with some missing items."""
     uid = str(uuid.uuid4())[:8]
     await async_table.async_put_item(
@@ -66,40 +66,40 @@ async def test_async_batch_get_missing_items(async_table: DynamoDBClient):
         {"pk": f"AMISS#{uid}", "sk": "EXISTS"},
         {"pk": f"AMISS#{uid}", "sk": "NOTEXISTS"},
     ]
-    results = await async_table.async_batch_get(TABLE_NAME, keys)
+    results = await async_table.batch_get(TABLE_NAME, keys)
 
     assert len(results) == 1
     assert results[0]["name"] == "Found"
 
 
 @pytest.mark.asyncio
-async def test_async_batch_get_empty_keys(async_table: DynamoDBClient):
+async def test_batch_get_empty_keys(async_table: DynamoDBClient):
     """Test async batch get with empty keys list."""
-    results = await async_table.async_batch_get(TABLE_NAME, [])
+    results = await async_table.batch_get(TABLE_NAME, [])
     assert results == []
 
 
 @pytest.mark.asyncio
-async def test_async_batch_get_more_than_100_items(async_table: DynamoDBClient):
+async def test_batch_get_more_than_100_items(async_table: DynamoDBClient):
     """Test async batch get with more than 100 items."""
     uid = str(uuid.uuid4())[:8]
     items = [{"pk": f"ALARGE#{uid}", "sk": f"ITEM#{i:03d}", "index": i} for i in range(120)]
     # Use sync batch_write for setup (faster)
-    async_table.batch_write(TABLE_NAME, put_items=items)
+    async_table.sync_batch_write(TABLE_NAME, put_items=items)
 
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    results = await async_table.async_batch_get(TABLE_NAME, keys)
+    results = await async_table.batch_get(TABLE_NAME, keys)
 
     assert len(results) == 120
     indices = {r["index"] for r in results}
     assert indices == set(range(120))
 
 
-# ========== Client async_batch_write tests ==========
+# ========== Client batch_write tests (async default) ==========
 
 
 @pytest.mark.asyncio
-async def test_async_batch_write_puts_items(async_table: DynamoDBClient):
+async def test_batch_write_puts_items(async_table: DynamoDBClient):
     """Test async batch write with a few items."""
     uid = str(uuid.uuid4())[:8]
     items = [
@@ -108,7 +108,7 @@ async def test_async_batch_write_puts_items(async_table: DynamoDBClient):
         {"pk": f"ABATCH#{uid}", "sk": "ITEM#3", "name": "Charlie"},
     ]
 
-    await async_table.async_batch_write(TABLE_NAME, put_items=items)
+    await async_table.batch_write(TABLE_NAME, put_items=items)
 
     for item in items:
         key = {"pk": item["pk"], "sk": item["sk"]}
@@ -118,7 +118,7 @@ async def test_async_batch_write_puts_items(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_batch_write_deletes_items(async_table: DynamoDBClient):
+async def test_batch_write_deletes_items(async_table: DynamoDBClient):
     """Test async batch write with delete operations."""
     uid = str(uuid.uuid4())[:8]
     items = [
@@ -129,7 +129,7 @@ async def test_async_batch_write_deletes_items(async_table: DynamoDBClient):
         await async_table.async_put_item(TABLE_NAME, item)
 
     delete_keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    await async_table.async_batch_write(TABLE_NAME, delete_keys=delete_keys)
+    await async_table.batch_write(TABLE_NAME, delete_keys=delete_keys)
 
     for key in delete_keys:
         result = await async_table.async_get_item(TABLE_NAME, key)
@@ -137,7 +137,7 @@ async def test_async_batch_write_deletes_items(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_batch_write_mixed_operations(async_table: DynamoDBClient):
+async def test_batch_write_mixed_operations(async_table: DynamoDBClient):
     """Test async batch write with both puts and deletes."""
     uid = str(uuid.uuid4())[:8]
     to_delete = {"pk": f"AMIX#{uid}", "sk": "DELETE", "name": "WillBeDeleted"}
@@ -148,7 +148,7 @@ async def test_async_batch_write_mixed_operations(async_table: DynamoDBClient):
         {"pk": f"AMIX#{uid}", "sk": "NEW#2", "name": "NewItem2"},
     ]
     delete_keys = [{"pk": f"AMIX#{uid}", "sk": "DELETE"}]
-    await async_table.async_batch_write(TABLE_NAME, put_items=new_items, delete_keys=delete_keys)
+    await async_table.batch_write(TABLE_NAME, put_items=new_items, delete_keys=delete_keys)
 
     for item in new_items:
         key = {"pk": item["pk"], "sk": item["sk"]}
@@ -160,12 +160,12 @@ async def test_async_batch_write_mixed_operations(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_batch_write_more_than_25_items(async_table: DynamoDBClient):
+async def test_batch_write_more_than_25_items(async_table: DynamoDBClient):
     """Test async batch write with more than 25 items."""
     uid = str(uuid.uuid4())[:8]
     items = [{"pk": f"A25#{uid}", "sk": f"ITEM#{i:03d}", "index": i} for i in range(30)]
 
-    await async_table.async_batch_write(TABLE_NAME, put_items=items)
+    await async_table.batch_write(TABLE_NAME, put_items=items)
 
     for item in items:
         key = {"pk": item["pk"], "sk": item["sk"]}
@@ -174,15 +174,15 @@ async def test_async_batch_write_more_than_25_items(async_table: DynamoDBClient)
         assert result["index"] == item["index"]
 
 
-# ========== AsyncBatchWriter tests ==========
+# ========== BatchWriter tests (async default) ==========
 
 
 @pytest.mark.asyncio
-async def test_async_batch_writer_puts_items(async_table: DynamoDBClient):
-    """Test AsyncBatchWriter with put operations."""
+async def test_batch_writer_puts_items(async_table: DynamoDBClient):
+    """Test BatchWriter with put operations."""
     uid = str(uuid.uuid4())[:8]
 
-    async with AsyncBatchWriter(async_table, TABLE_NAME) as batch:
+    async with BatchWriter(async_table, TABLE_NAME) as batch:
         for i in range(5):
             batch.put({"pk": f"ABW#{uid}", "sk": f"ITEM#{i}", "name": f"User {i}"})
 
@@ -195,15 +195,15 @@ async def test_async_batch_writer_puts_items(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_batch_writer_deletes_items(async_table: DynamoDBClient):
-    """Test AsyncBatchWriter with delete operations."""
+async def test_batch_writer_deletes_items(async_table: DynamoDBClient):
+    """Test BatchWriter with delete operations."""
     uid = str(uuid.uuid4())[:8]
     for i in range(3):
         await async_table.async_put_item(
             TABLE_NAME, {"pk": f"ABWD#{uid}", "sk": f"ITEM#{i}", "name": f"User {i}"}
         )
 
-    async with AsyncBatchWriter(async_table, TABLE_NAME) as batch:
+    async with BatchWriter(async_table, TABLE_NAME) as batch:
         for i in range(3):
             batch.delete({"pk": f"ABWD#{uid}", "sk": f"ITEM#{i}"})
 
@@ -215,14 +215,14 @@ async def test_async_batch_writer_deletes_items(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_batch_writer_mixed_operations(async_table: DynamoDBClient):
-    """Test AsyncBatchWriter with mixed put and delete."""
+async def test_batch_writer_mixed_operations(async_table: DynamoDBClient):
+    """Test BatchWriter with mixed put and delete."""
     uid = str(uuid.uuid4())[:8]
     await async_table.async_put_item(
         TABLE_NAME, {"pk": f"ABWM#{uid}", "sk": "OLD", "name": "ToDelete"}
     )
 
-    async with AsyncBatchWriter(async_table, TABLE_NAME) as batch:
+    async with BatchWriter(async_table, TABLE_NAME) as batch:
         batch.put({"pk": f"ABWM#{uid}", "sk": "NEW#1", "name": "New1"})
         batch.put({"pk": f"ABWM#{uid}", "sk": "NEW#2", "name": "New2"})
         batch.delete({"pk": f"ABWM#{uid}", "sk": "OLD"})
@@ -233,11 +233,11 @@ async def test_async_batch_writer_mixed_operations(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_batch_writer_manual_flush(async_table: DynamoDBClient):
-    """Test AsyncBatchWriter manual flush."""
+async def test_batch_writer_manual_flush(async_table: DynamoDBClient):
+    """Test BatchWriter manual flush."""
     uid = str(uuid.uuid4())[:8]
 
-    async with AsyncBatchWriter(async_table, TABLE_NAME) as batch:
+    async with BatchWriter(async_table, TABLE_NAME) as batch:
         batch.put({"pk": f"ABWF#{uid}", "sk": "ITEM#1", "name": "First"})
         await batch.flush()
 
@@ -252,12 +252,12 @@ async def test_async_batch_writer_manual_flush(async_table: DynamoDBClient):
     assert result is not None
 
 
-# ========== Model.async_batch_get tests ==========
+# ========== Model.batch_get tests (async default) ==========
 
 
 @pytest.mark.asyncio
-async def test_model_async_batch_get_returns_instances(async_table: DynamoDBClient):
-    """Model.async_batch_get returns Model instances by default."""
+async def test_model_batch_get_returns_instances(async_table: DynamoDBClient):
+    """Model.batch_get returns Model instances by default."""
     uid = str(uuid.uuid4())[:8]
     items = [
         {"pk": f"MABG#{uid}", "sk": "USER#1", "name": "Alice", "age": 25},
@@ -268,7 +268,7 @@ async def test_model_async_batch_get_returns_instances(async_table: DynamoDBClie
         await async_table.async_put_item(TABLE_NAME, item)
 
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    users = await AsyncUser.async_batch_get(keys)
+    users = await AsyncUser.batch_get(keys)
 
     assert len(users) == 3
     for user in users:
@@ -278,8 +278,8 @@ async def test_model_async_batch_get_returns_instances(async_table: DynamoDBClie
 
 
 @pytest.mark.asyncio
-async def test_model_async_batch_get_as_dict(async_table: DynamoDBClient):
-    """Model.async_batch_get(as_dict=True) returns plain dicts."""
+async def test_model_batch_get_as_dict(async_table: DynamoDBClient):
+    """Model.batch_get(as_dict=True) returns plain dicts."""
     uid = str(uuid.uuid4())[:8]
     items = [
         {"pk": f"MABGD#{uid}", "sk": "USER#1", "name": "Alice", "age": 25},
@@ -289,7 +289,7 @@ async def test_model_async_batch_get_as_dict(async_table: DynamoDBClient):
         await async_table.async_put_item(TABLE_NAME, item)
 
     keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
-    users = await AsyncUser.async_batch_get(keys, as_dict=True)
+    users = await AsyncUser.batch_get(keys, as_dict=True)
 
     assert len(users) == 2
     for user in users:
@@ -299,15 +299,15 @@ async def test_model_async_batch_get_as_dict(async_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_model_async_batch_get_empty_keys(async_table: DynamoDBClient):
-    """Model.async_batch_get with empty keys returns empty list."""
-    users = await AsyncUser.async_batch_get([])
+async def test_model_batch_get_empty_keys(async_table: DynamoDBClient):
+    """Model.batch_get with empty keys returns empty list."""
+    users = await AsyncUser.batch_get([])
     assert users == []
 
 
 @pytest.mark.asyncio
-async def test_model_async_batch_get_missing_items(async_table: DynamoDBClient):
-    """Model.async_batch_get only returns existing items."""
+async def test_model_batch_get_missing_items(async_table: DynamoDBClient):
+    """Model.batch_get only returns existing items."""
     uid = str(uuid.uuid4())[:8]
     await async_table.async_put_item(
         TABLE_NAME,
@@ -318,7 +318,7 @@ async def test_model_async_batch_get_missing_items(async_table: DynamoDBClient):
         {"pk": f"MABGM#{uid}", "sk": "EXISTS"},
         {"pk": f"MABGM#{uid}", "sk": "NOTEXISTS"},
     ]
-    users = await AsyncUser.async_batch_get(keys)
+    users = await AsyncUser.batch_get(keys)
 
     assert len(users) == 1
     assert users[0].name == "Found"

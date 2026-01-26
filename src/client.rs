@@ -480,15 +480,15 @@ impl DynamoDBClient {
         )
     }
 
-    /// Batch write items to a DynamoDB table.
-    pub fn batch_write(
+    /// Sync batch write items to a DynamoDB table.
+    pub fn sync_batch_write(
         &self,
         py: Python<'_>,
         table: &str,
         put_items: &Bound<'_, pyo3::types::PyList>,
         delete_keys: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<()> {
-        batch_operations::batch_write(
+        batch_operations::sync_batch_write(
             py,
             &self.client,
             &self.runtime,
@@ -498,14 +498,14 @@ impl DynamoDBClient {
         )
     }
 
-    /// Batch get items from a DynamoDB table.
-    pub fn batch_get(
+    /// Sync batch get items from a DynamoDB table.
+    pub fn sync_batch_get(
         &self,
         py: Python<'_>,
         table: &str,
         keys: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<Vec<Py<PyAny>>> {
-        batch_operations::batch_get(py, &self.client, &self.runtime, table, keys)
+        batch_operations::sync_batch_get(py, &self.client, &self.runtime, table, keys)
     }
 
     // ========== TRANSACTION OPERATIONS (SYNC - with sync_ prefix) ==========
@@ -569,29 +569,29 @@ impl DynamoDBClient {
         transaction_operations::transact_get(py, self.client.clone(), gets)
     }
 
-    /// Async version of batch_write.
+    /// Async batch write items to a DynamoDB table (default, no prefix).
     ///
     /// Returns a Python awaitable that writes items in batch.
-    pub fn async_batch_write<'py>(
+    pub fn batch_write<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         put_items: &Bound<'_, pyo3::types::PyList>,
         delete_keys: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        batch_operations::async_batch_write(py, self.client.clone(), table, put_items, delete_keys)
+        batch_operations::batch_write(py, self.client.clone(), table, put_items, delete_keys)
     }
 
-    /// Async version of batch_get.
+    /// Async batch get items from a DynamoDB table (default, no prefix).
     ///
     /// Returns a Python awaitable that gets items in batch.
-    pub fn async_batch_get<'py>(
+    pub fn batch_get<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         keys: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        batch_operations::async_batch_get(py, self.client.clone(), table, keys)
+        batch_operations::batch_get(py, self.client.clone(), table, keys)
     }
 
     // ========== TABLE OPERATIONS (SYNC - with sync_ prefix) ==========
