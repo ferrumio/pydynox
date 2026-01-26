@@ -198,20 +198,20 @@ user.update(
 )
 ```
 
-### Batch Operations
+### Batch operations
 
 ```python
-from pydynox import BatchWriter, DynamoDBClient
+from pydynox import BatchWriter, SyncBatchWriter, DynamoDBClient
 
 client = DynamoDBClient()
 
-# Batch write - items are sent in groups of 25
-with BatchWriter(client, "users") as batch:
+# Async batch write (default) - items are sent in groups of 25
+async with BatchWriter(client, "users") as batch:
     for i in range(100):
         batch.put({"pk": f"USER#{i}", "sk": "PROFILE", "name": f"User {i}"})
 
-# Mix puts and deletes
-with BatchWriter(client, "users") as batch:
+# Sync batch write - use SyncBatchWriter for sync code
+with SyncBatchWriter(client, "users") as batch:
     batch.put({"pk": "USER#1", "sk": "PROFILE", "name": "John"})
     batch.delete({"pk": "USER#2", "sk": "PROFILE"})
 ```

@@ -1,6 +1,6 @@
 # Async support
 
-pydynox supports async/await for high-concurrency applications like FastAPI, aiohttp, and other asyncio-based frameworks.
+pydynox is async-first. All main operations like `batch_get`, `batch_write`, and `BatchWriter` are async by default. This works great with FastAPI, aiohttp, and other asyncio-based frameworks.
 
 ## Why async?
 
@@ -8,7 +8,7 @@ Sync operations block the event loop:
 
 ```python
 async def handle_request(user_id: str):
-    user = User.get(pk=user_id, sk="PROFILE")  # Blocks!
+    user = User.sync_get(pk=user_id, sk="PROFILE")  # Blocks!
     # Other async tasks can't run while waiting for DynamoDB
 ```
 
@@ -16,13 +16,13 @@ Async operations let other tasks run while waiting for I/O:
 
 ```python
 async def handle_request(user_id: str):
-    user = await User.async_get(pk=user_id, sk="PROFILE")  # Non-blocking
+    user = await User.get(pk=user_id, sk="PROFILE")  # Non-blocking
     # Other tasks can run while waiting
 ```
 
 ## Model async methods
 
-All Model CRUD operations have async versions with `async_` prefix:
+Model CRUD operations are async by default:
 
 === "model_async.py"
     ```python
@@ -31,7 +31,7 @@ All Model CRUD operations have async versions with `async_` prefix:
 
 ## Client async methods
 
-The `DynamoDBClient` also has async versions:
+The `DynamoDBClient` methods are also async by default:
 
 === "client_async.py"
     ```python
@@ -72,37 +72,53 @@ Fetch user and their orders at the same time:
     --8<-- "docs/examples/async/fastapi_example.py"
     ```
 
-## Available async methods
+## Sync operations
 
-### Model
+For sync code (scripts, CLI tools, or frameworks that don't support async), use the `sync_` prefixed methods:
 
-| Sync | Async |
-|------|-------|
-| `Model.get()` | `Model.async_get()` |
-| `model.save()` | `model.async_save()` |
-| `model.delete()` | `model.async_delete()` |
-| `model.update()` | `model.async_update()` |
-| `Model.batch_get()` | `Model.async_batch_get()` |
-| `Model.query()` | `Model.async_query()` |
-| `Model.scan()` | `Model.async_scan()` |
+```python
+# Sync versions have sync_ prefix
+user = User.sync_get(pk="USER#1", sk="PROFILE")
+user.sync_save()
+user.sync_delete()
 
-### DynamoDBClient
+# Client sync methods
+client.sync_put_item("users", item)
+client.sync_get_item("users", key)
+items = client.sync_batch_get("users", keys)
+```
 
-| Sync | Async |
-|------|-------|
-| `get_item()` | `async_get_item()` |
-| `put_item()` | `async_put_item()` |
-| `delete_item()` | `async_delete_item()` |
-| `update_item()` | `async_update_item()` |
-| `query()` | `async_query()` |
-| `batch_get()` | `async_batch_get()` |
-| `batch_write()` | `async_batch_write()` |
+## API reference
+
+### Model methods
+
+| Async (default) | Sync |
+|-----------------|------|
+| `await Model.get()` | `Model.sync_get()` |
+| `await model.save()` | `model.sync_save()` |
+| `await model.delete()` | `model.sync_delete()` |
+| `await model.update()` | `model.sync_update()` |
+| `await Model.batch_get()` | `Model.sync_batch_get()` |
+| `async for item in Model.query()` | `for item in Model.sync_query()` |
+| `async for item in Model.scan()` | `for item in Model.sync_scan()` |
+
+### DynamoDBClient methods
+
+| Async (default) | Sync |
+|-----------------|------|
+| `await client.get_item()` | `client.sync_get_item()` |
+| `await client.put_item()` | `client.sync_put_item()` |
+| `await client.delete_item()` | `client.sync_delete_item()` |
+| `await client.update_item()` | `client.sync_update_item()` |
+| `async for item in client.query()` | `for item in client.sync_query()` |
+| `await client.batch_get()` | `client.sync_batch_get()` |
+| `await client.batch_write()` | `client.sync_batch_write()` |
 
 ### Batch operations
 
-| Sync | Async |
-|------|-------|
-| `BatchWriter` | `AsyncBatchWriter` |
+| Async (default) | Sync |
+|-----------------|------|
+| `async with BatchWriter()` | `with SyncBatchWriter()` |
 
 ## Notes
 

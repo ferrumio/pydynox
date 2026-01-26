@@ -4,8 +4,8 @@ Work with multiple items at once. Instead of making 100 separate API calls, batc
 
 ## Key features
 
-- `sync_batch_get` / `batch_get` - Fetch up to 100 items per request (auto-splits larger batches)
-- `SyncBatchWriter` / `BatchWriter` - Write up to 25 items per request (auto-splits larger batches)
+- `batch_get` - Fetch up to 100 items per request (auto-splits larger batches)
+- `BatchWriter` - Write up to 25 items per request (auto-splits larger batches)
 - Automatic retry for failed items
 - Mix puts and deletes in one batch
 - Async-first API: `BatchWriter` and `batch_get` are async by default
@@ -33,7 +33,7 @@ Use `BatchWriter` to save or delete many items. The batch writer handles all the
     --8<-- "docs/examples/batch/batch_write.py"
     ```
 
-When you use `BatchWriter` as a context manager (with `with`), it automatically flushes any remaining items when the block ends. This means you don't have to worry about items being left unsent.
+When you use `BatchWriter` as a context manager (with `async with`), it automatically flushes any remaining items when the block ends. This means you don't have to worry about items being left unsent.
 
 The batch writer accepts two types of operations:
 
@@ -42,6 +42,41 @@ The batch writer accepts two types of operations:
 
 You can mix both operations in the same batch. DynamoDB processes them in any order, so don't rely on a specific sequence.
 
+## Sync operations
+
+For sync code (scripts, CLI tools, or frameworks that don't support async), use the `sync_` prefixed methods and `SyncBatchWriter`:
+
+=== "sync_batch_get.py"
+    ```python
+    --8<-- "docs/examples/batch/sync_batch_get.py"
+    ```
+
+=== "sync_batch_write.py"
+    ```python
+    --8<-- "docs/examples/batch/sync_batch_write.py"
+    ```
+
+## API reference
+
+### Client methods
+
+| Async (default) | Sync |
+|-----------------|------|
+| `await client.batch_get(table, keys)` | `client.sync_batch_get(table, keys)` |
+| `await client.batch_write(table, put_items, delete_keys)` | `client.sync_batch_write(table, put_items, delete_keys)` |
+
+### Model methods
+
+| Async (default) | Sync |
+|-----------------|------|
+| `await Model.batch_get(keys)` | `Model.sync_batch_get(keys)` |
+
+### Context managers
+
+| Async (default) | Sync |
+|-----------------|------|
+| `async with BatchWriter(client, table)` | `with SyncBatchWriter(client, table)` |
+
 ## Advanced
 
 ### Manual flush
@@ -49,13 +84,13 @@ You can mix both operations in the same batch. DynamoDB processes them in any or
 By default, the batch writer sends items to DynamoDB when it has 25 items ready, or when the context exits. If you want to send items earlier, call `flush()`:
 
 ```python
-with BatchWriter(client, "users") as batch:
+async with BatchWriter(client, "users") as batch:
     for i in range(100):
         batch.put({"pk": f"USER#{i}", "name": f"User {i}"})
         
         # Flush every 50 items instead of waiting
         if i % 50 == 0:
-            batch.flush()
+            await batch.flush()
 ```
 
 This is useful when you want to see progress during long-running operations, or when you need to free up memory.
@@ -68,7 +103,7 @@ The batch writer automatically retries failed items with exponential backoff. If
 
 ```python
 try:
-    with BatchWriter(client, "users") as batch:
+    async with BatchWriter(client, "users") as batch:
         batch.put({"pk": "USER#1", "name": "John"})
 except Exception as e:
     print(f"Some items failed: {e}")
@@ -76,17 +111,6 @@ except Exception as e:
 
 !!! tip
     If you're seeing frequent failures, consider using [rate limiting](rate-limiting.md) to stay within your provisioned capacity.
-
-### Async batch operations
-
-All batch operations have async versions. Use `AsyncBatchWriter` for writes and `async_batch_get` for reads:
-
-=== "async_batch.py"
-    ```python
-    --8<-- "docs/examples/batch/async_batch.py"
-    ```
-
-The async versions work the same as sync, but use `async with` and `await`.
 
 ### Performance tips
 
