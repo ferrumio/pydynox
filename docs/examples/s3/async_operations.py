@@ -1,4 +1,4 @@
-"""Async S3 operations."""
+"""Async S3 operations (S3Value methods are async-first)."""
 
 import asyncio
 
@@ -20,27 +20,25 @@ class Document(Model):
 
 
 async def main():
-    # Async upload (default)
+    # Upload (Model uses async_save)
     doc = Document(pk="DOC#async", sk="v1", name="async.txt")
     doc.content = S3File(b"Async content", name="async.txt")
     await doc.async_save()
     print(f"Uploaded: {doc.content.key}")
 
-    # Async get
+    # Get (Model uses async_get)
     loaded = await Document.async_get(pk="DOC#async", sk="v1")
     if loaded and loaded.content:
-        # Async download (default, no prefix)
+        # S3Value methods are async-first (no prefix = async)
         data = await loaded.content.get_bytes()
         print(f"Downloaded: {len(data)} bytes")
 
-        # Async save to file (default, no prefix)
         await loaded.content.save_to("/tmp/async_download.txt")
 
-        # Async presigned URL (default, no prefix)
         url = await loaded.content.presigned_url(3600)
         print(f"URL: {url}")
 
-    # Async delete
+    # Delete (Model uses async_delete)
     await doc.async_delete()
     print("Deleted")
 
