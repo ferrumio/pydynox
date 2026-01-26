@@ -6,8 +6,8 @@ client = DynamoDBClient()
 client.put_item("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 client.put_item("orders", {"pk": "ORDER#1", "sk": "DETAILS", "total": 100})
 
-# Read multiple items atomically
-items = client.transact_get(
+# Read multiple items atomically (sync version)
+items = client.sync_transact_get(
     [
         {"table": "users", "key": {"pk": "USER#1", "sk": "PROFILE"}},
         {"table": "orders", "key": {"pk": "ORDER#1", "sk": "DETAILS"}},

@@ -5,7 +5,7 @@ Requirements: 9.3, 9.4
 """
 
 import pytest
-from pydynox import Transaction
+from pydynox import SyncTransaction
 from pydynox.exceptions import PydynoxException, TransactionCanceledException
 
 
@@ -30,8 +30,8 @@ def test_transact_write_puts_multiple_items(dynamo):
         },
     ]
 
-    # WHEN we execute the transaction
-    dynamo.transact_write(operations)
+    # WHEN we execute the transaction (sync)
+    dynamo.sync_transact_write(operations)
 
     # THEN all items are saved
     for op in operations:
@@ -60,7 +60,7 @@ def test_transact_write_with_delete(dynamo):
         },
     ]
 
-    dynamo.transact_write(operations)
+    dynamo.sync_transact_write(operations)
 
     # Verify new item exists
     result = dynamo.get_item("test_table", {"pk": "TXN#2", "sk": "NEW#1"})
@@ -88,7 +88,7 @@ def test_transact_write_with_update(dynamo):
         },
     ]
 
-    dynamo.transact_write(operations)
+    dynamo.sync_transact_write(operations)
 
     # Verify update was applied
     result = dynamo.get_item("test_table", {"pk": "TXN#3", "sk": "UPDATE"})
@@ -125,7 +125,7 @@ def test_transact_write_rollback_on_condition_failure(dynamo):
     # WHEN we execute the transaction
     # THEN it fails
     with pytest.raises((TransactionCanceledException, PydynoxException)):
-        dynamo.transact_write(operations)
+        dynamo.sync_transact_write(operations)
 
     # AND the put was rolled back - original value remains
     result = dynamo.get_item("test_table", {"pk": "TXN#4", "sk": "ITEM#1"})
@@ -154,7 +154,7 @@ def test_transact_write_condition_check_success(dynamo):
         },
     ]
 
-    dynamo.transact_write(operations)
+    dynamo.sync_transact_write(operations)
 
     # Verify the put succeeded
     result = dynamo.get_item("test_table", {"pk": "TXN#5", "sk": "NEW"})
@@ -163,9 +163,9 @@ def test_transact_write_condition_check_success(dynamo):
 
 
 def test_transaction_context_manager(dynamo):
-    """Test Transaction context manager commits on exit."""
-    # WHEN we use the context manager
-    with Transaction(dynamo) as txn:
+    """Test SyncTransaction context manager commits on exit."""
+    # WHEN we use the context manager (sync)
+    with SyncTransaction(dynamo) as txn:
         txn.put("test_table", {"pk": "TXN#6", "sk": "ITEM#1", "name": "Alice"})
         txn.put("test_table", {"pk": "TXN#6", "sk": "ITEM#2", "name": "Bob"})
 
@@ -180,13 +180,13 @@ def test_transaction_context_manager(dynamo):
 
 
 def test_transaction_context_manager_rollback_on_exception(dynamo):
-    """Test Transaction context manager does not commit on exception."""
+    """Test SyncTransaction context manager does not commit on exception."""
     # GIVEN an existing item
     dynamo.put_item("test_table", {"pk": "TXN#7", "sk": "ITEM", "value": "original"})
 
     # WHEN an exception occurs in the context
     try:
-        with Transaction(dynamo) as txn:
+        with SyncTransaction(dynamo) as txn:
             txn.put("test_table", {"pk": "TXN#7", "sk": "ITEM", "value": "updated"})
             raise RuntimeError("Simulated error")
     except RuntimeError:
@@ -200,5 +200,5 @@ def test_transaction_context_manager_rollback_on_exception(dynamo):
 
 def test_transact_write_empty_operations(dynamo):
     """Test transaction with empty operations list does nothing."""
-    # Should not raise an error
-    dynamo.transact_write([])
+    # Should not raise an error (sync)
+    dynamo.sync_transact_write([])

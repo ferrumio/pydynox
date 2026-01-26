@@ -4,7 +4,7 @@ Tests atomic read of multiple items.
 """
 
 import pytest
-from pydynox import AsyncTransaction
+from pydynox import Transaction
 
 
 def test_transact_get_multiple_items(dynamo):
@@ -14,13 +14,13 @@ def test_transact_get_multiple_items(dynamo):
     dynamo.put_item("test_table", {"pk": "TGET#1", "sk": "ITEM#2", "name": "Bob"})
     dynamo.put_item("test_table", {"pk": "TGET#1", "sk": "ITEM#3", "name": "Charlie"})
 
-    # WHEN we read them in a transaction
+    # WHEN we read them in a transaction (sync)
     gets = [
         {"table": "test_table", "key": {"pk": "TGET#1", "sk": "ITEM#1"}},
         {"table": "test_table", "key": {"pk": "TGET#1", "sk": "ITEM#2"}},
         {"table": "test_table", "key": {"pk": "TGET#1", "sk": "ITEM#3"}},
     ]
-    results = dynamo.transact_get(gets)
+    results = dynamo.sync_transact_get(gets)
 
     # THEN all items are returned
     assert len(results) == 3
@@ -39,7 +39,7 @@ def test_transact_get_with_missing_item(dynamo):
         {"table": "test_table", "key": {"pk": "TGET#2", "sk": "EXISTS"}},
         {"table": "test_table", "key": {"pk": "TGET#2", "sk": "MISSING"}},
     ]
-    results = dynamo.transact_get(gets)
+    results = dynamo.sync_transact_get(gets)
 
     # THEN existing item is returned, missing is None
     assert len(results) == 2
@@ -49,7 +49,7 @@ def test_transact_get_with_missing_item(dynamo):
 
 def test_transact_get_empty_list(dynamo):
     """Test transact_get with empty list returns empty list."""
-    results = dynamo.transact_get([])
+    results = dynamo.sync_transact_get([])
     assert results == []
 
 
@@ -70,7 +70,7 @@ def test_transact_get_with_projection(dynamo):
             "expression_attribute_names": {"#n": "name", "#a": "age"},
         },
     ]
-    results = dynamo.transact_get(gets)
+    results = dynamo.sync_transact_get(gets)
 
     # THEN only projected attributes are returned (plus keys)
     assert len(results) == 1
@@ -83,8 +83,8 @@ def test_transact_get_with_projection(dynamo):
 
 
 @pytest.mark.asyncio
-async def test_async_transact_write(dynamo):
-    """Test async transact_write."""
+async def test_transact_write_async(dynamo):
+    """Test async transact_write (default)."""
     operations = [
         {
             "type": "put",
@@ -98,8 +98,8 @@ async def test_async_transact_write(dynamo):
         },
     ]
 
-    # WHEN we execute async transaction
-    await dynamo.async_transact_write(operations)
+    # WHEN we execute async transaction (default, no prefix)
+    await dynamo.transact_write(operations)
 
     # THEN items are saved
     result = dynamo.get_item("test_table", {"pk": "ASYNC_TXN#1", "sk": "ITEM#1"})
@@ -108,18 +108,18 @@ async def test_async_transact_write(dynamo):
 
 
 @pytest.mark.asyncio
-async def test_async_transact_get(dynamo):
-    """Test async transact_get."""
+async def test_transact_get_async(dynamo):
+    """Test async transact_get (default)."""
     # GIVEN items exist
     dynamo.put_item("test_table", {"pk": "ASYNC_TGET#1", "sk": "ITEM#1", "name": "Alice"})
     dynamo.put_item("test_table", {"pk": "ASYNC_TGET#1", "sk": "ITEM#2", "name": "Bob"})
 
-    # WHEN we read them async
+    # WHEN we read them async (default, no prefix)
     gets = [
         {"table": "test_table", "key": {"pk": "ASYNC_TGET#1", "sk": "ITEM#1"}},
         {"table": "test_table", "key": {"pk": "ASYNC_TGET#1", "sk": "ITEM#2"}},
     ]
-    results = await dynamo.async_transact_get(gets)
+    results = await dynamo.transact_get(gets)
 
     # THEN all items are returned
     assert len(results) == 2
@@ -128,10 +128,10 @@ async def test_async_transact_get(dynamo):
 
 
 @pytest.mark.asyncio
-async def test_async_transaction_context_manager(dynamo):
-    """Test AsyncTransaction context manager."""
+async def test_transaction_context_manager_async(dynamo):
+    """Test Transaction (async) context manager."""
     # WHEN we use the async context manager
-    async with AsyncTransaction(dynamo) as txn:
+    async with Transaction(dynamo) as txn:
         txn.put("test_table", {"pk": "ASYNC_CTX#1", "sk": "ITEM#1", "name": "Alice"})
         txn.put("test_table", {"pk": "ASYNC_CTX#1", "sk": "ITEM#2", "name": "Bob"})
 
@@ -142,14 +142,14 @@ async def test_async_transaction_context_manager(dynamo):
 
 
 @pytest.mark.asyncio
-async def test_async_transaction_rollback_on_exception(dynamo):
-    """Test AsyncTransaction does not commit on exception."""
+async def test_transaction_rollback_on_exception_async(dynamo):
+    """Test Transaction (async) does not commit on exception."""
     # GIVEN an existing item
     dynamo.put_item("test_table", {"pk": "ASYNC_CTX#2", "sk": "ITEM", "value": "original"})
 
     # WHEN an exception occurs
     try:
-        async with AsyncTransaction(dynamo) as txn:
+        async with Transaction(dynamo) as txn:
             txn.put("test_table", {"pk": "ASYNC_CTX#2", "sk": "ITEM", "value": "updated"})
             raise RuntimeError("Simulated error")
     except RuntimeError:

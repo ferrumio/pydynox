@@ -508,18 +508,20 @@ impl DynamoDBClient {
         batch_operations::batch_get(py, &self.client, &self.runtime, table, keys)
     }
 
-    /// Execute a transactional write operation.
+    // ========== TRANSACTION OPERATIONS (SYNC - with sync_ prefix) ==========
+
+    /// Sync version of transact_write. Blocks until complete.
     ///
     /// All operations run atomically. Either all succeed or all fail.
-    pub fn transact_write(
+    pub fn sync_transact_write(
         &self,
         py: Python<'_>,
         operations: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<()> {
-        transaction_operations::transact_write(py, &self.client, &self.runtime, operations)
+        transaction_operations::sync_transact_write(py, &self.client, &self.runtime, operations)
     }
 
-    /// Execute a transactional get operation.
+    /// Sync version of transact_get. Blocks until complete.
     ///
     /// Reads multiple items atomically. Either all reads succeed or all fail.
     /// Use this when you need a consistent snapshot of multiple items.
@@ -535,34 +537,36 @@ impl DynamoDBClient {
     /// # Returns
     ///
     /// List of items (or None for items that don't exist).
-    pub fn transact_get(
+    pub fn sync_transact_get(
         &self,
         py: Python<'_>,
         gets: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<Vec<Option<Py<PyAny>>>> {
-        transaction_operations::transact_get(py, &self.client, &self.runtime, gets)
+        transaction_operations::sync_transact_get(py, &self.client, &self.runtime, gets)
     }
 
-    /// Async version of transact_write.
+    // ========== TRANSACTION OPERATIONS (ASYNC - default, no prefix) ==========
+
+    /// Execute a transactional write operation. Returns a Python awaitable.
     ///
-    /// Returns a Python awaitable that executes the transaction.
-    pub fn async_transact_write<'py>(
+    /// All operations run atomically. Either all succeed or all fail.
+    pub fn transact_write<'py>(
         &self,
         py: Python<'py>,
         operations: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        transaction_operations::async_transact_write(py, self.client.clone(), operations)
+        transaction_operations::transact_write(py, self.client.clone(), operations)
     }
 
-    /// Async version of transact_get.
+    /// Execute a transactional get operation. Returns a Python awaitable.
     ///
-    /// Returns a Python awaitable that reads multiple items atomically.
-    pub fn async_transact_get<'py>(
+    /// Reads multiple items atomically. Either all reads succeed or all fail.
+    pub fn transact_get<'py>(
         &self,
         py: Python<'py>,
         gets: &Bound<'_, pyo3::types::PyList>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        transaction_operations::async_transact_get(py, self.client.clone(), gets)
+        transaction_operations::transact_get(py, self.client.clone(), gets)
     }
 
     /// Async version of batch_write.
