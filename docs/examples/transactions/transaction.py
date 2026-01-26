@@ -6,7 +6,6 @@ client = DynamoDBClient()
 
 
 async def create_order():
-    # Async transaction - Transaction is async by default
     async with Transaction(client) as tx:
         tx.put("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
         tx.put("orders", {"pk": "ORDER#1", "sk": "DETAILS", "user": "USER#1"})
