@@ -48,19 +48,19 @@ class BatchOperations:
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
         return self._client.batch_get(table, keys)  # type: ignore[attr-defined, no-any-return]
 
-    # ========== TRANSACT WRITE ==========
+    # ========== TRANSACT WRITE (SYNC) ==========
 
-    def transact_write(self, operations: list[dict[str, Any]]) -> None:
-        """Execute a transactional write operation.
+    def sync_transact_write(self, operations: list[dict[str, Any]]) -> None:
+        """Sync version of transact_write. Blocks until complete.
 
         All operations run atomically. Either all succeed or all fail.
         """
-        self._client.transact_write(operations)  # type: ignore[attr-defined]
+        self._client.sync_transact_write(operations)  # type: ignore[attr-defined]
 
-    # ========== TRANSACT GET ==========
+    # ========== TRANSACT GET (SYNC) ==========
 
-    def transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
-        """Execute a transactional get operation.
+    def sync_transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+        """Sync version of transact_get. Blocks until complete.
 
         Reads multiple items atomically. Either all reads succeed or all fail.
         Use this when you need a consistent snapshot of multiple items.
@@ -76,36 +76,36 @@ class BatchOperations:
             List of items (or None for items that don't exist).
 
         Example:
-            items = client.transact_get([
+            items = client.sync_transact_get([
                 {"table": "users", "key": {"pk": "USER#1"}},
                 {"table": "orders", "key": {"pk": "ORDER#1", "sk": "ITEM#1"}},
             ])
         """
-        return self._client.transact_get(gets)  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_transact_get(gets)  # type: ignore[attr-defined, no-any-return]
 
-    # ========== ASYNC TRANSACT WRITE ==========
+    # ========== TRANSACT WRITE (ASYNC - default) ==========
 
-    async def async_transact_write(self, operations: list[dict[str, Any]]) -> None:
-        """Async version of transact_write.
+    async def transact_write(self, operations: list[dict[str, Any]]) -> None:
+        """Execute a transactional write operation.
 
         All operations run atomically. Either all succeed or all fail.
         """
-        await self._client.async_transact_write(operations)  # type: ignore[attr-defined]
+        await self._client.transact_write(operations)  # type: ignore[attr-defined]
 
-    # ========== ASYNC TRANSACT GET ==========
+    # ========== TRANSACT GET (ASYNC - default) ==========
 
-    async def async_transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
-        """Async version of transact_get.
+    async def transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
+        """Execute a transactional get operation.
 
         Reads multiple items atomically. Either all reads succeed or all fail.
 
         Args:
-            gets: List of get dicts (same format as transact_get).
+            gets: List of get dicts (same format as sync_transact_get).
 
         Returns:
             List of items (or None for items that don't exist).
         """
-        return await self._client.async_transact_get(gets)  # type: ignore[attr-defined, no-any-return]
+        return await self._client.transact_get(gets)  # type: ignore[attr-defined, no-any-return]
 
     # ========== ASYNC BATCH WRITE ==========
 

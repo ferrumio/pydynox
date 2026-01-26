@@ -32,7 +32,7 @@ from pydynox.config import (
 from pydynox.generators import AutoGenerate
 from pydynox.integrations.functions import dynamodb_model
 from pydynox.model import Model
-from pydynox.transaction import AsyncTransaction, Transaction
+from pydynox.transaction import SyncTransaction, Transaction
 from pydynox.version import VERSION
 
 __version__ = VERSION
@@ -45,9 +45,9 @@ __all__ = [
     "ModelConfig",
     # Operations
     "AsyncBatchWriter",
-    "AsyncTransaction",
     "BatchWriter",
     "Condition",
+    "SyncTransaction",
     "Transaction",
     # Generators
     "AutoGenerate",

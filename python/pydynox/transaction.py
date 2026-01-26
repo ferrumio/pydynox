@@ -9,20 +9,20 @@ if TYPE_CHECKING:
 
 
 class Transaction:
-    """Context manager for transactional write operations.
+    """Async context manager for transactional write operations.
 
     Collects put, delete, and update operations, then sends them all
     atomically when the context exits. Either all operations succeed
     or all fail together.
 
     Example:
-        >>> with Transaction(client) as txn:
+        >>> async with Transaction(client) as txn:
         ...     txn.put("users", {"pk": "USER#1", "sk": "PROFILE", "name": "Alice"})
         ...     txn.put("users", {"pk": "USER#1", "sk": "SETTINGS", "theme": "dark"})
         ...     txn.delete("users", {"pk": "USER#2", "sk": "PROFILE"})
 
         >>> # With condition check
-        >>> with Transaction(client) as txn:
+        >>> async with Transaction(client) as txn:
         ...     txn.condition_check(
         ...         "accounts",
         ...         {"pk": "ACC#1", "sk": "BALANCE"},
@@ -48,19 +48,19 @@ class Transaction:
         self._client = client
         self._operations: list[dict[str, Any]] = []
 
-    def __enter__(self) -> Transaction:
-        """Enter the context manager."""
+    async def __aenter__(self) -> Transaction:
+        """Enter the async context manager."""
         return self
 
-    def __exit__(
+    async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: Any,
     ) -> None:
-        """Exit the context manager and execute the transaction."""
+        """Exit the async context manager and execute the transaction."""
         if exc_type is None:
-            self.commit()
+            await self.commit()
 
     def put(
         self,
@@ -188,10 +188,10 @@ class Transaction:
             op["expression_attribute_values"] = expression_attribute_values
         self._operations.append(op)
 
-    def commit(self) -> None:
+    async def commit(self) -> None:
         """Execute all collected operations atomically.
 
-        Called automatically when exiting the context manager.
+        Called automatically when exiting the async context manager.
         Can also be called manually to execute operations early.
 
         Raises:
@@ -201,25 +201,25 @@ class Transaction:
         if not self._operations:
             return
 
-        self._client.transact_write(self._operations)
+        await self._client.transact_write(self._operations)
 
         # Clear operations after successful commit
         self._operations = []
 
 
-class AsyncTransaction:
-    """Async context manager for transactional write operations.
+class SyncTransaction:
+    """Sync context manager for transactional write operations.
 
-    Same as Transaction but for async code.
+    Same as Transaction but for sync code.
 
     Example:
-        >>> async with AsyncTransaction(client) as txn:
+        >>> with SyncTransaction(client) as txn:
         ...     txn.put("users", {"pk": "USER#1", "sk": "PROFILE", "name": "Alice"})
         ...     txn.delete("users", {"pk": "USER#2", "sk": "PROFILE"})
     """
 
     def __init__(self, client: DynamoDBClient):
-        """Create an AsyncTransaction.
+        """Create a SyncTransaction.
 
         Args:
             client: The DynamoDBClient to use.
@@ -227,19 +227,19 @@ class AsyncTransaction:
         self._client = client
         self._operations: list[dict[str, Any]] = []
 
-    async def __aenter__(self) -> AsyncTransaction:
-        """Enter the async context manager."""
+    def __enter__(self) -> SyncTransaction:
+        """Enter the context manager."""
         return self
 
-    async def __aexit__(
+    def __exit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: Any,
     ) -> None:
-        """Exit the async context manager and execute the transaction."""
+        """Exit the context manager and execute the transaction."""
         if exc_type is None:
-            await self.commit()
+            self.commit()
 
     def put(
         self,
@@ -330,16 +330,16 @@ class AsyncTransaction:
             op["expression_attribute_values"] = expression_attribute_values
         self._operations.append(op)
 
-    async def commit(self) -> None:
+    def commit(self) -> None:
         """Execute all collected operations atomically.
 
-        Called automatically when exiting the async context manager.
+        Called automatically when exiting the context manager.
         Can also be called manually to execute operations early.
         """
         if not self._operations:
             return
 
-        await self._client.async_transact_write(self._operations)
+        self._client.sync_transact_write(self._operations)
 
         # Clear operations after successful commit
         self._operations = []
