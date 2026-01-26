@@ -12,22 +12,23 @@ class User(Model):
     age = NumberAttribute()
 
 
-# Client-level sync batch get (use sync_batch_get for sync code)
-keys = [
-    {"pk": "USER#1", "sk": "PROFILE"},
-    {"pk": "USER#2", "sk": "PROFILE"},
-    {"pk": "USER#3", "sk": "PROFILE"},
-]
-items = client.sync_batch_get("users", keys)
-for item in items:
-    print(item["name"])
+async def main():
+    # Client-level batch get (async by default)
+    keys = [
+        {"pk": "USER#1", "sk": "PROFILE"},
+        {"pk": "USER#2", "sk": "PROFILE"},
+        {"pk": "USER#3", "sk": "PROFILE"},
+    ]
+    items = await client.batch_get("users", keys)
+    for item in items:
+        print(item["name"])
 
-# Model-level sync batch get - returns typed instances
-users = User.sync_batch_get(keys)
-for user in users:
-    print(user.name, user.age)
+    # Model-level batch get - returns typed instances
+    users = await User.batch_get(keys)
+    for user in users:
+        print(user.name, user.age)
 
-# Return as dicts for better performance
-users_dict = User.sync_batch_get(keys, as_dict=True)
-for user in users_dict:
-    print(user["name"])
+    # Return as dicts for better performance
+    users_dict = await User.batch_get(keys, as_dict=True)
+    for user in users_dict:
+        print(user["name"])
