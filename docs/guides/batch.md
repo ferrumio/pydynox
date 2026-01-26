@@ -4,11 +4,11 @@ Work with multiple items at once. Instead of making 100 separate API calls, batc
 
 ## Key features
 
-- `batch_get` - Fetch up to 100 items per request (auto-splits larger batches)
-- `BatchWriter` - Write up to 25 items per request (auto-splits larger batches)
+- `sync_batch_get` / `batch_get` - Fetch up to 100 items per request (auto-splits larger batches)
+- `SyncBatchWriter` / `BatchWriter` - Write up to 25 items per request (auto-splits larger batches)
 - Automatic retry for failed items
 - Mix puts and deletes in one batch
-- Full async support with `AsyncBatchWriter` and `async_batch_get`
+- Async-first API: `BatchWriter` and `batch_get` are async by default
 - Metrics on every operation (see [observability](observability.md))
 
 ## Getting started

@@ -1,4 +1,4 @@
-"""Batch operations for Model: batch_get."""
+"""Batch operations for Model: batch_get (async default), sync_batch_get."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ if TYPE_CHECKING:
 M = TypeVar("M", bound="Model")
 
 
-def batch_get(
+async def batch_get(
     cls: type[M],
     keys: list[dict[str, Any]],
     consistent_read: bool | None = None,
     as_dict: bool = False,
 ) -> list[M] | list[dict[str, Any]]:
-    """Batch get items by keys.
+    """Async batch get items by keys (default, no prefix).
 
     Args:
         keys: List of key dicts (each with hash_key and optional range_key).
@@ -38,8 +38,8 @@ def batch_get(
     # but we keep the parameter for future compatibility
     _ = consistent_read
 
-    # Call client batch_get
-    items = client.batch_get(table, keys)
+    # Call client async batch_get
+    items = await client.batch_get(table, keys)
 
     if as_dict:
         return items
@@ -55,13 +55,13 @@ def batch_get(
     return instances
 
 
-async def async_batch_get(
+def sync_batch_get(
     cls: type[M],
     keys: list[dict[str, Any]],
     consistent_read: bool | None = None,
     as_dict: bool = False,
 ) -> list[M] | list[dict[str, Any]]:
-    """Async batch get items by keys.
+    """Sync batch get items by keys.
 
     Args:
         keys: List of key dicts (each with hash_key and optional range_key).
@@ -77,12 +77,12 @@ async def async_batch_get(
     client = cls._get_client()
     table = cls._get_table()
 
-    # consistent_read is not yet supported by client.async_batch_get
+    # consistent_read is not yet supported by client.sync_batch_get
     # but we keep the parameter for future compatibility
     _ = consistent_read
 
-    # Call client async_batch_get
-    items = await client.async_batch_get(table, keys)
+    # Call client sync_batch_get
+    items = client.sync_batch_get(table, keys)
 
     if as_dict:
         return items

@@ -9,14 +9,14 @@ if TYPE_CHECKING:
 
 
 class BatchWriter:
-    """Context manager for batch write operations.
+    """Async context manager for batch write operations (default).
 
     Collects put and delete operations, then sends them all at once
     when the context exits. Handles splitting into batches of 25 items
     and retrying unprocessed items.
 
     Example:
-        >>> with BatchWriter(client, "users") as batch:
+        >>> async with BatchWriter(client, "users") as batch:
         ...     batch.put({"pk": "USER#1", "sk": "PROFILE", "name": "Alice"})
         ...     batch.put({"pk": "USER#2", "sk": "PROFILE", "name": "Bob"})
         ...     batch.delete({"pk": "USER#3", "sk": "PROFILE"})
@@ -34,80 +34,7 @@ class BatchWriter:
         self._put_items: list[dict[str, Any]] = []
         self._delete_keys: list[dict[str, Any]] = []
 
-    def __enter__(self) -> BatchWriter:
-        """Enter the context manager."""
-        return self
-
-    def __exit__(
-        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
-    ) -> None:
-        """Exit the context manager and send all operations."""
-        if exc_type is None:
-            self.flush()
-
-    def put(self, item: dict[str, Any]) -> None:
-        """Add an item to be put.
-
-        Args:
-            item: The item to put (as a dict).
-        """
-        self._put_items.append(item)
-
-    def delete(self, key: dict[str, Any]) -> None:
-        """Add a key to be deleted.
-
-        Args:
-            key: The key to delete (as a dict with pk and optional sk).
-        """
-        self._delete_keys.append(key)
-
-    def flush(self) -> None:
-        """Send all collected operations to DynamoDB.
-
-        Called automatically when exiting the context manager.
-        Can also be called manually to send operations early.
-        """
-        if not self._put_items and not self._delete_keys:
-            return
-
-        self._client.batch_write(
-            self._table,
-            put_items=self._put_items,
-            delete_keys=self._delete_keys,
-        )
-
-        # Clear the lists after successful write
-        self._put_items = []
-        self._delete_keys = []
-
-
-class AsyncBatchWriter:
-    """Async context manager for batch write operations.
-
-    Collects put and delete operations, then sends them all at once
-    when the context exits. Handles splitting into batches of 25 items
-    and retrying unprocessed items.
-
-    Example:
-        >>> async with AsyncBatchWriter(client, "users") as batch:
-        ...     batch.put({"pk": "USER#1", "sk": "PROFILE", "name": "Alice"})
-        ...     batch.put({"pk": "USER#2", "sk": "PROFILE", "name": "Bob"})
-        ...     batch.delete({"pk": "USER#3", "sk": "PROFILE"})
-    """
-
-    def __init__(self, client: DynamoDBClient, table: str):
-        """Create an AsyncBatchWriter.
-
-        Args:
-            client: The DynamoDBClient to use.
-            table: The table name.
-        """
-        self._client = client
-        self._table = table
-        self._put_items: list[dict[str, Any]] = []
-        self._delete_keys: list[dict[str, Any]] = []
-
-    async def __aenter__(self) -> AsyncBatchWriter:
+    async def __aenter__(self) -> BatchWriter:
         """Enter the async context manager."""
         return self
 
@@ -143,7 +70,80 @@ class AsyncBatchWriter:
         if not self._put_items and not self._delete_keys:
             return
 
-        await self._client.async_batch_write(
+        await self._client.batch_write(
+            self._table,
+            put_items=self._put_items,
+            delete_keys=self._delete_keys,
+        )
+
+        # Clear the lists after successful write
+        self._put_items = []
+        self._delete_keys = []
+
+
+class SyncBatchWriter:
+    """Sync context manager for batch write operations.
+
+    Collects put and delete operations, then sends them all at once
+    when the context exits. Handles splitting into batches of 25 items
+    and retrying unprocessed items.
+
+    Example:
+        >>> with SyncBatchWriter(client, "users") as batch:
+        ...     batch.put({"pk": "USER#1", "sk": "PROFILE", "name": "Alice"})
+        ...     batch.put({"pk": "USER#2", "sk": "PROFILE", "name": "Bob"})
+        ...     batch.delete({"pk": "USER#3", "sk": "PROFILE"})
+    """
+
+    def __init__(self, client: DynamoDBClient, table: str):
+        """Create a SyncBatchWriter.
+
+        Args:
+            client: The DynamoDBClient to use.
+            table: The table name.
+        """
+        self._client = client
+        self._table = table
+        self._put_items: list[dict[str, Any]] = []
+        self._delete_keys: list[dict[str, Any]] = []
+
+    def __enter__(self) -> SyncBatchWriter:
+        """Enter the context manager."""
+        return self
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
+    ) -> None:
+        """Exit the context manager and send all operations."""
+        if exc_type is None:
+            self.flush()
+
+    def put(self, item: dict[str, Any]) -> None:
+        """Add an item to be put.
+
+        Args:
+            item: The item to put (as a dict).
+        """
+        self._put_items.append(item)
+
+    def delete(self, key: dict[str, Any]) -> None:
+        """Add a key to be deleted.
+
+        Args:
+            key: The key to delete (as a dict with pk and optional sk).
+        """
+        self._delete_keys.append(key)
+
+    def flush(self) -> None:
+        """Send all collected operations to DynamoDB.
+
+        Called automatically when exiting the context manager.
+        Can also be called manually to send operations early.
+        """
+        if not self._put_items and not self._delete_keys:
+            return
+
+        self._client.sync_batch_write(
             self._table,
             put_items=self._put_items,
             delete_keys=self._delete_keys,

@@ -14,7 +14,7 @@ from pydynox._internal._model._async import (
     async_update_by_key,
 )
 from pydynox._internal._model._base import ModelBase, ModelMeta
-from pydynox._internal._model._batch import async_batch_get, batch_get
+from pydynox._internal._model._batch import batch_get, sync_batch_get
 from pydynox._internal._model._crud import (
     delete,
     delete_by_key,
@@ -214,13 +214,13 @@ class Model(ModelBase, metaclass=ModelMeta):
         delete_by_key(cls, condition, **kwargs)
 
     @classmethod
-    def batch_get(
+    def sync_batch_get(
         cls: type[M],
         keys: list[dict[str, Any]],
         consistent_read: bool | None = None,
         as_dict: bool = False,
     ) -> list[M] | list[dict[str, Any]]:
-        """Batch get multiple items by their keys.
+        """Sync batch get multiple items by their keys.
 
         Args:
             keys: List of key dicts (each with hash_key and optional range_key).
@@ -235,23 +235,23 @@ class Model(ModelBase, metaclass=ModelMeta):
             ...     {"pk": "USER#1", "sk": "PROFILE"},
             ...     {"pk": "USER#2", "sk": "PROFILE"},
             ... ]
-            >>> users = User.batch_get(keys)
+            >>> users = User.sync_batch_get(keys)
             >>> for user in users:
             ...     print(user.name)
             >>>
             >>> # Return as dicts for better performance
-            >>> users = User.batch_get(keys, as_dict=True)
+            >>> users = User.sync_batch_get(keys, as_dict=True)
         """
-        return batch_get(cls, keys, consistent_read, as_dict)
+        return sync_batch_get(cls, keys, consistent_read, as_dict)
 
     @classmethod
-    async def async_batch_get(
+    async def batch_get(
         cls: type[M],
         keys: list[dict[str, Any]],
         consistent_read: bool | None = None,
         as_dict: bool = False,
     ) -> list[M] | list[dict[str, Any]]:
-        """Async batch get multiple items by their keys.
+        """Async batch get multiple items by their keys (default).
 
         Args:
             keys: List of key dicts (each with hash_key and optional range_key).
@@ -266,11 +266,11 @@ class Model(ModelBase, metaclass=ModelMeta):
             ...     {"pk": "USER#1", "sk": "PROFILE"},
             ...     {"pk": "USER#2", "sk": "PROFILE"},
             ... ]
-            >>> users = await User.async_batch_get(keys)
+            >>> users = await User.batch_get(keys)
             >>> for user in users:
             ...     print(user.name)
         """
-        return await async_batch_get(cls, keys, consistent_read, as_dict)
+        return await batch_get(cls, keys, consistent_read, as_dict)
 
     # ========== ASYNC CRUD ==========
 

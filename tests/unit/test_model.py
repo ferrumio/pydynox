@@ -454,13 +454,13 @@ def test_get_as_dict_returns_none_when_not_found(user_model, mock_client):
     assert user is None
 
 
-# ========== batch_get tests ==========
+# ========== sync_batch_get tests ==========
 
 
-def test_batch_get_returns_model_instances(user_model, mock_client):
-    """batch_get returns Model instances by default."""
+def test_sync_batch_get_returns_model_instances(user_model, mock_client):
+    """sync_batch_get returns Model instances by default."""
     # GIVEN a mock client that returns multiple users
-    mock_client.batch_get.return_value = [
+    mock_client.sync_batch_get.return_value = [
         {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
         {"pk": "USER#2", "sk": "PROFILE", "name": "Bob", "age": 25},
     ]
@@ -470,8 +470,8 @@ def test_batch_get_returns_model_instances(user_model, mock_client):
         {"pk": "USER#2", "sk": "PROFILE"},
     ]
 
-    # WHEN we call batch_get
-    users = user_model.batch_get(keys)
+    # WHEN we call sync_batch_get
+    users = user_model.sync_batch_get(keys)
 
     # THEN Model instances should be returned
     assert len(users) == 2
@@ -481,10 +481,10 @@ def test_batch_get_returns_model_instances(user_model, mock_client):
     assert users[1].name == "Bob"
 
 
-def test_batch_get_as_dict_true_returns_dicts(user_model, mock_client):
-    """batch_get(as_dict=True) returns plain dicts."""
+def test_sync_batch_get_as_dict_true_returns_dicts(user_model, mock_client):
+    """sync_batch_get(as_dict=True) returns plain dicts."""
     # GIVEN a mock client that returns multiple users
-    mock_client.batch_get.return_value = [
+    mock_client.sync_batch_get.return_value = [
         {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
         {"pk": "USER#2", "sk": "PROFILE", "name": "Bob", "age": 25},
     ]
@@ -494,8 +494,8 @@ def test_batch_get_as_dict_true_returns_dicts(user_model, mock_client):
         {"pk": "USER#2", "sk": "PROFILE"},
     ]
 
-    # WHEN we call batch_get with as_dict=True
-    users = user_model.batch_get(keys, as_dict=True)
+    # WHEN we call sync_batch_get with as_dict=True
+    users = user_model.sync_batch_get(keys, as_dict=True)
 
     # THEN plain dicts should be returned
     assert len(users) == 2
@@ -505,13 +505,13 @@ def test_batch_get_as_dict_true_returns_dicts(user_model, mock_client):
     assert users[1]["name"] == "Bob"
 
 
-def test_batch_get_empty_keys_returns_empty_list(user_model, mock_client):
-    """batch_get with empty keys returns empty list."""
+def test_sync_batch_get_empty_keys_returns_empty_list(user_model, mock_client):
+    """sync_batch_get with empty keys returns empty list."""
     # GIVEN an empty list of keys
 
-    # WHEN we call batch_get with empty keys
-    users = user_model.batch_get([])
+    # WHEN we call sync_batch_get with empty keys
+    users = user_model.sync_batch_get([])
 
     # THEN empty list should be returned without calling the client
     assert users == []
-    mock_client.batch_get.assert_not_called()
+    mock_client.sync_batch_get.assert_not_called()
