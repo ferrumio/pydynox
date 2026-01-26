@@ -311,8 +311,10 @@ pub async fn execute_decrypt(
 
 // ========== SYNC WRAPPERS ==========
 
-/// Sync encrypt - returns (ciphertext, metrics).
-pub fn sync_encrypt(
+/// Sync encrypt - blocks until complete.
+///
+/// Returns: (ciphertext, metrics)
+pub fn sync_encrypt_impl(
     client: &Client,
     runtime: &Arc<Runtime>,
     key_id: &str,
@@ -327,8 +329,10 @@ pub fn sync_encrypt(
     ))
 }
 
-/// Sync decrypt - returns (plaintext, metrics).
-pub fn sync_decrypt(
+/// Sync decrypt - blocks until complete.
+///
+/// Returns: (plaintext, metrics)
+pub fn sync_decrypt_impl(
     client: &Client,
     runtime: &Arc<Runtime>,
     context: &HashMap<String, String>,
@@ -341,10 +345,10 @@ pub fn sync_decrypt(
     ))
 }
 
-// ========== ASYNC WRAPPERS ==========
+// ========== ASYNC WRAPPERS (default) ==========
 
-/// Async encrypt - returns EncryptResult with ciphertext and metrics.
-pub fn async_encrypt<'py>(
+/// Async encrypt - returns awaitable EncryptResult.
+pub fn encrypt_impl<'py>(
     py: Python<'py>,
     client: Client,
     key_id: String,
@@ -360,8 +364,8 @@ pub fn async_encrypt<'py>(
     })
 }
 
-/// Async decrypt - returns DecryptResult with plaintext and metrics.
-pub fn async_decrypt<'py>(
+/// Async decrypt - returns awaitable DecryptResult.
+pub fn decrypt_impl<'py>(
     py: Python<'py>,
     client: Client,
     context: HashMap<String, String>,

@@ -22,8 +22,8 @@ def test_encrypt_decrypt_roundtrip(localstack_endpoint, kms_key_id):
 
     # WHEN we encrypt and decrypt
     plaintext = "my secret data"
-    encrypted = encryptor.encrypt(plaintext)
-    decrypted = encryptor.decrypt(encrypted)
+    encrypted = encryptor.sync_encrypt(plaintext)
+    decrypted = encryptor.sync_decrypt(encrypted)
 
     # THEN we get the original value back
     assert decrypted == plaintext
@@ -44,15 +44,15 @@ def test_encrypt_produces_different_ciphertext(localstack_endpoint, kms_key_id):
 
     # WHEN we encrypt the same data twice
     plaintext = "same data"
-    encrypted1 = encryptor.encrypt(plaintext)
-    encrypted2 = encryptor.encrypt(plaintext)
+    encrypted1 = encryptor.sync_encrypt(plaintext)
+    encrypted2 = encryptor.sync_encrypt(plaintext)
 
     # THEN ciphertext is different (random nonce)
     assert encrypted1 != encrypted2
 
     # AND both decrypt to the same value
-    assert encryptor.decrypt(encrypted1) == plaintext
-    assert encryptor.decrypt(encrypted2) == plaintext
+    assert encryptor.sync_decrypt(encrypted1) == plaintext
+    assert encryptor.sync_decrypt(encrypted2) == plaintext
 
 
 # --- Large data (tests no 4KB limit) ---
@@ -71,8 +71,8 @@ def test_encrypt_large_data(localstack_endpoint, kms_key_id):
 
     # WHEN we encrypt 100KB of data (way over KMS 4KB limit)
     plaintext = "x" * 100_000
-    encrypted = encryptor.encrypt(plaintext)
-    decrypted = encryptor.decrypt(encrypted)
+    encrypted = encryptor.sync_encrypt(plaintext)
+    decrypted = encryptor.sync_decrypt(encrypted)
 
     # THEN it works (envelope encryption handles large data)
     assert decrypted == plaintext
@@ -90,8 +90,8 @@ def test_encrypt_unicode(localstack_endpoint, kms_key_id):
     )
 
     plaintext = "Hello 世界 🔐 émojis"
-    encrypted = encryptor.encrypt(plaintext)
-    decrypted = encryptor.decrypt(encrypted)
+    encrypted = encryptor.sync_encrypt(plaintext)
+    decrypted = encryptor.sync_decrypt(encrypted)
 
     assert decrypted == plaintext
 
@@ -113,8 +113,8 @@ def test_encryption_context(localstack_endpoint, kms_key_id):
     )
 
     plaintext = "secret with context"
-    encrypted = encryptor.encrypt(plaintext)
-    decrypted = encryptor.decrypt(encrypted)
+    encrypted = encryptor.sync_encrypt(plaintext)
+    decrypted = encryptor.sync_decrypt(encrypted)
 
     assert decrypted == plaintext
 
@@ -141,13 +141,13 @@ def test_wrong_context_fails(localstack_endpoint, kms_key_id):
     )
 
     # WHEN we encrypt with one context
-    encrypted = encryptor1.encrypt("secret")
+    encrypted = encryptor1.sync_encrypt("secret")
 
     # THEN decrypting with different context fails
     from pydynox.exceptions import EncryptionException
 
     with pytest.raises(EncryptionException):
-        encryptor2.decrypt(encrypted)
+        encryptor2.sync_decrypt(encrypted)
 
 
 # --- is_encrypted helper ---
@@ -181,7 +181,7 @@ def test_decrypt_invalid_prefix(localstack_endpoint, kms_key_id):
     )
 
     with pytest.raises(ValueError, match="must start with 'ENC:'"):
-        encryptor.decrypt("not encrypted")
+        encryptor.sync_decrypt("not encrypted")
 
 
 def test_decrypt_invalid_base64(localstack_endpoint, kms_key_id):
@@ -195,7 +195,7 @@ def test_decrypt_invalid_base64(localstack_endpoint, kms_key_id):
     )
 
     with pytest.raises(ValueError, match="Invalid base64"):
-        encryptor.decrypt("ENC:not-valid-base64!!!")
+        encryptor.sync_decrypt("ENC:not-valid-base64!!!")
 
 
 def test_invalid_key_id(localstack_endpoint):
@@ -214,4 +214,4 @@ def test_invalid_key_id(localstack_endpoint):
     from pydynox.exceptions import EncryptionException
 
     with pytest.raises(EncryptionException):
-        encryptor.encrypt("test")
+        encryptor.sync_encrypt("test")

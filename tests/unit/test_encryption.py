@@ -99,14 +99,14 @@ def test_encrypted_attribute_none_value():
 
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
-    """serialize calls encryptor.encrypt_with_metrics."""
+    """serialize calls encryptor.sync_encrypt_with_metrics."""
     # GIVEN a mocked encryptor
     mock_encryptor = MagicMock()
     mock_result = MagicMock()
     mock_result.ciphertext = "ENC:encrypted_data"
     mock_result.metrics.duration_ms = 10.0
     mock_result.metrics.kms_calls = 1
-    mock_encryptor.encrypt_with_metrics.return_value = mock_result
+    mock_encryptor.sync_encrypt_with_metrics.return_value = mock_result
     mock_kms_class.return_value = mock_encryptor
 
     attr = EncryptedAttribute(key_id="alias/test")
@@ -114,21 +114,21 @@ def test_encrypted_attribute_serialize_calls_encrypt(mock_kms_class):
     # WHEN we serialize a value
     result = attr.serialize("secret")
 
-    # THEN encrypt_with_metrics should be called
-    mock_encryptor.encrypt_with_metrics.assert_called_once_with("secret")
+    # THEN sync_encrypt_with_metrics should be called
+    mock_encryptor.sync_encrypt_with_metrics.assert_called_once_with("secret")
     assert result == "ENC:encrypted_data"
 
 
 @patch("pydynox.attributes.encrypted.KmsEncryptor")
 def test_encrypted_attribute_deserialize_calls_decrypt(mock_kms_class):
-    """deserialize calls encryptor.decrypt_with_metrics for encrypted values."""
+    """deserialize calls encryptor.sync_decrypt_with_metrics for encrypted values."""
     # GIVEN a mocked encryptor
     mock_encryptor = MagicMock()
     mock_result = MagicMock()
     mock_result.plaintext = "secret"
     mock_result.metrics.duration_ms = 10.0
     mock_result.metrics.kms_calls = 1
-    mock_encryptor.decrypt_with_metrics.return_value = mock_result
+    mock_encryptor.sync_decrypt_with_metrics.return_value = mock_result
     mock_kms_class.return_value = mock_encryptor
     mock_kms_class.is_encrypted.return_value = True
 
@@ -137,8 +137,8 @@ def test_encrypted_attribute_deserialize_calls_decrypt(mock_kms_class):
     # WHEN we deserialize an encrypted value
     result = attr.deserialize("ENC:encrypted_data")
 
-    # THEN decrypt_with_metrics should be called
-    mock_encryptor.decrypt_with_metrics.assert_called_once_with("ENC:encrypted_data")
+    # THEN sync_decrypt_with_metrics should be called
+    mock_encryptor.sync_decrypt_with_metrics.assert_called_once_with("ENC:encrypted_data")
     assert result == "secret"
 
 
@@ -218,13 +218,13 @@ def test_encrypted_attribute_readwrite_can_do_both(mock_kms_class):
     mock_encrypt_result.ciphertext = "ENC:data"
     mock_encrypt_result.metrics.duration_ms = 10.0
     mock_encrypt_result.metrics.kms_calls = 1
-    mock_encryptor.encrypt_with_metrics.return_value = mock_encrypt_result
+    mock_encryptor.sync_encrypt_with_metrics.return_value = mock_encrypt_result
 
     mock_decrypt_result = MagicMock()
     mock_decrypt_result.plaintext = "secret"
     mock_decrypt_result.metrics.duration_ms = 10.0
     mock_decrypt_result.metrics.kms_calls = 1
-    mock_encryptor.decrypt_with_metrics.return_value = mock_decrypt_result
+    mock_encryptor.sync_decrypt_with_metrics.return_value = mock_decrypt_result
 
     mock_kms_class.return_value = mock_encryptor
     mock_kms_class.is_encrypted.return_value = True
@@ -235,3 +235,108 @@ def test_encrypted_attribute_readwrite_can_do_both(mock_kms_class):
     # THEN both should work
     assert attr.serialize("secret") == "ENC:data"
     assert attr.deserialize("ENC:data") == "secret"
+
+
+# --- Additional coverage tests ---
+
+
+def test_encrypted_attribute_deserialize_non_string():
+    """deserialize converts non-string values to string."""
+    # GIVEN an encrypted attribute
+    attr = EncryptedAttribute(key_id="alias/test")
+
+    # WHEN we deserialize a non-string value
+    result = attr.deserialize(12345)
+
+    # THEN it should be converted to string
+    assert result == "12345"
+
+
+def test_encrypted_attribute_can_encrypt_default_mode():
+    """_can_encrypt returns True when mode is None (default)."""
+    # GIVEN an attribute with default mode (None)
+    attr = EncryptedAttribute(key_id="alias/test")
+
+    # THEN _can_encrypt should return True
+    assert attr._can_encrypt() is True
+
+
+def test_encrypted_attribute_can_decrypt_default_mode():
+    """_can_decrypt returns True when mode is None (default)."""
+    # GIVEN an attribute with default mode (None)
+    attr = EncryptedAttribute(key_id="alias/test")
+
+    # THEN _can_decrypt should return True
+    assert attr._can_decrypt() is True
+
+
+def test_encrypted_attribute_can_encrypt_readwrite():
+    """_can_encrypt returns True for ReadWrite mode."""
+    # GIVEN an attribute with ReadWrite mode
+    attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.ReadWrite)
+
+    # THEN _can_encrypt should return True
+    assert attr._can_encrypt() is True
+
+
+def test_encrypted_attribute_can_decrypt_readwrite():
+    """_can_decrypt returns True for ReadWrite mode."""
+    # GIVEN an attribute with ReadWrite mode
+    attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.ReadWrite)
+
+    # THEN _can_decrypt should return True
+    assert attr._can_decrypt() is True
+
+
+def test_encrypted_attribute_can_encrypt_writeonly():
+    """_can_encrypt returns True for WriteOnly mode."""
+    # GIVEN an attribute with WriteOnly mode
+    attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.WriteOnly)
+
+    # THEN _can_encrypt should return True
+    assert attr._can_encrypt() is True
+
+
+def test_encrypted_attribute_cannot_decrypt_writeonly():
+    """_can_decrypt returns False for WriteOnly mode."""
+    # GIVEN an attribute with WriteOnly mode
+    attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.WriteOnly)
+
+    # THEN _can_decrypt should return False
+    assert attr._can_decrypt() is False
+
+
+def test_encrypted_attribute_cannot_encrypt_readonly():
+    """_can_encrypt returns False for ReadOnly mode."""
+    # GIVEN an attribute with ReadOnly mode
+    attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.ReadOnly)
+
+    # THEN _can_encrypt should return False
+    assert attr._can_encrypt() is False
+
+
+def test_encrypted_attribute_can_decrypt_readonly():
+    """_can_decrypt returns True for ReadOnly mode."""
+    # GIVEN an attribute with ReadOnly mode
+    attr = EncryptedAttribute(key_id="alias/test", mode=EncryptionMode.ReadOnly)
+
+    # THEN _can_decrypt should return True
+    assert attr._can_decrypt() is True
+
+
+@patch("pydynox.attributes.encrypted.KmsEncryptor")
+def test_encrypted_attribute_encryptor_lazy_load_creates_once(mock_kms_class):
+    """Encryptor is created once and reused."""
+    # GIVEN an encrypted attribute
+    mock_encryptor = MagicMock()
+    mock_kms_class.return_value = mock_encryptor
+
+    attr = EncryptedAttribute(key_id="alias/test")
+
+    # WHEN we access encryptor multiple times
+    enc1 = attr.encryptor
+    enc2 = attr.encryptor
+
+    # THEN it should be created only once
+    mock_kms_class.assert_called_once()
+    assert enc1 is enc2
