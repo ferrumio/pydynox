@@ -252,17 +252,20 @@ for user in User.email_index.query(hash_key="john@test.com"):
 ### Transactions
 
 ```python
+import asyncio
 from pydynox import DynamoDBClient, Transaction
 
 client = DynamoDBClient()
 
-with Transaction(client) as tx:
-    tx.put("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
-    tx.put("orders", {"pk": "ORDER#1", "sk": "DETAILS", "user": "USER#1"})
-    tx.delete("temp", {"pk": "TEMP#1"})
+async def create_order():
+    async with Transaction(client) as tx:
+        tx.put("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
+        tx.put("orders", {"pk": "ORDER#1", "sk": "DETAILS", "user": "USER#1"})
+
+asyncio.run(create_order())
 ```
 
-### Async Support
+### Async support
 
 ```python
 # All methods have async versions with async_ prefix
