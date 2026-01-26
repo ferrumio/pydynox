@@ -36,9 +36,9 @@ from pydynox._internal._model._query import (
     scan,
 )
 from pydynox._internal._model._s3_helpers import (
-    _async_delete_s3_files,
-    _async_upload_s3_files,
     _delete_s3_files,
+    _sync_delete_s3_files,
+    _sync_upload_s3_files,
     _upload_s3_files,
 )
 from pydynox._internal._model._ttl import (
@@ -747,23 +747,25 @@ class Model(ModelBase, metaclass=ModelMeta):
         """Build condition for optimistic locking."""
         return _build_version_condition(self)
 
-    # ========== S3 ==========
+    # ========== S3 (ASYNC - default, no prefix) ==========
 
-    def _upload_s3_files(self) -> None:
-        """Upload S3File values to S3 and replace with S3Value."""
-        _upload_s3_files(self)
-
-    async def _async_upload_s3_files(self) -> None:
+    async def _upload_s3_files(self) -> None:
         """Async upload S3File values to S3 and replace with S3Value."""
-        await _async_upload_s3_files(self)
+        await _upload_s3_files(self)
 
-    def _delete_s3_files(self) -> None:
-        """Delete S3 files associated with this model."""
-        _delete_s3_files(self)
-
-    async def _async_delete_s3_files(self) -> None:
+    async def _delete_s3_files(self) -> None:
         """Async delete S3 files associated with this model."""
-        await _async_delete_s3_files(self)
+        await _delete_s3_files(self)
+
+    # ========== S3 (SYNC - with sync_ prefix) ==========
+
+    def _sync_upload_s3_files(self) -> None:
+        """Sync upload S3File values to S3 and replace with S3Value."""
+        _sync_upload_s3_files(self)
+
+    def _sync_delete_s3_files(self) -> None:
+        """Sync delete S3 files associated with this model."""
+        _sync_delete_s3_files(self)
 
     # ========== TABLE OPERATIONS (ASYNC - default, no prefix) ==========
 

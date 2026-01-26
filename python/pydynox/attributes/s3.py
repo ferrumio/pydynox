@@ -30,10 +30,14 @@ class S3Attribute(Attribute[S3Value | None]):
         doc.content = S3File(b"...", name="report.pdf", content_type="application/pdf")
         doc.save()
 
-        # Download
+        # Download (async)
         doc = Document.get(pk="DOC#1")
-        data = doc.content.get_bytes()
-        url = doc.content.presigned_url(3600)
+        data = await doc.content.get_bytes()
+        url = await doc.content.presigned_url(3600)
+
+        # Download (sync)
+        data = doc.content.sync_get_bytes()
+        url = doc.content.sync_presigned_url(3600)
     """
 
     attr_type: str = "M"  # Stored as Map in DynamoDB
@@ -177,42 +181,9 @@ class S3Attribute(Attribute[S3Value | None]):
             metadata=value.get("metadata"),
         )
 
-    def upload_to_s3(
-        self,
-        value: S3File,
-        model_instance: Any,
-        client: DynamoDBClient,
-    ) -> tuple[S3Value, S3Metrics]:
-        """Upload S3File to S3 and return (S3Value, S3Metrics).
+    # ========== ASYNC METHODS (default, no prefix) ==========
 
-        Called by Model.save() before serialization.
-        """
-        s3_ops = self._get_s3_ops(client)
-        key = f"{self._generate_key(model_instance)}/{value.name}"
-
-        metadata, metrics = s3_ops.upload_bytes(
-            self.bucket,
-            key,
-            value.data,
-            value.content_type,
-            value.metadata,
-        )
-
-        s3_value = S3Value(
-            bucket=metadata.bucket,
-            key=metadata.key,
-            size=metadata.size,
-            etag=metadata.etag,
-            content_type=metadata.content_type,
-            s3_ops=s3_ops,
-            last_modified=metadata.last_modified,
-            version_id=metadata.version_id,
-            metadata=metadata.metadata,
-        )
-
-        return s3_value, metrics
-
-    async def async_upload_to_s3(
+    async def upload_to_s3(
         self,
         value: S3File,
         model_instance: Any,
@@ -222,7 +193,7 @@ class S3Attribute(Attribute[S3Value | None]):
         s3_ops = self._get_s3_ops(client)
         key = f"{self._generate_key(model_instance)}/{value.name}"
 
-        metadata, metrics = await s3_ops.async_upload_bytes(
+        metadata, metrics = await s3_ops.upload_bytes(
             self.bucket,
             key,
             value.data,
@@ -244,15 +215,52 @@ class S3Attribute(Attribute[S3Value | None]):
 
         return s3_value, metrics
 
-    def delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> S3Metrics:
-        """Delete file from S3. Returns S3Metrics.
+    async def delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> S3Metrics:
+        """Async delete file from S3. Returns S3Metrics."""
+        s3_ops = self._get_s3_ops(client)
+        return await s3_ops.delete_object(value.bucket, value.key)
+
+    # ========== SYNC METHODS (with sync_ prefix) ==========
+
+    def sync_upload_to_s3(
+        self,
+        value: S3File,
+        model_instance: Any,
+        client: DynamoDBClient,
+    ) -> tuple[S3Value, S3Metrics]:
+        """Sync upload S3File to S3 and return (S3Value, S3Metrics).
+
+        Called by Model.save() before serialization.
+        """
+        s3_ops = self._get_s3_ops(client)
+        key = f"{self._generate_key(model_instance)}/{value.name}"
+
+        metadata, metrics = s3_ops.sync_upload_bytes(
+            self.bucket,
+            key,
+            value.data,
+            value.content_type,
+            value.metadata,
+        )
+
+        s3_value = S3Value(
+            bucket=metadata.bucket,
+            key=metadata.key,
+            size=metadata.size,
+            etag=metadata.etag,
+            content_type=metadata.content_type,
+            s3_ops=s3_ops,
+            last_modified=metadata.last_modified,
+            version_id=metadata.version_id,
+            metadata=metadata.metadata,
+        )
+
+        return s3_value, metrics
+
+    def sync_delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> S3Metrics:
+        """Sync delete file from S3. Returns S3Metrics.
 
         Called by Model.delete().
         """
         s3_ops = self._get_s3_ops(client)
-        return s3_ops.delete_object(value.bucket, value.key)
-
-    async def async_delete_from_s3(self, value: S3Value, client: DynamoDBClient) -> S3Metrics:
-        """Async delete file from S3. Returns S3Metrics."""
-        s3_ops = self._get_s3_ops(client)
-        return await s3_ops.async_delete_object(value.bucket, value.key)
+        return s3_ops.sync_delete_object(value.bucket, value.key)

@@ -22,13 +22,13 @@ doc = Document.get(pk="DOC#DOWNLOAD")
 
 if doc and doc.content:
     # Download to memory (careful with large files)
-    data = doc.content.get_bytes()
+    data = doc.content.sync_get_bytes()
     print(f"Downloaded {len(data)} bytes")
 
     # Stream to file (memory efficient for large files)
-    doc.content.save_to("/tmp/downloaded.pdf")
+    doc.content.sync_save_to("/tmp/downloaded.pdf")
     print("Saved to /tmp/downloaded.pdf")
 
     # Get presigned URL for sharing
-    url = doc.content.presigned_url(expires=3600)  # 1 hour
+    url = doc.content.sync_presigned_url(expires=3600)  # 1 hour
     print(f"Presigned URL: {url}")

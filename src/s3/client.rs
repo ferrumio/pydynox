@@ -6,9 +6,9 @@
 use crate::client_internal::{build_s3_client, AwsConfig};
 use crate::errors::S3Exception;
 use crate::s3::operations::{
-    async_delete_object, async_download_bytes, async_head_object, async_presigned_url,
-    async_save_to_file, async_upload_bytes, delete_object, download_bytes, head_object,
-    presigned_url, save_to_file, upload_bytes, S3Metadata, S3Metrics,
+    delete_object, download_bytes, head_object, presigned_url, save_to_file, sync_delete_object,
+    sync_download_bytes, sync_head_object, sync_presigned_url, sync_save_to_file,
+    sync_upload_bytes, upload_bytes, S3Metadata, S3Metrics,
 };
 use aws_sdk_s3::Client;
 use once_cell::sync::Lazy;
@@ -95,67 +95,11 @@ impl S3Client {
         Ok(Self { client, runtime })
     }
 
-    // ========== SYNC METHODS ==========
-
-    /// Upload bytes to S3. Returns (S3Metadata, S3Metrics).
-    #[pyo3(signature = (bucket, key, data, content_type=None, metadata=None))]
-    pub fn upload_bytes(
-        &self,
-        py: Python<'_>,
-        bucket: &str,
-        key: &str,
-        data: &Bound<'_, PyBytes>,
-        content_type: Option<String>,
-        metadata: Option<std::collections::HashMap<String, String>>,
-    ) -> PyResult<(S3Metadata, S3Metrics)> {
-        upload_bytes(
-            py,
-            &self.client,
-            &self.runtime,
-            bucket,
-            key,
-            data,
-            content_type,
-            metadata,
-        )
-    }
-
-    /// Download file from S3 as bytes. Returns (bytes, S3Metrics).
-    pub fn download_bytes<'py>(
-        &self,
-        py: Python<'py>,
-        bucket: &str,
-        key: &str,
-    ) -> PyResult<(Bound<'py, PyBytes>, S3Metrics)> {
-        download_bytes(py, &self.client, &self.runtime, bucket, key)
-    }
-
-    /// Generate a presigned URL for download. Returns (url, S3Metrics).
-    #[pyo3(signature = (bucket, key, expires_secs=3600))]
-    pub fn presigned_url(
-        &self,
-        bucket: &str,
-        key: &str,
-        expires_secs: u64,
-    ) -> PyResult<(String, S3Metrics)> {
-        presigned_url(&self.client, &self.runtime, bucket, key, expires_secs)
-    }
-
-    /// Delete an object from S3. Returns S3Metrics.
-    pub fn delete_object(&self, bucket: &str, key: &str) -> PyResult<S3Metrics> {
-        delete_object(&self.client, &self.runtime, bucket, key)
-    }
-
-    /// Get object metadata without downloading. Returns (S3Metadata, S3Metrics).
-    pub fn head_object(&self, bucket: &str, key: &str) -> PyResult<(S3Metadata, S3Metrics)> {
-        head_object(&self.client, &self.runtime, bucket, key)
-    }
-
-    // ========== ASYNC METHODS ==========
+    // ========== ASYNC METHODS (default, no prefix) ==========
 
     /// Async upload bytes to S3. Returns (S3Metadata, S3Metrics).
     #[pyo3(signature = (bucket, key, data, content_type=None, metadata=None))]
-    pub fn async_upload_bytes<'py>(
+    pub fn upload_bytes<'py>(
         &self,
         py: Python<'py>,
         bucket: &str,
@@ -164,7 +108,7 @@ impl S3Client {
         content_type: Option<String>,
         metadata: Option<std::collections::HashMap<String, String>>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        async_upload_bytes(
+        upload_bytes(
             py,
             self.client.clone(),
             bucket.to_string(),
@@ -176,25 +120,25 @@ impl S3Client {
     }
 
     /// Async download file from S3 as bytes. Returns (bytes, S3Metrics).
-    pub fn async_download_bytes<'py>(
+    pub fn download_bytes<'py>(
         &self,
         py: Python<'py>,
         bucket: &str,
         key: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
-        async_download_bytes(py, self.client.clone(), bucket.to_string(), key.to_string())
+        download_bytes(py, self.client.clone(), bucket.to_string(), key.to_string())
     }
 
     /// Async generate a presigned URL for download. Returns (url, S3Metrics).
     #[pyo3(signature = (bucket, key, expires_secs=3600))]
-    pub fn async_presigned_url<'py>(
+    pub fn presigned_url<'py>(
         &self,
         py: Python<'py>,
         bucket: &str,
         key: &str,
         expires_secs: u64,
     ) -> PyResult<Bound<'py, PyAny>> {
-        async_presigned_url(
+        presigned_url(
             py,
             self.client.clone(),
             bucket.to_string(),
@@ -204,47 +148,106 @@ impl S3Client {
     }
 
     /// Async delete an object from S3. Returns S3Metrics.
-    pub fn async_delete_object<'py>(
+    pub fn delete_object<'py>(
         &self,
         py: Python<'py>,
         bucket: &str,
         key: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
-        async_delete_object(py, self.client.clone(), bucket.to_string(), key.to_string())
+        delete_object(py, self.client.clone(), bucket.to_string(), key.to_string())
     }
 
     /// Async get object metadata without downloading. Returns (S3Metadata, S3Metrics).
-    pub fn async_head_object<'py>(
+    pub fn head_object<'py>(
         &self,
         py: Python<'py>,
         bucket: &str,
         key: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
-        async_head_object(py, self.client.clone(), bucket.to_string(), key.to_string())
-    }
-
-    // ========== STREAMING METHODS ==========
-
-    /// Save S3 object directly to file (streaming, memory efficient).
-    /// Returns (bytes_written, S3Metrics).
-    pub fn save_to_file(&self, bucket: &str, key: &str, path: &str) -> PyResult<(u64, S3Metrics)> {
-        save_to_file(&self.client, &self.runtime, bucket, key, path)
+        head_object(py, self.client.clone(), bucket.to_string(), key.to_string())
     }
 
     /// Async save S3 object directly to file. Returns (bytes_written, S3Metrics).
-    pub fn async_save_to_file<'py>(
+    pub fn save_to_file<'py>(
         &self,
         py: Python<'py>,
         bucket: &str,
         key: &str,
         path: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
-        async_save_to_file(
+        save_to_file(
             py,
             self.client.clone(),
             bucket.to_string(),
             key.to_string(),
             path.to_string(),
         )
+    }
+
+    // ========== SYNC METHODS (with sync_ prefix) ==========
+
+    /// Sync upload bytes to S3. Returns (S3Metadata, S3Metrics).
+    #[pyo3(signature = (bucket, key, data, content_type=None, metadata=None))]
+    pub fn sync_upload_bytes(
+        &self,
+        py: Python<'_>,
+        bucket: &str,
+        key: &str,
+        data: &Bound<'_, PyBytes>,
+        content_type: Option<String>,
+        metadata: Option<std::collections::HashMap<String, String>>,
+    ) -> PyResult<(S3Metadata, S3Metrics)> {
+        sync_upload_bytes(
+            py,
+            &self.client,
+            &self.runtime,
+            bucket,
+            key,
+            data,
+            content_type,
+            metadata,
+        )
+    }
+
+    /// Sync download file from S3 as bytes. Returns (bytes, S3Metrics).
+    pub fn sync_download_bytes<'py>(
+        &self,
+        py: Python<'py>,
+        bucket: &str,
+        key: &str,
+    ) -> PyResult<(Bound<'py, PyBytes>, S3Metrics)> {
+        sync_download_bytes(py, &self.client, &self.runtime, bucket, key)
+    }
+
+    /// Sync generate a presigned URL for download. Returns (url, S3Metrics).
+    #[pyo3(signature = (bucket, key, expires_secs=3600))]
+    pub fn sync_presigned_url(
+        &self,
+        bucket: &str,
+        key: &str,
+        expires_secs: u64,
+    ) -> PyResult<(String, S3Metrics)> {
+        sync_presigned_url(&self.client, &self.runtime, bucket, key, expires_secs)
+    }
+
+    /// Sync delete an object from S3. Returns S3Metrics.
+    pub fn sync_delete_object(&self, bucket: &str, key: &str) -> PyResult<S3Metrics> {
+        sync_delete_object(&self.client, &self.runtime, bucket, key)
+    }
+
+    /// Sync get object metadata without downloading. Returns (S3Metadata, S3Metrics).
+    pub fn sync_head_object(&self, bucket: &str, key: &str) -> PyResult<(S3Metadata, S3Metrics)> {
+        sync_head_object(&self.client, &self.runtime, bucket, key)
+    }
+
+    /// Sync save S3 object directly to file (streaming, memory efficient).
+    /// Returns (bytes_written, S3Metrics).
+    pub fn sync_save_to_file(
+        &self,
+        bucket: &str,
+        key: &str,
+        path: &str,
+    ) -> PyResult<(u64, S3Metrics)> {
+        sync_save_to_file(&self.client, &self.runtime, bucket, key, path)
     }
 }

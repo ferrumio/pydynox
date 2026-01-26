@@ -68,7 +68,7 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
     _start_s3_metrics_collection()
 
     # S3 upload before prepare (needs to happen before to_dict)
-    self._upload_s3_files()
+    self._sync_upload_s3_files()
 
     # Collect S3 metrics from uploads
     s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
@@ -139,7 +139,7 @@ def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | N
     _start_s3_metrics_collection()
 
     # S3 cleanup after successful delete
-    self._delete_s3_files()
+    self._sync_delete_s3_files()
 
     # Collect S3 metrics from deletes
     s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()

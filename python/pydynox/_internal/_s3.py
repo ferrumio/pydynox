@@ -157,33 +157,42 @@ class S3Value:
         """Get user-defined metadata."""
         return self._metadata
 
-    def get_bytes(self) -> bytes:
-        """Download the file as bytes.
+    # ========== ASYNC METHODS (default, no prefix) ==========
+
+    async def get_bytes(self) -> bytes:
+        """Async download the file as bytes."""
+        data, _ = await self._s3_ops.download_bytes(self._bucket, self._key)
+        return data
+
+    async def save_to(self, path: str | Path) -> None:
+        """Async download and save to a file (streaming)."""
+        await self._s3_ops.save_to_file(self._bucket, self._key, str(path))
+
+    async def presigned_url(self, expires: int = 3600) -> str:
+        """Async generate a presigned URL."""
+        url, _ = await self._s3_ops.presigned_url(self._bucket, self._key, expires)
+        return url
+
+    # ========== SYNC METHODS (with sync_ prefix) ==========
+
+    def sync_get_bytes(self) -> bytes:
+        """Sync download the file as bytes.
 
         Warning: Loads entire file into memory.
         """
-        data, _ = self._s3_ops.download_bytes(self._bucket, self._key)
+        data, _ = self._s3_ops.sync_download_bytes(self._bucket, self._key)
         return data
 
-    async def async_get_bytes(self) -> bytes:
-        """Async download the file as bytes."""
-        data, _ = await self._s3_ops.async_download_bytes(self._bucket, self._key)
-        return data
-
-    def save_to(self, path: str | Path) -> None:
-        """Download and save to a file (streaming, memory efficient).
+    def sync_save_to(self, path: str | Path) -> None:
+        """Sync download and save to a file (streaming, memory efficient).
 
         Args:
             path: Path to save the file.
         """
-        self._s3_ops.save_to_file(self._bucket, self._key, str(path))
+        self._s3_ops.sync_save_to_file(self._bucket, self._key, str(path))
 
-    async def async_save_to(self, path: str | Path) -> None:
-        """Async download and save to a file (streaming)."""
-        await self._s3_ops.async_save_to_file(self._bucket, self._key, str(path))
-
-    def presigned_url(self, expires: int = 3600) -> str:
-        """Generate a presigned URL for download.
+    def sync_presigned_url(self, expires: int = 3600) -> str:
+        """Sync generate a presigned URL for download.
 
         Args:
             expires: URL expiration time in seconds (default 1 hour).
@@ -191,12 +200,7 @@ class S3Value:
         Returns:
             Presigned URL string.
         """
-        url, _ = self._s3_ops.presigned_url(self._bucket, self._key, expires)
-        return url
-
-    async def async_presigned_url(self, expires: int = 3600) -> str:
-        """Async generate a presigned URL."""
-        url, _ = await self._s3_ops.async_presigned_url(self._bucket, self._key, expires)
+        url, _ = self._s3_ops.sync_presigned_url(self._bucket, self._key, expires)
         return url
 
     def __repr__(self) -> str:
