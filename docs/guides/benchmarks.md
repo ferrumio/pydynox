@@ -131,7 +131,7 @@ item = Model.get(pk="...")  # GET first
 item.update(data="new")     # then UPDATE
 ```
 
-We're adding `update_by_key()` and `delete_by_key()` methods to do direct updates without fetching first. See [issue #92](https://github.com/leandrodamascena/pydynox/issues/92).
+We're adding `update_by_key()` and `delete_by_key()` methods to do direct updates without fetching first. See [issue #92](https://github.com/ferrumio/pydynox/issues/92).
 
 ### query
 

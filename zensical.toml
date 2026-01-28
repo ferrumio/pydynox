@@ -1,8 +1,8 @@
 site_name = "pydynox"
 site_description = "Fast DynamoDB ORM for Python with Rust core"
-site_url = "https://leandrodamascena.github.io/pydynox"
-repo_url = "https://github.com/leandrodamascena/pydynox"
-repo_name = "leandrodamascena/pydynox"
+site_url = "https://ferrumio.github.io/pydynox"
+repo_url = "https://github.com/ferrumio/pydynox"
+repo_name = "ferrumio/pydynox"
 
 nav = [
     { "Home" = [
