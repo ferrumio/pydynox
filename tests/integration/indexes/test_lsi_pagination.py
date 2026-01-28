@@ -40,7 +40,7 @@ def lsi_pagination_client(dynamodb_endpoint):
 
     # Seed data - 15 items for pagination
     for i in range(15):
-        client.put_item(
+        client.sync_put_item(
             table_name,
             {"pk": "LSI_PAGE#1", "sk": f"ORDER#{i:03d}", "created_at": i * 1000},
         )
@@ -63,11 +63,12 @@ class OrderWithLSI(Model):
     )
 
 
-def test_lsi_query_with_last_evaluated_key(lsi_pagination_client):
+@pytest.mark.asyncio
+async def test_lsi_query_with_last_evaluated_key(lsi_pagination_client):
     """LSI query accepts last_evaluated_key for manual pagination."""
     # WHEN we query with a limit
     result = OrderWithLSI.created_at_index.query(pk="LSI_PAGE#1", limit=5, page_size=5)
-    first_page = list(result)
+    first_page = [x async for x in result]
 
     # THEN we get 5 items and a last_evaluated_key
     assert len(first_page) == 5
@@ -80,7 +81,7 @@ def test_lsi_query_with_last_evaluated_key(lsi_pagination_client):
         page_size=5,
         last_evaluated_key=result.last_evaluated_key,
     )
-    second_page = list(result2)
+    second_page = [x async for x in result2]
 
     # THEN we get the next 5 items
     assert len(second_page) == 5
@@ -91,7 +92,8 @@ def test_lsi_query_with_last_evaluated_key(lsi_pagination_client):
     assert first_sks.isdisjoint(second_sks)
 
 
-def test_lsi_query_pagination_exhausts_results(lsi_pagination_client):
+@pytest.mark.asyncio
+async def test_lsi_query_pagination_exhausts_results(lsi_pagination_client):
     """LSI pagination eventually returns None for last_evaluated_key."""
     # WHEN we paginate through all items
     all_items = []
@@ -104,7 +106,7 @@ def test_lsi_query_pagination_exhausts_results(lsi_pagination_client):
             page_size=5,
             last_evaluated_key=last_key,
         )
-        items = list(result)
+        items = [x async for x in result]
         all_items.extend(items)
         last_key = result.last_evaluated_key
 
@@ -117,9 +119,9 @@ def test_lsi_query_pagination_exhausts_results(lsi_pagination_client):
 
 @pytest.mark.asyncio
 async def test_lsi_async_query_with_last_evaluated_key(lsi_pagination_client):
-    """LSI async_query accepts last_evaluated_key for manual pagination."""
+    """LSI query accepts last_evaluated_key for manual pagination."""
     # WHEN we query with a limit (async)
-    result = OrderWithLSI.created_at_index.async_query(pk="LSI_PAGE#1", limit=5, page_size=5)
+    result = OrderWithLSI.created_at_index.query(pk="LSI_PAGE#1", limit=5, page_size=5)
     first_page = [item async for item in result]
 
     # THEN we get 5 items

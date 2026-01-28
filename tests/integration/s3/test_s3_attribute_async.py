@@ -30,7 +30,7 @@ def document_model(dynamo, s3_bucket, localstack_endpoint):
 
 
 @pytest.mark.asyncio
-async def test_async_get_bytes(document_model):
+async def test_get_bytes(document_model):
     """Test async get_bytes() downloads file content."""
     doc_id = str(uuid.uuid4())
     content = b"Async download test content"
@@ -41,9 +41,9 @@ async def test_async_get_bytes(document_model):
         name="async_download.txt",
     )
     doc.content = S3File(content, name="async_download.txt")
-    doc.save()
+    await doc.save()
 
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     # Set s3_ops
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
@@ -64,9 +64,9 @@ async def test_async_presigned_url(document_model):
         name="async_presigned.txt",
     )
     doc.content = S3File(b"data", name="async_presigned.txt")
-    doc.save()
+    await doc.save()
 
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     # Set s3_ops
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
@@ -77,7 +77,7 @@ async def test_async_presigned_url(document_model):
 
 
 @pytest.mark.asyncio
-async def test_async_save_to(document_model, tmp_path):
+async def test_save_to(document_model, tmp_path):
     """Test async save_to() streams to file."""
     doc_id = str(uuid.uuid4())
     content = b"Async save to file content"
@@ -85,12 +85,12 @@ async def test_async_save_to(document_model, tmp_path):
     doc = document_model(
         pk=f"DOC#{doc_id}",
         sk="v1",
-        name="async_save.bin",
+        name="save.bin",
     )
-    doc.content = S3File(content, name="async_save.bin")
-    doc.save()
+    doc.content = S3File(content, name="save.bin")
+    await doc.save()
 
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     # Set s3_ops
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())

@@ -87,7 +87,7 @@ fn convert_parameters(py: Python<'_>, params: &Bound<'_, PyList>) -> PyResult<Ve
 
 /// Sync execute_statement - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_statement(
+pub fn sync_execute_statement(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -122,9 +122,9 @@ pub fn execute_statement(
     }
 }
 
-/// Async execute_statement - returns a Python awaitable.
+/// Async execute_statement - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_execute_statement<'py>(
+pub fn execute_statement<'py>(
     py: Python<'py>,
     client: Client,
     statement: String,

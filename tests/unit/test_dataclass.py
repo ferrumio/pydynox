@@ -86,10 +86,10 @@ def test_get_key_returns_hash_and_range():
 
 
 def test_get_fetches_from_dynamodb():
-    """get() fetches item from DynamoDB and returns dataclass."""
+    """sync_get() fetches item from DynamoDB and returns dataclass."""
     # GIVEN a mock client that returns user data
     mock_client = MagicMock()
-    mock_client.get_item.return_value = {
+    mock_client.sync_get_item.return_value = {
         "pk": "USER#1",
         "sk": "PROFILE",
         "name": "John",
@@ -104,22 +104,22 @@ def test_get_fetches_from_dynamodb():
         name: str
         age: int = 0
 
-    # WHEN we call get
-    user = User.get(pk="USER#1", sk="PROFILE")
+    # WHEN we call sync_get
+    user = User.sync_get(pk="USER#1", sk="PROFILE")
 
     # THEN a dataclass instance should be returned with correct data
     assert user is not None
     assert isinstance(user, User)
     assert user.pk == "USER#1"
     assert user.name == "John"
-    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
+    mock_client.sync_get_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
 
 
 def test_get_returns_none_when_not_found():
-    """get() returns None when item not found."""
+    """sync_get() returns None when item not found."""
     # GIVEN a mock client that returns None
     mock_client = MagicMock()
-    mock_client.get_item.return_value = None
+    mock_client.sync_get_item.return_value = None
 
     @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
     @dataclass
@@ -128,15 +128,15 @@ def test_get_returns_none_when_not_found():
         sk: str
         name: str
 
-    # WHEN we call get for non-existent item
-    user = User.get(pk="USER#1", sk="PROFILE")
+    # WHEN we call sync_get for non-existent item
+    user = User.sync_get(pk="USER#1", sk="PROFILE")
 
     # THEN None should be returned
     assert user is None
 
 
 def test_save_puts_to_dynamodb():
-    """save() puts item to DynamoDB."""
+    """sync_save() puts item to DynamoDB."""
     # GIVEN a mock client
     mock_client = MagicMock()
 
@@ -150,17 +150,17 @@ def test_save_puts_to_dynamodb():
 
     user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
 
-    # WHEN we save
-    user.save()
+    # WHEN we sync_save
+    user.sync_save()
 
-    # THEN put_item should be called with correct data
-    mock_client.put_item.assert_called_once_with(
+    # THEN sync_put_item should be called with correct data
+    mock_client.sync_put_item.assert_called_once_with(
         "users", {"pk": "USER#1", "sk": "PROFILE", "name": "John", "age": 30}
     )
 
 
 def test_delete_removes_from_dynamodb():
-    """delete() removes item from DynamoDB."""
+    """sync_delete() removes item from DynamoDB."""
     # GIVEN a mock client
     mock_client = MagicMock()
 
@@ -173,15 +173,15 @@ def test_delete_removes_from_dynamodb():
 
     user = User(pk="USER#1", sk="PROFILE", name="John")
 
-    # WHEN we delete
-    user.delete()
+    # WHEN we sync_delete
+    user.sync_delete()
 
-    # THEN delete_item should be called with the key
-    mock_client.delete_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
+    # THEN sync_delete_item should be called with the key
+    mock_client.sync_delete_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
 
 
 def test_update_updates_dynamodb():
-    """update() updates item in DynamoDB."""
+    """sync_update() updates item in DynamoDB."""
     # GIVEN a mock client
     mock_client = MagicMock()
 
@@ -195,15 +195,15 @@ def test_update_updates_dynamodb():
 
     user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
 
-    # WHEN we update
-    user.update(name="Jane", age=31)
+    # WHEN we sync_update
+    user.sync_update(name="Jane", age=31)
 
     # THEN local instance should be updated
     assert user.name == "Jane"
     assert user.age == 31
 
     # AND DynamoDB should be updated
-    mock_client.update_item.assert_called_once_with(
+    mock_client.sync_update_item.assert_called_once_with(
         "users", {"pk": "USER#1", "sk": "PROFILE"}, updates={"name": "Jane", "age": 31}
     )
 
@@ -268,11 +268,11 @@ def test_set_client_after_creation():
         name: str
 
     mock_client = MagicMock()
-    mock_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
+    mock_client.sync_get_item.return_value = {"pk": "USER#1", "name": "John"}
 
     # WHEN we set the client
     User._set_client(mock_client)
-    user = User.get(pk="USER#1")
+    user = User.sync_get(pk="USER#1")
 
     # THEN operations should work
     assert user is not None
@@ -291,10 +291,10 @@ def test_no_client_raises_error():
 
     user = User(pk="USER#1", name="John")
 
-    # WHEN we try to save without client
+    # WHEN we try to sync_save without client
     # THEN RuntimeError should be raised
     with pytest.raises(RuntimeError, match="No client set"):
-        user.save()
+        user.sync_save()
 
 
 def test_invalid_hash_key_raises_error():
@@ -322,7 +322,7 @@ def test_invalid_range_key_raises_error():
 
 
 def test_update_invalid_attribute_raises_error():
-    """update() with invalid attribute raises AttributeError."""
+    """sync_update() with invalid attribute raises AttributeError."""
     # GIVEN a model with known attributes
     mock_client = MagicMock()
 
@@ -334,7 +334,7 @@ def test_update_invalid_attribute_raises_error():
 
     user = User(pk="USER#1", name="John")
 
-    # WHEN we try to update an invalid attribute
+    # WHEN we try to sync_update an invalid attribute
     # THEN AttributeError should be raised
     with pytest.raises(AttributeError, match="has no attribute 'invalid'"):
-        user.update(invalid="value")
+        user.sync_update(invalid="value")

@@ -8,6 +8,8 @@
 //! - `query` - Query items by key condition
 //! - `scan` - Scan all items in a table
 //! - `partiql` - PartiQL statement execution
+//!
+//! All operations are async by default. Sync versions have `sync_` prefix.
 
 mod delete;
 mod get;
@@ -17,7 +19,7 @@ mod query;
 mod scan;
 mod update_op;
 
-// Re-export sync operations
+// Re-export async operations (default, no prefix)
 pub use delete::delete_item;
 pub use get::get_item;
 pub use partiql::execute_statement;
@@ -26,11 +28,11 @@ pub use query::query;
 pub use scan::{count, parallel_scan, scan};
 pub use update_op::update_item;
 
-// Re-export async operations
-pub use delete::async_delete_item;
-pub use get::async_get_item;
-pub use partiql::async_execute_statement;
-pub use put::async_put_item;
-pub use query::async_query;
-pub use scan::{async_count, async_parallel_scan, async_scan};
-pub use update_op::async_update_item;
+// Re-export sync operations (with sync_ prefix)
+pub use delete::sync_delete_item;
+pub use get::sync_get_item;
+pub use partiql::sync_execute_statement;
+pub use put::sync_put_item;
+pub use query::sync_query;
+pub use scan::{sync_count, sync_parallel_scan, sync_scan};
+pub use update_op::sync_update_item;

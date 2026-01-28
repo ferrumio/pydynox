@@ -49,7 +49,8 @@ def test_sync_create_table_basic(model_table_client):
     model_table_client.sync_delete_table(table_name)
 
 
-def test_sync_create_table_with_range_key(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_range_key(model_table_client):
     """Test Model.sync_create_table() with hash and range key."""
     table_name = unique_table_name()
 
@@ -61,11 +62,11 @@ def test_sync_create_table_with_range_key(model_table_client):
 
     UserWithRange.sync_create_table(wait=True)
 
-    # Verify by saving and getting an item
+    # Verify by saving and getting an item (async)
     user = UserWithRange(pk="USER#1", sk="PROFILE", name="John")
-    user.save()
+    await user.save()
 
-    fetched = UserWithRange.get(pk="USER#1", sk="PROFILE")
+    fetched = await UserWithRange.get(pk="USER#1", sk="PROFILE")
     assert fetched is not None
     assert fetched.name == "John"
 
@@ -157,7 +158,8 @@ def test_sync_create_table_idempotent_check(model_table_client):
     model_table_client.sync_delete_table(table_name)
 
 
-def test_sync_create_table_with_number_hash_key(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_number_hash_key(model_table_client):
     """Test Model.sync_create_table() with number hash key."""
     table_name = unique_table_name()
 
@@ -169,9 +171,9 @@ def test_sync_create_table_with_number_hash_key(model_table_client):
     NumberKeyModel.sync_create_table(wait=True)
 
     item = NumberKeyModel(id=123, name="Test")
-    item.save()
+    await item.save()
 
-    fetched = NumberKeyModel.get(id=123)
+    fetched = await NumberKeyModel.get(id=123)
     assert fetched is not None
     assert fetched.name == "Test"
 
@@ -181,7 +183,8 @@ def test_sync_create_table_with_number_hash_key(model_table_client):
 # ============ GSI Tests ============
 
 
-def test_sync_create_table_with_gsi(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_gsi(model_table_client):
     """Test Model.sync_create_table() with GSI."""
     table_name = unique_table_name()
 
@@ -198,16 +201,17 @@ def test_sync_create_table_with_gsi(model_table_client):
 
     UserWithGSI.sync_create_table(wait=True)
 
-    UserWithGSI(pk="USER#1", sk="PROFILE", email="john@example.com").save()
+    await UserWithGSI(pk="USER#1", sk="PROFILE", email="john@example.com").save()
 
-    results = list(UserWithGSI.email_index.query(email="john@example.com"))
+    results = [r async for r in UserWithGSI.email_index.query(email="john@example.com")]
     assert len(results) == 1
     assert results[0].pk == "USER#1"
 
     model_table_client.sync_delete_table(table_name)
 
 
-def test_sync_create_table_with_gsi_and_range_key(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_gsi_and_range_key(model_table_client):
     """Test Model.sync_create_table() with GSI that has range key."""
     table_name = unique_table_name()
 
@@ -226,10 +230,10 @@ def test_sync_create_table_with_gsi_and_range_key(model_table_client):
 
     UserWithGSIRange.sync_create_table(wait=True)
 
-    UserWithGSIRange(pk="USER#1", sk="PROFILE", status="active", age=30).save()
-    UserWithGSIRange(pk="USER#2", sk="PROFILE", status="active", age=25).save()
+    await UserWithGSIRange(pk="USER#1", sk="PROFILE", status="active", age=30).save()
+    await UserWithGSIRange(pk="USER#2", sk="PROFILE", status="active", age=25).save()
 
-    results = list(UserWithGSIRange.status_index.query(status="active"))
+    results = [r async for r in UserWithGSIRange.status_index.query(status="active")]
     assert len(results) == 2
     assert results[0].age == 25  # Ordered by age ascending
     assert results[1].age == 30
@@ -237,7 +241,8 @@ def test_sync_create_table_with_gsi_and_range_key(model_table_client):
     model_table_client.sync_delete_table(table_name)
 
 
-def test_sync_create_table_with_multiple_gsis(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_multiple_gsis(model_table_client):
     """Test Model.sync_create_table() with multiple GSIs."""
     table_name = unique_table_name()
 
@@ -260,12 +265,12 @@ def test_sync_create_table_with_multiple_gsis(model_table_client):
 
     UserMultiGSI.sync_create_table(wait=True)
 
-    UserMultiGSI(pk="USER#1", sk="PROFILE", email="john@example.com", status="active").save()
+    await UserMultiGSI(pk="USER#1", sk="PROFILE", email="john@example.com", status="active").save()
 
-    by_email = list(UserMultiGSI.email_index.query(email="john@example.com"))
+    by_email = [r async for r in UserMultiGSI.email_index.query(email="john@example.com")]
     assert len(by_email) == 1
 
-    by_status = list(UserMultiGSI.status_index.query(status="active"))
+    by_status = [r async for r in UserMultiGSI.status_index.query(status="active")]
     assert len(by_status) == 1
 
     model_table_client.sync_delete_table(table_name)
@@ -274,7 +279,8 @@ def test_sync_create_table_with_multiple_gsis(model_table_client):
 # ============ LSI Tests ============
 
 
-def test_sync_create_table_with_lsi(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_lsi(model_table_client):
     """Test Model.sync_create_table() with LSI."""
     table_name = unique_table_name()
 
@@ -291,16 +297,17 @@ def test_sync_create_table_with_lsi(model_table_client):
 
     UserWithLSI.sync_create_table(wait=True)
 
-    UserWithLSI(pk="USER#1", sk="PROFILE#1", status="active").save()
-    UserWithLSI(pk="USER#1", sk="PROFILE#2", status="inactive").save()
+    await UserWithLSI(pk="USER#1", sk="PROFILE#1", status="active").save()
+    await UserWithLSI(pk="USER#1", sk="PROFILE#2", status="inactive").save()
 
-    results = list(UserWithLSI.status_index.query(pk="USER#1"))
+    results = [r async for r in UserWithLSI.status_index.query(pk="USER#1")]
     assert len(results) == 2
 
     model_table_client.sync_delete_table(table_name)
 
 
-def test_sync_create_table_with_lsi_range_condition(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_lsi_range_condition(model_table_client):
     """Test Model.sync_create_table() with LSI and range condition query."""
     table_name = unique_table_name()
 
@@ -317,16 +324,17 @@ def test_sync_create_table_with_lsi_range_condition(model_table_client):
 
     UserWithLSI.sync_create_table(wait=True)
 
-    UserWithLSI(pk="USER#1", sk="PROFILE#1", status="active").save()
-    UserWithLSI(pk="USER#1", sk="PROFILE#2", status="inactive").save()
-    UserWithLSI(pk="USER#1", sk="PROFILE#3", status="active").save()
+    await UserWithLSI(pk="USER#1", sk="PROFILE#1", status="active").save()
+    await UserWithLSI(pk="USER#1", sk="PROFILE#2", status="inactive").save()
+    await UserWithLSI(pk="USER#1", sk="PROFILE#3", status="active").save()
 
-    results = list(
-        UserWithLSI.status_index.query(
+    results = [
+        r
+        async for r in UserWithLSI.status_index.query(
             pk="USER#1",
             range_key_condition=UserWithLSI.status == "active",
         )
-    )
+    ]
 
     assert len(results) == 2
     for user in results:
@@ -335,7 +343,8 @@ def test_sync_create_table_with_lsi_range_condition(model_table_client):
     model_table_client.sync_delete_table(table_name)
 
 
-def test_sync_create_table_with_gsi_and_lsi(model_table_client):
+@pytest.mark.asyncio
+async def test_sync_create_table_with_gsi_and_lsi(model_table_client):
     """Test Model.sync_create_table() with both GSI and LSI."""
     table_name = unique_table_name()
 
@@ -358,12 +367,14 @@ def test_sync_create_table_with_gsi_and_lsi(model_table_client):
 
     UserBothIndexes.sync_create_table(wait=True)
 
-    UserBothIndexes(pk="USER#1", sk="PROFILE", email="john@example.com", status="active").save()
+    await UserBothIndexes(
+        pk="USER#1", sk="PROFILE", email="john@example.com", status="active"
+    ).save()
 
-    by_email = list(UserBothIndexes.email_index.query(email="john@example.com"))
+    by_email = [r async for r in UserBothIndexes.email_index.query(email="john@example.com")]
     assert len(by_email) == 1
 
-    by_status = list(UserBothIndexes.status_index.query(pk="USER#1"))
+    by_status = [r async for r in UserBothIndexes.status_index.query(pk="USER#1")]
     assert len(by_status) == 1
 
     model_table_client.sync_delete_table(table_name)

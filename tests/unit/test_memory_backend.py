@@ -1,4 +1,9 @@
-"""Unit tests for MemoryBackend."""
+"""Unit tests for MemoryBackend.
+
+With async-first API:
+- get(), save(), delete(), update() are async (default)
+- sync_get(), sync_save(), sync_delete(), sync_update() are sync
+"""
 
 import pytest
 from pydynox import Model, ModelConfig, get_default_client
@@ -17,14 +22,12 @@ class User(Model):
 
 def test_memory_backend_context_manager():
     """Test MemoryBackend as context manager."""
-    # WHEN we use MemoryBackend as context manager
     with MemoryBackend():
         user = User(pk="USER#1", name="John")
-        user.save()
+        user.sync_save()
 
-        found = User.get(pk="USER#1")
+        found = User.sync_get(pk="USER#1")
 
-        # THEN operations should work in memory
         assert found is not None
         assert found.name == "John"
 
@@ -32,45 +35,36 @@ def test_memory_backend_context_manager():
 def test_memory_backend_decorator():
     """Test MemoryBackend as decorator."""
 
-    # GIVEN a function decorated with MemoryBackend
     @MemoryBackend()
     def inner():
         user = User(pk="USER#1", name="Jane")
-        user.save()
-        return User.get(pk="USER#1")
+        user.sync_save()
+        return User.sync_get(pk="USER#1")
 
-    # WHEN we call the function
     result = inner()
 
-    # THEN operations should work in memory
     assert result is not None
     assert result.name == "Jane"
 
 
 def test_memory_backend_restores_client():
     """Test that MemoryBackend restores previous client."""
-    # GIVEN the original client
     original = get_default_client()
 
-    # WHEN we use MemoryBackend
     with MemoryBackend():
         pass
 
-    # THEN the original client should be restored
     assert get_default_client() == original
 
 
 def test_put_and_get():
     """Test basic put and get operations."""
-    # GIVEN a MemoryBackend
     with MemoryBackend():
-        # WHEN we save and get a user
         user = User(pk="USER#1", name="Alice", age=30)
-        user.save()
+        user.sync_save()
 
-        found = User.get(pk="USER#1")
+        found = User.sync_get(pk="USER#1")
 
-        # THEN the user should be found with correct data
         assert found is not None
         assert found.pk == "USER#1"
         assert found.name == "Alice"
@@ -79,42 +73,32 @@ def test_put_and_get():
 
 def test_get_not_found():
     """Test get returns None for missing item."""
-    # GIVEN a MemoryBackend
     with MemoryBackend():
-        # WHEN we get a non-existent item
-        found = User.get(pk="NONEXISTENT")
-
-        # THEN None should be returned
+        found = User.sync_get(pk="NONEXISTENT")
         assert found is None
 
 
 def test_delete():
     """Test delete operation."""
-    # GIVEN a saved user
     with MemoryBackend():
         user = User(pk="USER#1", name="Bob")
-        user.save()
-        assert User.get(pk="USER#1") is not None
+        user.sync_save()
+        assert User.sync_get(pk="USER#1") is not None
 
-        # WHEN we delete
-        user.delete()
+        user.sync_delete()
 
-        # THEN the user should be gone
-        assert User.get(pk="USER#1") is None
+        assert User.sync_get(pk="USER#1") is None
 
 
 def test_update():
     """Test update operation."""
-    # GIVEN a saved user
     with MemoryBackend():
         user = User(pk="USER#1", name="Charlie", age=25)
-        user.save()
+        user.sync_save()
 
-        # WHEN we update
-        user.update(name="Charles", age=26)
+        user.sync_update(name="Charles", age=26)
 
-        # THEN the changes should be persisted
-        found = User.get(pk="USER#1")
+        found = User.sync_get(pk="USER#1")
         assert found is not None
         assert found.name == "Charles"
         assert found.age == 26
@@ -122,72 +106,59 @@ def test_update():
 
 def test_atomic_increment():
     """Test atomic increment operation."""
-    # GIVEN a saved user with age=0
     with MemoryBackend():
         user = User(pk="USER#1", name="Dave", age=0)
-        user.save()
+        user.sync_save()
 
-        # WHEN we do atomic increment
-        user.update(atomic=[User.age.add(5)])
+        user.sync_update(atomic=[User.age.add(5)])
 
-        # THEN age should be incremented
-        found = User.get(pk="USER#1")
+        found = User.sync_get(pk="USER#1")
         assert found is not None
         assert found.age == 5
 
 
 def test_scan():
     """Test scan operation."""
-    # GIVEN multiple saved users
     with MemoryBackend():
-        User(pk="USER#1", name="Eve").save()
-        User(pk="USER#2", name="Frank").save()
-        User(pk="USER#3", name="Grace").save()
+        User(pk="USER#1", name="Eve").sync_save()
+        User(pk="USER#2", name="Frank").sync_save()
+        User(pk="USER#3", name="Grace").sync_save()
 
-        # WHEN we scan
-        results = list(User.scan())
+        results = list(User.sync_scan())
 
-        # THEN all users should be returned
         assert len(results) == 3
 
 
 def test_query():
     """Test query operation."""
 
-    # GIVEN an Order model with hash and range key
     class Order(Model):
         model_config = ModelConfig(table="orders")
         pk = StringAttribute(hash_key=True)
         sk = StringAttribute(range_key=True)
         total = NumberAttribute()
 
-    # AND multiple orders for different users
     with MemoryBackend():
-        Order(pk="USER#1", sk="ORDER#001", total=100).save()
-        Order(pk="USER#1", sk="ORDER#002", total=200).save()
-        Order(pk="USER#2", sk="ORDER#001", total=50).save()
+        Order(pk="USER#1", sk="ORDER#001", total=100).sync_save()
+        Order(pk="USER#1", sk="ORDER#002", total=200).sync_save()
+        Order(pk="USER#2", sk="ORDER#001", total=50).sync_save()
 
-        # WHEN we query for USER#1
-        results = list(Order.query(hash_key="USER#1"))
+        results = list(Order.sync_query(hash_key="USER#1"))
 
-        # THEN only USER#1's orders should be returned
         assert len(results) == 2
 
 
 def test_seed_data():
     """Test MemoryBackend with seed data."""
-    # GIVEN seed data
     seed = {
         "users": [
             {"pk": "USER#1", "name": "Seeded User", "age": 99},
         ]
     }
 
-    # WHEN we use MemoryBackend with seed
     with MemoryBackend(seed=seed):
-        found = User.get(pk="USER#1")
+        found = User.sync_get(pk="USER#1")
 
-        # THEN seeded data should be available
         assert found is not None
         assert found.name == "Seeded User"
         assert found.age == 99
@@ -195,113 +166,159 @@ def test_seed_data():
 
 def test_clear():
     """Test clearing all data."""
-    # GIVEN a MemoryBackend with data
     with MemoryBackend() as backend:
-        User(pk="USER#1", name="Test").save()
+        User(pk="USER#1", name="Test").sync_save()
         assert len(backend.tables.get("users", {})) == 1
 
-        # WHEN we clear
         backend.clear()
 
-        # THEN all data should be gone
         assert len(backend.tables) == 0
 
 
 def test_tables_property():
     """Test accessing tables for inspection."""
-    # GIVEN a MemoryBackend with data
     with MemoryBackend() as backend:
-        User(pk="USER#1", name="Test").save()
+        User(pk="USER#1", name="Test").sync_save()
 
-        # THEN tables should be accessible
         assert "users" in backend.tables
         assert len(backend.tables["users"]) == 1
 
 
 def test_condition_attribute_not_exists():
     """Test condition with attribute_not_exists."""
-    # GIVEN a saved user
     with MemoryBackend():
         user = User(pk="USER#1", name="Test")
-        user.save(condition=User.pk.not_exists())
+        user.sync_save(condition=User.pk.not_exists())
 
-        # WHEN we try to save again with same condition
         user2 = User(pk="USER#1", name="Test2")
 
-        # THEN it should fail
-        with pytest.raises(Exception):  # ConditionalCheckFailedException
-            user2.save(condition=User.pk.not_exists())
+        with pytest.raises(Exception):
+            user2.sync_save(condition=User.pk.not_exists())
 
 
 def test_multiple_tables():
     """Test operations on multiple tables."""
 
-    # GIVEN a Product model
     class Product(Model):
         model_config = ModelConfig(table="products")
         pk = StringAttribute(hash_key=True)
         name = StringAttribute()
 
-    # WHEN we save to multiple tables
     with MemoryBackend():
-        User(pk="USER#1", name="User").save()
-        Product(pk="PROD#1", name="Product").save()
+        User(pk="USER#1", name="User").sync_save()
+        Product(pk="PROD#1", name="Product").sync_save()
 
-        # THEN both should be retrievable
-        assert User.get(pk="USER#1") is not None
-        assert Product.get(pk="PROD#1") is not None
+        assert User.sync_get(pk="USER#1") is not None
+        assert Product.sync_get(pk="PROD#1") is not None
 
 
 def test_isolation_between_contexts():
     """Test that data is isolated between contexts."""
-    # GIVEN data saved in one context
     with MemoryBackend():
-        User(pk="USER#1", name="First").save()
+        User(pk="USER#1", name="First").sync_save()
 
-    # WHEN we use a new context
     with MemoryBackend():
-        # THEN data from previous context should not exist
-        assert User.get(pk="USER#1") is None
+        assert User.sync_get(pk="USER#1") is None
 
 
 def test_table_exists():
     """Test table_exists method."""
-    # GIVEN a MemoryBackend
     with MemoryBackend() as backend:
-        # THEN table doesn't exist yet
-        assert not backend._client.table_exists("users")
+        assert not backend._client.sync_table_exists("users")
 
-        # WHEN we save
-        User(pk="USER#1", name="Test").save()
+        User(pk="USER#1", name="Test").sync_save()
 
-        # THEN table should exist
-        assert backend._client.table_exists("users")
+        assert backend._client.sync_table_exists("users")
 
 
 def test_delete_by_key():
     """Test delete_by_key operation."""
-    # GIVEN a saved user
     with MemoryBackend():
-        User(pk="USER#1", name="Test").save()
-        assert User.get(pk="USER#1") is not None
+        User(pk="USER#1", name="Test").sync_save()
+        assert User.sync_get(pk="USER#1") is not None
 
-        # WHEN we delete by key
-        User.delete_by_key(pk="USER#1")
+        User.sync_delete_by_key(pk="USER#1")
 
-        # THEN user should be gone
-        assert User.get(pk="USER#1") is None
+        assert User.sync_get(pk="USER#1") is None
 
 
 def test_update_by_key():
     """Test update_by_key operation."""
-    # GIVEN a saved user
     with MemoryBackend():
-        User(pk="USER#1", name="Original", age=20).save()
+        User(pk="USER#1", name="Original", age=20).sync_save()
 
-        # WHEN we update by key
-        User.update_by_key(pk="USER#1", name="Updated")
+        User.sync_update_by_key(pk="USER#1", name="Updated")
 
-        # THEN changes should be persisted
-        found = User.get(pk="USER#1")
+        found = User.sync_get(pk="USER#1")
+        assert found is not None
+        assert found.name == "Updated"
+
+
+# ========== ASYNC TESTS ==========
+
+
+@pytest.mark.asyncio
+async def test_async_put_and_get():
+    """Test async put and get operations."""
+    with MemoryBackend():
+        user = User(pk="USER#1", name="Alice", age=30)
+        await user.save()
+
+        found = await User.get(pk="USER#1")
+
+        assert found is not None
+        assert found.pk == "USER#1"
+        assert found.name == "Alice"
+
+
+@pytest.mark.asyncio
+async def test_async_delete():
+    """Test async delete operation."""
+    with MemoryBackend():
+        user = User(pk="USER#1", name="Bob")
+        await user.save()
+
+        await user.delete()
+
+        found = await User.get(pk="USER#1")
+        assert found is None
+
+
+@pytest.mark.asyncio
+async def test_async_update():
+    """Test async update operation."""
+    with MemoryBackend():
+        user = User(pk="USER#1", name="Charlie", age=25)
+        await user.save()
+
+        await user.update(name="Charles", age=26)
+
+        found = await User.get(pk="USER#1")
+        assert found is not None
+        assert found.name == "Charles"
+        assert found.age == 26
+
+
+@pytest.mark.asyncio
+async def test_async_delete_by_key():
+    """Test async delete_by_key operation."""
+    with MemoryBackend():
+        User(pk="USER#1", name="Test").sync_save()
+
+        await User.delete_by_key(pk="USER#1")
+
+        found = await User.get(pk="USER#1")
+        assert found is None
+
+
+@pytest.mark.asyncio
+async def test_async_update_by_key():
+    """Test async update_by_key operation."""
+    with MemoryBackend():
+        User(pk="USER#1", name="Original", age=20).sync_save()
+
+        await User.update_by_key(pk="USER#1", name="Updated")
+
+        found = await User.get(pk="USER#1")
         assert found is not None
         assert found.name == "Updated"

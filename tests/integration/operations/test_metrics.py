@@ -2,28 +2,31 @@
 
 from __future__ import annotations
 
+import pytest
 from pydynox import pydynox_core
 
 OperationMetrics = pydynox_core.OperationMetrics
 
 
-def test_put_item_returns_metrics(dynamo):
+@pytest.mark.asyncio
+async def test_put_item_returns_metrics(dynamo):
     """put_item returns OperationMetrics."""
     # WHEN we put an item
-    metrics = dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
+    metrics = await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 
     # THEN metrics are returned
     assert isinstance(metrics, OperationMetrics)
     assert metrics.duration_ms > 0
 
 
-def test_get_item_returns_dict(dynamo):
+@pytest.mark.asyncio
+async def test_get_item_returns_dict(dynamo):
     """get_item returns a plain dict."""
     # GIVEN an existing item
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 
     # WHEN we get the item
-    item = dynamo.get_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    item = await dynamo.get_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     # THEN it works like a normal dict
     assert item["name"] == "John"
@@ -35,28 +38,31 @@ def test_get_item_returns_dict(dynamo):
     assert dynamo._last_metrics.duration_ms > 0
 
 
-def test_get_item_not_found_returns_none(dynamo):
+@pytest.mark.asyncio
+async def test_get_item_not_found_returns_none(dynamo):
     """get_item returns None when item not found."""
-    item = dynamo.get_item("test_table", {"pk": "MISSING", "sk": "MISSING"})
+    item = await dynamo.get_item("test_table", {"pk": "MISSING", "sk": "MISSING"})
 
     assert item is None
 
 
-def test_delete_item_returns_metrics(dynamo):
+@pytest.mark.asyncio
+async def test_delete_item_returns_metrics(dynamo):
     """delete_item returns OperationMetrics."""
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
-    metrics = dynamo.delete_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    metrics = await dynamo.delete_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     assert isinstance(metrics, OperationMetrics)
     assert metrics.duration_ms > 0
 
 
-def test_update_item_returns_metrics(dynamo):
+@pytest.mark.asyncio
+async def test_update_item_returns_metrics(dynamo):
     """update_item returns OperationMetrics."""
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "count": 0})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "count": 0})
 
-    metrics = dynamo.update_item(
+    metrics = await dynamo.update_item(
         "test_table",
         {"pk": "USER#1", "sk": "PROFILE"},
         updates={"count": 5},
@@ -66,11 +72,12 @@ def test_update_item_returns_metrics(dynamo):
     assert metrics.duration_ms > 0
 
 
-def test_query_result_has_last_evaluated_key(dynamo):
+@pytest.mark.asyncio
+async def test_query_result_has_last_evaluated_key(dynamo):
     """QueryResult exposes last_evaluated_key after iteration."""
     # GIVEN items in the table
     for i in range(3):
-        dynamo.put_item("test_table", {"pk": "ORG#1", "sk": f"USER#{i}", "name": f"User {i}"})
+        await dynamo.put_item("test_table", {"pk": "ORG#1", "sk": f"USER#{i}", "name": f"User {i}"})
 
     # WHEN we query and iterate
     result = dynamo.query(
@@ -79,7 +86,7 @@ def test_query_result_has_last_evaluated_key(dynamo):
         expression_attribute_names={"#pk": "pk"},
         expression_attribute_values={":pk": "ORG#1"},
     )
-    items = list(result)
+    items = [item async for item in result]
 
     # THEN all items are returned
     assert len(items) == 3
@@ -88,11 +95,12 @@ def test_query_result_has_last_evaluated_key(dynamo):
     assert result.last_evaluated_key is None
 
 
-def test_get_item_dict_is_mutable(dynamo):
+@pytest.mark.asyncio
+async def test_get_item_dict_is_mutable(dynamo):
     """Returned dict can be modified like a normal dict."""
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 
-    item = dynamo.get_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    item = await dynamo.get_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     # Can modify
     item["name"] = "Jane"

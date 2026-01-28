@@ -16,10 +16,11 @@ def capture_logs(caplog):
     return caplog
 
 
-def test_put_item_logs_operation(dynamo, capture_logs):
+@pytest.mark.asyncio
+async def test_put_item_logs_operation(dynamo, capture_logs):
     """put_item logs the operation."""
     # WHEN we put an item
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "name": "John"})
 
     # THEN the operation is logged
     assert len(capture_logs.records) >= 1
@@ -29,12 +30,13 @@ def test_put_item_logs_operation(dynamo, capture_logs):
     assert "duration_ms=" in msg
 
 
-def test_get_item_logs_operation(dynamo, capture_logs):
+@pytest.mark.asyncio
+async def test_get_item_logs_operation(dynamo, capture_logs):
     """get_item logs the operation."""
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
     capture_logs.clear()
 
-    dynamo.get_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.get_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     assert len(capture_logs.records) >= 1
     msg = capture_logs.records[0].message
@@ -42,34 +44,37 @@ def test_get_item_logs_operation(dynamo, capture_logs):
     assert "table=test_table" in msg
 
 
-def test_delete_item_logs_operation(dynamo, capture_logs):
+@pytest.mark.asyncio
+async def test_delete_item_logs_operation(dynamo, capture_logs):
     """delete_item logs the operation."""
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
     capture_logs.clear()
 
-    dynamo.delete_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.delete_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     assert len(capture_logs.records) >= 1
     msg = capture_logs.records[0].message
     assert "delete_item" in msg
 
 
-def test_update_item_logs_operation(dynamo, capture_logs):
+@pytest.mark.asyncio
+async def test_update_item_logs_operation(dynamo, capture_logs):
     """update_item logs the operation."""
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "count": 0})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE", "count": 0})
     capture_logs.clear()
 
-    dynamo.update_item("test_table", {"pk": "USER#1", "sk": "PROFILE"}, updates={"count": 5})
+    await dynamo.update_item("test_table", {"pk": "USER#1", "sk": "PROFILE"}, updates={"count": 5})
 
     assert len(capture_logs.records) >= 1
     msg = capture_logs.records[0].message
     assert "update_item" in msg
 
 
-def test_query_logs_operation(dynamo, capture_logs):
+@pytest.mark.asyncio
+async def test_query_logs_operation(dynamo, capture_logs):
     """query logs the operation."""
     for i in range(3):
-        dynamo.put_item("test_table", {"pk": "ORG#1", "sk": f"USER#{i}"})
+        await dynamo.put_item("test_table", {"pk": "ORG#1", "sk": f"USER#{i}"})
     capture_logs.clear()
 
     result = dynamo.query(
@@ -78,7 +83,7 @@ def test_query_logs_operation(dynamo, capture_logs):
         expression_attribute_names={"#pk": "pk"},
         expression_attribute_values={":pk": "ORG#1"},
     )
-    list(result)  # Trigger fetch
+    _ = [item async for item in result]  # Trigger fetch
 
     assert len(capture_logs.records) >= 1
     msg = capture_logs.records[0].message
@@ -87,13 +92,14 @@ def test_query_logs_operation(dynamo, capture_logs):
     assert "items=" in msg
 
 
-def test_correlation_id_in_logs(dynamo, capture_logs):
+@pytest.mark.asyncio
+async def test_correlation_id_in_logs(dynamo, capture_logs):
     """Correlation ID appears in logs when set."""
     # GIVEN a correlation ID is set
     set_correlation_id("lambda-req-123")
 
     # WHEN we do an operation
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     # THEN the correlation ID is in the log record
     record = capture_logs.records[0]
@@ -122,13 +128,14 @@ class MockLogger:
         self.messages.append(("error", msg))
 
 
-def test_custom_logger_receives_operation_logs(dynamo):
+@pytest.mark.asyncio
+async def test_custom_logger_receives_operation_logs(dynamo):
     """Custom logger receives logs from operations."""
     original = get_logger()
     mock = MockLogger()
     set_logger(mock)
 
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     assert len(mock.messages) >= 1
     level, msg = mock.messages[0]
@@ -139,7 +146,8 @@ def test_custom_logger_receives_operation_logs(dynamo):
     set_logger(original)
 
 
-def test_set_logger_with_sdk_debug(dynamo):
+@pytest.mark.asyncio
+async def test_set_logger_with_sdk_debug(dynamo):
     """set_logger with sdk_debug=True enables SDK debug logs."""
     original = get_logger()
     mock = MockLogger()
@@ -148,7 +156,7 @@ def test_set_logger_with_sdk_debug(dynamo):
     set_logger(mock, sdk_debug=True)
 
     # Operations should still work
-    dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
+    await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     assert len(mock.messages) >= 1
 

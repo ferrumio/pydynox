@@ -42,8 +42,8 @@ async def test_async_create_table_with_wait(client):
     await client.create_table("async_wait", hash_key=("pk", "S"), wait=True)
 
     # Table should be usable
-    client.put_item("async_wait", {"pk": "test", "data": "value"})
-    result = client.get_item("async_wait", {"pk": "test"})
+    await client.put_item("async_wait", {"pk": "test", "data": "value"})
+    result = await client.get_item("async_wait", {"pk": "test"})
     assert result is not None
     assert result["data"] == "value"
 
@@ -57,7 +57,7 @@ async def test_async_wait_for_table_active(client):
     await client.wait_for_table_active("async_wait_active")
 
     # Table should be usable
-    client.put_item("async_wait_active", {"pk": "test"})
+    await client.put_item("async_wait_active", {"pk": "test"})
 
     await client.delete_table("async_wait_active")
 

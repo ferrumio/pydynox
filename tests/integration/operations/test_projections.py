@@ -32,13 +32,14 @@ def projection_table(localstack_endpoint):
     client.sync_delete_table(table_name)
 
 
-def test_get_item_with_projection(projection_table):
+@pytest.mark.asyncio
+async def test_get_item_with_projection(projection_table):
     """Test get_item returns only projected fields."""
     client, table_name = projection_table
     pk = f"USER#{uuid.uuid4().hex}"
 
     # GIVEN an item with many fields
-    client.put_item(
+    await client.put_item(
         table_name,
         {
             "pk": pk,
@@ -51,7 +52,7 @@ def test_get_item_with_projection(projection_table):
     )
 
     # WHEN we get with projection
-    item = client.get_item(
+    item = await client.get_item(
         table_name,
         {"pk": pk, "sk": "PROFILE"},
         projection=["name", "email"],
@@ -68,14 +69,15 @@ def test_get_item_with_projection(projection_table):
     assert "city" not in item
 
 
-def test_query_with_projection_expression(projection_table):
+@pytest.mark.asyncio
+async def test_query_with_projection_expression(projection_table):
     """Test query with projection_expression."""
     client, table_name = projection_table
     pk = f"USER#{uuid.uuid4().hex}"
 
     # Put multiple items
     for i in range(3):
-        client.put_item(
+        await client.put_item(
             table_name,
             {
                 "pk": pk,
@@ -87,15 +89,16 @@ def test_query_with_projection_expression(projection_table):
         )
 
     # Query with projection
-    results = list(
-        client.query(
+    results = [
+        item
+        async for item in client.query(
             table_name,
             key_condition_expression="#pk = :pk",
             projection_expression="#total, #status",
             expression_attribute_names={"#pk": "pk", "#total": "total", "#status": "status"},
             expression_attribute_values={":pk": pk},
         )
-    )
+    ]
 
     assert len(results) == 3
     for item in results:
@@ -105,14 +108,15 @@ def test_query_with_projection_expression(projection_table):
         assert "items" not in item
 
 
-def test_scan_with_projection_expression(projection_table):
+@pytest.mark.asyncio
+async def test_scan_with_projection_expression(projection_table):
     """Test scan with projection_expression."""
     client, table_name = projection_table
     pk = f"SCAN#{uuid.uuid4().hex}"
 
     # Put items
     for i in range(2):
-        client.put_item(
+        await client.put_item(
             table_name,
             {
                 "pk": pk,
@@ -124,15 +128,16 @@ def test_scan_with_projection_expression(projection_table):
         )
 
     # Scan with projection
-    results = list(
-        client.scan(
+    results = [
+        item
+        async for item in client.scan(
             table_name,
             filter_expression="#pk = :pk",
             projection_expression="#name",
             expression_attribute_names={"#pk": "pk", "#name": "name"},
             expression_attribute_values={":pk": pk},
         )
-    )
+    ]
 
     assert len(results) == 2
     for item in results:
@@ -173,7 +178,8 @@ def user_model(localstack_endpoint):
     client.sync_delete_table(table_name)
 
 
-def test_model_query_with_fields(user_model):
+@pytest.mark.asyncio
+async def test_model_query_with_fields(user_model):
     """Test Model.query with fields parameter."""
     User = user_model
     pk = f"USER#{uuid.uuid4().hex}"
@@ -188,10 +194,12 @@ def test_model_query_with_fields(user_model):
             age=20 + i,
             city="NYC",
         )
-        user.save()
+        await user.save()
 
     # Query with fields - returns dicts with only specified fields
-    results = list(User.query(hash_key=pk, as_dict=True, fields=["name", "email"]))
+    results = [
+        item async for item in User.query(hash_key=pk, as_dict=True, fields=["name", "email"])
+    ]
 
     assert len(results) == 3
     for item in results:
@@ -202,7 +210,8 @@ def test_model_query_with_fields(user_model):
         assert "city" not in item
 
 
-def test_model_scan_with_fields(user_model):
+@pytest.mark.asyncio
+async def test_model_scan_with_fields(user_model):
     """Test Model.scan with fields parameter."""
     User = user_model
     pk = f"SCAN#{uuid.uuid4().hex}"
@@ -217,10 +226,15 @@ def test_model_scan_with_fields(user_model):
             age=25,
             city="LA",
         )
-        user.save()
+        await user.save()
 
     # Scan with fields
-    results = list(User.scan(filter_condition=User.pk == pk, as_dict=True, fields=["pk", "name"]))
+    results = [
+        item
+        async for item in User.scan(
+            filter_condition=User.pk == pk, as_dict=True, fields=["pk", "name"]
+        )
+    ]
 
     assert len(results) == 2
     for item in results:

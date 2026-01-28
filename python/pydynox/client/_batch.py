@@ -22,6 +22,9 @@ class BatchOperations:
         - Splitting requests to respect the 25-item limit per batch
         - Retrying unprocessed items with exponential backoff
         """
+        put_count = len(put_items) if put_items else 0
+        delete_count = len(delete_keys) if delete_keys else 0
+        self._acquire_wcu(float(put_count + delete_count))  # type: ignore[attr-defined]
         await self._client.batch_write(  # type: ignore[attr-defined]
             table,
             put_items or [],
@@ -42,6 +45,7 @@ class BatchOperations:
         - Retrying unprocessed keys with exponential backoff
         - Combining results from multiple requests
         """
+        self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
         return await self._client.batch_get(table, keys)  # type: ignore[attr-defined, no-any-return]
 
     # ========== BATCH WRITE (SYNC - with sync_ prefix) ==========

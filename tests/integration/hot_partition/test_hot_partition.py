@@ -30,14 +30,15 @@ def client_with_detector(localstack_endpoint, detector):
     )
 
 
-def test_put_item_tracks_writes(client_with_detector, detector, _create_table):
+@pytest.mark.asyncio
+async def test_put_item_tracks_writes(client_with_detector, detector, _create_table):
     """put_item operations are tracked for hot partition detection."""
     # GIVEN a client with hot partition detection
     pk = f"HOT#{uuid.uuid4()}"
 
     # WHEN putting 3 items with same pk
     for i in range(3):
-        client_with_detector.put_item(
+        await client_with_detector.put_item(
             "test_table",
             {"pk": pk, "sk": f"ITEM#{i}", "data": "test"},
         )
@@ -46,35 +47,37 @@ def test_put_item_tracks_writes(client_with_detector, detector, _create_table):
     assert detector.get_write_count("test_table", pk) == 3
 
 
-def test_get_item_tracks_reads(client_with_detector, detector, _create_table):
+@pytest.mark.asyncio
+async def test_get_item_tracks_reads(client_with_detector, detector, _create_table):
     """get_item operations are tracked for hot partition detection."""
     # GIVEN an existing item
     pk = f"HOT#{uuid.uuid4()}"
-    client_with_detector.put_item(
+    await client_with_detector.put_item(
         "test_table",
         {"pk": pk, "sk": "ITEM#1", "data": "test"},
     )
 
     # WHEN reading it multiple times
     for _ in range(3):
-        client_with_detector.get_item("test_table", {"pk": pk, "sk": "ITEM#1"})
+        await client_with_detector.get_item("test_table", {"pk": pk, "sk": "ITEM#1"})
 
     # THEN reads are tracked
     assert detector.get_read_count("test_table", pk) == 3
 
 
-def test_update_item_tracks_writes(client_with_detector, detector, _create_table):
+@pytest.mark.asyncio
+async def test_update_item_tracks_writes(client_with_detector, detector, _create_table):
     """update_item operations are tracked for hot partition detection."""
     # GIVEN an existing item
     pk = f"HOT#{uuid.uuid4()}"
-    client_with_detector.put_item(
+    await client_with_detector.put_item(
         "test_table",
         {"pk": pk, "sk": "ITEM#1", "data": "test"},
     )
 
     # WHEN updating it multiple times
     for i in range(3):
-        client_with_detector.update_item(
+        await client_with_detector.update_item(
             "test_table",
             {"pk": pk, "sk": "ITEM#1"},
             updates={"data": f"updated-{i}"},
@@ -84,25 +87,27 @@ def test_update_item_tracks_writes(client_with_detector, detector, _create_table
     assert detector.get_write_count("test_table", pk) == 4
 
 
-def test_delete_item_tracks_writes(client_with_detector, detector, _create_table):
+@pytest.mark.asyncio
+async def test_delete_item_tracks_writes(client_with_detector, detector, _create_table):
     """delete_item operations are tracked for hot partition detection."""
     # GIVEN existing items
     pk = f"HOT#{uuid.uuid4()}"
     for i in range(3):
-        client_with_detector.put_item(
+        await client_with_detector.put_item(
             "test_table",
             {"pk": pk, "sk": f"ITEM#{i}", "data": "test"},
         )
 
     # WHEN deleting them
     for i in range(3):
-        client_with_detector.delete_item("test_table", {"pk": pk, "sk": f"ITEM#{i}"})
+        await client_with_detector.delete_item("test_table", {"pk": pk, "sk": f"ITEM#{i}"})
 
     # THEN writes are tracked (3 puts + 3 deletes >= 5)
     assert detector.get_write_count("test_table", pk) >= 5
 
 
-def test_logs_warning_on_hot_partition(client_with_detector, detector, _create_table, caplog):
+@pytest.mark.asyncio
+async def test_logs_warning_on_hot_partition(client_with_detector, detector, _create_table, caplog):
     """Logs warning when partition becomes hot."""
     # GIVEN a client with threshold=5
     pk = f"HOT#{uuid.uuid4()}"
@@ -110,7 +115,7 @@ def test_logs_warning_on_hot_partition(client_with_detector, detector, _create_t
     # WHEN writing 6 items (exceeds threshold)
     with caplog.at_level(logging.WARNING, logger="pydynox.diagnostics"):
         for i in range(6):
-            client_with_detector.put_item(
+            await client_with_detector.put_item(
                 "test_table",
                 {"pk": pk, "sk": f"ITEM#{i}", "data": "test"},
             )
@@ -120,7 +125,8 @@ def test_logs_warning_on_hot_partition(client_with_detector, detector, _create_t
     assert pk in caplog.text
 
 
-def test_different_pks_tracked_separately(client_with_detector, detector, _create_table):
+@pytest.mark.asyncio
+async def test_different_pks_tracked_separately(client_with_detector, detector, _create_table):
     """Different partition keys are tracked separately."""
     # GIVEN two different pks
     pk1 = f"HOT1#{uuid.uuid4()}"
@@ -128,12 +134,12 @@ def test_different_pks_tracked_separately(client_with_detector, detector, _creat
 
     # WHEN writing to each
     for i in range(3):
-        client_with_detector.put_item(
+        await client_with_detector.put_item(
             "test_table",
             {"pk": pk1, "sk": f"ITEM#{i}", "data": "test"},
         )
     for i in range(2):
-        client_with_detector.put_item(
+        await client_with_detector.put_item(
             "test_table",
             {"pk": pk2, "sk": f"ITEM#{i}", "data": "test"},
         )
@@ -143,24 +149,28 @@ def test_different_pks_tracked_separately(client_with_detector, detector, _creat
     assert detector.get_write_count("test_table", pk2) == 2
 
 
-def test_client_without_detector_works(dynamo, _create_table):
+@pytest.mark.asyncio
+async def test_client_without_detector_works(dynamo, _create_table):
     """Client without detector still works normally."""
     # GIVEN a client without detector
     pk = f"NORMAL#{uuid.uuid4()}"
 
     # WHEN using it normally
-    dynamo.put_item(
+    await dynamo.put_item(
         "test_table",
         {"pk": pk, "sk": "ITEM#1", "data": "test"},
     )
-    result = dynamo.get_item("test_table", {"pk": pk, "sk": "ITEM#1"})
+    result = await dynamo.get_item("test_table", {"pk": pk, "sk": "ITEM#1"})
 
     # THEN operations work
     assert result is not None
     assert result["data"] == "test"
 
 
-def test_table_override_prevents_warning(client_with_detector, detector, _create_table, caplog):
+@pytest.mark.asyncio
+async def test_table_override_prevents_warning(
+    client_with_detector, detector, _create_table, caplog
+):
     """Table override with higher threshold prevents warning."""
     # GIVEN a higher threshold for test_table
     pk = f"HOT#{uuid.uuid4()}"
@@ -169,7 +179,7 @@ def test_table_override_prevents_warning(client_with_detector, detector, _create
     # WHEN writing 10 items
     with caplog.at_level(logging.WARNING, logger="pydynox.diagnostics"):
         for i in range(10):
-            client_with_detector.put_item(
+            await client_with_detector.put_item(
                 "test_table",
                 {"pk": pk, "sk": f"ITEM#{i}", "data": "test"},
             )
@@ -178,7 +188,8 @@ def test_table_override_prevents_warning(client_with_detector, detector, _create
     assert "Hot partition detected" not in caplog.text
 
 
-def test_model_config_overrides_client_threshold(
+@pytest.mark.asyncio
+async def test_model_config_overrides_client_threshold(
     client_with_detector, detector, _create_table, caplog
 ):
     """ModelConfig hot_partition_writes/reads overrides client's detector threshold."""
@@ -203,14 +214,15 @@ def test_model_config_overrides_client_threshold(
     with caplog.at_level(logging.WARNING, logger="pydynox.diagnostics"):
         for i in range(10):
             item = HighTrafficModel(pk=pk, sk=f"ITEM#{i}", data="test")
-            item.save()
+            await item.save()
 
     # THEN no warning because model threshold (50) > writes (10)
     assert "Hot partition detected" not in caplog.text
     assert detector.get_write_count("test_table", pk) == 10
 
 
-def test_model_config_lower_threshold_triggers_warning(
+@pytest.mark.asyncio
+async def test_model_config_lower_threshold_triggers_warning(
     client_with_detector, detector, _create_table, caplog
 ):
     """ModelConfig with lower threshold triggers warning before client threshold."""
@@ -234,7 +246,7 @@ def test_model_config_lower_threshold_triggers_warning(
     with caplog.at_level(logging.WARNING, logger="pydynox.diagnostics"):
         for i in range(4):
             item = LowThresholdModel(pk=pk, sk=f"ITEM#{i}", data="test")
-            item.save()
+            await item.save()
 
     # THEN warning because model threshold (3) < writes (4)
     assert "Hot partition detected" in caplog.text

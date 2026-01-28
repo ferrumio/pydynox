@@ -10,7 +10,7 @@ from pydynox.query import AsyncQueryResult, QueryResult
 class QueryOperations:
     """Query operations."""
 
-    def query(
+    def sync_query(
         self,
         table: str,
         key_condition_expression: str,
@@ -25,7 +25,7 @@ class QueryOperations:
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
     ) -> QueryResult:
-        """Query items from a DynamoDB table.
+        """Query items from a DynamoDB table (sync).
 
         Args:
             table: Table name.
@@ -61,7 +61,7 @@ class QueryOperations:
             consistent_read=consistent_read,
         )
 
-    def async_query(
+    def query(
         self,
         table: str,
         key_condition_expression: str,
@@ -76,7 +76,7 @@ class QueryOperations:
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
     ) -> AsyncQueryResult:
-        """Async query items from a DynamoDB table.
+        """Query items from a DynamoDB table (async).
 
         Args:
             table: Table name.

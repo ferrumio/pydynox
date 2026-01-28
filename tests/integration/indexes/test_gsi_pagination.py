@@ -41,7 +41,7 @@ def gsi_pagination_client(dynamodb_endpoint):
 
     # Seed data - 15 items for pagination
     for i in range(15):
-        client.put_item(
+        client.sync_put_item(
             table_name,
             {"pk": f"GSI_PAGE#{i}", "sk": "PROFILE", "status": "active", "age": i},
         )
@@ -66,11 +66,12 @@ class UserWithGSI(Model):
     )
 
 
-def test_gsi_query_with_last_evaluated_key(gsi_pagination_client):
+@pytest.mark.asyncio
+async def test_gsi_query_with_last_evaluated_key(gsi_pagination_client):
     """GSI query accepts last_evaluated_key for manual pagination."""
     # WHEN we query with a limit
     result = UserWithGSI.status_index.query(status="active", limit=5, page_size=5)
-    first_page = list(result)
+    first_page = [x async for x in result]
 
     # THEN we get 5 items and a last_evaluated_key
     assert len(first_page) == 5
@@ -83,7 +84,7 @@ def test_gsi_query_with_last_evaluated_key(gsi_pagination_client):
         page_size=5,
         last_evaluated_key=result.last_evaluated_key,
     )
-    second_page = list(result2)
+    second_page = [x async for x in result2]
 
     # THEN we get the next 5 items
     assert len(second_page) == 5
@@ -94,7 +95,8 @@ def test_gsi_query_with_last_evaluated_key(gsi_pagination_client):
     assert first_pks.isdisjoint(second_pks)
 
 
-def test_gsi_query_pagination_exhausts_results(gsi_pagination_client):
+@pytest.mark.asyncio
+async def test_gsi_query_pagination_exhausts_results(gsi_pagination_client):
     """GSI pagination eventually returns None for last_evaluated_key."""
     # WHEN we paginate through all items
     all_items = []
@@ -107,7 +109,7 @@ def test_gsi_query_pagination_exhausts_results(gsi_pagination_client):
             page_size=5,
             last_evaluated_key=last_key,
         )
-        items = list(result)
+        items = [x async for x in result]
         all_items.extend(items)
         last_key = result.last_evaluated_key
 
@@ -120,9 +122,9 @@ def test_gsi_query_pagination_exhausts_results(gsi_pagination_client):
 
 @pytest.mark.asyncio
 async def test_gsi_async_query_with_last_evaluated_key(gsi_pagination_client):
-    """GSI async_query accepts last_evaluated_key for manual pagination."""
+    """GSI query accepts last_evaluated_key for manual pagination."""
     # WHEN we query with a limit (async)
-    result = UserWithGSI.status_index.async_query(status="active", limit=5, page_size=5)
+    result = UserWithGSI.status_index.query(status="active", limit=5, page_size=5)
     first_page = [item async for item in result]
 
     # THEN we get 5 items

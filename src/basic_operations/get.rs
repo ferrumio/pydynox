@@ -108,7 +108,7 @@ pub async fn execute_get_item(
 
 /// Sync get_item - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn get_item(
+pub fn sync_get_item(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -145,9 +145,9 @@ pub fn get_item(
     }
 }
 
-/// Async get_item - returns a Python awaitable.
+/// Async get_item - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_get_item<'py>(
+pub fn get_item<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,

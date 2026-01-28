@@ -292,9 +292,9 @@ class MemoryClient:
         self._last_metrics = metrics
         self._total_metrics.add(metrics, operation)
 
-    # ========== CRUD ==========
+    # ========== CRUD (internal sync implementations) ==========
 
-    def put_item(
+    def _do_put_item(
         self,
         table: str,
         item: dict[str, Any],
@@ -302,7 +302,7 @@ class MemoryClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> FakeMetrics:
-        """Put an item into the in-memory table."""
+        """Internal sync put item implementation."""
         start = time.time()
         tbl = self._get_table(table)
         key_str = self._make_key_string(item)
@@ -325,10 +325,10 @@ class MemoryClient:
         self._record_metrics(metrics, "put")
         return metrics
 
-    def get_item(
+    def _do_get_item(
         self, table: str, key: dict[str, Any], consistent_read: bool = False
     ) -> dict[str, Any] | None:
-        """Get an item from the in-memory table."""
+        """Internal sync get item implementation."""
         start = time.time()
         tbl = self._get_table(table)
         key_str = self._make_key_string(key)
@@ -339,7 +339,7 @@ class MemoryClient:
             return None
         return copy.deepcopy(item)
 
-    def delete_item(
+    def _do_delete_item(
         self,
         table: str,
         key: dict[str, Any],
@@ -347,7 +347,7 @@ class MemoryClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> FakeMetrics:
-        """Delete an item from the in-memory table."""
+        """Internal sync delete item implementation."""
         start = time.time()
         tbl = self._get_table(table)
         key_str = self._make_key_string(key)
@@ -370,7 +370,7 @@ class MemoryClient:
         self._record_metrics(metrics, "delete")
         return metrics
 
-    def update_item(
+    def _do_update_item(
         self,
         table: str,
         key: dict[str, Any],
@@ -380,7 +380,7 @@ class MemoryClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> FakeMetrics:
-        """Update an item in the in-memory table."""
+        """Internal sync update item implementation."""
         start = time.time()
         tbl = self._get_table(table)
         key_str = self._make_key_string(key)
@@ -419,9 +419,135 @@ class MemoryClient:
         self._record_metrics(metrics, "update")
         return metrics
 
-    # ========== QUERY/SCAN ==========
+    # ========== SYNC CRUD (sync_ prefix) ==========
 
-    def query_page(
+    def sync_put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> FakeMetrics:
+        """Sync put item."""
+        return self._do_put_item(
+            table,
+            item,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+
+    def sync_get_item(
+        self, table: str, key: dict[str, Any], consistent_read: bool = False
+    ) -> dict[str, Any] | None:
+        """Sync get item."""
+        return self._do_get_item(table, key, consistent_read)
+
+    def sync_delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> FakeMetrics:
+        """Sync delete item."""
+        return self._do_delete_item(
+            table,
+            key,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+
+    def sync_update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> FakeMetrics:
+        """Sync update item."""
+        return self._do_update_item(
+            table,
+            key,
+            updates,
+            update_expression,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+
+    # ========== ASYNC CRUD (default, no prefix) ==========
+
+    async def put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> FakeMetrics:
+        """Async put item (default)."""
+        return self._do_put_item(
+            table,
+            item,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+
+    async def get_item(
+        self, table: str, key: dict[str, Any], consistent_read: bool = False
+    ) -> dict[str, Any] | None:
+        """Async get item (default)."""
+        return self._do_get_item(table, key, consistent_read)
+
+    async def delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> FakeMetrics:
+        """Async delete item (default)."""
+        return self._do_delete_item(
+            table,
+            key,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+
+    async def update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> FakeMetrics:
+        """Async update item (default)."""
+        return self._do_update_item(
+            table,
+            key,
+            updates,
+            update_expression,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+        )
+
+    # ========== QUERY/SCAN (internal sync implementations) ==========
+
+    def _do_query_page(
         self,
         table: str,
         key_condition_expression: str,
@@ -435,7 +561,7 @@ class MemoryClient:
         index_name: str | None = None,
         projection_expression: str | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
-        """Query a page of items from the in-memory table."""
+        """Internal sync query page implementation."""
         result = self.query(
             table,
             key_condition_expression,
@@ -452,7 +578,7 @@ class MemoryClient:
         metrics.items_count = len(result["items"])
         return result["items"], result["last_evaluated_key"], metrics
 
-    def scan_page(
+    def _do_scan_page(
         self,
         table: str,
         filter_expression: str | None = None,
@@ -466,7 +592,7 @@ class MemoryClient:
         index_name: str | None = None,
         projection_expression: str | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
-        """Scan a page of items from the in-memory table."""
+        """Internal sync scan page implementation."""
         result = self.scan(
             table,
             filter_expression,
@@ -482,6 +608,136 @@ class MemoryClient:
         metrics = result["metrics"]
         metrics.items_count = len(result["items"])
         return result["items"], result["last_evaluated_key"], metrics
+
+    # ========== SYNC QUERY/SCAN (sync_ prefix) ==========
+
+    def sync_query_page(
+        self,
+        table: str,
+        key_condition_expression: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        consistent_read: bool = False,
+        exclusive_start_key: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        projection_expression: str | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
+        """Sync query page."""
+        return self._do_query_page(
+            table,
+            key_condition_expression,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            scan_index_forward,
+            consistent_read,
+            exclusive_start_key,
+            index_name,
+            projection_expression,
+        )
+
+    def sync_scan_page(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        consistent_read: bool = False,
+        exclusive_start_key: dict[str, Any] | None = None,
+        segment: int | None = None,
+        total_segments: int | None = None,
+        index_name: str | None = None,
+        projection_expression: str | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
+        """Sync scan page."""
+        return self._do_scan_page(
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            consistent_read,
+            exclusive_start_key,
+            segment,
+            total_segments,
+            index_name,
+            projection_expression,
+        )
+
+    # ========== ASYNC QUERY/SCAN (default, no prefix) ==========
+
+    async def query_page(
+        self,
+        table: str,
+        key_condition_expression: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        scan_index_forward: bool = True,
+        consistent_read: bool = False,
+        exclusive_start_key: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        projection_expression: str | None = None,
+    ) -> dict[str, Any]:
+        """Async query page (default). Returns dict like Rust client."""
+        items, last_key, metrics = self._do_query_page(
+            table,
+            key_condition_expression,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            scan_index_forward,
+            consistent_read,
+            exclusive_start_key,
+            index_name,
+            projection_expression,
+        )
+        return {
+            "items": items,
+            "last_evaluated_key": last_key,
+            "metrics": metrics,
+        }
+
+    async def scan_page(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        limit: int | None = None,
+        consistent_read: bool = False,
+        exclusive_start_key: dict[str, Any] | None = None,
+        segment: int | None = None,
+        total_segments: int | None = None,
+        index_name: str | None = None,
+        projection_expression: str | None = None,
+    ) -> dict[str, Any]:
+        """Async scan page (default). Returns dict like Rust client."""
+        items, last_key, metrics = self._do_scan_page(
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            consistent_read,
+            exclusive_start_key,
+            segment,
+            total_segments,
+            index_name,
+            projection_expression,
+        )
+        return {
+            "items": items,
+            "last_evaluated_key": last_key,
+            "metrics": metrics,
+        }
 
     def query(
         self,
@@ -628,6 +884,9 @@ class MemoryClient:
     def table_exists(self, table: str) -> bool:
         """Check if table exists (always True for memory backend)."""
         return table in self._tables
+
+    # Alias for async-first API (sync version has sync_ prefix)
+    sync_table_exists = table_exists
 
     def create_table(self, table: str, **kwargs: Any) -> None:
         """Create a table (just initializes empty dict)."""

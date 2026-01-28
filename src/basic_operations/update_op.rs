@@ -162,7 +162,7 @@ fn extract_item_from_update_error(
 
 /// Sync update_item - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn update_item(
+pub fn sync_update_item(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -195,9 +195,9 @@ pub fn update_item(
     }
 }
 
-/// Async update_item - returns a Python awaitable.
+/// Async update_item - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_update_item<'py>(
+pub fn update_item<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,

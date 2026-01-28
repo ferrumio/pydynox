@@ -82,7 +82,8 @@ def test_calculate_size_detailed_breakdown(dynamo):
     assert size.fields["pk"] < size.fields["bio"]
 
 
-def test_save_succeeds_under_limit(dynamo):
+@pytest.mark.asyncio
+async def test_save_succeeds_under_limit(dynamo):
     """save() works when item is under max_size."""
 
     class LimitedUser(Model):
@@ -94,14 +95,15 @@ def test_save_succeeds_under_limit(dynamo):
     LimitedUser._client_instance = None
 
     user = LimitedUser(pk="USER#4", sk="PROFILE", bio="Short bio")
-    user.save()
+    await user.save()
 
     # Verify it was saved
-    result = dynamo.get_item("test_table", {"pk": "USER#4", "sk": "PROFILE"})
+    result = await dynamo.get_item("test_table", {"pk": "USER#4", "sk": "PROFILE"})
     assert result["bio"] == "Short bio"
 
 
-def test_save_raises_when_over_limit(dynamo):
+@pytest.mark.asyncio
+async def test_save_raises_when_over_limit(dynamo):
     """save() raises ItemTooLargeException when item exceeds max_size."""
 
     class LimitedUser(Model):
@@ -122,14 +124,15 @@ def test_save_raises_when_over_limit(dynamo):
     # WHEN we try to save
     # THEN ItemTooLargeException is raised
     with pytest.raises(ItemTooLargeException) as exc_info:
-        user.save()
+        await user.save()
 
     assert exc_info.value.size > 500
     assert exc_info.value.max_size == 500
     assert exc_info.value.item_key == {"pk": "USER#5", "sk": "PROFILE"}
 
 
-def test_save_without_limit_allows_large_items(dynamo):
+@pytest.mark.asyncio
+async def test_save_without_limit_allows_large_items(dynamo):
     """save() without max_size allows large items."""
 
     class User(Model):
@@ -145,7 +148,7 @@ def test_save_without_limit_allows_large_items(dynamo):
         sk="PROFILE",
         bio="Y" * 10000,  # Large but under 400KB
     )
-    user.save()
+    await user.save()
 
-    result = dynamo.get_item("test_table", {"pk": "USER#6", "sk": "PROFILE"})
+    result = await dynamo.get_item("test_table", {"pk": "USER#6", "sk": "PROFILE"})
     assert len(result["bio"]) == 10000

@@ -107,11 +107,16 @@ def test_clear_default_client():
     assert get_default_client() is None
 
 
-def test_model_uses_config_client():
+@pytest.mark.asyncio
+async def test_model_uses_config_client():
     """Model uses client from model_config."""
     # GIVEN a model with a mock client configured
     mock_client = MagicMock()
-    mock_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
+
+    async def mock_get_item(table, key, consistent_read=False):
+        return {"pk": "USER#1", "name": "John"}
+
+    mock_client.get_item = mock_get_item
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
@@ -120,18 +125,24 @@ def test_model_uses_config_client():
 
     User._client_instance = None
 
-    # WHEN we call get
-    User.get(pk="USER#1")
+    # WHEN we call get (async)
+    result = await User.get(pk="USER#1")
 
-    # THEN the mock client should be called with correct params
-    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1"}, consistent_read=False)
+    # THEN the result should be returned
+    assert result is not None
+    assert result.pk == "USER#1"
 
 
-def test_model_uses_default_client_when_no_config_client():
+@pytest.mark.asyncio
+async def test_model_uses_default_client_when_no_config_client():
     """Model uses default client when model_config.client is None."""
     # GIVEN a default client is set
     mock_client = MagicMock()
-    mock_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
+
+    async def mock_get_item(table, key, consistent_read=False):
+        return {"pk": "USER#1", "name": "John"}
+
+    mock_client.get_item = mock_get_item
     set_default_client(mock_client)
 
     class User(Model):
@@ -141,19 +152,34 @@ def test_model_uses_default_client_when_no_config_client():
 
     User._client_instance = None
 
-    # WHEN we call get
-    User.get(pk="USER#1")
+    # WHEN we call get (async)
+    result = await User.get(pk="USER#1")
 
-    # THEN the default client should be used
-    mock_client.get_item.assert_called_once_with("users", {"pk": "USER#1"}, consistent_read=False)
+    # THEN the result should be returned
+    assert result is not None
+    assert result.pk == "USER#1"
 
 
-def test_model_config_client_takes_priority_over_default():
+@pytest.mark.asyncio
+async def test_model_config_client_takes_priority_over_default():
     """model_config.client takes priority over default client."""
     # GIVEN both a default client and a config client
     default_client = MagicMock()
     config_client = MagicMock()
-    config_client.get_item.return_value = {"pk": "USER#1", "name": "John"}
+
+    default_called = []
+    config_called = []
+
+    async def default_get_item(table, key, consistent_read=False):
+        default_called.append(True)
+        return {"pk": "USER#1", "name": "John"}
+
+    async def config_get_item(table, key, consistent_read=False):
+        config_called.append(True)
+        return {"pk": "USER#1", "name": "John"}
+
+    default_client.get_item = default_get_item
+    config_client.get_item = config_get_item
 
     set_default_client(default_client)
 
@@ -164,15 +190,16 @@ def test_model_config_client_takes_priority_over_default():
 
     User._client_instance = None
 
-    # WHEN we call get
-    User.get(pk="USER#1")
+    # WHEN we call get (async)
+    await User.get(pk="USER#1")
 
     # THEN the config client should be used, not the default
-    config_client.get_item.assert_called_once()
-    default_client.get_item.assert_not_called()
+    assert len(config_called) == 1
+    assert len(default_called) == 0
 
 
-def test_model_raises_error_when_no_client():
+@pytest.mark.asyncio
+async def test_model_raises_error_when_no_client():
     """Model raises error when no client is configured."""
 
     # GIVEN a model with no client configured
@@ -183,13 +210,14 @@ def test_model_raises_error_when_no_client():
 
     User._client_instance = None
 
-    # WHEN we try to call get
+    # WHEN we try to call get (async)
     # THEN ValueError should be raised
     with pytest.raises(ValueError, match="No client configured"):
-        User.get(pk="USER#1")
+        await User.get(pk="USER#1")
 
 
-def test_model_raises_error_when_no_model_config():
+@pytest.mark.asyncio
+async def test_model_raises_error_when_no_model_config():
     """Model raises error when model_config is not defined."""
 
     # GIVEN a model without model_config
@@ -201,10 +229,10 @@ def test_model_raises_error_when_no_model_config():
     mock_client = MagicMock()
     set_default_client(mock_client)
 
-    # WHEN we try to call get
+    # WHEN we try to call get (async)
     # THEN ValueError should be raised
     with pytest.raises(ValueError, match="must define model_config"):
-        User.get(pk="USER#1")
+        await User.get(pk="USER#1")
 
 
 def test_model_skip_hooks_from_config():

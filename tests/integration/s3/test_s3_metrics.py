@@ -26,7 +26,8 @@ def s3_model(dynamo: DynamoDBClient, s3_bucket: str):
     return Document
 
 
-def test_s3_metrics_on_save(s3_model):
+@pytest.mark.asyncio
+async def test_s3_metrics_on_save(s3_model):
     """S3 metrics are recorded when saving with S3File."""
     doc_id = str(uuid.uuid4())
 
@@ -35,7 +36,7 @@ def test_s3_metrics_on_save(s3_model):
     doc.content = S3File(b"Hello, S3 metrics!", name="test.txt")
 
     # WHEN we save
-    doc.save()
+    await doc.save()
 
     # THEN S3 metrics should be recorded
     metrics = s3_model.get_total_metrics()
@@ -45,20 +46,21 @@ def test_s3_metrics_on_save(s3_model):
     assert metrics.s3_bytes_downloaded == 0
 
 
-def test_s3_metrics_on_delete(s3_model):
+@pytest.mark.asyncio
+async def test_s3_metrics_on_delete(s3_model):
     """S3 metrics are recorded when deleting model with S3 file."""
     doc_id = str(uuid.uuid4())
 
     # GIVEN a saved model with S3 content
     doc = s3_model(pk=f"DOC#{doc_id}", sk="v1", name="to_delete.txt")
     doc.content = S3File(b"Content to delete", name="to_delete.txt")
-    doc.save()
+    await doc.save()
 
     # Reset metrics to isolate delete metrics
     s3_model.reset_metrics()
 
     # WHEN we delete
-    doc.delete()
+    await doc.delete()
 
     # THEN S3 delete metrics should be recorded
     metrics = s3_model.get_total_metrics()
@@ -69,14 +71,15 @@ def test_s3_metrics_on_delete(s3_model):
     assert metrics.s3_bytes_downloaded == 0
 
 
-def test_s3_metrics_accumulate(s3_model):
+@pytest.mark.asyncio
+async def test_s3_metrics_accumulate(s3_model):
     """S3 metrics accumulate across multiple operations."""
     # GIVEN multiple saves with S3 content
     for i in range(3):
         doc_id = str(uuid.uuid4())
         doc = s3_model(pk=f"DOC#{doc_id}", sk="v1", name=f"file{i}.txt")
         doc.content = S3File(f"Content {i}".encode(), name=f"file{i}.txt")
-        doc.save()
+        await doc.save()
 
     # THEN metrics should accumulate
     metrics = s3_model.get_total_metrics()
@@ -84,7 +87,8 @@ def test_s3_metrics_accumulate(s3_model):
     assert metrics.s3_bytes_uploaded > 0
 
 
-def test_s3_metrics_zero_without_s3_operations(dynamo: DynamoDBClient):
+@pytest.mark.asyncio
+async def test_s3_metrics_zero_without_s3_operations(dynamo: DynamoDBClient):
     """S3 metrics are zero when no S3 operations happen."""
     set_default_client(dynamo)
 
@@ -100,7 +104,7 @@ def test_s3_metrics_zero_without_s3_operations(dynamo: DynamoDBClient):
     # WHEN we save a model without S3
     doc_id = str(uuid.uuid4())
     item = SimpleModel(pk=f"SIMPLE#{doc_id}", sk="v1", name="No S3")
-    item.save()
+    await item.save()
 
     # THEN S3 metrics should be zero
     metrics = SimpleModel.get_total_metrics()
@@ -110,14 +114,15 @@ def test_s3_metrics_zero_without_s3_operations(dynamo: DynamoDBClient):
     assert metrics.s3_bytes_downloaded == 0
 
 
-def test_s3_metrics_reset(s3_model):
+@pytest.mark.asyncio
+async def test_s3_metrics_reset(s3_model):
     """S3 metrics are cleared on reset."""
     doc_id = str(uuid.uuid4())
 
     # GIVEN a model with S3 metrics
     doc = s3_model(pk=f"DOC#{doc_id}", sk="v1", name="reset.txt")
     doc.content = S3File(b"Content", name="reset.txt")
-    doc.save()
+    await doc.save()
 
     # Verify metrics exist
     metrics = s3_model.get_total_metrics()
@@ -135,7 +140,7 @@ def test_s3_metrics_reset(s3_model):
 
 
 @pytest.mark.asyncio
-async def test_s3_metrics_async_save(s3_model):
+async def test_s3_metrics_save(s3_model):
     """S3 metrics are recorded on async save."""
     doc_id = str(uuid.uuid4())
 
@@ -143,8 +148,8 @@ async def test_s3_metrics_async_save(s3_model):
     doc = s3_model(pk=f"DOC#{doc_id}", sk="v1", name="async.txt")
     doc.content = S3File(b"Async S3 content", name="async.txt")
 
-    # WHEN we async save
-    await doc.async_save()
+    # WHEN we async save (save() is now async by default)
+    await doc.save()
 
     # THEN S3 metrics should be recorded
     metrics = s3_model.get_total_metrics()
@@ -161,13 +166,13 @@ async def test_s3_metrics_async_delete(s3_model):
     # GIVEN a saved model with S3 content
     doc = s3_model(pk=f"DOC#{doc_id}", sk="v1", name="async_delete.txt")
     doc.content = S3File(b"Async delete content", name="async_delete.txt")
-    await doc.async_save()
+    await doc.save()
 
     # Reset metrics
     s3_model.reset_metrics()
 
-    # WHEN we async delete
-    await doc.async_delete()
+    # WHEN we async delete (delete() is now async by default)
+    await doc.delete()
 
     # THEN S3 delete metrics should be recorded
     metrics = s3_model.get_total_metrics()

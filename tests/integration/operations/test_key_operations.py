@@ -23,91 +23,96 @@ def user_model(dynamo):
     return User
 
 
-def test_update_by_key_updates_item(user_model):
+@pytest.mark.asyncio
+async def test_update_by_key_updates_item(user_model):
     """update_by_key updates an existing item."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     # GIVEN an existing item
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
+    await user.save()
 
     # WHEN we update by key without fetching
-    user_model.update_by_key(pk=pk, sk="PROFILE", name="Jane", age=31)
+    await user_model.update_by_key(pk=pk, sk="PROFILE", name="Jane", age=31)
 
     # THEN the update is applied
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result is not None
     assert result.name == "Jane"
     assert result.age == 31
 
 
-def test_update_by_key_partial_update(user_model):
+@pytest.mark.asyncio
+async def test_update_by_key_partial_update(user_model):
     """update_by_key only updates specified fields."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
+    await user.save()
 
     # Update only name
-    user_model.update_by_key(pk=pk, sk="PROFILE", name="Jane")
+    await user_model.update_by_key(pk=pk, sk="PROFILE", name="Jane")
 
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result.name == "Jane"
     assert result.age == 30  # Unchanged
 
 
-def test_update_by_key_creates_item_if_not_exists(user_model):
+@pytest.mark.asyncio
+async def test_update_by_key_creates_item_if_not_exists(user_model):
     """update_by_key creates item if it doesn't exist (DynamoDB behavior)."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     # Update non-existent item
-    user_model.update_by_key(pk=pk, sk="PROFILE", name="NewUser")
+    await user_model.update_by_key(pk=pk, sk="PROFILE", name="NewUser")
 
     # Item should be created
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result is not None
     assert result.name == "NewUser"
 
 
-def test_update_by_key_with_condition_success(user_model):
+@pytest.mark.asyncio
+async def test_update_by_key_with_condition_success(user_model):
     """update_by_key with condition that passes."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
+    await user.save()
 
     # Build condition separately to avoid any parsing issues
     age_condition = user_model.age == 30
 
     # Update with condition
-    user_model.update_by_key(
+    await user_model.update_by_key(
         pk=pk,
         sk="PROFILE",
         name="Jane",
         condition=age_condition,
     )
 
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result.name == "Jane"
 
 
-def test_update_by_key_with_condition_fails(user_model):
+@pytest.mark.asyncio
+async def test_update_by_key_with_condition_fails(user_model):
     """update_by_key with condition that fails raises error."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
+    await user.save()
 
     # Build condition separately
     age_condition = user_model.age == 99  # Wrong age
 
     with pytest.raises(ConditionalCheckFailedException):
-        user_model.update_by_key(
+        await user_model.update_by_key(
             pk=pk,
             sk="PROFILE",
             name="Jane",
@@ -115,124 +120,130 @@ def test_update_by_key_with_condition_fails(user_model):
         )
 
     # Item unchanged
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result.name == "John"
 
 
-def test_delete_by_key_deletes_item(user_model):
+@pytest.mark.asyncio
+async def test_delete_by_key_deletes_item(user_model):
     """delete_by_key removes an existing item."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     # GIVEN an existing item
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
+    await user.save()
 
     # WHEN we delete by key without fetching
-    user_model.delete_by_key(pk=pk, sk="PROFILE")
+    await user_model.delete_by_key(pk=pk, sk="PROFILE")
 
     # THEN the item is deleted
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result is None
 
 
-def test_delete_by_key_nonexistent_item_no_error(user_model):
+@pytest.mark.asyncio
+async def test_delete_by_key_nonexistent_item_no_error(user_model):
     """delete_by_key on non-existent item doesn't raise error."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     # Should not raise
-    user_model.delete_by_key(pk=pk, sk="PROFILE")
+    await user_model.delete_by_key(pk=pk, sk="PROFILE")
 
 
-def test_delete_by_key_with_condition_success(user_model):
+@pytest.mark.asyncio
+async def test_delete_by_key_with_condition_success(user_model):
     """delete_by_key with condition that passes."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
+    await user.save()
 
     # Build condition separately
     name_condition = user_model.name == "John"
 
-    user_model.delete_by_key(
+    await user_model.delete_by_key(
         pk=pk,
         sk="PROFILE",
         condition=name_condition,
     )
 
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result is None
 
 
-def test_delete_by_key_with_condition_fails(user_model):
+@pytest.mark.asyncio
+async def test_delete_by_key_with_condition_fails(user_model):
     """delete_by_key with condition that fails raises error."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    user.save()
+    await user.save()
 
     # Build condition separately
     name_condition = user_model.name == "Jane"  # Wrong name
 
     with pytest.raises(ConditionalCheckFailedException):
-        user_model.delete_by_key(
+        await user_model.delete_by_key(
             pk=pk,
             sk="PROFILE",
             condition=name_condition,
         )
 
     # Item still exists
-    result = user_model.get(pk=pk, sk="PROFILE")
+    result = await user_model.get(pk=pk, sk="PROFILE")
     assert result is not None
 
 
-@pytest.mark.asyncio
-async def test_async_update_by_key(user_model):
-    """async_update_by_key updates an existing item."""
+# ========== SYNC TESTS ==========
+
+
+def test_sync_update_by_key(user_model):
+    """sync_update_by_key updates an existing item."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    await user.async_save()
+    user.sync_save()
 
-    await user_model.async_update_by_key(pk=pk, sk="PROFILE", name="Jane")
+    user_model.sync_update_by_key(pk=pk, sk="PROFILE", name="Jane")
 
-    result = await user_model.async_get(pk=pk, sk="PROFILE")
+    result = user_model.sync_get(pk=pk, sk="PROFILE")
     assert result.name == "Jane"
 
 
-@pytest.mark.asyncio
-async def test_async_delete_by_key(user_model):
-    """async_delete_by_key removes an existing item."""
+def test_sync_delete_by_key(user_model):
+    """sync_delete_by_key removes an existing item."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="John", age=30)
-    await user.async_save()
+    user.sync_save()
 
-    await user_model.async_delete_by_key(pk=pk, sk="PROFILE")
+    user_model.sync_delete_by_key(pk=pk, sk="PROFILE")
 
-    result = await user_model.async_get(pk=pk, sk="PROFILE")
+    result = user_model.sync_get(pk=pk, sk="PROFILE")
     assert result is None
 
 
 # ========== as_dict tests ==========
 
 
-def test_get_as_dict_returns_dict(user_model):
+@pytest.mark.asyncio
+async def test_get_as_dict_returns_dict(user_model):
     """Model.get(as_dict=True) returns plain dict."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     # GIVEN an existing item
     user = user_model(pk=pk, sk="PROFILE", name="Alice", age=25)
-    user.save()
+    await user.save()
 
     # WHEN we get with as_dict=True
-    result = user_model.get(pk=pk, sk="PROFILE", as_dict=True)
+    result = await user_model.get(pk=pk, sk="PROFILE", as_dict=True)
 
     # THEN a plain dict is returned
     assert result is not None
@@ -241,42 +252,28 @@ def test_get_as_dict_returns_dict(user_model):
     assert result["age"] == 25
 
 
-def test_get_as_dict_false_returns_model(user_model):
+@pytest.mark.asyncio
+async def test_get_as_dict_false_returns_model(user_model):
     """Model.get(as_dict=False) returns Model instance."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
     user = user_model(pk=pk, sk="PROFILE", name="Bob", age=30)
-    user.save()
+    await user.save()
 
-    result = user_model.get(pk=pk, sk="PROFILE", as_dict=False)
+    result = await user_model.get(pk=pk, sk="PROFILE", as_dict=False)
 
     assert result is not None
     assert isinstance(result, user_model)
     assert result.name == "Bob"
 
 
-def test_get_as_dict_not_found_returns_none(user_model):
+@pytest.mark.asyncio
+async def test_get_as_dict_not_found_returns_none(user_model):
     """Model.get(as_dict=True) returns None when not found."""
     uid = str(uuid.uuid4())
     pk = f"USER#{uid}"
 
-    result = user_model.get(pk=pk, sk="PROFILE", as_dict=True)
+    result = await user_model.get(pk=pk, sk="PROFILE", as_dict=True)
 
     assert result is None
-
-
-@pytest.mark.asyncio
-async def test_async_get_as_dict_returns_dict(user_model):
-    """Model.async_get(as_dict=True) returns plain dict."""
-    uid = str(uuid.uuid4())
-    pk = f"USER#{uid}"
-
-    user = user_model(pk=pk, sk="PROFILE", name="Charlie", age=35)
-    await user.async_save()
-
-    result = await user_model.async_get(pk=pk, sk="PROFILE", as_dict=True)
-
-    assert result is not None
-    assert isinstance(result, dict)
-    assert result["name"] == "Charlie"

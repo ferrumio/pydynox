@@ -233,10 +233,35 @@ impl DynamoDBClient {
             Err(_) => Ok(false),
         }
     }
-    /// Put an item into a DynamoDB table.
+    /// Put an item into a DynamoDB table. Returns a Python awaitable.
     #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
     #[allow(clippy::too_many_arguments)]
-    pub fn put_item(
+    pub fn put_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        item: &Bound<'_, PyDict>,
+        condition_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::put_item(
+            py,
+            self.client.clone(),
+            table,
+            item,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            return_values_on_condition_check_failure,
+        )
+    }
+
+    /// Sync put_item - blocks until complete.
+    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn sync_put_item(
         &self,
         py: Python<'_>,
         table: &str,
@@ -246,7 +271,7 @@ impl DynamoDBClient {
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         return_values_on_condition_check_failure: bool,
     ) -> PyResult<OperationMetrics> {
-        basic_operations::put_item(
+        basic_operations::sync_put_item(
             py,
             &self.client,
             &self.runtime,
@@ -259,7 +284,7 @@ impl DynamoDBClient {
         )
     }
 
-    /// Get an item from a DynamoDB table by its key.
+    /// Get an item from a DynamoDB table by its key. Returns a Python awaitable.
     ///
     /// # Arguments
     ///
@@ -271,9 +296,31 @@ impl DynamoDBClient {
     ///
     /// # Returns
     ///
-    /// Tuple of (item or None, metrics).
+    /// A Python awaitable that resolves to dict with item (or None) and metrics.
     #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None))]
-    pub fn get_item(
+    pub fn get_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key: &Bound<'_, PyDict>,
+        consistent_read: bool,
+        projection: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::get_item(
+            py,
+            self.client.clone(),
+            table,
+            key,
+            consistent_read,
+            projection,
+            expression_attribute_names,
+        )
+    }
+
+    /// Sync get_item - blocks until complete.
+    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None))]
+    pub fn sync_get_item(
         &self,
         py: Python<'_>,
         table: &str,
@@ -282,7 +329,7 @@ impl DynamoDBClient {
         projection: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
-        basic_operations::get_item(
+        basic_operations::sync_get_item(
             py,
             &self.client,
             &self.runtime,
@@ -294,10 +341,35 @@ impl DynamoDBClient {
         )
     }
 
-    /// Delete an item from a DynamoDB table.
+    /// Delete an item from a DynamoDB table. Returns a Python awaitable.
     #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
     #[allow(clippy::too_many_arguments)]
-    pub fn delete_item(
+    pub fn delete_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key: &Bound<'_, PyDict>,
+        condition_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::delete_item(
+            py,
+            self.client.clone(),
+            table,
+            key,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            return_values_on_condition_check_failure,
+        )
+    }
+
+    /// Sync delete_item - blocks until complete.
+    #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn sync_delete_item(
         &self,
         py: Python<'_>,
         table: &str,
@@ -307,7 +379,7 @@ impl DynamoDBClient {
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         return_values_on_condition_check_failure: bool,
     ) -> PyResult<OperationMetrics> {
-        basic_operations::delete_item(
+        basic_operations::sync_delete_item(
             py,
             &self.client,
             &self.runtime,
@@ -320,10 +392,39 @@ impl DynamoDBClient {
         )
     }
 
-    /// Update an item in a DynamoDB table.
+    /// Update an item in a DynamoDB table. Returns a Python awaitable.
     #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
     #[allow(clippy::too_many_arguments)]
-    pub fn update_item(
+    pub fn update_item<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key: &Bound<'_, PyDict>,
+        updates: Option<&Bound<'_, PyDict>>,
+        update_expression: Option<String>,
+        condition_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        return_values_on_condition_check_failure: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::update_item(
+            py,
+            self.client.clone(),
+            table,
+            key,
+            updates,
+            update_expression,
+            condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            return_values_on_condition_check_failure,
+        )
+    }
+
+    /// Sync update_item - blocks until complete.
+    #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn sync_update_item(
         &self,
         py: Python<'_>,
         table: &str,
@@ -335,7 +436,7 @@ impl DynamoDBClient {
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         return_values_on_condition_check_failure: bool,
     ) -> PyResult<OperationMetrics> {
-        basic_operations::update_item(
+        basic_operations::sync_update_item(
             py,
             &self.client,
             &self.runtime,
@@ -350,7 +451,7 @@ impl DynamoDBClient {
         )
     }
 
-    /// Query a single page of items from a DynamoDB table.
+    /// Query a single page of items from a DynamoDB table. Returns a Python awaitable.
     ///
     /// # Arguments
     ///
@@ -368,7 +469,43 @@ impl DynamoDBClient {
     #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
-    pub fn query_page(
+    pub fn query_page<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        key_condition_expression: &str,
+        filter_expression: Option<String>,
+        projection_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        limit: Option<i32>,
+        exclusive_start_key: Option<&Bound<'_, PyDict>>,
+        scan_index_forward: Option<bool>,
+        index_name: Option<String>,
+        consistent_read: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::query(
+            py,
+            self.client.clone(),
+            table,
+            key_condition_expression,
+            filter_expression,
+            projection_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            exclusive_start_key,
+            scan_index_forward,
+            index_name,
+            consistent_read,
+        )
+    }
+
+    /// Sync query_page - blocks until complete.
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::type_complexity)]
+    pub fn sync_query_page(
         &self,
         py: Python<'_>,
         table: &str,
@@ -383,7 +520,7 @@ impl DynamoDBClient {
         index_name: Option<String>,
         consistent_read: bool,
     ) -> PyResult<(Vec<Py<PyAny>>, Option<Py<PyAny>>, OperationMetrics)> {
-        let result = basic_operations::query(
+        let result = basic_operations::sync_query(
             py,
             &self.client,
             &self.runtime,
@@ -402,7 +539,7 @@ impl DynamoDBClient {
         Ok((result.items, result.last_evaluated_key, result.metrics))
     }
 
-    /// Scan a single page of items from a DynamoDB table.
+    /// Scan a single page of items from a DynamoDB table. Returns a Python awaitable.
     ///
     /// # Arguments
     ///
@@ -420,7 +557,43 @@ impl DynamoDBClient {
     #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
-    pub fn scan_page(
+    pub fn scan_page<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        filter_expression: Option<String>,
+        projection_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        limit: Option<i32>,
+        exclusive_start_key: Option<&Bound<'_, PyDict>>,
+        index_name: Option<String>,
+        consistent_read: bool,
+        segment: Option<i32>,
+        total_segments: Option<i32>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::scan(
+            py,
+            self.client.clone(),
+            table,
+            filter_expression,
+            projection_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            limit,
+            exclusive_start_key,
+            index_name,
+            consistent_read,
+            segment,
+            total_segments,
+        )
+    }
+
+    /// Sync scan_page - blocks until complete.
+    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::type_complexity)]
+    pub fn sync_scan_page(
         &self,
         py: Python<'_>,
         table: &str,
@@ -435,7 +608,7 @@ impl DynamoDBClient {
         segment: Option<i32>,
         total_segments: Option<i32>,
     ) -> PyResult<(Vec<Py<PyAny>>, Option<Py<PyAny>>, OperationMetrics)> {
-        let result = basic_operations::scan(
+        let result = basic_operations::sync_scan(
             py,
             &self.client,
             &self.runtime,
@@ -454,10 +627,35 @@ impl DynamoDBClient {
         Ok((result.items, result.last_evaluated_key, result.metrics))
     }
 
-    /// Count items in a DynamoDB table.
+    /// Count items in a DynamoDB table. Returns a Python awaitable.
     #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, index_name=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
-    pub fn count(
+    pub fn count<'py>(
+        &self,
+        py: Python<'py>,
+        table: &str,
+        filter_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        index_name: Option<String>,
+        consistent_read: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        basic_operations::count(
+            py,
+            self.client.clone(),
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            index_name,
+            consistent_read,
+        )
+    }
+
+    /// Sync count - blocks until complete.
+    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, index_name=None, consistent_read=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn sync_count(
         &self,
         py: Python<'_>,
         table: &str,
@@ -467,7 +665,7 @@ impl DynamoDBClient {
         index_name: Option<String>,
         consistent_read: bool,
     ) -> PyResult<(i64, OperationMetrics)> {
-        basic_operations::count(
+        basic_operations::sync_count(
             py,
             &self.client,
             &self.runtime,
@@ -765,205 +963,9 @@ impl DynamoDBClient {
         )
     }
 
-    // ========== ASYNC METHODS ==========
+    // ========== PARALLEL SCAN ==========
 
-    /// Async version of get_item.
-    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None))]
-    pub fn async_get_item<'py>(
-        &self,
-        py: Python<'py>,
-        table: &str,
-        key: &Bound<'_, PyDict>,
-        consistent_read: bool,
-        projection: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_get_item(
-            py,
-            self.client.clone(),
-            table,
-            key,
-            consistent_read,
-            projection,
-            expression_attribute_names,
-        )
-    }
-
-    /// Async version of put_item.
-    #[pyo3(signature = (table, item, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn async_put_item<'py>(
-        &self,
-        py: Python<'py>,
-        table: &str,
-        item: &Bound<'_, PyDict>,
-        condition_expression: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        expression_attribute_values: Option<&Bound<'_, PyDict>>,
-        return_values_on_condition_check_failure: bool,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_put_item(
-            py,
-            self.client.clone(),
-            table,
-            item,
-            condition_expression,
-            expression_attribute_names,
-            expression_attribute_values,
-            return_values_on_condition_check_failure,
-        )
-    }
-
-    /// Async version of delete_item.
-    #[pyo3(signature = (table, key, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn async_delete_item<'py>(
-        &self,
-        py: Python<'py>,
-        table: &str,
-        key: &Bound<'_, PyDict>,
-        condition_expression: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        expression_attribute_values: Option<&Bound<'_, PyDict>>,
-        return_values_on_condition_check_failure: bool,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_delete_item(
-            py,
-            self.client.clone(),
-            table,
-            key,
-            condition_expression,
-            expression_attribute_names,
-            expression_attribute_values,
-            return_values_on_condition_check_failure,
-        )
-    }
-
-    /// Async version of update_item.
-    #[pyo3(signature = (table, key, updates=None, update_expression=None, condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, return_values_on_condition_check_failure=false))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn async_update_item<'py>(
-        &self,
-        py: Python<'py>,
-        table: &str,
-        key: &Bound<'_, PyDict>,
-        updates: Option<&Bound<'_, PyDict>>,
-        update_expression: Option<String>,
-        condition_expression: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        expression_attribute_values: Option<&Bound<'_, PyDict>>,
-        return_values_on_condition_check_failure: bool,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_update_item(
-            py,
-            self.client.clone(),
-            table,
-            key,
-            updates,
-            update_expression,
-            condition_expression,
-            expression_attribute_names,
-            expression_attribute_values,
-            return_values_on_condition_check_failure,
-        )
-    }
-
-    /// Async version of query_page.
-    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn async_query_page<'py>(
-        &self,
-        py: Python<'py>,
-        table: &str,
-        key_condition_expression: &str,
-        filter_expression: Option<String>,
-        projection_expression: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        expression_attribute_values: Option<&Bound<'_, PyDict>>,
-        limit: Option<i32>,
-        exclusive_start_key: Option<&Bound<'_, PyDict>>,
-        scan_index_forward: Option<bool>,
-        index_name: Option<String>,
-        consistent_read: bool,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_query(
-            py,
-            self.client.clone(),
-            table,
-            key_condition_expression,
-            filter_expression,
-            projection_expression,
-            expression_attribute_names,
-            expression_attribute_values,
-            limit,
-            exclusive_start_key,
-            scan_index_forward,
-            index_name,
-            consistent_read,
-        )
-    }
-
-    /// Async version of scan_page.
-    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn async_scan_page<'py>(
-        &self,
-        py: Python<'py>,
-        table: &str,
-        filter_expression: Option<String>,
-        projection_expression: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        expression_attribute_values: Option<&Bound<'_, PyDict>>,
-        limit: Option<i32>,
-        exclusive_start_key: Option<&Bound<'_, PyDict>>,
-        index_name: Option<String>,
-        consistent_read: bool,
-        segment: Option<i32>,
-        total_segments: Option<i32>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_scan(
-            py,
-            self.client.clone(),
-            table,
-            filter_expression,
-            projection_expression,
-            expression_attribute_names,
-            expression_attribute_values,
-            limit,
-            exclusive_start_key,
-            index_name,
-            consistent_read,
-            segment,
-            total_segments,
-        )
-    }
-
-    /// Async version of count.
-    #[pyo3(signature = (table, filter_expression=None, expression_attribute_names=None, expression_attribute_values=None, index_name=None, consistent_read=false))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn async_count<'py>(
-        &self,
-        py: Python<'py>,
-        table: &str,
-        filter_expression: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        expression_attribute_values: Option<&Bound<'_, PyDict>>,
-        index_name: Option<String>,
-        consistent_read: bool,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_count(
-            py,
-            self.client.clone(),
-            table,
-            filter_expression,
-            expression_attribute_names,
-            expression_attribute_values,
-            index_name,
-            consistent_read,
-        )
-    }
-
-    /// Parallel scan - runs multiple segment scans concurrently.
+    /// Parallel scan - runs multiple segment scans concurrently. Returns a Python awaitable.
     ///
     /// This is much faster than regular scan for large tables.
     /// Each segment is scanned in parallel using tokio tasks.
@@ -980,38 +982,10 @@ impl DynamoDBClient {
     ///
     /// # Returns
     ///
-    /// Tuple of (items, metrics) where items is a list of all scanned items.
+    /// A Python awaitable that resolves to dict with items and metrics.
     #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
     #[allow(clippy::too_many_arguments)]
-    pub fn parallel_scan(
-        &self,
-        py: Python<'_>,
-        table: &str,
-        total_segments: i32,
-        filter_expression: Option<String>,
-        projection_expression: Option<String>,
-        expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        expression_attribute_values: Option<&Bound<'_, PyDict>>,
-        consistent_read: bool,
-    ) -> PyResult<(Vec<Py<PyAny>>, OperationMetrics)> {
-        basic_operations::parallel_scan(
-            py,
-            &self.client,
-            &self.runtime,
-            table,
-            total_segments,
-            filter_expression,
-            projection_expression,
-            expression_attribute_names,
-            expression_attribute_values,
-            consistent_read,
-        )
-    }
-
-    /// Async version of parallel_scan.
-    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn async_parallel_scan<'py>(
+    pub fn parallel_scan<'py>(
         &self,
         py: Python<'py>,
         table: &str,
@@ -1022,9 +996,37 @@ impl DynamoDBClient {
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         consistent_read: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_parallel_scan(
+        basic_operations::parallel_scan(
             py,
             self.client.clone(),
+            table,
+            total_segments,
+            filter_expression,
+            projection_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            consistent_read,
+        )
+    }
+
+    /// Sync parallel_scan - blocks until all segments complete.
+    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
+    #[allow(clippy::too_many_arguments)]
+    pub fn sync_parallel_scan(
+        &self,
+        py: Python<'_>,
+        table: &str,
+        total_segments: i32,
+        filter_expression: Option<String>,
+        projection_expression: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, PyDict>>,
+        expression_attribute_values: Option<&Bound<'_, PyDict>>,
+        consistent_read: bool,
+    ) -> PyResult<(Vec<Py<PyAny>>, OperationMetrics)> {
+        basic_operations::sync_parallel_scan(
+            py,
+            &self.client,
+            &self.runtime,
             table,
             total_segments,
             filter_expression,
@@ -1037,30 +1039,9 @@ impl DynamoDBClient {
 
     // ========== PARTIQL OPERATIONS ==========
 
-    /// Execute a PartiQL statement.
+    /// Execute a PartiQL statement. Returns a Python awaitable.
     #[pyo3(signature = (statement, parameters=None, consistent_read=false, next_token=None))]
-    pub fn execute_statement(
-        &self,
-        py: Python<'_>,
-        statement: &str,
-        parameters: Option<&Bound<'_, pyo3::types::PyList>>,
-        consistent_read: bool,
-        next_token: Option<String>,
-    ) -> PyResult<(Vec<Py<PyAny>>, Option<String>, OperationMetrics)> {
-        basic_operations::execute_statement(
-            py,
-            &self.client,
-            &self.runtime,
-            statement,
-            parameters,
-            consistent_read,
-            next_token,
-        )
-    }
-
-    /// Async version of execute_statement.
-    #[pyo3(signature = (statement, parameters=None, consistent_read=false, next_token=None))]
-    pub fn async_execute_statement<'py>(
+    pub fn execute_statement<'py>(
         &self,
         py: Python<'py>,
         statement: &str,
@@ -1068,10 +1049,31 @@ impl DynamoDBClient {
         consistent_read: bool,
         next_token: Option<String>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        basic_operations::async_execute_statement(
+        basic_operations::execute_statement(
             py,
             self.client.clone(),
             statement.to_string(),
+            parameters,
+            consistent_read,
+            next_token,
+        )
+    }
+
+    /// Sync execute_statement - blocks until complete.
+    #[pyo3(signature = (statement, parameters=None, consistent_read=false, next_token=None))]
+    pub fn sync_execute_statement(
+        &self,
+        py: Python<'_>,
+        statement: &str,
+        parameters: Option<&Bound<'_, pyo3::types::PyList>>,
+        consistent_read: bool,
+        next_token: Option<String>,
+    ) -> PyResult<(Vec<Py<PyAny>>, Option<String>, OperationMetrics)> {
+        basic_operations::sync_execute_statement(
+            py,
+            &self.client,
+            &self.runtime,
+            statement,
             parameters,
             consistent_read,
             next_token,

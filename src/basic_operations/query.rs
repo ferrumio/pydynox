@@ -202,7 +202,7 @@ fn raw_to_py_result(py: Python<'_>, raw: RawQueryResult) -> PyResult<QueryResult
 
 /// Sync query - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn query(
+pub fn sync_query(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -241,9 +241,9 @@ pub fn query(
     }
 }
 
-/// Async query - returns a Python awaitable.
+/// Async query - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_query<'py>(
+pub fn query<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,

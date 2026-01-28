@@ -49,7 +49,8 @@ def test_client_with_all_config_options(dynamodb_endpoint):
     assert client.get_region() == "us-east-1"
 
 
-def test_client_operations_with_timeouts(dynamodb_endpoint):
+@pytest.mark.asyncio
+async def test_client_operations_with_timeouts(dynamodb_endpoint):
     """Test that operations work with timeout configuration."""
     # GIVEN a client with timeout settings
     client = DynamoDBClient(
@@ -72,15 +73,15 @@ def test_client_operations_with_timeouts(dynamodb_endpoint):
         )
 
     # WHEN we do put_item and get_item
-    client.put_item(table_name, {"pk": "CONFIG#1", "sk": "TEST", "data": "value"})
-    result = client.get_item(table_name, {"pk": "CONFIG#1", "sk": "TEST"})
+    await client.put_item(table_name, {"pk": "CONFIG#1", "sk": "TEST", "data": "value"})
+    result = await client.get_item(table_name, {"pk": "CONFIG#1", "sk": "TEST"})
 
     # THEN operations succeed
     assert result is not None
     assert result["data"] == "value"
 
     # Cleanup
-    client.delete_item(table_name, {"pk": "CONFIG#1", "sk": "TEST"})
+    await client.delete_item(table_name, {"pk": "CONFIG#1", "sk": "TEST"})
 
 
 @pytest.mark.parametrize(

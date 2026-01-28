@@ -15,18 +15,19 @@ def populated_table(dynamo):
         {"pk": "USER#2", "sk": "ORDER#001", "total": 75, "status": "shipped"},
     ]
     for item in items:
-        dynamo.put_item("test_table", item)
+        dynamo.sync_put_item("test_table", item)
     return dynamo
 
 
-def test_query_by_partition_key(populated_table):
+@pytest.mark.asyncio
+async def test_query_by_partition_key(populated_table):
     """Test querying items by partition key only."""
     # GIVEN a populated table
     dynamo = populated_table
 
     # WHEN querying by partition key
     count = 0
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
@@ -39,14 +40,15 @@ def test_query_by_partition_key(populated_table):
     assert count == 4
 
 
-def test_query_with_sort_key_begins_with(populated_table):
+@pytest.mark.asyncio
+async def test_query_with_sort_key_begins_with(populated_table):
     """Test querying with begins_with on sort key."""
     # GIVEN a populated table
     dynamo = populated_table
 
     # WHEN querying with begins_with on sk
     count = 0
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk AND begins_with(#sk, :prefix)",
         expression_attribute_names={"#pk": "pk", "#sk": "sk"},
@@ -59,14 +61,15 @@ def test_query_with_sort_key_begins_with(populated_table):
     assert count == 3
 
 
-def test_query_with_filter_expression(populated_table):
+@pytest.mark.asyncio
+async def test_query_with_filter_expression(populated_table):
     """Test querying with a filter expression."""
     # GIVEN a populated table
     dynamo = populated_table
 
     # WHEN querying with a filter
     count = 0
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         filter_expression="#status = :status",
@@ -80,14 +83,15 @@ def test_query_with_filter_expression(populated_table):
     assert count == 2
 
 
-def test_query_with_limit(populated_table):
+@pytest.mark.asyncio
+async def test_query_with_limit(populated_table):
     """Test querying with a limit returns exactly that many items."""
     # GIVEN a populated table with 4 items for USER#1
     dynamo = populated_table
 
     # WHEN querying with limit=2
     count = 0
-    for _ in dynamo.query(
+    async for _ in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
@@ -100,14 +104,15 @@ def test_query_with_limit(populated_table):
     assert count == 2
 
 
-def test_query_descending_order(populated_table):
+@pytest.mark.asyncio
+async def test_query_descending_order(populated_table):
     """Test querying in descending order."""
     # GIVEN a populated table
     dynamo = populated_table
 
     # WHEN querying in ascending order
     asc_keys = []
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk AND begins_with(#sk, :prefix)",
         expression_attribute_names={"#pk": "pk", "#sk": "sk"},
@@ -118,7 +123,7 @@ def test_query_descending_order(populated_table):
 
     # AND querying in descending order
     desc_keys = []
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk AND begins_with(#sk, :prefix)",
         expression_attribute_names={"#pk": "pk", "#sk": "sk"},
@@ -131,7 +136,8 @@ def test_query_descending_order(populated_table):
     assert asc_keys == list(reversed(desc_keys))
 
 
-def test_query_empty_result(populated_table):
+@pytest.mark.asyncio
+async def test_query_empty_result(populated_table):
     """Test querying with no matching items."""
     # GIVEN a populated table
     dynamo = populated_table
@@ -145,7 +151,7 @@ def test_query_empty_result(populated_table):
     )
 
     count = 0
-    for _ in results:
+    async for _ in results:
         count += 1
 
     # THEN no items are returned
@@ -153,7 +159,8 @@ def test_query_empty_result(populated_table):
     assert results.last_evaluated_key is None
 
 
-def test_query_result_has_last_evaluated_key(populated_table):
+@pytest.mark.asyncio
+async def test_query_result_has_last_evaluated_key(populated_table):
     """Test that query result has last_evaluated_key attribute."""
     # GIVEN a populated table
     dynamo = populated_table
@@ -169,7 +176,7 @@ def test_query_result_has_last_evaluated_key(populated_table):
     # THEN result has last_evaluated_key attribute
     assert hasattr(result, "last_evaluated_key")
 
-    for _ in result:
+    async for _ in result:
         pass
 
     # AND after consuming all, no more pages
@@ -180,21 +187,22 @@ def test_query_result_has_last_evaluated_key(populated_table):
 def large_table(dynamo):
     """Create a table with many items for pagination tests."""
     for i in range(15):
-        dynamo.put_item(
+        dynamo.sync_put_item(
             "test_table",
             {"pk": "USER#LARGE", "sk": f"ITEM#{i:03d}", "value": i},
         )
     return dynamo
 
 
-def test_query_automatic_pagination(large_table):
+@pytest.mark.asyncio
+async def test_query_automatic_pagination(large_table):
     """Test that iterator automatically paginates when no limit is set."""
     # GIVEN a table with 15 items
     dynamo = large_table
 
     # WHEN querying without limit
     sort_keys = []
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
@@ -207,7 +215,8 @@ def test_query_automatic_pagination(large_table):
     assert sort_keys == sorted(sort_keys)
 
 
-def test_query_manual_pagination(large_table):
+@pytest.mark.asyncio
+async def test_query_manual_pagination(large_table):
     """Test manual pagination using last_evaluated_key."""
     # GIVEN a table with 15 items
     dynamo = large_table
@@ -222,7 +231,7 @@ def test_query_manual_pagination(large_table):
         page_size=4,
     )
 
-    for item in results:
+    async for item in results:
         all_items.append(item)
         if len(all_items) == 4:
             break
@@ -231,7 +240,7 @@ def test_query_manual_pagination(large_table):
     assert results.last_evaluated_key is not None
 
     # AND continuing from last_evaluated_key gets remaining items
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
@@ -243,14 +252,15 @@ def test_query_manual_pagination(large_table):
     assert len(all_items) == 15
 
 
-def test_query_eventually_consistent(populated_table):
+@pytest.mark.asyncio
+async def test_query_eventually_consistent(populated_table):
     """Test query with eventually consistent read (default)."""
     # GIVEN a populated table
     dynamo = populated_table
 
     # WHEN querying with default consistency
     count = 0
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
@@ -263,14 +273,15 @@ def test_query_eventually_consistent(populated_table):
     assert count == 4
 
 
-def test_query_strongly_consistent(populated_table):
+@pytest.mark.asyncio
+async def test_query_strongly_consistent(populated_table):
     """Test query with strongly consistent read."""
     # GIVEN a populated table
     dynamo = populated_table
 
     # WHEN querying with consistent_read=True
     count = 0
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
@@ -284,7 +295,8 @@ def test_query_strongly_consistent(populated_table):
     assert count == 4
 
 
-def test_query_consistent_read_empty_result(populated_table):
+@pytest.mark.asyncio
+async def test_query_consistent_read_empty_result(populated_table):
     """Test query with consistent_read returns empty for non-existent partition."""
     # GIVEN a populated table
     dynamo = populated_table
@@ -299,21 +311,22 @@ def test_query_consistent_read_empty_result(populated_table):
     )
 
     count = 0
-    for _ in results:
+    async for _ in results:
         count += 1
 
     # THEN no items are returned
     assert count == 0
 
 
-def test_query_consistent_read_with_filter(populated_table):
+@pytest.mark.asyncio
+async def test_query_consistent_read_with_filter(populated_table):
     """Test query with consistent_read and filter expression."""
     # GIVEN a populated table
     dynamo = populated_table
 
     # WHEN querying with consistent_read and filter
     count = 0
-    for item in dynamo.query(
+    async for item in dynamo.query(
         "test_table",
         key_condition_expression="#pk = :pk",
         filter_expression="#status = :status",

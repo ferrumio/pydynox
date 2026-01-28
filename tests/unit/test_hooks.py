@@ -1,6 +1,6 @@
 """Tests for lifecycle hooks."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydynox import Model, ModelConfig, clear_default_client
@@ -27,8 +27,14 @@ def reset_state():
 
 @pytest.fixture
 def mock_client():
-    """Create a mock DynamoDB client."""
-    return MagicMock()
+    """Create a mock DynamoDB client with async methods."""
+    client = MagicMock()
+    client._client = MagicMock()
+    # Async methods
+    client.put_item = AsyncMock()
+    client.delete_item = AsyncMock()
+    client.update_item = AsyncMock(return_value={})
+    return client
 
 
 def test_hook_decorator_sets_hook_type():
@@ -112,7 +118,8 @@ def test_model_inherits_hooks(mock_client):
     assert len(User._hooks[HookType.BEFORE_SAVE]) == 2
 
 
-def test_before_save_hook_runs(mock_client):
+@pytest.mark.asyncio
+async def test_before_save_hook_runs(mock_client):
     """Test that before_save hook runs before save."""
     # GIVEN a model with a before_save hook that logs calls
     call_order = []
@@ -130,14 +137,15 @@ def test_before_save_hook_runs(mock_client):
     user = User(pk="USER#1")
 
     # WHEN we save
-    user.save()
+    await user.save()
 
     # THEN before_save should have been called
     assert "before_save" in call_order
     mock_client.put_item.assert_called_once()
 
 
-def test_after_save_hook_runs(mock_client):
+@pytest.mark.asyncio
+async def test_after_save_hook_runs(mock_client):
     """Test that after_save hook runs after save."""
     # GIVEN a model with an after_save hook
     call_order = []
@@ -155,13 +163,14 @@ def test_after_save_hook_runs(mock_client):
     user = User(pk="USER#1")
 
     # WHEN we save
-    user.save()
+    await user.save()
 
     # THEN after_save should have been called
     assert "after_save" in call_order
 
 
-def test_skip_hooks_on_save(mock_client):
+@pytest.mark.asyncio
+async def test_skip_hooks_on_save(mock_client):
     """Test that skip_hooks=True skips hooks."""
     # GIVEN a model with a before_save hook
     hook_called = []
@@ -179,14 +188,15 @@ def test_skip_hooks_on_save(mock_client):
     user = User(pk="USER#1")
 
     # WHEN we save with skip_hooks=True
-    user.save(skip_hooks=True)
+    await user.save(skip_hooks=True)
 
     # THEN hook should not be called, but save should happen
     assert len(hook_called) == 0
     mock_client.put_item.assert_called_once()
 
 
-def test_model_config_skip_hooks_default(mock_client):
+@pytest.mark.asyncio
+async def test_model_config_skip_hooks_default(mock_client):
     """Test that model_config.skip_hooks=True skips hooks by default."""
     # GIVEN a model with skip_hooks=True in config
     hook_called = []
@@ -204,13 +214,14 @@ def test_model_config_skip_hooks_default(mock_client):
     item = BulkModel(pk="ITEM#1")
 
     # WHEN we save without specifying skip_hooks
-    item.save()
+    await item.save()
 
     # THEN hook should not be called
     assert len(hook_called) == 0
 
 
-def test_model_config_skip_hooks_override(mock_client):
+@pytest.mark.asyncio
+async def test_model_config_skip_hooks_override(mock_client):
     """Test that skip_hooks=False overrides model_config.skip_hooks=True."""
     # GIVEN a model with skip_hooks=True in config
     hook_called = []
@@ -228,13 +239,14 @@ def test_model_config_skip_hooks_override(mock_client):
     item = BulkModel(pk="ITEM#1")
 
     # WHEN we save with skip_hooks=False
-    item.save(skip_hooks=False)
+    await item.save(skip_hooks=False)
 
     # THEN hook should be called
     assert len(hook_called) == 1
 
 
-def test_before_delete_hook_runs(mock_client):
+@pytest.mark.asyncio
+async def test_before_delete_hook_runs(mock_client):
     """Test that before_delete hook runs."""
     # GIVEN a model with a before_delete hook
     hook_called = []
@@ -252,13 +264,14 @@ def test_before_delete_hook_runs(mock_client):
     user = User(pk="USER#1")
 
     # WHEN we delete
-    user.delete()
+    await user.delete()
 
     # THEN before_delete should have been called
     assert "before_delete" in hook_called
 
 
-def test_before_update_hook_runs(mock_client):
+@pytest.mark.asyncio
+async def test_before_update_hook_runs(mock_client):
     """Test that before_update hook runs."""
     # GIVEN a model with a before_update hook
     hook_called = []
@@ -277,13 +290,14 @@ def test_before_update_hook_runs(mock_client):
     user = User(pk="USER#1", name="John")
 
     # WHEN we update
-    user.update(name="Jane")
+    await user.update(name="Jane")
 
     # THEN before_update should have been called
     assert "before_update" in hook_called
 
 
-def test_hook_can_raise_exception(mock_client):
+@pytest.mark.asyncio
+async def test_hook_can_raise_exception(mock_client):
     """Test that hooks can raise exceptions to stop operation."""
 
     # GIVEN a model with a validating hook that raises on invalid email
@@ -304,13 +318,14 @@ def test_hook_can_raise_exception(mock_client):
     # WHEN we try to save with invalid email
     # THEN ValueError should be raised
     with pytest.raises(ValueError, match="Invalid email domain"):
-        user.save()
+        await user.save()
 
     # AND put_item should not be called
     mock_client.put_item.assert_not_called()
 
 
-def test_multiple_hooks_run_in_order(mock_client):
+@pytest.mark.asyncio
+async def test_multiple_hooks_run_in_order(mock_client):
     """Test that multiple hooks run in definition order."""
     # GIVEN a model with multiple before_save hooks
     call_order = []
@@ -332,7 +347,7 @@ def test_multiple_hooks_run_in_order(mock_client):
     user = User(pk="USER#1")
 
     # WHEN we save
-    user.save()
+    await user.save()
 
     # THEN hooks should run in definition order
     assert call_order == ["first", "second"]

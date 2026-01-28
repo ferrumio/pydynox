@@ -69,19 +69,19 @@ def seeded_table(pagination_table: DynamoDBClient):
             "status": "active",
             "age": 20 + i,
         }
-        pagination_table.put_item(TABLE_NAME, item)
+        pagination_table.sync_put_item(TABLE_NAME, item)
     yield pagination_table
 
 
-# ========== Model async_query pagination ==========
+# ========== Model query pagination ==========
 
 
 @pytest.mark.asyncio
-async def test_async_query_last_evaluated_key(seeded_table: DynamoDBClient):
-    """Test that async_query exposes last_evaluated_key for pagination."""
+async def test_query_last_evaluated_key(seeded_table: DynamoDBClient):
+    """Test that query exposes last_evaluated_key for pagination."""
     # GIVEN a table with 25 items
     # WHEN we query with page_size=10
-    result = PaginationUser.async_query(
+    result = PaginationUser.query(
         hash_key="USER#pagination",
         page_size=10,
     )
@@ -99,7 +99,7 @@ async def test_async_query_last_evaluated_key(seeded_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_query_manual_pagination(seeded_table: DynamoDBClient):
+async def test_query_manual_pagination(seeded_table: DynamoDBClient):
     """Test manual pagination using last_evaluated_key."""
     # GIVEN a table with 25 items
     all_items = []
@@ -107,7 +107,7 @@ async def test_async_query_manual_pagination(seeded_table: DynamoDBClient):
 
     # WHEN we paginate manually
     while True:
-        result = PaginationUser.async_query(
+        result = PaginationUser.query(
             hash_key="USER#pagination",
             page_size=10,
             last_evaluated_key=last_key,
@@ -125,11 +125,11 @@ async def test_async_query_manual_pagination(seeded_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_query_collect(seeded_table: DynamoDBClient):
-    """Test collecting all items from async_query."""
+async def test_query_collect(seeded_table: DynamoDBClient):
+    """Test collecting all items from query."""
     # GIVEN a table with 25 items
     # WHEN we collect all items
-    result = PaginationUser.async_query(hash_key="USER#pagination")
+    result = PaginationUser.query(hash_key="USER#pagination")
     all_items = []
     async for user in result:
         all_items.append(user)
@@ -138,15 +138,15 @@ async def test_async_query_collect(seeded_table: DynamoDBClient):
     assert len(all_items) == 25
 
 
-# ========== Model async_scan pagination ==========
+# ========== Model scan pagination ==========
 
 
 @pytest.mark.asyncio
-async def test_async_scan_last_evaluated_key(seeded_table: DynamoDBClient):
-    """Test that async_scan exposes last_evaluated_key for pagination."""
+async def test_scan_last_evaluated_key(seeded_table: DynamoDBClient):
+    """Test that scan exposes last_evaluated_key for pagination."""
     # GIVEN a table with items
     # WHEN we scan with page_size=10
-    result = PaginationUser.async_scan(page_size=10)
+    result = PaginationUser.scan(page_size=10)
 
     # Consume first page
     first_page = []
@@ -161,7 +161,7 @@ async def test_async_scan_last_evaluated_key(seeded_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_scan_manual_pagination(seeded_table: DynamoDBClient):
+async def test_scan_manual_pagination(seeded_table: DynamoDBClient):
     """Test manual scan pagination using last_evaluated_key."""
     # GIVEN a table with items
     all_items = []
@@ -169,7 +169,7 @@ async def test_async_scan_manual_pagination(seeded_table: DynamoDBClient):
 
     # WHEN we paginate manually
     while True:
-        result = PaginationUser.async_scan(
+        result = PaginationUser.scan(
             page_size=10,
             last_evaluated_key=last_key,
         )
@@ -189,11 +189,11 @@ async def test_async_scan_manual_pagination(seeded_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_gsi_query_last_evaluated_key(seeded_table: DynamoDBClient):
-    """Test that GSI async_query exposes last_evaluated_key."""
+async def test_gsi_query_last_evaluated_key(seeded_table: DynamoDBClient):
+    """Test that GSI query exposes last_evaluated_key."""
     # GIVEN a table with 25 active users
     # WHEN we query the GSI with page_size=10
-    result = PaginationUser.status_index.async_query(
+    result = PaginationUser.status_index.query(
         status="active",
         page_size=10,
     )
@@ -211,7 +211,7 @@ async def test_async_gsi_query_last_evaluated_key(seeded_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_gsi_query_manual_pagination(seeded_table: DynamoDBClient):
+async def test_gsi_query_manual_pagination(seeded_table: DynamoDBClient):
     """Test GSI manual pagination using last_evaluated_key."""
     # GIVEN a table with 25 active users
     all_items = []
@@ -219,7 +219,7 @@ async def test_async_gsi_query_manual_pagination(seeded_table: DynamoDBClient):
 
     # WHEN we paginate manually through GSI
     while True:
-        result = PaginationUser.status_index.async_query(
+        result = PaginationUser.status_index.query(
             status="active",
             page_size=10,
             last_evaluated_key=last_key,
@@ -240,11 +240,11 @@ async def test_async_gsi_query_manual_pagination(seeded_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_lsi_query_last_evaluated_key(seeded_table: DynamoDBClient):
-    """Test that LSI async_query exposes last_evaluated_key."""
+async def test_lsi_query_last_evaluated_key(seeded_table: DynamoDBClient):
+    """Test that LSI query exposes last_evaluated_key."""
     # GIVEN a table with 25 users
     # WHEN we query the LSI with page_size=10
-    result = PaginationUser.age_index.async_query(
+    result = PaginationUser.age_index.query(
         pk="USER#pagination",
         page_size=10,
     )
@@ -262,7 +262,7 @@ async def test_async_lsi_query_last_evaluated_key(seeded_table: DynamoDBClient):
 
 
 @pytest.mark.asyncio
-async def test_async_lsi_query_manual_pagination(seeded_table: DynamoDBClient):
+async def test_lsi_query_manual_pagination(seeded_table: DynamoDBClient):
     """Test LSI manual pagination using last_evaluated_key."""
     # GIVEN a table with 25 users
     all_items = []
@@ -270,7 +270,7 @@ async def test_async_lsi_query_manual_pagination(seeded_table: DynamoDBClient):
 
     # WHEN we paginate manually through LSI
     while True:
-        result = PaginationUser.age_index.async_query(
+        result = PaginationUser.age_index.query(
             pk="USER#pagination",
             page_size=10,
             last_evaluated_key=last_key,

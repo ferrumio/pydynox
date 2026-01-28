@@ -14,7 +14,7 @@ class ScanOperations:
 
     # ========== SCAN ==========
 
-    def scan(
+    def sync_scan(
         self,
         table: str,
         filter_expression: str | None = None,
@@ -29,7 +29,7 @@ class ScanOperations:
         segment: int | None = None,
         total_segments: int | None = None,
     ) -> ScanResult:
-        """Scan items from a DynamoDB table.
+        """Scan items from a DynamoDB table (sync).
 
         Args:
             table: Table name.
@@ -65,7 +65,7 @@ class ScanOperations:
             total_segments=total_segments,
         )
 
-    def async_scan(
+    def scan(
         self,
         table: str,
         filter_expression: str | None = None,
@@ -80,7 +80,7 @@ class ScanOperations:
         segment: int | None = None,
         total_segments: int | None = None,
     ) -> AsyncScanResult:
-        """Async scan items from a DynamoDB table.
+        """Scan items from a DynamoDB table (async).
 
         Args:
             table: Table name.
@@ -118,7 +118,7 @@ class ScanOperations:
 
     # ========== COUNT ==========
 
-    def count(
+    def sync_count(
         self,
         table: str,
         filter_expression: str | None = None,
@@ -127,8 +127,8 @@ class ScanOperations:
         index_name: str | None = None,
         consistent_read: bool = False,
     ) -> tuple[int, OperationMetrics]:
-        """Count items in a DynamoDB table."""
-        count, metrics = self._client.count(  # type: ignore[attr-defined]
+        """Count items in a DynamoDB table (sync)."""
+        count, metrics = self._client.sync_count(  # type: ignore[attr-defined]
             table,
             filter_expression=filter_expression,
             expression_attribute_names=expression_attribute_names,
@@ -139,7 +139,7 @@ class ScanOperations:
         _log_operation("count", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         return count, metrics
 
-    async def async_count(
+    async def count(
         self,
         table: str,
         filter_expression: str | None = None,
@@ -148,8 +148,8 @@ class ScanOperations:
         index_name: str | None = None,
         consistent_read: bool = False,
     ) -> tuple[int, OperationMetrics]:
-        """Async count items in a DynamoDB table."""
-        result = await self._client.async_count(  # type: ignore[attr-defined]
+        """Count items in a DynamoDB table (async)."""
+        result = await self._client.count(  # type: ignore[attr-defined]
             table,
             filter_expression=filter_expression,
             expression_attribute_names=expression_attribute_names,
@@ -164,7 +164,7 @@ class ScanOperations:
 
     # ========== PARALLEL SCAN ==========
 
-    def parallel_scan(
+    def sync_parallel_scan(
         self,
         table: str,
         total_segments: int,
@@ -174,7 +174,7 @@ class ScanOperations:
         expression_attribute_values: dict[str, Any] | None = None,
         consistent_read: bool = False,
     ) -> tuple[list[dict[str, Any]], OperationMetrics]:
-        """Parallel scan - runs multiple segment scans concurrently.
+        """Parallel scan - runs multiple segment scans concurrently (sync).
 
         Much faster than regular scan for large tables. Each segment is
         scanned in parallel using tokio tasks in Rust.
@@ -192,10 +192,10 @@ class ScanOperations:
             Tuple of (items, metrics) where items is a list of all scanned items.
 
         Example:
-            >>> items, metrics = client.parallel_scan("users", total_segments=4)
+            >>> items, metrics = client.sync_parallel_scan("users", total_segments=4)
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
-        items, metrics = self._client.parallel_scan(  # type: ignore[attr-defined]
+        items, metrics = self._client.sync_parallel_scan(  # type: ignore[attr-defined]
             table,
             total_segments,
             filter_expression=filter_expression,
@@ -209,7 +209,7 @@ class ScanOperations:
         )
         return items, metrics
 
-    async def async_parallel_scan(
+    async def parallel_scan(
         self,
         table: str,
         total_segments: int,
@@ -219,7 +219,7 @@ class ScanOperations:
         expression_attribute_values: dict[str, Any] | None = None,
         consistent_read: bool = False,
     ) -> tuple[list[dict[str, Any]], OperationMetrics]:
-        """Async parallel scan - runs multiple segment scans concurrently.
+        """Parallel scan - runs multiple segment scans concurrently (async).
 
         Much faster than regular scan for large tables. Each segment is
         scanned in parallel using tokio tasks in Rust.
@@ -237,10 +237,10 @@ class ScanOperations:
             Tuple of (items, metrics) where items is a list of all scanned items.
 
         Example:
-            >>> items, metrics = await client.async_parallel_scan("users", total_segments=4)
+            >>> items, metrics = await client.parallel_scan("users", total_segments=4)
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
-        result = await self._client.async_parallel_scan(  # type: ignore[attr-defined]
+        result = await self._client.parallel_scan(  # type: ignore[attr-defined]
             table,
             total_segments,
             filter_expression=filter_expression,

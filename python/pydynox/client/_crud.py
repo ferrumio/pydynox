@@ -73,7 +73,7 @@ class CrudOperations:
 
     # ========== PUT ==========
 
-    def put_item(
+    async def put_item(
         self,
         table: str,
         item: dict[str, Any],
@@ -82,7 +82,54 @@ class CrudOperations:
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Put an item into a DynamoDB table.
+        """Put an item into a DynamoDB table (async).
+
+        Args:
+            table: Table name.
+            item: Item to put.
+            condition_expression: Condition that must be true for the write.
+            expression_attribute_names: Attribute name placeholders.
+            expression_attribute_values: Attribute value placeholders.
+            return_values_on_condition_check_failure: If True and condition fails,
+                the ConditionalCheckFailedException will have an 'item' attribute.
+
+        Returns:
+            Operation metrics.
+        """
+        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(item)
+        if pk:
+            self._record_write(table, pk)  # type: ignore[attr-defined]
+
+        with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            metrics = await self._client.put_item(  # type: ignore[attr-defined]
+                table,
+                item,
+                condition_expression=condition_expression,
+                expression_attribute_names=expression_attribute_names,
+                expression_attribute_values=expression_attribute_values,
+                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
+            )
+            add_response_attributes(
+                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
+            )
+
+        _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        self._record_metrics(metrics, "put")
+        return metrics
+
+    def sync_put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+    ) -> OperationMetrics:
+        """Put an item into a DynamoDB table (sync).
 
         Args:
             table: Table name.
@@ -108,54 +155,7 @@ class CrudOperations:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
         with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = self._client.put_item(  # type: ignore[attr-defined]
-                table,
-                item,
-                condition_expression=condition_expression,
-                expression_attribute_names=expression_attribute_names,
-                expression_attribute_values=expression_attribute_values,
-                return_values_on_condition_check_failure=return_values_on_condition_check_failure,
-            )
-            add_response_attributes(
-                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
-            )
-
-        _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
-        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
-            _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        self._record_metrics(metrics, "put")
-        return metrics
-
-    async def async_put_item(
-        self,
-        table: str,
-        item: dict[str, Any],
-        condition_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        return_values_on_condition_check_failure: bool = False,
-    ) -> OperationMetrics:
-        """Async version of put_item.
-
-        Args:
-            table: Table name.
-            item: Item to put.
-            condition_expression: Condition that must be true for the write.
-            expression_attribute_names: Attribute name placeholders.
-            expression_attribute_values: Attribute value placeholders.
-            return_values_on_condition_check_failure: If True and condition fails,
-                the ConditionalCheckFailedException will have an 'item' attribute.
-
-        Returns:
-            Operation metrics.
-        """
-        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
-        pk = _extract_pk(item)
-        if pk:
-            self._record_write(table, pk)  # type: ignore[attr-defined]
-
-        with trace_operation("async_put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = await self._client.async_put_item(  # type: ignore[attr-defined]
+            metrics = self._client.sync_put_item(  # type: ignore[attr-defined]
                 table,
                 item,
                 condition_expression=condition_expression,
@@ -175,62 +175,14 @@ class CrudOperations:
 
     # ========== GET ==========
 
-    def get_item(
+    async def get_item(
         self,
         table: str,
         key: dict[str, Any],
         consistent_read: bool = False,
         projection: list[str] | None = None,
     ) -> dict[str, Any] | None:
-        """Get an item from a DynamoDB table by its key.
-
-        Args:
-            table: Table name.
-            key: Key attributes as a dict.
-            consistent_read: Use strongly consistent read.
-            projection: List of attributes to return. Saves RCU by fetching only
-                what you need. Use dot notation for nested: ["name", "address.city"].
-
-        Returns:
-            The item as a dict, or None if not found.
-
-        Example:
-            >>> item = client.get_item("users", {"pk": "USER#1"}, projection=["name", "email"])
-        """
-        self._acquire_rcu(1.0)  # type: ignore[attr-defined]
-        pk = _extract_pk(key)
-        if pk:
-            self._record_read(table, pk)  # type: ignore[attr-defined]
-
-        # Build projection expression
-        projection_expr, attr_names = _build_projection(projection)
-
-        with trace_operation("get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result, metrics = self._client.get_item(  # type: ignore[attr-defined]
-                table,
-                key,
-                consistent_read=consistent_read,
-                projection=projection_expr,
-                expression_attribute_names=attr_names,
-            )
-            add_response_attributes(
-                span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
-            )
-
-        self._record_metrics(metrics, "get")
-        _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
-        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
-            _log_warning("get_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
-        return result
-
-    async def async_get_item(
-        self,
-        table: str,
-        key: dict[str, Any],
-        consistent_read: bool = False,
-        projection: list[str] | None = None,
-    ) -> dict[str, Any] | None:
-        """Async version of get_item.
+        """Get an item from a DynamoDB table by its key (async).
 
         Args:
             table: Table name.
@@ -249,8 +201,8 @@ class CrudOperations:
         # Build projection expression
         projection_expr, attr_names = _build_projection(projection)
 
-        with trace_operation("async_get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result = await self._client.async_get_item(  # type: ignore[attr-defined]
+        with trace_operation("get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            result = await self._client.get_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 consistent_read=consistent_read,
@@ -268,9 +220,57 @@ class CrudOperations:
         self._record_metrics(metrics, "get")
         return result["item"]
 
+    def sync_get_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        projection: list[str] | None = None,
+    ) -> dict[str, Any] | None:
+        """Get an item from a DynamoDB table by its key (sync).
+
+        Args:
+            table: Table name.
+            key: Key attributes as a dict.
+            consistent_read: Use strongly consistent read.
+            projection: List of attributes to return. Saves RCU by fetching only
+                what you need. Use dot notation for nested: ["name", "address.city"].
+
+        Returns:
+            The item as a dict, or None if not found.
+
+        Example:
+            >>> item = client.sync_get_item("users", {"pk": "USER#1"}, projection=["name", "email"])
+        """
+        self._acquire_rcu(1.0)  # type: ignore[attr-defined]
+        pk = _extract_pk(key)
+        if pk:
+            self._record_read(table, pk)  # type: ignore[attr-defined]
+
+        # Build projection expression
+        projection_expr, attr_names = _build_projection(projection)
+
+        with trace_operation("get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            result, metrics = self._client.sync_get_item(  # type: ignore[attr-defined]
+                table,
+                key,
+                consistent_read=consistent_read,
+                projection=projection_expr,
+                expression_attribute_names=attr_names,
+            )
+            add_response_attributes(
+                span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
+            )
+
+        self._record_metrics(metrics, "get")
+        _log_operation("get_item", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
+        if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+            _log_warning("get_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
+        return result
+
     # ========== DELETE ==========
 
-    def delete_item(
+    async def delete_item(
         self,
         table: str,
         key: dict[str, Any],
@@ -279,7 +279,7 @@ class CrudOperations:
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Delete an item from a DynamoDB table.
+        """Delete an item from a DynamoDB table (async).
 
         Args:
             table: Table name.
@@ -299,7 +299,7 @@ class CrudOperations:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
         with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = self._client.delete_item(  # type: ignore[attr-defined]
+            metrics = await self._client.delete_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 condition_expression=condition_expression,
@@ -317,7 +317,7 @@ class CrudOperations:
         self._record_metrics(metrics, "delete")
         return metrics
 
-    async def async_delete_item(
+    def sync_delete_item(
         self,
         table: str,
         key: dict[str, Any],
@@ -326,7 +326,7 @@ class CrudOperations:
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Async version of delete_item.
+        """Delete an item from a DynamoDB table (sync).
 
         Args:
             table: Table name.
@@ -345,8 +345,8 @@ class CrudOperations:
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
-        with trace_operation("async_delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = await self._client.async_delete_item(  # type: ignore[attr-defined]
+        with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            metrics = self._client.sync_delete_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 condition_expression=condition_expression,
@@ -366,7 +366,7 @@ class CrudOperations:
 
     # ========== UPDATE ==========
 
-    def update_item(
+    async def update_item(
         self,
         table: str,
         key: dict[str, Any],
@@ -377,7 +377,7 @@ class CrudOperations:
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Update an item in a DynamoDB table.
+        """Update an item in a DynamoDB table (async).
 
         Args:
             table: Table name.
@@ -399,7 +399,7 @@ class CrudOperations:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
         with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = self._client.update_item(  # type: ignore[attr-defined]
+            metrics = await self._client.update_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 updates=updates,
@@ -419,7 +419,7 @@ class CrudOperations:
         self._record_metrics(metrics, "update")
         return metrics
 
-    async def async_update_item(
+    def sync_update_item(
         self,
         table: str,
         key: dict[str, Any],
@@ -430,7 +430,7 @@ class CrudOperations:
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
     ) -> OperationMetrics:
-        """Async version of update_item.
+        """Update an item in a DynamoDB table (sync).
 
         Args:
             table: Table name.
@@ -451,8 +451,8 @@ class CrudOperations:
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
-        with trace_operation("async_update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = await self._client.async_update_item(  # type: ignore[attr-defined]
+        with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            metrics = self._client.sync_update_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 updates=updates,

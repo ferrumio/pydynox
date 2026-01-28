@@ -6,7 +6,8 @@ from pydynox.attributes import StringAttribute
 from pydynox.hooks import after_delete, after_save, before_delete, before_save
 
 
-def test_hooks_run_on_save(dynamo):
+@pytest.mark.asyncio
+async def test_hooks_run_on_save(dynamo):
     """Test that hooks run when saving to real DynamoDB."""
     # GIVEN a model with before_save and after_save hooks
     call_log = []
@@ -29,17 +30,18 @@ def test_hooks_run_on_save(dynamo):
     user = User(pk="USER#1", sk="PROFILE", name="John")
 
     # WHEN saving the user
-    user.save()
+    await user.save()
 
     # THEN both hooks are called and item is saved
     assert "before_save:USER#1" in call_log
     assert "after_save:USER#1" in call_log
-    loaded = User.get(pk="USER#1", sk="PROFILE")
+    loaded = await User.get(pk="USER#1", sk="PROFILE")
     assert loaded is not None
     assert loaded.name == "John"
 
 
-def test_hooks_run_on_delete(dynamo):
+@pytest.mark.asyncio
+async def test_hooks_run_on_delete(dynamo):
     """Test that hooks run when deleting from real DynamoDB."""
     # GIVEN a saved user with delete hooks
     call_log = []
@@ -60,20 +62,21 @@ def test_hooks_run_on_delete(dynamo):
 
     User._client_instance = None
     user = User(pk="USER#2", sk="PROFILE", name="Jane")
-    user.save()
+    await user.save()
     call_log.clear()
 
     # WHEN deleting the user
-    user.delete()
+    await user.delete()
 
     # THEN both hooks are called and item is deleted
     assert "before_delete:USER#2" in call_log
     assert "after_delete:USER#2" in call_log
-    loaded = User.get(pk="USER#2", sk="PROFILE")
+    loaded = await User.get(pk="USER#2", sk="PROFILE")
     assert loaded is None
 
 
-def test_skip_hooks_on_save(dynamo):
+@pytest.mark.asyncio
+async def test_skip_hooks_on_save(dynamo):
     """Test that skip_hooks=True skips hooks on real save."""
     # GIVEN a model with a before_save hook
     hook_called = []
@@ -92,16 +95,17 @@ def test_skip_hooks_on_save(dynamo):
     user = User(pk="USER#3", sk="PROFILE", name="Bob")
 
     # WHEN saving with skip_hooks=True
-    user.save(skip_hooks=True)
+    await user.save(skip_hooks=True)
 
     # THEN hook is not called but item is saved
     assert len(hook_called) == 0
-    loaded = User.get(pk="USER#3", sk="PROFILE")
+    loaded = await User.get(pk="USER#3", sk="PROFILE")
     assert loaded is not None
     assert loaded.name == "Bob"
 
 
-def test_before_save_validation_blocks_save(dynamo):
+@pytest.mark.asyncio
+async def test_before_save_validation_blocks_save(dynamo):
     """Test that before_save can block save with exception."""
 
     # GIVEN a model with email validation in before_save
@@ -122,13 +126,14 @@ def test_before_save_validation_blocks_save(dynamo):
     # WHEN saving with invalid email
     # THEN ValueError is raised and item is not saved
     with pytest.raises(ValueError, match="Email must be @company.com"):
-        user.save()
+        await user.save()
 
-    loaded = ValidatedUser.get(pk="USER#4", sk="PROFILE")
+    loaded = await ValidatedUser.get(pk="USER#4", sk="PROFILE")
     assert loaded is None
 
 
-def test_before_save_can_modify_data(dynamo):
+@pytest.mark.asyncio
+async def test_before_save_can_modify_data(dynamo):
     """Test that before_save can modify data before saving."""
 
     # GIVEN a model that normalizes name in before_save
@@ -146,15 +151,16 @@ def test_before_save_can_modify_data(dynamo):
     user = NormalizedUser(pk="USER#5", sk="PROFILE", name="  john doe  ")
 
     # WHEN saving
-    user.save()
+    await user.save()
 
     # THEN name is normalized locally and in DynamoDB
     assert user.name == "John Doe"
-    loaded = NormalizedUser.get(pk="USER#5", sk="PROFILE")
+    loaded = await NormalizedUser.get(pk="USER#5", sk="PROFILE")
     assert loaded.name == "John Doe"
 
 
-def test_model_config_skip_hooks_default(dynamo):
+@pytest.mark.asyncio
+async def test_model_config_skip_hooks_default(dynamo):
     """Test that model_config.skip_hooks=True skips hooks by default."""
     # GIVEN a model with skip_hooks=True in config
     call_log = []
@@ -172,15 +178,16 @@ def test_model_config_skip_hooks_default(dynamo):
     item = BulkModel(pk="BULK#1", sk="DATA")
 
     # WHEN saving without explicit skip_hooks
-    item.save()
+    await item.save()
 
     # THEN hook is not called but item is saved
     assert len(call_log) == 0
-    loaded = BulkModel.get(pk="BULK#1", sk="DATA")
+    loaded = await BulkModel.get(pk="BULK#1", sk="DATA")
     assert loaded is not None
 
 
-def test_model_config_skip_hooks_override(dynamo):
+@pytest.mark.asyncio
+async def test_model_config_skip_hooks_override(dynamo):
     """Test that skip_hooks=False overrides model_config.skip_hooks=True."""
     # GIVEN a model with skip_hooks=True in config
     call_log = []
@@ -198,7 +205,7 @@ def test_model_config_skip_hooks_override(dynamo):
     item = BulkModel(pk="BULK#2", sk="DATA")
 
     # WHEN saving with skip_hooks=False
-    item.save(skip_hooks=False)
+    await item.save(skip_hooks=False)
 
     # THEN hook is called
     assert len(call_log) == 1

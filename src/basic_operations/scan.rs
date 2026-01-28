@@ -202,7 +202,7 @@ fn raw_to_py_result(py: Python<'_>, raw: RawScanResult) -> PyResult<ScanResult> 
 
 /// Sync scan - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn scan(
+pub fn sync_scan(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -241,9 +241,9 @@ pub fn scan(
     }
 }
 
-/// Async scan - returns a Python awaitable.
+/// Async scan - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_scan<'py>(
+pub fn scan<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,
@@ -440,7 +440,7 @@ pub async fn execute_count(
 
 /// Sync count - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn count(
+pub fn sync_count(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -469,9 +469,9 @@ pub fn count(
     }
 }
 
-/// Async count - returns a Python awaitable.
+/// Async count - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_count<'py>(
+pub fn count<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,
@@ -675,7 +675,7 @@ pub async fn execute_parallel_scan(
 
 /// Sync parallel scan - blocks until all segments complete.
 #[allow(clippy::too_many_arguments)]
-pub fn parallel_scan(
+pub fn sync_parallel_scan(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -713,9 +713,9 @@ pub fn parallel_scan(
     }
 }
 
-/// Async parallel scan - returns a Python awaitable.
+/// Async parallel scan - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_parallel_scan<'py>(
+pub fn parallel_scan<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,

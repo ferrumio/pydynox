@@ -81,9 +81,10 @@ async def test_async_create_table_with_gsi(model_table_client):
     assert exists is True
 
     # Verify GSI works by saving and querying
-    UserWithGSI(pk="USER#1", email="john@example.com").save()
+    user = UserWithGSI(pk="USER#1", email="john@example.com")
+    await user.save()
 
-    results = list(UserWithGSI.email_index.query(email="john@example.com"))
+    results = [x async for x in UserWithGSI.email_index.query(email="john@example.com")]
     assert len(results) == 1
 
     await UserWithGSI.delete_table()

@@ -16,7 +16,7 @@ def pagination_table(dynamo):
     pk = f"PAGE#{unique_id}"
 
     for i in range(25):
-        dynamo.put_item(
+        dynamo.sync_put_item(
             "test_table",
             {"pk": pk, "sk": f"ITEM#{i:03d}", "value": i},
         )
@@ -25,7 +25,8 @@ def pagination_table(dynamo):
     return dynamo, pk
 
 
-def test_query_limit_stops_after_n_items(pagination_table):
+@pytest.mark.asyncio
+async def test_query_limit_stops_after_n_items(pagination_table):
     """Query with limit=10 returns exactly 10 items, not all items.
 
     GIVEN a table with 25 items
@@ -34,20 +35,22 @@ def test_query_limit_stops_after_n_items(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.query(
+    items = [
+        item
+        async for item in dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
             limit=10,
         )
-    )
+    ]
 
     assert len(items) == 10
 
 
-def test_query_page_size_controls_dynamo_limit(pagination_table):
+@pytest.mark.asyncio
+async def test_query_page_size_controls_dynamo_limit(pagination_table):
     """Query with page_size controls items per DynamoDB request.
 
     GIVEN a table with 25 items
@@ -56,20 +59,22 @@ def test_query_page_size_controls_dynamo_limit(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.query(
+    items = [
+        item
+        async for item in dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
             page_size=5,
         )
-    )
+    ]
 
     assert len(items) == 25
 
 
-def test_query_limit_and_page_size_together(pagination_table):
+@pytest.mark.asyncio
+async def test_query_limit_and_page_size_together(pagination_table):
     """Query with both limit and page_size works correctly.
 
     GIVEN a table with 25 items
@@ -78,8 +83,9 @@ def test_query_limit_and_page_size_together(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.query(
+    items = [
+        item
+        async for item in dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
@@ -87,7 +93,7 @@ def test_query_limit_and_page_size_together(pagination_table):
             limit=12,
             page_size=5,
         )
-    )
+    ]
 
     assert len(items) == 12
     # Items should be in order
@@ -95,7 +101,8 @@ def test_query_limit_and_page_size_together(pagination_table):
     assert items[11]["sk"] == "ITEM#011"
 
 
-def test_query_no_limit_returns_all(pagination_table):
+@pytest.mark.asyncio
+async def test_query_no_limit_returns_all(pagination_table):
     """Query without limit returns all items via auto-pagination.
 
     GIVEN a table with 25 items
@@ -104,19 +111,21 @@ def test_query_no_limit_returns_all(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.query(
+    items = [
+        item
+        async for item in dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
         )
-    )
+    ]
 
     assert len(items) == 25
 
 
-def test_query_limit_greater_than_total(pagination_table):
+@pytest.mark.asyncio
+async def test_query_limit_greater_than_total(pagination_table):
     """Query with limit > total items returns all items.
 
     GIVEN a table with 25 items
@@ -125,20 +134,22 @@ def test_query_limit_greater_than_total(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.query(
+    items = [
+        item
+        async for item in dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
             limit=100,
         )
-    )
+    ]
 
     assert len(items) == 25
 
 
-def test_query_limit_one(pagination_table):
+@pytest.mark.asyncio
+async def test_query_limit_one(pagination_table):
     """Query with limit=1 returns exactly 1 item.
 
     GIVEN a table with 25 items
@@ -147,21 +158,23 @@ def test_query_limit_one(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.query(
+    items = [
+        item
+        async for item in dynamo.query(
             "test_table",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
             limit=1,
         )
-    )
+    ]
 
     assert len(items) == 1
     assert items[0]["sk"] == "ITEM#000"
 
 
-def test_query_manual_pagination_with_limit(pagination_table):
+@pytest.mark.asyncio
+async def test_query_manual_pagination_with_limit(pagination_table):
     """Manual pagination works correctly with limit.
 
     GIVEN a table with 25 items
@@ -179,7 +192,7 @@ def test_query_manual_pagination_with_limit(pagination_table):
         expression_attribute_values={":pk": pk},
         limit=10,
     )
-    for item in result:
+    async for item in result:
         all_items.append(item)
 
     assert len(all_items) == 10
@@ -194,7 +207,7 @@ def test_query_manual_pagination_with_limit(pagination_table):
         limit=10,
         last_evaluated_key=result.last_evaluated_key,
     )
-    for item in result:
+    async for item in result:
         all_items.append(item)
 
     assert len(all_items) == 20
@@ -208,14 +221,15 @@ def test_query_manual_pagination_with_limit(pagination_table):
         limit=10,
         last_evaluated_key=result.last_evaluated_key,
     )
-    for item in result:
+    async for item in result:
         all_items.append(item)
 
     assert len(all_items) == 25
     assert result.last_evaluated_key is None
 
 
-def test_scan_limit_stops_after_n_items(pagination_table):
+@pytest.mark.asyncio
+async def test_scan_limit_stops_after_n_items(pagination_table):
     """Scan with limit=10 returns at most 10 items.
 
     GIVEN a table with items
@@ -227,21 +241,23 @@ def test_scan_limit_stops_after_n_items(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.scan(
+    items = [
+        item
+        async for item in dynamo.scan(
             "test_table",
             filter_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
             limit=10,
         )
-    )
+    ]
 
     # With filter, we get at most 10 items (may be fewer due to DynamoDB behavior)
     assert len(items) <= 10
 
 
-def test_scan_page_size_returns_all(pagination_table):
+@pytest.mark.asyncio
+async def test_scan_page_size_returns_all(pagination_table):
     """Scan with page_size (no limit) returns all items matching filter.
 
     GIVEN a table with 25 items with unique pk
@@ -250,20 +266,22 @@ def test_scan_page_size_returns_all(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.scan(
+    items = [
+        item
+        async for item in dynamo.scan(
             "test_table",
             filter_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
             page_size=100,
         )
-    )
+    ]
 
     assert len(items) == 25
 
 
-def test_scan_no_limit_returns_all(pagination_table):
+@pytest.mark.asyncio
+async def test_scan_no_limit_returns_all(pagination_table):
     """Scan without limit returns all items matching filter.
 
     GIVEN a table with 25 items with unique pk
@@ -272,13 +290,14 @@ def test_scan_no_limit_returns_all(pagination_table):
     """
     dynamo, pk = pagination_table
 
-    items = list(
-        dynamo.scan(
+    items = [
+        item
+        async for item in dynamo.scan(
             "test_table",
             filter_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": pk},
         )
-    )
+    ]
 
     assert len(items) == 25

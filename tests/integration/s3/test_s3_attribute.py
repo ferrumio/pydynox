@@ -26,7 +26,8 @@ def document_model(dynamo, s3_bucket, localstack_endpoint):
     return Document
 
 
-def test_save_with_s3file(document_model):
+@pytest.mark.asyncio
+async def test_save_with_s3file(document_model):
     """Model.save() uploads S3File to S3."""
     doc_id = str(uuid.uuid4())
 
@@ -39,7 +40,7 @@ def test_save_with_s3file(document_model):
     doc.content = S3File(b"PDF content here", name="report.pdf", content_type="application/pdf")
 
     # WHEN we save it
-    doc.save()
+    await doc.save()
 
     # THEN content becomes S3Value with metadata
     assert isinstance(doc.content, S3Value)
@@ -47,7 +48,8 @@ def test_save_with_s3file(document_model):
     assert doc.content.content_type == "application/pdf"
 
 
-def test_get_returns_s3value(document_model):
+@pytest.mark.asyncio
+async def test_get_returns_s3value(document_model):
     """Model.get() returns S3Value for S3Attribute."""
     doc_id = str(uuid.uuid4())
 
@@ -58,10 +60,10 @@ def test_get_returns_s3value(document_model):
         name="test.txt",
     )
     doc.content = S3File(b"Hello World", name="test.txt")
-    doc.save()
+    await doc.save()
 
     # WHEN we get the document
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     # THEN content is S3Value
     assert loaded is not None
@@ -69,7 +71,8 @@ def test_get_returns_s3value(document_model):
     assert loaded.content.size == 11
 
 
-def test_s3value_get_bytes(document_model):
+@pytest.mark.asyncio
+async def test_s3value_get_bytes(document_model):
     """S3Value.sync_get_bytes() downloads file content."""
     doc_id = str(uuid.uuid4())
     content = b"File content for download test"
@@ -80,10 +83,10 @@ def test_s3value_get_bytes(document_model):
         name="download.txt",
     )
     doc.content = S3File(content, name="download.txt")
-    doc.save()
+    await doc.save()
 
     # Get and download
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     # Set s3_ops on the loaded value
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
@@ -93,7 +96,8 @@ def test_s3value_get_bytes(document_model):
     assert downloaded == content
 
 
-def test_s3value_presigned_url(document_model):
+@pytest.mark.asyncio
+async def test_s3value_presigned_url(document_model):
     """S3Value.sync_presigned_url() generates URL."""
     doc_id = str(uuid.uuid4())
 
@@ -103,9 +107,9 @@ def test_s3value_presigned_url(document_model):
         name="presigned.txt",
     )
     doc.content = S3File(b"data", name="presigned.txt")
-    doc.save()
+    await doc.save()
 
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     # Set s3_ops
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
@@ -116,7 +120,8 @@ def test_s3value_presigned_url(document_model):
     assert url.startswith("http")
 
 
-def test_s3value_save_to_file(document_model, tmp_path):
+@pytest.mark.asyncio
+async def test_s3value_save_to_file(document_model, tmp_path):
     """S3Value.sync_save_to() streams to file."""
     doc_id = str(uuid.uuid4())
     content = b"Large file content " * 100
@@ -127,9 +132,9 @@ def test_s3value_save_to_file(document_model, tmp_path):
         name="large.bin",
     )
     doc.content = S3File(content, name="large.bin")
-    doc.save()
+    await doc.save()
 
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     # Set s3_ops
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
@@ -141,7 +146,8 @@ def test_s3value_save_to_file(document_model, tmp_path):
     assert output_path.read_bytes() == content
 
 
-def test_delete_removes_s3_file(document_model):
+@pytest.mark.asyncio
+async def test_delete_removes_s3_file(document_model):
     """Model.delete() removes file from S3."""
     doc_id = str(uuid.uuid4())
 
@@ -151,16 +157,17 @@ def test_delete_removes_s3_file(document_model):
         name="to_delete.txt",
     )
     doc.content = S3File(b"will be deleted", name="to_delete.txt")
-    doc.save()
+    await doc.save()
 
-    doc.delete()
+    await doc.delete()
 
     # Verify deleted from DynamoDB
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
     assert loaded is None
 
 
-def test_s3file_with_metadata(document_model):
+@pytest.mark.asyncio
+async def test_s3file_with_metadata(document_model):
     """S3File metadata is stored in S3."""
     doc_id = str(uuid.uuid4())
 
@@ -174,12 +181,13 @@ def test_s3file_with_metadata(document_model):
         name="with_meta.txt",
         metadata={"author": "test", "version": "1.0"},
     )
-    doc.save()
+    await doc.save()
 
     assert doc.content.metadata == {"author": "test", "version": "1.0"}
 
 
-def test_null_s3attribute(document_model):
+@pytest.mark.asyncio
+async def test_null_s3attribute(document_model):
     """S3Attribute can be null."""
     doc_id = str(uuid.uuid4())
 
@@ -190,13 +198,14 @@ def test_null_s3attribute(document_model):
     )
     # content is None by default
 
-    doc.save()
+    await doc.save()
 
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
     assert loaded.content is None
 
 
-def test_update_s3file(document_model):
+@pytest.mark.asyncio
+async def test_update_s3file(document_model):
     """S3File can be updated."""
     doc_id = str(uuid.uuid4())
 
@@ -207,14 +216,14 @@ def test_update_s3file(document_model):
         name="update.txt",
     )
     doc.content = S3File(b"version 1", name="update.txt")
-    doc.save()
+    await doc.save()
 
     # Update
     doc.content = S3File(b"version 2", name="update.txt")
-    doc.save()
+    await doc.save()
 
     # Verify
-    loaded = document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
 
     loaded._attributes["content"]._get_s3_ops(loaded._get_client())
     loaded.content._s3_ops = loaded._attributes["content"]._s3_ops
