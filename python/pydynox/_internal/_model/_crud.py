@@ -37,7 +37,7 @@ def get(
     """Get an item by key. Returns model instance, dict, or None."""
     # prepare: get client, table, resolve consistent_read
     client, table, keys_dict, use_consistent = prepare_get(cls, consistent_read, keys)
-    item = client.get_item(table, keys_dict, consistent_read=use_consistent)
+    item = client.sync_get_item(table, keys_dict, consistent_read=use_consistent)
 
     # Record metrics from client
     if client._last_metrics is not None:
@@ -85,7 +85,7 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
     kms_duration, kms_calls = _stop_kms_metrics_collection()
 
     if cond_expr is not None:
-        client.put_item(
+        client.sync_put_item(
             table,
             item,
             condition_expression=cond_expr,
@@ -93,7 +93,7 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
             expression_attribute_values=attr_values,
         )
     else:
-        client.put_item(table, item)
+        client.sync_put_item(table, item)
 
     # Record metrics from client
     if client._last_metrics is not None:
@@ -121,7 +121,7 @@ def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | N
     )
 
     if cond_expr is not None:
-        client.delete_item(
+        client.sync_delete_item(
             table,
             key,
             condition_expression=cond_expr,
@@ -129,7 +129,7 @@ def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | N
             expression_attribute_values=attr_values,
         )
     else:
-        client.delete_item(table, key)
+        client.sync_delete_item(table, key)
 
     # Record metrics from client
     if client._last_metrics is not None:
@@ -168,7 +168,7 @@ def update(
     )
 
     if update_expr is not None:
-        client.update_item(
+        client.sync_update_item(
             table,
             key,
             update_expression=update_expr,
@@ -178,7 +178,7 @@ def update(
         )
     elif updates is not None:
         if cond_expr is not None:
-            client.update_item(
+            client.sync_update_item(
                 table,
                 key,
                 updates=updates,
@@ -187,7 +187,7 @@ def update(
                 expression_attribute_values=attr_values,
             )
         else:
-            client.update_item(table, key, updates=updates)
+            client.sync_update_item(table, key, updates=updates)
 
     # Record metrics from client
     if client._last_metrics is not None:
@@ -210,7 +210,7 @@ def update_by_key(
 
     client, table, key, updates, cond_expr, attr_names, attr_values = result
     if cond_expr is not None:
-        client.update_item(
+        client.sync_update_item(
             table,
             key,
             updates=updates,
@@ -219,7 +219,7 @@ def update_by_key(
             expression_attribute_values=attr_values,
         )
     else:
-        client.update_item(table, key, updates=updates)
+        client.sync_update_item(table, key, updates=updates)
 
     # Record metrics from client
     if client._last_metrics is not None:
@@ -238,7 +238,7 @@ def delete_by_key(
     )
 
     if cond_expr is not None:
-        client.delete_item(
+        client.sync_delete_item(
             table,
             key,
             condition_expression=cond_expr,
@@ -246,7 +246,7 @@ def delete_by_key(
             expression_attribute_values=attr_values,
         )
     else:
-        client.delete_item(table, key)
+        client.sync_delete_item(table, key)
 
     # Record metrics from client
     if client._last_metrics is not None:

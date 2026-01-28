@@ -105,7 +105,7 @@ class GlobalSecondaryIndex(Generic[M]):
             )
         return self._model_class
 
-    def query(
+    def sync_query(
         self,
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
@@ -115,13 +115,13 @@ class GlobalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> GSIQueryResult[M]:
-        """Query the GSI."""
+        """Sync query the GSI."""
         model_class = self._get_model_class()
 
         missing_hash_keys = [k for k in self.hash_keys if k not in key_values]
         if missing_hash_keys:
             raise ValueError(
-                f"GSI query requires all hash key attributes: {self.hash_keys}. "
+                f"GSI sync_query requires all hash key attributes: {self.hash_keys}. "
                 f"Missing: {missing_hash_keys}"
             )
 
@@ -139,7 +139,7 @@ class GlobalSecondaryIndex(Generic[M]):
             last_evaluated_key=last_evaluated_key,
         )
 
-    def async_query(
+    def query(
         self,
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
@@ -149,13 +149,13 @@ class GlobalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> AsyncGSIQueryResult[M]:
-        """Async version of query."""
+        """Query the GSI (async)."""
         model_class = self._get_model_class()
 
         missing_hash_keys = [k for k in self.hash_keys if k not in key_values]
         if missing_hash_keys:
             raise ValueError(
-                f"GSI async_query requires all hash key attributes: {self.hash_keys}. "
+                f"GSI query requires all hash key attributes: {self.hash_keys}. "
                 f"Missing: {missing_hash_keys}"
             )
 
@@ -549,7 +549,7 @@ class LocalSecondaryIndex(Generic[M]):
             )
         return self._model_class
 
-    def query(
+    def sync_query(
         self,
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
@@ -560,7 +560,7 @@ class LocalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> LSIQueryResult[M]:
-        """Query the LSI."""
+        """Sync query the LSI."""
         model_class = self._get_model_class()
 
         hash_key_name = model_class._hash_key
@@ -569,7 +569,7 @@ class LocalSecondaryIndex(Generic[M]):
 
         if hash_key_name not in key_values:
             raise ValueError(
-                f"LSI query requires the table's hash key '{hash_key_name}'. "
+                f"LSI sync_query requires the table's hash key '{hash_key_name}'. "
                 f"Got: {list(key_values.keys())}"
             )
 
@@ -588,7 +588,7 @@ class LocalSecondaryIndex(Generic[M]):
             last_evaluated_key=last_evaluated_key,
         )
 
-    def async_query(
+    def query(
         self,
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
@@ -599,7 +599,7 @@ class LocalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> AsyncLSIQueryResult[M]:
-        """Async version of query."""
+        """Query the LSI (async)."""
         model_class = self._get_model_class()
 
         hash_key_name = model_class._hash_key
@@ -608,7 +608,7 @@ class LocalSecondaryIndex(Generic[M]):
 
         if hash_key_name not in key_values:
             raise ValueError(
-                f"LSI async_query requires the table's hash key '{hash_key_name}'. "
+                f"LSI query requires the table's hash key '{hash_key_name}'. "
                 f"Got: {list(key_values.keys())}"
             )
 

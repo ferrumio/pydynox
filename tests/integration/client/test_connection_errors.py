@@ -5,7 +5,8 @@ from pydynox import DynamoDBClient
 from pydynox.exceptions import ConnectionException
 
 
-def test_connection_refused_gives_clear_error():
+@pytest.mark.asyncio
+async def test_connection_refused_gives_clear_error():
     """Test that connection refused gives a helpful error message."""
     # GIVEN a client pointing to a non-existent endpoint
     client = DynamoDBClient(
@@ -18,10 +19,11 @@ def test_connection_refused_gives_clear_error():
     # WHEN we try to put an item
     # THEN a ConnectionException is raised
     with pytest.raises(ConnectionException, match="Connection failed"):
-        client.put_item("test_table", {"pk": "TEST#1", "sk": "A"})
+        await client.put_item("test_table", {"pk": "TEST#1", "sk": "A"})
 
 
-def test_connection_refused_on_get_item():
+@pytest.mark.asyncio
+async def test_connection_refused_on_get_item():
     """Test connection error on get_item."""
     # GIVEN a client pointing to a non-existent endpoint
     client = DynamoDBClient(
@@ -34,7 +36,7 @@ def test_connection_refused_on_get_item():
     # WHEN we try to get an item
     # THEN a ConnectionException is raised
     with pytest.raises(ConnectionException, match="Connection failed"):
-        client.get_item("test_table", {"pk": "TEST#1", "sk": "A"})
+        await client.get_item("test_table", {"pk": "TEST#1", "sk": "A"})
 
 
 def test_connection_refused_on_ping():

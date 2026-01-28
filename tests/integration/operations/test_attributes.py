@@ -28,7 +28,8 @@ def setup_client(dynamo):
     yield dynamo
 
 
-def test_json_attribute_roundtrip(setup_client, table):
+@pytest.mark.asyncio
+async def test_json_attribute_roundtrip(setup_client, table):
     """JSONAttribute saves and loads dict correctly."""
 
     class Config(Model):
@@ -45,15 +46,16 @@ def test_json_attribute_roundtrip(setup_client, table):
     )
 
     # WHEN we save and load it
-    config.save()
-    loaded = Config.get(pk="CFG#1", sk="SETTINGS")
+    await config.save()
+    loaded = await Config.get(pk="CFG#1", sk="SETTINGS")
 
     # THEN JSON data is preserved
     assert loaded is not None
     assert loaded.settings == {"theme": "dark", "notifications": True, "count": 42}
 
 
-def test_json_attribute_with_list(setup_client, table):
+@pytest.mark.asyncio
+async def test_json_attribute_with_list(setup_client, table):
     """JSONAttribute saves and loads list correctly."""
 
     class Config(Model):
@@ -63,14 +65,15 @@ def test_json_attribute_with_list(setup_client, table):
         items = JSONAttribute()
 
     config = Config(pk="CFG#2", sk="ITEMS", items=["a", "b", "c"])
-    config.save()
+    await config.save()
 
-    loaded = Config.get(pk="CFG#2", sk="ITEMS")
+    loaded = await Config.get(pk="CFG#2", sk="ITEMS")
     assert loaded is not None
     assert loaded.items == ["a", "b", "c"]
 
 
-def test_enum_attribute_roundtrip(setup_client, table):
+@pytest.mark.asyncio
+async def test_enum_attribute_roundtrip(setup_client, table):
     """EnumAttribute saves and loads enum correctly."""
 
     class User(Model):
@@ -83,15 +86,16 @@ def test_enum_attribute_roundtrip(setup_client, table):
     user = User(pk="USER#1", sk="PROFILE", status=Status.ACTIVE)
 
     # WHEN we save and load it
-    user.save()
-    loaded = User.get(pk="USER#1", sk="PROFILE")
+    await user.save()
+    loaded = await User.get(pk="USER#1", sk="PROFILE")
 
     # THEN enum value is preserved
     assert loaded is not None
     assert loaded.status == Status.ACTIVE
 
 
-def test_enum_attribute_with_default(setup_client, table):
+@pytest.mark.asyncio
+async def test_enum_attribute_with_default(setup_client, table):
     """EnumAttribute uses default value."""
 
     class User(Model):
@@ -101,14 +105,15 @@ def test_enum_attribute_with_default(setup_client, table):
         status = EnumAttribute(Status, default=Status.PENDING)
 
     user = User(pk="USER#2", sk="PROFILE")
-    user.save()
+    await user.save()
 
-    loaded = User.get(pk="USER#2", sk="PROFILE")
+    loaded = await User.get(pk="USER#2", sk="PROFILE")
     assert loaded is not None
     assert loaded.status == Status.PENDING
 
 
-def test_datetime_attribute_roundtrip(setup_client, table):
+@pytest.mark.asyncio
+async def test_datetime_attribute_roundtrip(setup_client, table):
     """DatetimeAttribute saves and loads datetime correctly."""
 
     class Event(Model):
@@ -122,15 +127,16 @@ def test_datetime_attribute_roundtrip(setup_client, table):
     event = Event(pk="EVT#1", sk="DATA", created_at=dt)
 
     # WHEN we save and load it
-    event.save()
-    loaded = Event.get(pk="EVT#1", sk="DATA")
+    await event.save()
+    loaded = await Event.get(pk="EVT#1", sk="DATA")
 
     # THEN datetime is preserved
     assert loaded is not None
     assert loaded.created_at == dt
 
 
-def test_string_set_attribute_roundtrip(setup_client, table):
+@pytest.mark.asyncio
+async def test_string_set_attribute_roundtrip(setup_client, table):
     """StringSetAttribute saves and loads set correctly."""
 
     class User(Model):
@@ -143,15 +149,16 @@ def test_string_set_attribute_roundtrip(setup_client, table):
     user = User(pk="USER#3", sk="PROFILE", tags={"admin", "verified", "premium"})
 
     # WHEN we save and load it
-    user.save()
-    loaded = User.get(pk="USER#3", sk="PROFILE")
+    await user.save()
+    loaded = await User.get(pk="USER#3", sk="PROFILE")
 
     # THEN set is preserved
     assert loaded is not None
     assert loaded.tags == {"admin", "verified", "premium"}
 
 
-def test_number_set_attribute_roundtrip(setup_client, table):
+@pytest.mark.asyncio
+async def test_number_set_attribute_roundtrip(setup_client, table):
     """NumberSetAttribute saves and loads set correctly."""
 
     class User(Model):
@@ -161,14 +168,15 @@ def test_number_set_attribute_roundtrip(setup_client, table):
         scores = NumberSetAttribute()
 
     user = User(pk="USER#4", sk="PROFILE", scores={100, 95, 88})
-    user.save()
+    await user.save()
 
-    loaded = User.get(pk="USER#4", sk="PROFILE")
+    loaded = await User.get(pk="USER#4", sk="PROFILE")
     assert loaded is not None
     assert loaded.scores == {100, 95, 88}
 
 
-def test_number_set_attribute_with_floats(setup_client, table):
+@pytest.mark.asyncio
+async def test_number_set_attribute_with_floats(setup_client, table):
     """NumberSetAttribute handles floats correctly."""
 
     class User(Model):
@@ -178,9 +186,9 @@ def test_number_set_attribute_with_floats(setup_client, table):
         ratings = NumberSetAttribute()
 
     user = User(pk="USER#5", sk="PROFILE", ratings={4.5, 3.8, 5.0})
-    user.save()
+    await user.save()
 
-    loaded = User.get(pk="USER#5", sk="PROFILE")
+    loaded = await User.get(pk="USER#5", sk="PROFILE")
     assert loaded is not None
     # 5.0 becomes 5 (int)
     assert 4.5 in loaded.ratings

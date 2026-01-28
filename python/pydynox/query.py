@@ -133,7 +133,7 @@ class QueryResult:
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
-        items, self._last_evaluated_key, self._metrics = self._client.query_page(
+        items, self._last_evaluated_key, self._metrics = self._client.sync_query_page(
             self._table,
             self._key_condition_expression,
             filter_expression=self._filter_expression,
@@ -275,7 +275,7 @@ class AsyncQueryResult:
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
-        result = await self._client.async_query_page(
+        result = await self._client.query_page(
             self._table,
             self._key_condition_expression,
             filter_expression=self._filter_expression,
@@ -428,7 +428,7 @@ class ScanResult:
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
-        items, self._last_evaluated_key, self._metrics = self._client.scan_page(
+        items, self._last_evaluated_key, self._metrics = self._client.sync_scan_page(
             self._table,
             filter_expression=self._filter_expression,
             projection_expression=self._projection_expression,
@@ -566,7 +566,7 @@ class AsyncScanResult:
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
-        result = await self._client.async_scan_page(
+        result = await self._client.scan_page(
             self._table,
             filter_expression=self._filter_expression,
             projection_expression=self._projection_expression,

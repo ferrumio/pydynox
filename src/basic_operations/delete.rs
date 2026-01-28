@@ -146,7 +146,7 @@ fn extract_item_from_delete_error(
 
 /// Sync delete_item - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn delete_item(
+pub fn sync_delete_item(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -175,9 +175,9 @@ pub fn delete_item(
     }
 }
 
-/// Async delete_item - returns a Python awaitable.
+/// Async delete_item - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_delete_item<'py>(
+pub fn delete_item<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,

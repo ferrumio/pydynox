@@ -110,7 +110,8 @@ def readwrite_model(dynamo, localstack_endpoint, kms_key_id):
 # --- WriteOnly mode ---
 
 
-def test_writeonly_encrypts_on_save(writeonly_model, dynamo):
+@pytest.mark.asyncio
+async def test_writeonly_encrypts_on_save(writeonly_model, dynamo):
     """WriteOnly mode encrypts data on save."""
     item_id = str(uuid.uuid4())
 
@@ -119,14 +120,15 @@ def test_writeonly_encrypts_on_save(writeonly_model, dynamo):
         sk="v1",
         secret="my-secret",
     )
-    item.save()
+    await item.save()
 
     # Raw data should be encrypted
-    raw = dynamo.get_item("test_table", {"pk": f"SECRET#{item_id}", "sk": "v1"})
+    raw = dynamo.sync_get_item("test_table", {"pk": f"SECRET#{item_id}", "sk": "v1"})
     assert raw["secret"].startswith("ENC:")
 
 
-def test_writeonly_returns_ciphertext_on_load(writeonly_model):
+@pytest.mark.asyncio
+async def test_writeonly_returns_ciphertext_on_load(writeonly_model):
     """WriteOnly mode returns encrypted value on load (no decrypt)."""
     item_id = str(uuid.uuid4())
 
@@ -135,10 +137,10 @@ def test_writeonly_returns_ciphertext_on_load(writeonly_model):
         sk="v1",
         secret="my-secret",
     )
-    item.save()
+    await item.save()
 
     # Load returns encrypted value
-    loaded = writeonly_model.get(pk=f"SECRET#{item_id}", sk="v1")
+    loaded = await writeonly_model.get(pk=f"SECRET#{item_id}", sk="v1")
     assert loaded.secret.startswith("ENC:")
     assert loaded.secret != "my-secret"
 
@@ -146,7 +148,8 @@ def test_writeonly_returns_ciphertext_on_load(writeonly_model):
 # --- ReadOnly mode ---
 
 
-def test_readonly_stores_plaintext(readonly_model, dynamo):
+@pytest.mark.asyncio
+async def test_readonly_stores_plaintext(readonly_model, dynamo):
     """ReadOnly mode stores value as-is (no encrypt)."""
     item_id = str(uuid.uuid4())
 
@@ -155,15 +158,16 @@ def test_readonly_stores_plaintext(readonly_model, dynamo):
         sk="v1",
         secret="plaintext-value",
     )
-    item.save()
+    await item.save()
 
     # Raw data should be plaintext
-    raw = dynamo.get_item("test_table", {"pk": f"SECRET#{item_id}", "sk": "v1"})
+    raw = dynamo.sync_get_item("test_table", {"pk": f"SECRET#{item_id}", "sk": "v1"})
     assert raw["secret"] == "plaintext-value"
     assert not raw["secret"].startswith("ENC:")
 
 
-def test_readonly_decrypts_existing_data(readonly_model, readwrite_model):
+@pytest.mark.asyncio
+async def test_readonly_decrypts_existing_data(readonly_model, readwrite_model):
     """ReadOnly mode can decrypt data encrypted by another service."""
     item_id = str(uuid.uuid4())
 
@@ -173,17 +177,18 @@ def test_readonly_decrypts_existing_data(readonly_model, readwrite_model):
         sk="v1",
         secret="encrypted-by-writer",
     )
-    writer.save()
+    await writer.save()
 
     # Read with ReadOnly model
-    loaded = readonly_model.get(pk=f"SECRET#{item_id}", sk="v1")
+    loaded = await readonly_model.get(pk=f"SECRET#{item_id}", sk="v1")
     assert loaded.secret == "encrypted-by-writer"
 
 
 # --- ReadWrite mode ---
 
 
-def test_readwrite_encrypts_and_decrypts(readwrite_model, dynamo):
+@pytest.mark.asyncio
+async def test_readwrite_encrypts_and_decrypts(readwrite_model, dynamo):
     """ReadWrite mode encrypts on save and decrypts on load."""
     item_id = str(uuid.uuid4())
 
@@ -192,21 +197,22 @@ def test_readwrite_encrypts_and_decrypts(readwrite_model, dynamo):
         sk="v1",
         secret="full-access-secret",
     )
-    item.save()
+    await item.save()
 
     # Raw data is encrypted
-    raw = dynamo.get_item("test_table", {"pk": f"SECRET#{item_id}", "sk": "v1"})
+    raw = dynamo.sync_get_item("test_table", {"pk": f"SECRET#{item_id}", "sk": "v1"})
     assert raw["secret"].startswith("ENC:")
 
     # Load decrypts
-    loaded = readwrite_model.get(pk=f"SECRET#{item_id}", sk="v1")
+    loaded = await readwrite_model.get(pk=f"SECRET#{item_id}", sk="v1")
     assert loaded.secret == "full-access-secret"
 
 
 # --- Cross-mode workflows ---
 
 
-def test_writeonly_and_readonly_workflow(writeonly_model, readonly_model):
+@pytest.mark.asyncio
+async def test_writeonly_and_readonly_workflow(writeonly_model, readonly_model):
     """WriteOnly writes, ReadOnly reads - typical ingest/report pattern."""
     item_id = str(uuid.uuid4())
 
@@ -216,14 +222,15 @@ def test_writeonly_and_readonly_workflow(writeonly_model, readonly_model):
         sk="v1",
         secret="sensitive-data-from-ingest",
     )
-    ingest_item.save()
+    await ingest_item.save()
 
     # Report service (ReadOnly) reads data
-    report_item = readonly_model.get(pk=f"SECRET#{item_id}", sk="v1")
+    report_item = await readonly_model.get(pk=f"SECRET#{item_id}", sk="v1")
     assert report_item.secret == "sensitive-data-from-ingest"
 
 
-def test_readwrite_can_read_writeonly_data(readwrite_model, writeonly_model):
+@pytest.mark.asyncio
+async def test_readwrite_can_read_writeonly_data(readwrite_model, writeonly_model):
     """ReadWrite can read data written by WriteOnly."""
     item_id = str(uuid.uuid4())
 
@@ -233,8 +240,8 @@ def test_readwrite_can_read_writeonly_data(readwrite_model, writeonly_model):
         sk="v1",
         secret="written-by-writeonly",
     )
-    writer.save()
+    await writer.save()
 
     # ReadWrite reads
-    reader = readwrite_model.get(pk=f"SECRET#{item_id}", sk="v1")
+    reader = await readwrite_model.get(pk=f"SECRET#{item_id}", sk="v1")
     assert reader.secret == "written-by-writeonly"

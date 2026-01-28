@@ -5,11 +5,12 @@ Requirements: 9.3, 9.4
 """
 
 import pytest
-from pydynox import SyncTransaction
+from pydynox import SyncTransaction, Transaction
 from pydynox.exceptions import PydynoxException, TransactionCanceledException
 
 
-def test_transact_write_puts_multiple_items(dynamo):
+@pytest.mark.asyncio
+async def test_transact_write_puts_multiple_items(dynamo):
     """Test transaction with multiple put operations."""
     # GIVEN multiple items to put
     operations = [
@@ -30,22 +31,23 @@ def test_transact_write_puts_multiple_items(dynamo):
         },
     ]
 
-    # WHEN we execute the transaction (sync)
-    dynamo.sync_transact_write(operations)
+    # WHEN we execute the transaction
+    await dynamo.transact_write(operations)
 
     # THEN all items are saved
     for op in operations:
         item = op["item"]
         key = {"pk": item["pk"], "sk": item["sk"]}
-        result = dynamo.get_item("test_table", key)
+        result = await dynamo.get_item("test_table", key)
         assert result is not None
         assert result["name"] == item["name"]
 
 
-def test_transact_write_with_delete(dynamo):
+@pytest.mark.asyncio
+async def test_transact_write_with_delete(dynamo):
     """Test transaction with put and delete operations."""
     # First, put an item to delete later
-    dynamo.put_item("test_table", {"pk": "TXN#2", "sk": "DELETE", "name": "ToDelete"})
+    await dynamo.put_item("test_table", {"pk": "TXN#2", "sk": "DELETE", "name": "ToDelete"})
 
     operations = [
         {
@@ -60,22 +62,23 @@ def test_transact_write_with_delete(dynamo):
         },
     ]
 
-    dynamo.sync_transact_write(operations)
+    await dynamo.transact_write(operations)
 
     # Verify new item exists
-    result = dynamo.get_item("test_table", {"pk": "TXN#2", "sk": "NEW#1"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#2", "sk": "NEW#1"})
     assert result is not None
     assert result["name"] == "NewItem"
 
     # Verify deleted item is gone
-    result = dynamo.get_item("test_table", {"pk": "TXN#2", "sk": "DELETE"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#2", "sk": "DELETE"})
     assert result is None
 
 
-def test_transact_write_with_update(dynamo):
+@pytest.mark.asyncio
+async def test_transact_write_with_update(dynamo):
     """Test transaction with update operation."""
     # First, put an item to update
-    dynamo.put_item("test_table", {"pk": "TXN#3", "sk": "UPDATE", "counter": 10})
+    await dynamo.put_item("test_table", {"pk": "TXN#3", "sk": "UPDATE", "counter": 10})
 
     operations = [
         {
@@ -88,22 +91,23 @@ def test_transact_write_with_update(dynamo):
         },
     ]
 
-    dynamo.sync_transact_write(operations)
+    await dynamo.transact_write(operations)
 
     # Verify update was applied
-    result = dynamo.get_item("test_table", {"pk": "TXN#3", "sk": "UPDATE"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#3", "sk": "UPDATE"})
     assert result is not None
     assert result["counter"] == 15
 
 
-def test_transact_write_rollback_on_condition_failure(dynamo):
+@pytest.mark.asyncio
+async def test_transact_write_rollback_on_condition_failure(dynamo):
     """Test that transaction rolls back all operations when a condition fails.
 
     Requirements: 9.4
     """
     # GIVEN initial items
-    dynamo.put_item("test_table", {"pk": "TXN#4", "sk": "ITEM#1", "value": "original"})
-    dynamo.put_item("test_table", {"pk": "TXN#4", "sk": "CHECK", "status": "inactive"})
+    await dynamo.put_item("test_table", {"pk": "TXN#4", "sk": "ITEM#1", "value": "original"})
+    await dynamo.put_item("test_table", {"pk": "TXN#4", "sk": "CHECK", "status": "inactive"})
 
     # AND a transaction with a condition check that will fail
     operations = [
@@ -125,18 +129,19 @@ def test_transact_write_rollback_on_condition_failure(dynamo):
     # WHEN we execute the transaction
     # THEN it fails
     with pytest.raises((TransactionCanceledException, PydynoxException)):
-        dynamo.sync_transact_write(operations)
+        await dynamo.transact_write(operations)
 
     # AND the put was rolled back - original value remains
-    result = dynamo.get_item("test_table", {"pk": "TXN#4", "sk": "ITEM#1"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#4", "sk": "ITEM#1"})
     assert result is not None
     assert result["value"] == "original"
 
 
-def test_transact_write_condition_check_success(dynamo):
+@pytest.mark.asyncio
+async def test_transact_write_condition_check_success(dynamo):
     """Test transaction with a passing condition check."""
     # Put initial items
-    dynamo.put_item("test_table", {"pk": "TXN#5", "sk": "CHECK", "status": "active"})
+    await dynamo.put_item("test_table", {"pk": "TXN#5", "sk": "CHECK", "status": "active"})
 
     operations = [
         {
@@ -154,51 +159,71 @@ def test_transact_write_condition_check_success(dynamo):
         },
     ]
 
-    dynamo.sync_transact_write(operations)
+    await dynamo.transact_write(operations)
 
     # Verify the put succeeded
-    result = dynamo.get_item("test_table", {"pk": "TXN#5", "sk": "NEW"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#5", "sk": "NEW"})
     assert result is not None
     assert result["name"] == "Created"
 
 
-def test_transaction_context_manager(dynamo):
-    """Test SyncTransaction context manager commits on exit."""
-    # WHEN we use the context manager (sync)
-    with SyncTransaction(dynamo) as txn:
+@pytest.mark.asyncio
+async def test_transaction_context_manager(dynamo):
+    """Test Transaction async context manager commits on exit."""
+    # WHEN we use the async context manager
+    async with Transaction(dynamo) as txn:
         txn.put("test_table", {"pk": "TXN#6", "sk": "ITEM#1", "name": "Alice"})
         txn.put("test_table", {"pk": "TXN#6", "sk": "ITEM#2", "name": "Bob"})
 
     # THEN items are saved
-    result = dynamo.get_item("test_table", {"pk": "TXN#6", "sk": "ITEM#1"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#6", "sk": "ITEM#1"})
     assert result is not None
     assert result["name"] == "Alice"
 
-    result = dynamo.get_item("test_table", {"pk": "TXN#6", "sk": "ITEM#2"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#6", "sk": "ITEM#2"})
     assert result is not None
     assert result["name"] == "Bob"
 
 
-def test_transaction_context_manager_rollback_on_exception(dynamo):
-    """Test SyncTransaction context manager does not commit on exception."""
+@pytest.mark.asyncio
+async def test_transaction_context_manager_rollback_on_exception(dynamo):
+    """Test Transaction async context manager does not commit on exception."""
     # GIVEN an existing item
-    dynamo.put_item("test_table", {"pk": "TXN#7", "sk": "ITEM", "value": "original"})
+    await dynamo.put_item("test_table", {"pk": "TXN#7", "sk": "ITEM", "value": "original"})
 
     # WHEN an exception occurs in the context
     try:
-        with SyncTransaction(dynamo) as txn:
+        async with Transaction(dynamo) as txn:
             txn.put("test_table", {"pk": "TXN#7", "sk": "ITEM", "value": "updated"})
             raise RuntimeError("Simulated error")
     except RuntimeError:
         pass
 
     # THEN the put was NOT committed - original value remains
-    result = dynamo.get_item("test_table", {"pk": "TXN#7", "sk": "ITEM"})
+    result = await dynamo.get_item("test_table", {"pk": "TXN#7", "sk": "ITEM"})
     assert result is not None
     assert result["value"] == "original"
 
 
-def test_transact_write_empty_operations(dynamo):
+@pytest.mark.asyncio
+async def test_transact_write_empty_operations(dynamo):
     """Test transaction with empty operations list does nothing."""
-    # Should not raise an error (sync)
-    dynamo.sync_transact_write([])
+    # Should not raise an error
+    await dynamo.transact_write([])
+
+
+def test_sync_transaction_context_manager(dynamo):
+    """Test SyncTransaction context manager commits on exit."""
+    # WHEN we use the sync context manager
+    with SyncTransaction(dynamo) as txn:
+        txn.put("test_table", {"pk": "TXN#8", "sk": "ITEM#1", "name": "Alice"})
+        txn.put("test_table", {"pk": "TXN#8", "sk": "ITEM#2", "name": "Bob"})
+
+    # THEN items are saved
+    result = dynamo.sync_get_item("test_table", {"pk": "TXN#8", "sk": "ITEM#1"})
+    assert result is not None
+    assert result["name"] == "Alice"
+
+    result = dynamo.sync_get_item("test_table", {"pk": "TXN#8", "sk": "ITEM#2"})
+    assert result is not None
+    assert result["name"] == "Bob"

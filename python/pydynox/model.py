@@ -6,34 +6,64 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydynox._internal._model._async import (
-    async_delete,
-    async_delete_by_key,
-    async_get,
-    async_save,
-    async_update,
-    async_update_by_key,
+    delete as async_delete,
+)
+from pydynox._internal._model._async import (
+    delete_by_key as async_delete_by_key,
+)
+from pydynox._internal._model._async import (
+    get as async_get,
+)
+from pydynox._internal._model._async import (
+    save as async_save,
+)
+from pydynox._internal._model._async import (
+    update as async_update,
+)
+from pydynox._internal._model._async import (
+    update_by_key as async_update_by_key,
 )
 from pydynox._internal._model._base import ModelBase, ModelMeta
 from pydynox._internal._model._batch import batch_get, sync_batch_get
 from pydynox._internal._model._crud import (
-    delete,
-    delete_by_key,
-    get,
-    save,
-    update,
-    update_by_key,
+    delete as sync_delete,
+)
+from pydynox._internal._model._crud import (
+    delete_by_key as sync_delete_by_key,
+)
+from pydynox._internal._model._crud import (
+    get as sync_get,
+)
+from pydynox._internal._model._crud import (
+    save as sync_save,
+)
+from pydynox._internal._model._crud import (
+    update as sync_update,
+)
+from pydynox._internal._model._crud import (
+    update_by_key as sync_update_by_key,
 )
 from pydynox._internal._model._query import (
-    async_count,
-    async_execute_statement,
-    async_parallel_scan,
-    async_query,
-    async_scan,
-    count,
-    execute_statement,
-    parallel_scan,
-    query,
-    scan,
+    count as async_count,
+)
+from pydynox._internal._model._query import (
+    execute_statement as async_execute_statement,
+)
+from pydynox._internal._model._query import (
+    parallel_scan as async_parallel_scan,
+)
+from pydynox._internal._model._query import (
+    query as async_query,
+)
+from pydynox._internal._model._query import (
+    scan as async_scan,
+)
+from pydynox._internal._model._query import (
+    sync_count,
+    sync_execute_statement,
+    sync_parallel_scan,
+    sync_query,
+    sync_scan,
 )
 from pydynox._internal._model._s3_helpers import (
     _delete_s3_files,
@@ -94,13 +124,13 @@ class Model(ModelBase, metaclass=ModelMeta):
     # ========== SYNC CRUD ==========
 
     @classmethod
-    def get(
+    def sync_get(
         cls: type[M],
         consistent_read: bool | None = None,
         as_dict: bool = False,
         **keys: Any,
     ) -> M | dict[str, Any] | None:
-        """Get an item from DynamoDB by its key.
+        """Get an item from DynamoDB by its key (sync).
 
         Args:
             consistent_read: Use strongly consistent read. Defaults to model_config value.
@@ -111,17 +141,14 @@ class Model(ModelBase, metaclass=ModelMeta):
             The model instance (or dict if as_dict=True) if found, None otherwise.
 
         Example:
-            >>> user = User.get(pk="USER#1", sk="PROFILE")
+            >>> user = User.sync_get(pk="USER#1", sk="PROFILE")
             >>> if user:
             ...     print(user.name)
-            >>>
-            >>> # Return as dict for better performance
-            >>> user_dict = User.get(pk="USER#1", sk="PROFILE", as_dict=True)
         """
-        return get(cls, consistent_read, as_dict, **keys)
+        return sync_get(cls, consistent_read, as_dict, **keys)
 
-    def save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
-        """Save the model to DynamoDB.
+    def sync_save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
+        """Save the model to DynamoDB (sync).
 
         Args:
             condition: Optional condition that must be true for the write.
@@ -133,15 +160,14 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         Example:
             >>> user = User(pk="USER#1", sk="PROFILE", name="John")
-            >>> user.save()
-            >>>
-            >>> # With condition (prevent overwrite)
-            >>> user.save(condition=User.pk.not_exists())
+            >>> user.sync_save()
         """
-        save(self, condition, skip_hooks)
+        sync_save(self, condition, skip_hooks)
 
-    def delete(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
-        """Delete the model from DynamoDB.
+    def sync_delete(
+        self, condition: Condition | None = None, skip_hooks: bool | None = None
+    ) -> None:
+        """Delete the model from DynamoDB (sync).
 
         Args:
             condition: Optional condition that must be true for the delete.
@@ -151,22 +177,19 @@ class Model(ModelBase, metaclass=ModelMeta):
             ConditionalCheckFailedException: If the condition is not met.
 
         Example:
-            >>> user = User.get(pk="USER#1", sk="PROFILE")
-            >>> user.delete()
-            >>>
-            >>> # With condition
-            >>> user.delete(condition=User.status == "inactive")
+            >>> user = User.sync_get(pk="USER#1", sk="PROFILE")
+            >>> user.sync_delete()
         """
-        delete(self, condition, skip_hooks)
+        sync_delete(self, condition, skip_hooks)
 
-    def update(
+    def sync_update(
         self,
         atomic: list[AtomicOp] | None = None,
         condition: Condition | None = None,
         skip_hooks: bool | None = None,
         **kwargs: Any,
     ) -> None:
-        """Update specific attributes on the model.
+        """Update specific attributes on the model (sync).
 
         Args:
             atomic: List of atomic operations (SET, ADD, REMOVE, etc).
@@ -175,43 +198,36 @@ class Model(ModelBase, metaclass=ModelMeta):
             **kwargs: Attribute names and new values to update.
 
         Example:
-            >>> user = User.get(pk="USER#1", sk="PROFILE")
-            >>>
-            >>> # Simple update
-            >>> user.update(name="Jane")
-            >>>
-            >>> # Atomic operations
-            >>> from pydynox.atomic import AtomicOp
-            >>> user.update(atomic=[AtomicOp.add("login_count", 1)])
+            >>> user = User.sync_get(pk="USER#1", sk="PROFILE")
+            >>> user.sync_update(name="Jane")
         """
-        update(self, atomic, condition, skip_hooks, **kwargs)
+        sync_update(self, atomic, condition, skip_hooks, **kwargs)
 
     @classmethod
-    def update_by_key(cls: type[M], condition: Condition | None = None, **kwargs: Any) -> None:
-        """Update an item by key without fetching it first.
+    def sync_update_by_key(cls: type[M], condition: Condition | None = None, **kwargs: Any) -> None:
+        """Update an item by key without fetching it first (sync).
 
         Args:
             condition: Optional condition that must be true for the update.
             **kwargs: Must include key attributes plus attributes to update.
 
         Example:
-            >>> # Update without fetching
-            >>> User.update_by_key(pk="USER#1", sk="PROFILE", name="Jane")
+            >>> User.sync_update_by_key(pk="USER#1", sk="PROFILE", name="Jane")
         """
-        update_by_key(cls, condition, **kwargs)
+        sync_update_by_key(cls, condition, **kwargs)
 
     @classmethod
-    def delete_by_key(cls: type[M], condition: Condition | None = None, **kwargs: Any) -> None:
-        """Delete an item by key without fetching it first.
+    def sync_delete_by_key(cls: type[M], condition: Condition | None = None, **kwargs: Any) -> None:
+        """Delete an item by key without fetching it first (sync).
 
         Args:
             condition: Optional condition that must be true for the delete.
             **kwargs: The key attributes (hash_key and optional range_key).
 
         Example:
-            >>> User.delete_by_key(pk="USER#1", sk="PROFILE")
+            >>> User.sync_delete_by_key(pk="USER#1", sk="PROFILE")
         """
-        delete_by_key(cls, condition, **kwargs)
+        sync_delete_by_key(cls, condition, **kwargs)
 
     @classmethod
     def sync_batch_get(
@@ -272,85 +288,289 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return await batch_get(cls, keys, consistent_read, as_dict)
 
-    # ========== ASYNC CRUD ==========
+    # ========== ASYNC CRUD (default) ==========
 
     @classmethod
-    async def async_get(
+    async def get(
         cls: type[M],
         consistent_read: bool | None = None,
         as_dict: bool = False,
         **keys: Any,
     ) -> M | dict[str, Any] | None:
-        """Async version of get.
+        """Get an item from DynamoDB by its key (async, default).
+
+        Args:
+            consistent_read: Use strongly consistent read. Defaults to model_config value.
+            as_dict: If True, return dict instead of Model instance.
+            **keys: The key attributes (hash_key and optional range_key).
+
+        Returns:
+            The model instance (or dict if as_dict=True) if found, None otherwise.
 
         Example:
-            >>> user = await User.async_get(pk="USER#1", sk="PROFILE")
-            >>>
-            >>> # Return as dict for better performance
-            >>> user_dict = await User.async_get(pk="USER#1", as_dict=True)
+            >>> user = await User.get(pk="USER#1", sk="PROFILE")
+            >>> if user:
+            ...     print(user.name)
         """
         return await async_get(cls, consistent_read, as_dict, **keys)
 
-    async def async_save(
+    async def save(
         self, condition: Condition | None = None, skip_hooks: bool | None = None
     ) -> None:
-        """Async version of save.
+        """Save the model to DynamoDB (async, default).
+
+        Args:
+            condition: Optional condition that must be true for the write.
+            skip_hooks: If True, skip before/after save hooks.
+
+        Raises:
+            ConditionalCheckFailedException: If the condition is not met.
+            ItemTooLargeException: If item exceeds max_size in model_config.
 
         Example:
             >>> user = User(pk="USER#1", sk="PROFILE", name="John")
-            >>> await user.async_save()
+            >>> await user.save()
         """
         await async_save(self, condition, skip_hooks)
 
-    async def async_delete(
+    async def delete(
         self, condition: Condition | None = None, skip_hooks: bool | None = None
     ) -> None:
-        """Async version of delete.
+        """Delete the model from DynamoDB (async, default).
+
+        Args:
+            condition: Optional condition that must be true for the delete.
+            skip_hooks: If True, skip before/after delete hooks.
+
+        Raises:
+            ConditionalCheckFailedException: If the condition is not met.
 
         Example:
-            >>> user = await User.async_get(pk="USER#1", sk="PROFILE")
-            >>> await user.async_delete()
+            >>> user = await User.get(pk="USER#1", sk="PROFILE")
+            >>> await user.delete()
         """
         await async_delete(self, condition, skip_hooks)
 
-    async def async_update(
+    async def update(
         self,
         atomic: list[AtomicOp] | None = None,
         condition: Condition | None = None,
         skip_hooks: bool | None = None,
         **kwargs: Any,
     ) -> None:
-        """Async version of update.
+        """Update specific attributes on the model (async, default).
+
+        Args:
+            atomic: List of atomic operations (SET, ADD, REMOVE, etc).
+            condition: Optional condition that must be true for the update.
+            skip_hooks: If True, skip before/after update hooks.
+            **kwargs: Attribute names and new values to update.
 
         Example:
-            >>> user = await User.async_get(pk="USER#1", sk="PROFILE")
-            >>> await user.async_update(name="Jane")
+            >>> user = await User.get(pk="USER#1", sk="PROFILE")
+            >>> await user.update(name="Jane")
         """
         await async_update(self, atomic, condition, skip_hooks, **kwargs)
 
     @classmethod
-    async def async_update_by_key(
+    async def update_by_key(
         cls: type[M], condition: Condition | None = None, **kwargs: Any
     ) -> None:
-        """Async version of update_by_key.
+        """Update an item by key without fetching it first (async, default).
+
+        Args:
+            condition: Optional condition that must be true for the update.
+            **kwargs: Must include key attributes plus attributes to update.
 
         Example:
-            >>> await User.async_update_by_key(pk="USER#1", sk="PROFILE", name="Jane")
+            >>> await User.update_by_key(pk="USER#1", sk="PROFILE", name="Jane")
         """
         await async_update_by_key(cls, condition, **kwargs)
 
     @classmethod
-    async def async_delete_by_key(
+    async def delete_by_key(
         cls: type[M], condition: Condition | None = None, **kwargs: Any
     ) -> None:
-        """Async version of delete_by_key.
+        """Delete an item by key without fetching it first (async, default).
+
+        Args:
+            condition: Optional condition that must be true for the delete.
+            **kwargs: The key attributes (hash_key and optional range_key).
 
         Example:
-            >>> await User.async_delete_by_key(pk="USER#1", sk="PROFILE")
+            >>> await User.delete_by_key(pk="USER#1", sk="PROFILE")
         """
         await async_delete_by_key(cls, condition, **kwargs)
 
-    # ========== QUERY/SCAN ==========
+    # ========== SYNC QUERY/SCAN ==========
+
+    @classmethod
+    def sync_query(
+        cls: type[M],
+        hash_key: Any,
+        range_key_condition: Condition | None = None,
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        page_size: int | None = None,
+        scan_index_forward: bool = True,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+        as_dict: bool = False,
+        fields: list[str] | None = None,
+    ) -> ModelQueryResult[M]:
+        """Query items by hash key with optional conditions (sync).
+
+        Args:
+            hash_key: The hash key value to query.
+            range_key_condition: Optional condition on range key.
+            filter_condition: Optional filter applied after query.
+            limit: Max total items to return across all pages.
+            page_size: Items per page (passed as Limit to DynamoDB).
+            scan_index_forward: True for ascending, False for descending.
+            consistent_read: Use strongly consistent read.
+            last_evaluated_key: Start key for pagination.
+            as_dict: If True, return dicts instead of Model instances.
+            fields: List of fields to return. Saves RCU.
+
+        Returns:
+            Iterable result that auto-paginates.
+
+        Example:
+            >>> for order in Order.sync_query(hash_key="USER#1"):
+            ...     print(order.order_id)
+        """
+        return sync_query(
+            cls,
+            hash_key=hash_key,
+            range_key_condition=range_key_condition,
+            filter_condition=filter_condition,
+            limit=limit,
+            page_size=page_size,
+            scan_index_forward=scan_index_forward,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            as_dict=as_dict,
+            fields=fields,
+        )
+
+    @classmethod
+    def sync_scan(
+        cls: type[M],
+        filter_condition: Condition | None = None,
+        limit: int | None = None,
+        page_size: int | None = None,
+        consistent_read: bool | None = None,
+        last_evaluated_key: dict[str, Any] | None = None,
+        segment: int | None = None,
+        total_segments: int | None = None,
+        as_dict: bool = False,
+        fields: list[str] | None = None,
+    ) -> ModelScanResult[M]:
+        """Scan all items in the table (sync).
+
+        Args:
+            filter_condition: Optional filter applied after scan.
+            limit: Max total items to return across all pages.
+            page_size: Items per page (passed as Limit to DynamoDB).
+            consistent_read: Use strongly consistent read.
+            last_evaluated_key: Start key for pagination.
+            segment: Segment number for parallel scan.
+            total_segments: Total segments for parallel scan.
+            as_dict: If True, return dicts instead of Model instances.
+            fields: List of fields to return. Saves RCU.
+
+        Returns:
+            Iterable result that auto-paginates.
+
+        Example:
+            >>> for user in User.sync_scan():
+            ...     print(user.name)
+        """
+        return sync_scan(
+            cls,
+            filter_condition=filter_condition,
+            limit=limit,
+            page_size=page_size,
+            consistent_read=consistent_read,
+            last_evaluated_key=last_evaluated_key,
+            segment=segment,
+            total_segments=total_segments,
+            as_dict=as_dict,
+            fields=fields,
+        )
+
+    @classmethod
+    def sync_count(
+        cls: type[M],
+        filter_condition: Condition | None = None,
+        consistent_read: bool | None = None,
+    ) -> tuple[int, OperationMetrics]:
+        """Count items in the table (sync).
+
+        Args:
+            filter_condition: Optional filter to count matching items.
+            consistent_read: Use strongly consistent read.
+
+        Returns:
+            Tuple of (count, metrics).
+
+        Example:
+            >>> total, metrics = User.sync_count()
+            >>> print(f"Total users: {total}")
+        """
+        return sync_count(cls, filter_condition, consistent_read)
+
+    @classmethod
+    def sync_execute_statement(
+        cls: type[M],
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+    ) -> list[M]:
+        """Execute a PartiQL statement (sync).
+
+        Args:
+            statement: PartiQL SELECT statement.
+            parameters: Optional parameters for the statement.
+            consistent_read: Use strongly consistent read.
+
+        Returns:
+            List of model instances.
+
+        Example:
+            >>> users = User.sync_execute_statement(
+            ...     "SELECT * FROM users WHERE pk = ?",
+            ...     parameters=["USER#1"]
+            ... )
+        """
+        return sync_execute_statement(cls, statement, parameters, consistent_read)
+
+    @classmethod
+    def sync_parallel_scan(
+        cls: type[M],
+        total_segments: int,
+        filter_condition: Condition | None = None,
+        consistent_read: bool | None = None,
+        as_dict: bool = False,
+    ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
+        """Parallel scan - runs multiple segment scans concurrently (sync).
+
+        Args:
+            total_segments: Number of parallel segments (workers).
+            filter_condition: Optional filter applied after scan.
+            consistent_read: Use strongly consistent read.
+            as_dict: If True, return dicts instead of Model instances.
+
+        Returns:
+            Tuple of (list of items, combined metrics).
+
+        Example:
+            >>> users, metrics = User.sync_parallel_scan(total_segments=4)
+            >>> print(f"Found {len(users)} users")
+        """
+        return sync_parallel_scan(cls, total_segments, filter_condition, consistent_read, as_dict)
+
+    # ========== ASYNC QUERY/SCAN (default) ==========
 
     @classmethod
     def query(
@@ -365,8 +585,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         last_evaluated_key: dict[str, Any] | None = None,
         as_dict: bool = False,
         fields: list[str] | None = None,
-    ) -> ModelQueryResult[M]:
-        """Query items by hash key with optional conditions.
+    ) -> AsyncModelQueryResult[M]:
+        """Query items by hash key with optional conditions (async, default).
 
         Args:
             hash_key: The hash key value to query.
@@ -378,31 +598,16 @@ class Model(ModelBase, metaclass=ModelMeta):
             consistent_read: Use strongly consistent read.
             last_evaluated_key: Start key for pagination.
             as_dict: If True, return dicts instead of Model instances.
-            fields: List of fields to return. Saves RCU by fetching only what you need.
+            fields: List of fields to return. Saves RCU.
 
         Returns:
-            Iterable result that auto-paginates.
+            Async iterable result that auto-paginates.
 
         Example:
-            >>> # Get all orders for a user
-            >>> for order in Order.query(hash_key="USER#1"):
+            >>> async for order in Order.query(hash_key="USER#1"):
             ...     print(order.order_id)
-            >>>
-            >>> # With range key condition
-            >>> recent = Order.query(
-            ...     hash_key="USER#1",
-            ...     range_key_condition=Order.sk.begins_with("ORDER#2024")
-            ... )
-            >>>
-            >>> # Return as dicts for better performance
-            >>> for order in Order.query(hash_key="USER#1", as_dict=True):
-            ...     print(order["order_id"])
-            >>>
-            >>> # Fetch only specific fields (saves RCU)
-            >>> for order in Order.query(hash_key="USER#1", fields=["order_id", "total"]):
-            ...     print(order.order_id, order.total)
         """
-        return query(
+        return async_query(
             cls,
             hash_key=hash_key,
             range_key_condition=range_key_condition,
@@ -428,8 +633,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         total_segments: int | None = None,
         as_dict: bool = False,
         fields: list[str] | None = None,
-    ) -> ModelScanResult[M]:
-        """Scan all items in the table.
+    ) -> AsyncModelScanResult[M]:
+        """Scan all items in the table (async, default).
 
         Args:
             filter_condition: Optional filter applied after scan.
@@ -440,157 +645,14 @@ class Model(ModelBase, metaclass=ModelMeta):
             segment: Segment number for parallel scan.
             total_segments: Total segments for parallel scan.
             as_dict: If True, return dicts instead of Model instances.
-            fields: List of fields to return. Saves RCU by fetching only what you need.
+            fields: List of fields to return. Saves RCU.
 
         Returns:
-            Iterable result that auto-paginates.
+            Async iterable result that auto-paginates.
 
         Example:
-            >>> # Scan all users
-            >>> for user in User.scan():
+            >>> async for user in User.scan():
             ...     print(user.name)
-            >>>
-            >>> # With filter
-            >>> active = User.scan(filter_condition=User.status == "active")
-            >>>
-            >>> # Return as dicts for better performance
-            >>> for user in User.scan(as_dict=True):
-            ...     print(user["name"])
-            >>>
-            >>> # Fetch only specific fields (saves RCU)
-            >>> for user in User.scan(fields=["pk", "name"]):
-            ...     print(user.pk, user.name)
-        """
-        return scan(
-            cls,
-            filter_condition=filter_condition,
-            limit=limit,
-            page_size=page_size,
-            consistent_read=consistent_read,
-            last_evaluated_key=last_evaluated_key,
-            segment=segment,
-            total_segments=total_segments,
-            as_dict=as_dict,
-            fields=fields,
-        )
-
-    @classmethod
-    def count(
-        cls: type[M],
-        filter_condition: Condition | None = None,
-        consistent_read: bool | None = None,
-    ) -> tuple[int, OperationMetrics]:
-        """Count items in the table.
-
-        Args:
-            filter_condition: Optional filter to count matching items.
-            consistent_read: Use strongly consistent read.
-
-        Returns:
-            Tuple of (count, metrics).
-
-        Example:
-            >>> total, metrics = User.count()
-            >>> print(f"Total users: {total}")
-            >>>
-            >>> # Count with filter
-            >>> active, _ = User.count(filter_condition=User.status == "active")
-        """
-        return count(cls, filter_condition, consistent_read)
-
-    @classmethod
-    def execute_statement(
-        cls: type[M],
-        statement: str,
-        parameters: list[Any] | None = None,
-        consistent_read: bool = False,
-    ) -> list[M]:
-        """Execute a PartiQL statement and return typed model instances.
-
-        Args:
-            statement: PartiQL SELECT statement.
-            parameters: Optional parameters for the statement.
-            consistent_read: Use strongly consistent read.
-
-        Returns:
-            List of model instances.
-
-        Example:
-            >>> users = User.execute_statement(
-            ...     "SELECT * FROM users WHERE pk = ?",
-            ...     parameters=["USER#1"]
-            ... )
-        """
-        return execute_statement(cls, statement, parameters, consistent_read)
-
-    @classmethod
-    def async_query(
-        cls: type[M],
-        hash_key: Any,
-        range_key_condition: Condition | None = None,
-        filter_condition: Condition | None = None,
-        limit: int | None = None,
-        page_size: int | None = None,
-        scan_index_forward: bool = True,
-        consistent_read: bool | None = None,
-        last_evaluated_key: dict[str, Any] | None = None,
-        as_dict: bool = False,
-        fields: list[str] | None = None,
-    ) -> AsyncModelQueryResult[M]:
-        """Async version of query.
-
-        Example:
-            >>> async for order in Order.async_query(hash_key="USER#1"):
-            ...     print(order.order_id)
-            >>>
-            >>> # Return as dicts for better performance
-            >>> async for order in Order.async_query(hash_key="USER#1", as_dict=True):
-            ...     print(order["order_id"])
-            >>>
-            >>> # Fetch only specific fields (saves RCU)
-            >>> async for order in Order.async_query(hash_key="USER#1", fields=["order_id"]):
-            ...     print(order.order_id)
-        """
-        return async_query(
-            cls,
-            hash_key=hash_key,
-            range_key_condition=range_key_condition,
-            filter_condition=filter_condition,
-            limit=limit,
-            page_size=page_size,
-            scan_index_forward=scan_index_forward,
-            consistent_read=consistent_read,
-            last_evaluated_key=last_evaluated_key,
-            as_dict=as_dict,
-            fields=fields,
-        )
-
-    @classmethod
-    def async_scan(
-        cls: type[M],
-        filter_condition: Condition | None = None,
-        limit: int | None = None,
-        page_size: int | None = None,
-        consistent_read: bool | None = None,
-        last_evaluated_key: dict[str, Any] | None = None,
-        segment: int | None = None,
-        total_segments: int | None = None,
-        as_dict: bool = False,
-        fields: list[str] | None = None,
-    ) -> AsyncModelScanResult[M]:
-        """Async version of scan.
-
-        Example:
-            >>> async for user in User.async_scan():
-            ...     print(user.name)
-            >>>
-            >>> # Return as dicts for better performance
-            >>> async for user in User.async_scan(as_dict=True):
-            ...     print(user["name"])
-            >>>
-            >>> # Fetch only specific fields (saves RCU)
-            >>> async for user in User.async_scan(fields=["pk", "name"]):
-            ...     print(user.pk, user.name)
         """
         return async_scan(
             cls,
@@ -606,29 +668,45 @@ class Model(ModelBase, metaclass=ModelMeta):
         )
 
     @classmethod
-    async def async_count(
+    async def count(
         cls: type[M],
         filter_condition: Condition | None = None,
         consistent_read: bool | None = None,
     ) -> tuple[int, OperationMetrics]:
-        """Async version of count.
+        """Count items in the table (async, default).
+
+        Args:
+            filter_condition: Optional filter to count matching items.
+            consistent_read: Use strongly consistent read.
+
+        Returns:
+            Tuple of (count, metrics).
 
         Example:
-            >>> total, metrics = await User.async_count()
+            >>> total, metrics = await User.count()
+            >>> print(f"Total users: {total}")
         """
         return await async_count(cls, filter_condition, consistent_read)
 
     @classmethod
-    async def async_execute_statement(
+    async def execute_statement(
         cls: type[M],
         statement: str,
         parameters: list[Any] | None = None,
         consistent_read: bool = False,
     ) -> list[M]:
-        """Async version of execute_statement.
+        """Execute a PartiQL statement (async, default).
+
+        Args:
+            statement: PartiQL SELECT statement.
+            parameters: Optional parameters for the statement.
+            consistent_read: Use strongly consistent read.
+
+        Returns:
+            List of model instances.
 
         Example:
-            >>> users = await User.async_execute_statement(
+            >>> users = await User.execute_statement(
             ...     "SELECT * FROM users WHERE pk = ?",
             ...     parameters=["USER#1"]
             ... )
@@ -636,14 +714,14 @@ class Model(ModelBase, metaclass=ModelMeta):
         return await async_execute_statement(cls, statement, parameters, consistent_read)
 
     @classmethod
-    def parallel_scan(
+    async def parallel_scan(
         cls: type[M],
         total_segments: int,
         filter_condition: Condition | None = None,
         consistent_read: bool | None = None,
         as_dict: bool = False,
     ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
-        """Parallel scan - runs multiple segment scans concurrently.
+        """Parallel scan - runs multiple segment scans concurrently (async, default).
 
         Args:
             total_segments: Number of parallel segments (workers).
@@ -655,30 +733,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             Tuple of (list of items, combined metrics).
 
         Example:
-            >>> # Scan with 4 parallel workers
-            >>> users, metrics = User.parallel_scan(total_segments=4)
+            >>> users, metrics = await User.parallel_scan(total_segments=4)
             >>> print(f"Found {len(users)} users")
-            >>>
-            >>> # Return as dicts for better performance
-            >>> users, metrics = User.parallel_scan(total_segments=4, as_dict=True)
-        """
-        return parallel_scan(cls, total_segments, filter_condition, consistent_read, as_dict)
-
-    @classmethod
-    async def async_parallel_scan(
-        cls: type[M],
-        total_segments: int,
-        filter_condition: Condition | None = None,
-        consistent_read: bool | None = None,
-        as_dict: bool = False,
-    ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
-        """Async parallel scan - runs multiple segment scans concurrently.
-
-        Example:
-            >>> users, metrics = await User.async_parallel_scan(total_segments=4)
-            >>>
-            >>> # Return as dicts for better performance
-            >>> users, metrics = await User.async_parallel_scan(total_segments=4, as_dict=True)
         """
         return await async_parallel_scan(
             cls, total_segments, filter_condition, consistent_read, as_dict

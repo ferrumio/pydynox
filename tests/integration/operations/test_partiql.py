@@ -13,16 +13,17 @@ def populated_table(dynamo):
         {"pk": "USER#2", "sk": "PROFILE", "name": "Bob", "age": 25},
     ]
     for item in items:
-        dynamo.put_item("test_table", item)
+        dynamo.sync_put_item("test_table", item)
     return dynamo
 
 
-def test_execute_statement_select_all(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_select_all(populated_table):
     """Test SELECT * with PartiQL."""
     dynamo = populated_table
 
     # WHEN we execute a PartiQL SELECT
-    result = dynamo.execute_statement(
+    result = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["USER#1"],
     )
@@ -33,11 +34,12 @@ def test_execute_statement_select_all(populated_table):
     assert result.metrics.duration_ms > 0
 
 
-def test_execute_statement_select_specific_columns(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_select_specific_columns(populated_table):
     """Test SELECT specific columns with PartiQL."""
     dynamo = populated_table
 
-    result = dynamo.execute_statement(
+    result = await dynamo.execute_statement(
         "SELECT name, age FROM test_table WHERE pk = ? AND sk = ?",
         parameters=["USER#1", "PROFILE"],
     )
@@ -47,11 +49,12 @@ def test_execute_statement_select_specific_columns(populated_table):
     assert result[0]["age"] == 30
 
 
-def test_execute_statement_with_multiple_parameters(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_with_multiple_parameters(populated_table):
     """Test PartiQL with multiple parameters."""
     dynamo = populated_table
 
-    result = dynamo.execute_statement(
+    result = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ? AND sk = ?",
         parameters=["USER#1", "ORDER#001"],
     )
@@ -61,11 +64,12 @@ def test_execute_statement_with_multiple_parameters(populated_table):
     assert result[0]["status"] == "shipped"
 
 
-def test_execute_statement_no_results(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_no_results(populated_table):
     """Test PartiQL with no matching results."""
     dynamo = populated_table
 
-    result = dynamo.execute_statement(
+    result = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["NONEXISTENT"],
     )
@@ -73,11 +77,12 @@ def test_execute_statement_no_results(populated_table):
     assert len(result) == 0
 
 
-def test_execute_statement_consistent_read(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_consistent_read(populated_table):
     """Test PartiQL with consistent read."""
     dynamo = populated_table
 
-    result = dynamo.execute_statement(
+    result = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["USER#2"],
         consistent_read=True,
@@ -87,11 +92,12 @@ def test_execute_statement_consistent_read(populated_table):
     assert result[0]["name"] == "Bob"
 
 
-def test_execute_statement_returns_metrics(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_returns_metrics(populated_table):
     """Test that PartiQL returns metrics."""
     dynamo = populated_table
 
-    result = dynamo.execute_statement(
+    result = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["USER#1"],
     )
@@ -100,17 +106,18 @@ def test_execute_statement_returns_metrics(populated_table):
     assert result.metrics.items_count == 3
 
 
-def test_execute_statement_without_parameters(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_without_parameters(populated_table):
     """Test PartiQL without parameters - query specific partition."""
     dynamo = populated_table
 
     # Query USER#1 partition (3 items) and USER#2 partition (1 item) separately
     # to avoid full table scan which would include items from other tests
-    result1 = dynamo.execute_statement(
+    result1 = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["USER#1"],
     )
-    result2 = dynamo.execute_statement(
+    result2 = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["USER#2"],
     )
@@ -119,11 +126,12 @@ def test_execute_statement_without_parameters(populated_table):
     assert len(result2) == 1
 
 
-def test_execute_statement_iterate(populated_table):
+@pytest.mark.asyncio
+async def test_execute_statement_iterate(populated_table):
     """Test iterating over PartiQL result."""
     dynamo = populated_table
 
-    result = dynamo.execute_statement(
+    result = await dynamo.execute_statement(
         "SELECT * FROM test_table WHERE pk = ?",
         parameters=["USER#1"],
     )

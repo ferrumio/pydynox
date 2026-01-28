@@ -35,7 +35,8 @@ def test_create_table_hash_key_only(client):
     client.sync_delete_table("hash_only_table")
 
 
-def test_create_table_hash_and_range_key(client):
+@pytest.mark.asyncio
+async def test_create_table_hash_and_range_key(client):
     """Test creating a table with hash and range key."""
     client.sync_create_table(
         "hash_range_table",
@@ -45,9 +46,9 @@ def test_create_table_hash_and_range_key(client):
 
     assert client.sync_table_exists("hash_range_table")
 
-    # Verify we can write to it
-    client.put_item("hash_range_table", {"pk": "test", "sk": "item", "data": "value"})
-    result = client.get_item("hash_range_table", {"pk": "test", "sk": "item"})
+    # Verify we can write to it (async)
+    await client.put_item("hash_range_table", {"pk": "test", "sk": "item", "data": "value"})
+    result = await client.get_item("hash_range_table", {"pk": "test", "sk": "item"})
     assert result is not None
     assert result["data"] == "value"
 
@@ -84,13 +85,14 @@ def test_create_table_provisioned_billing(client):
     client.sync_delete_table("provisioned_table")
 
 
-def test_create_table_with_wait(client):
+@pytest.mark.asyncio
+async def test_create_table_with_wait(client):
     """Test creating a table and waiting for it to be active."""
     client.sync_create_table("wait_table", hash_key=("pk", "S"), wait=True)
 
-    # Table should be immediately usable
-    client.put_item("wait_table", {"pk": "test", "data": "value"})
-    result = client.get_item("wait_table", {"pk": "test"})
+    # Table should be immediately usable (async)
+    await client.put_item("wait_table", {"pk": "test", "data": "value"})
+    result = await client.get_item("wait_table", {"pk": "test"})
     assert result is not None
     assert result["data"] == "value"
 
@@ -117,8 +119,8 @@ def test_wait_for_table_active(client):
     client.sync_create_table("wait_active_table", hash_key=("pk", "S"))
     client.sync_wait_for_table_active("wait_active_table")
 
-    # Table should be usable
-    client.put_item("wait_active_table", {"pk": "test"})
+    # Table should be usable (sync)
+    client.sync_put_item("wait_active_table", {"pk": "test"})
 
     client.sync_delete_table("wait_active_table")
 
@@ -178,8 +180,8 @@ def test_create_table_with_gsi_hash_only(client):
 
     assert client.sync_table_exists("gsi_hash_table")
 
-    # Verify we can write
-    client.put_item(
+    # Verify we can write (sync)
+    client.sync_put_item(
         "gsi_hash_table", {"pk": "USER#1", "sk": "PROFILE", "email": "test@example.com"}
     )
 
@@ -269,8 +271,8 @@ def test_create_table_with_lsi(client):
 
     assert client.sync_table_exists("lsi_table")
 
-    # Verify we can write
-    client.put_item(
+    # Verify we can write (sync)
+    client.sync_put_item(
         "lsi_table",
         {"pk": "USER#1", "sk": "PROFILE#1", "status": "active"},
     )
@@ -365,8 +367,8 @@ def test_create_table_with_gsi_and_lsi(client):
 
     assert client.sync_table_exists("gsi_lsi_table")
 
-    # Verify we can write
-    client.put_item(
+    # Verify we can write (sync)
+    client.sync_put_item(
         "gsi_lsi_table",
         {
             "pk": "USER#1",

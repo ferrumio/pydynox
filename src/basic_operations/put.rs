@@ -143,7 +143,7 @@ fn extract_item_from_put_error(
 
 /// Sync put_item - blocks until complete.
 #[allow(clippy::too_many_arguments)]
-pub fn put_item(
+pub fn sync_put_item(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
@@ -172,9 +172,9 @@ pub fn put_item(
     }
 }
 
-/// Async put_item - returns a Python awaitable.
+/// Async put_item - returns a Python awaitable (default).
 #[allow(clippy::too_many_arguments)]
-pub fn async_put_item<'py>(
+pub fn put_item<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,

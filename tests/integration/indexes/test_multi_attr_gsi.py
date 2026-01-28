@@ -32,11 +32,11 @@ def multi_attr_client(dynamodb_endpoint):
     table_name = "multi_attr_gsi_test"
 
     # Delete if exists
-    if client.table_exists(table_name):
-        client.delete_table(table_name)
+    if client.sync_table_exists(table_name):
+        client.sync_delete_table(table_name)
 
     # Create table with multi-attribute GSI
-    client.create_table(
+    client.sync_create_table(
         table_name,
         hash_key=("pk", "S"),
         range_key=("sk", "S"),
@@ -89,10 +89,11 @@ class Product(Model):
     )
 
 
-def test_multi_attr_gsi_query_basic(multi_attr_client):
+@pytest.mark.asyncio
+async def test_multi_attr_gsi_query_basic(multi_attr_client):
     """Test basic query on multi-attribute GSI."""
     # GIVEN products in different regions
-    Product(
+    p1 = Product(
         pk="PROD#1",
         sk="DATA",
         tenant_id="ACME",
@@ -103,9 +104,10 @@ def test_multi_attr_gsi_query_basic(multi_attr_client):
         subcategory="phones",
         name="iPhone",
         price=999,
-    ).save()
+    )
+    await p1.save()
 
-    Product(
+    p2 = Product(
         pk="PROD#2",
         sk="DATA",
         tenant_id="ACME",
@@ -116,9 +118,10 @@ def test_multi_attr_gsi_query_basic(multi_attr_client):
         subcategory="laptops",
         name="MacBook",
         price=1999,
-    ).save()
+    )
+    await p2.save()
 
-    Product(
+    p3 = Product(
         pk="PROD#3",
         sk="DATA",
         tenant_id="ACME",
@@ -129,15 +132,17 @@ def test_multi_attr_gsi_query_basic(multi_attr_client):
         subcategory="phones",
         name="Galaxy",
         price=899,
-    ).save()
+    )
+    await p3.save()
 
     # WHEN querying by tenant_id + region (both hash key attrs required)
-    results = list(
-        Product.location_index.query(
+    results = [
+        x
+        async for x in Product.location_index.query(
             tenant_id="ACME",
             region="us-east-1",
         )
-    )
+    ]
 
     # THEN only us-east-1 products should be returned
     assert len(results) == 2
@@ -145,10 +150,11 @@ def test_multi_attr_gsi_query_basic(multi_attr_client):
     assert names == {"iPhone", "MacBook"}
 
 
-def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
+@pytest.mark.asyncio
+async def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
     """Test query returns only matching tenant/region combo."""
     # GIVEN products for different tenants
-    Product(
+    p1 = Product(
         pk="PROD#10",
         sk="DATA",
         tenant_id="ACME",
@@ -159,9 +165,10 @@ def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
         subcategory="fiction",
         name="Book A",
         price=20,
-    ).save()
+    )
+    await p1.save()
 
-    Product(
+    p2 = Product(
         pk="PROD#11",
         sk="DATA",
         tenant_id="GLOBEX",
@@ -172,15 +179,17 @@ def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
         subcategory="fiction",
         name="Book B",
         price=25,
-    ).save()
+    )
+    await p2.save()
 
     # WHEN querying ACME only
-    results = list(
-        Product.location_index.query(
+    results = [
+        x
+        async for x in Product.location_index.query(
             tenant_id="ACME",
             region="us-east-1",
         )
-    )
+    ]
 
     # THEN only ACME products should be returned
     assert len(results) == 1
@@ -188,10 +197,11 @@ def test_multi_attr_gsi_query_different_tenant(multi_attr_client):
     assert results[0].tenant_id == "ACME"
 
 
-def test_multi_attr_gsi_query_category_index(multi_attr_client):
+@pytest.mark.asyncio
+async def test_multi_attr_gsi_query_category_index(multi_attr_client):
     """Test query on category index (2 hash keys, no range key)."""
     # GIVEN products in different subcategories
-    Product(
+    p1 = Product(
         pk="PROD#20",
         sk="DATA",
         tenant_id="ACME",
@@ -202,9 +212,10 @@ def test_multi_attr_gsi_query_category_index(multi_attr_client):
         subcategory="shirts",
         name="T-Shirt",
         price=30,
-    ).save()
+    )
+    await p1.save()
 
-    Product(
+    p2 = Product(
         pk="PROD#21",
         sk="DATA",
         tenant_id="ACME",
@@ -215,9 +226,10 @@ def test_multi_attr_gsi_query_category_index(multi_attr_client):
         subcategory="shirts",
         name="Polo",
         price=50,
-    ).save()
+    )
+    await p2.save()
 
-    Product(
+    p3 = Product(
         pk="PROD#22",
         sk="DATA",
         tenant_id="ACME",
@@ -228,15 +240,17 @@ def test_multi_attr_gsi_query_category_index(multi_attr_client):
         subcategory="pants",
         name="Jeans",
         price=80,
-    ).save()
+    )
+    await p3.save()
 
     # WHEN querying clothing/shirts
-    results = list(
-        Product.category_index.query(
+    results = [
+        x
+        async for x in Product.category_index.query(
             category="clothing",
             subcategory="shirts",
         )
-    )
+    ]
 
     # THEN only shirts should be returned
     assert len(results) == 2
@@ -244,10 +258,11 @@ def test_multi_attr_gsi_query_category_index(multi_attr_client):
     assert names == {"T-Shirt", "Polo"}
 
 
-def test_multi_attr_gsi_query_with_filter(multi_attr_client):
+@pytest.mark.asyncio
+async def test_multi_attr_gsi_query_with_filter(multi_attr_client):
     """Test multi-attribute GSI query with filter condition."""
     # GIVEN products with different prices
-    Product(
+    p1 = Product(
         pk="PROD#30",
         sk="DATA",
         tenant_id="FILTER_TEST",
@@ -258,9 +273,10 @@ def test_multi_attr_gsi_query_with_filter(multi_attr_client):
         subcategory="games",
         name="Cheap Game",
         price=10,
-    ).save()
+    )
+    await p1.save()
 
-    Product(
+    p2 = Product(
         pk="PROD#31",
         sk="DATA",
         tenant_id="FILTER_TEST",
@@ -271,40 +287,45 @@ def test_multi_attr_gsi_query_with_filter(multi_attr_client):
         subcategory="games",
         name="Expensive Game",
         price=100,
-    ).save()
+    )
+    await p2.save()
 
     # WHEN querying with price filter
-    results = list(
-        Product.location_index.query(
+    results = [
+        x
+        async for x in Product.location_index.query(
             tenant_id="FILTER_TEST",
             region="us-west-2",
             filter_condition=Product.price >= 50,
         )
-    )
+    ]
 
     # THEN only expensive items should be returned
     assert len(results) == 1
     assert results[0].name == "Expensive Game"
 
 
-def test_multi_attr_gsi_query_empty_result(multi_attr_client):
+@pytest.mark.asyncio
+async def test_multi_attr_gsi_query_empty_result(multi_attr_client):
     """Test multi-attribute GSI query with no matches."""
     # WHEN querying for non-existent tenant/region
-    results = list(
-        Product.location_index.query(
+    results = [
+        x
+        async for x in Product.location_index.query(
             tenant_id="NONEXISTENT",
             region="nowhere",
         )
-    )
+    ]
 
     # THEN no results should be returned
     assert len(results) == 0
 
 
-def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
+@pytest.mark.asyncio
+async def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
     """Test that query returns proper model instances."""
     # GIVEN a product in the table
-    Product(
+    p = Product(
         pk="PROD#40",
         sk="DATA",
         tenant_id="INSTANCE_TEST",
@@ -315,15 +336,17 @@ def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
         subcategory="snacks",
         name="Chips",
         price=5,
-    ).save()
+    )
+    await p.save()
 
     # WHEN querying via GSI
-    results = list(
-        Product.location_index.query(
+    results = [
+        x
+        async for x in Product.location_index.query(
             tenant_id="INSTANCE_TEST",
             region="ap-south-1",
         )
-    )
+    ]
 
     # THEN result should be a Product instance with all attributes
     assert len(results) == 1
@@ -337,12 +360,13 @@ def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
     assert product.price == 5
 
 
-def test_multi_attr_gsi_query_requires_all_hash_keys(multi_attr_client):
+@pytest.mark.asyncio
+async def test_multi_attr_gsi_query_requires_all_hash_keys(multi_attr_client):
     """Test that query fails if not all hash keys provided."""
     # WHEN querying with missing hash key
     # THEN ValueError should be raised
     with pytest.raises(ValueError, match="Missing"):
-        list(Product.location_index.query(tenant_id="ACME"))
+        [x async for x in Product.location_index.query(tenant_id="ACME")]
 
     with pytest.raises(ValueError, match="Missing"):
-        list(Product.category_index.query(category="electronics"))
+        [x async for x in Product.category_index.query(category="electronics")]
