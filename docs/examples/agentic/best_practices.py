@@ -38,7 +38,7 @@ class Employee(Model):
 @tool
 def get_order(order_id: str) -> dict:
     """Get order details."""
-    order = Order.get(pk=order_id, sk="DETAILS")
+    order = Order.sync_get(pk=order_id, sk="DETAILS")
 
     if not order:
         return {"found": False, "error": "Order not found"}
@@ -55,12 +55,12 @@ def get_order(order_id: str) -> dict:
 @tool
 def delete_customer(customer_id: str) -> dict:
     """Delete a customer."""
-    customer = Customer.get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
+    customer = Customer.sync_get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
 
     if not customer:
         return {"success": False, "error": "Not found"}
 
-    customer.delete()
+    customer.sync_delete()
     return {"success": True}
 
 
@@ -88,7 +88,7 @@ def search_orders(customer_id: str, status: str = None) -> list:
         query_params["filter_condition"] = "status = :status"
         query_params["expression_values"][":status"] = status
 
-    orders = Order.query(**query_params)
+    orders = list(Order.sync_query(**query_params))
     return [{"order_id": o.order_id, "status": o.status, "total": o.total} for o in orders]
 
 
@@ -96,7 +96,7 @@ def search_orders(customer_id: str, status: str = None) -> list:
 @tool
 def get_employee_bad(employee_id: str) -> dict:
     """Get employee (BAD - exposes SSN)."""
-    emp = Employee.get(pk=f"EMP#{employee_id}", sk="PROFILE")
+    emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
     if not emp:
         return {"error": "Not found"}
     return {"name": emp.name, "ssn": emp.ssn}  # Don't expose SSN!
@@ -106,7 +106,7 @@ def get_employee_bad(employee_id: str) -> dict:
 @tool
 def get_employee_good(employee_id: str) -> dict:
     """Get employee (GOOD - no sensitive data)."""
-    emp = Employee.get(pk=f"EMP#{employee_id}", sk="PROFILE")
+    emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
     if not emp:
         return {"error": "Not found"}
     return {"name": emp.name, "department": emp.department}

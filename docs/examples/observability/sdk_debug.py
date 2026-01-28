@@ -1,3 +1,6 @@
+"""SDK debug logging example."""
+
+import asyncio
 import logging
 
 from pydynox import DynamoDBClient, set_logger
@@ -9,6 +12,11 @@ logger.setLevel(logging.DEBUG)
 # Enable SDK debug logs
 set_logger(logger, sdk_debug=True)
 
-# Now you'll see detailed AWS SDK logs
-client = DynamoDBClient()
-client.get_item("users", {"pk": "USER#1"})
+
+async def main():
+    # Now you'll see detailed AWS SDK logs
+    client = DynamoDBClient()
+    await client.get_item("users", {"pk": "USER#1"})
+
+
+asyncio.run(main())

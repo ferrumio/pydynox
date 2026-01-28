@@ -1,3 +1,5 @@
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 from pydynox.hooks import after_save, before_save
@@ -26,9 +28,13 @@ class User(Model):
         print(f"Saved user: {self.pk}")
 
 
-# Hooks run automatically
-user = User(pk="USER#HOOK", sk="PROFILE", email="JOHN@TEST.COM", name="john doe")
-user.save()  # Validates, normalizes, then logs
+async def main():
+    # Hooks run automatically
+    user = User(pk="USER#HOOK", sk="PROFILE", email="JOHN@TEST.COM", name="john doe")
+    await user.save()  # Validates, normalizes, then logs
 
-# Skip hooks if needed
-user.save(skip_hooks=True)
+    # Skip hooks if needed
+    await user.save(skip_hooks=True)
+
+
+asyncio.run(main())

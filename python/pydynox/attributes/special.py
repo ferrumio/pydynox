@@ -77,7 +77,7 @@ class EnumAttribute(Attribute[E], Generic[E]):
         hash_key: True if this is the partition key.
         range_key: True if this is the sort key.
         default: Default enum value.
-        null: Whether None is allowed.
+        required: Whether this field is required.
 
     Example:
         >>> from enum import Enum
@@ -106,7 +106,7 @@ class EnumAttribute(Attribute[E], Generic[E]):
         hash_key: bool = False,
         range_key: bool = False,
         default: E | None = None,
-        null: bool = True,
+        required: bool = False,
     ):
         """Create an enum attribute.
 
@@ -115,13 +115,13 @@ class EnumAttribute(Attribute[E], Generic[E]):
             hash_key: True if this is the partition key.
             range_key: True if this is the sort key.
             default: Default enum value.
-            null: Whether None is allowed.
+            required: Whether this field is required.
         """
         super().__init__(
             hash_key=hash_key,
             range_key=range_key,
             default=default,
-            null=null,
+            required=required,
         )
         self.enum_class = enum_class
 
@@ -180,7 +180,7 @@ class DatetimeAttribute(Attribute[datetime]):
         >>> class Event(Model):
         ...     model_config = ModelConfig(table="events")
         ...     pk = StringAttribute(hash_key=True)
-        ...     created_at = DatetimeAttribute(null=True)
+        ...     created_at = DatetimeAttribute(required=False)
         ...
         ...     @before_save
         ...     def set_created_at(self):

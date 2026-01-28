@@ -59,10 +59,12 @@ Control the sort order with `scan_index_forward`:
 
 ```python
 # Ascending (default)
-users = User.status_index.query(status="active", scan_index_forward=True)
+async for user in User.status_index.query(status="active", scan_index_forward=True):
+    print(user.name)
 
 # Descending
-users = User.status_index.query(status="active", scan_index_forward=False)
+async for user in User.status_index.query(status="active", scan_index_forward=False):
+    print(user.name)
 ```
 
 ## Pagination
@@ -94,39 +96,35 @@ GSI queries support the same pagination parameters as table queries:
 
 For "load more" buttons:
 
-```python
-result = User.status_index.query(status="active", limit=10, page_size=10)
-
-for user in result:
-    print(user.email)
-
-# Check if there are more results
-if result.last_evaluated_key:
-    next_result = User.status_index.query(
-        status="active",
-        limit=10,
-        page_size=10,
-        last_evaluated_key=result.last_evaluated_key,
-    )
-```
+=== "gsi_manual_pagination.py"
+    ```python
+    --8<-- "docs/examples/indexes/gsi_manual_pagination.py"
+    ```
 
 ## Async queries
 
-Use `async_query` for async/await support:
+GSI queries are async by default. Use `async for` to iterate:
 
 ```python
-async for user in User.email_index.async_query(email="john@example.com"):
+async for user in User.email_index.query(email="john@example.com"):
     print(user.name)
 
 # With filter
-async for user in User.status_index.async_query(
+async for user in User.status_index.query(
     status="active",
     filter_condition=User.age >= 18,
 ):
     print(user.email)
 
 # Get first result
-user = await User.email_index.async_query(email="john@example.com").first()
+user = await User.email_index.query(email="john@example.com").first()
+```
+
+For sync code, use `sync_query`:
+
+```python
+for user in User.email_index.sync_query(email="john@example.com"):
+    print(user.name)
 ```
 
 ## Metrics
@@ -134,8 +132,8 @@ user = await User.email_index.async_query(email="john@example.com").first()
 Access query metrics using class methods:
 
 ```python
-result = User.email_index.query(email="john@example.com")
-users = list(result)
+async for user in User.email_index.query(email="john@example.com"):
+    print(user.name)
 
 # Get last operation metrics
 last = User.get_last_metrics()

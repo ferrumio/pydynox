@@ -47,7 +47,7 @@ def get_customer_by_email(email: str) -> dict:
         Customer info with id, name, and email. Returns error if not found.
     """
     # Scan with filter since we don't have a GSI in this example
-    results = list(Customer.scan(filter_condition=Customer.email == email, limit=1))
+    results = list(Customer.sync_scan(filter_condition=Customer.email == email, limit=1))
 
     if not results:
         return {"error": f"No customer found with email {email}"}
@@ -70,7 +70,7 @@ def get_customer_by_id(customer_id: str) -> dict:
     Returns:
         Customer info with name and email. Returns error if not found.
     """
-    customer = Customer.get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
+    customer = Customer.sync_get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
 
     if not customer:
         return {"error": f"Customer {customer_id} not found"}
@@ -94,7 +94,7 @@ def get_recent_orders(customer_id: str, limit: int = 5) -> list:
         List of orders with order_id, status, tracking, and total.
     """
     orders = list(
-        Order.query(
+        Order.sync_query(
             hash_key=f"CUSTOMER#{customer_id}",
             range_key_condition=Order.sk.begins_with("ORDER#"),
             scan_index_forward=False,
@@ -125,7 +125,7 @@ def get_order_status(customer_id: str, order_id: str) -> dict:
         Order status and tracking info. Returns error if not found.
     """
     orders = list(
-        Order.query(
+        Order.sync_query(
             hash_key=f"CUSTOMER#{customer_id}",
             range_key_condition=Order.sk.begins_with("ORDER#"),
             filter_condition=Order.order_id == order_id,
@@ -155,12 +155,12 @@ def update_customer_preferences(customer_id: str, preferences: dict) -> dict:
     Returns:
         Success message or error.
     """
-    customer = Customer.get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
+    customer = Customer.sync_get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
 
     if not customer:
         return {"error": f"Customer {customer_id} not found"}
 
-    customer.update(**preferences)
+    customer.sync_update(**preferences)
     return {"success": True, "message": "Preferences updated"}
 
 
@@ -248,9 +248,9 @@ if __name__ == "__main__":
         ]
 
         for customer in sample_customers:
-            customer.save()
+            customer.sync_save()
         for order in sample_orders:
-            order.save()
+            order.sync_save()
 
         print("Sample data inserted!")
 

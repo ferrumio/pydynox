@@ -1,3 +1,5 @@
+"""Real world async example (async is default - no prefix needed)."""
+
 import asyncio
 
 from pydynox import DynamoDBClient, Model, ModelConfig
@@ -16,12 +18,12 @@ class User(Model):
 async def get_user_with_orders(user_id: str):
     """Fetch user and their orders at the same time."""
     user, orders = await asyncio.gather(
-        User.async_get(pk=f"USER#{user_id}", sk="PROFILE"),
-        client.async_query(
+        User.get(pk=f"USER#{user_id}", sk="PROFILE"),
+        client.query(
             "orders",
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": f"USER#{user_id}"},
-        ).to_list(),
+        ).all(),
     )
     return {"user": user, "orders": orders}

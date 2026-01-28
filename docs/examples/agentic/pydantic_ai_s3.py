@@ -45,7 +45,7 @@ async def upload_document(
         size_bytes=len(content_bytes),
     )
     doc.content = S3File(content_bytes, name=f"{doc_id}.txt", content_type="text/plain")
-    await doc.save_async()
+    await doc.save()
 
     return {
         "success": True,
@@ -58,17 +58,20 @@ async def upload_document(
 async def get_document(ctx, doc_id: str, version: str = "latest") -> dict:
     """Get document details."""
     if version == "latest":
-        docs = await Document.query_async(
-            key_condition="pk = :pk",
-            expression_values={":pk": f"DOC#{doc_id}"},
-            scan_index_forward=False,
-            limit=1,
-        )
+        docs = [
+            doc
+            async for doc in Document.query(
+                key_condition="pk = :pk",
+                expression_values={":pk": f"DOC#{doc_id}"},
+                scan_index_forward=False,
+                limit=1,
+            )
+        ]
         if not docs:
             return {"error": f"Document {doc_id} not found"}
         doc = docs[0]
     else:
-        doc = await Document.get_async(pk=f"DOC#{doc_id}", sk=f"VERSION#{version}")
+        doc = await Document.get(pk=f"DOC#{doc_id}", sk=f"VERSION#{version}")
         if not doc:
             return {"error": f"Document {doc_id} version {version} not found"}
 

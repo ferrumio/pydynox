@@ -43,8 +43,8 @@ class PaginationUser(Model):
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     name = StringAttribute()
-    status = StringAttribute(null=True)
-    age = NumberAttribute(null=True)
+    status = StringAttribute()
+    age = NumberAttribute()
 
     status_index = GlobalSecondaryIndex(
         index_name="status-index",

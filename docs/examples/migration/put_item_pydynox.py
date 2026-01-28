@@ -1,5 +1,7 @@
 """pydynox: Put item to DynamoDB."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 
@@ -12,5 +14,9 @@ class User(Model):
     email = StringAttribute()
 
 
-user = User(pk="USER#123", sk="PROFILE", name="John Doe", email="john@example.com")
-user.save()
+async def main():
+    user = User(pk="USER#123", sk="PROFILE", name="John Doe", email="john@example.com")
+    await user.save()
+
+
+asyncio.run(main())

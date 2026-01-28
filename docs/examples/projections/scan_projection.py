@@ -1,3 +1,5 @@
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 
@@ -10,6 +12,10 @@ class User(Model):
     status = StringAttribute()
 
 
-# Scan with fields - useful for reports or exports
-for user in User.scan(fields=["pk", "status"]):
-    print(user.pk, user.status)
+async def main():
+    # Scan with fields - useful for reports or exports
+    async for user in User.scan(fields=["pk", "status"]):
+        print(user.pk, user.status)
+
+
+asyncio.run(main())

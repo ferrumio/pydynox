@@ -1,5 +1,6 @@
 """EnumAttribute example - store Python enum as string."""
 
+import asyncio
 from enum import Enum
 
 from pydynox import Model, ModelConfig
@@ -20,16 +21,20 @@ class User(Model):
     status = EnumAttribute(Status, default=Status.PENDING)
 
 
-# Create with enum value
-user = User(pk="USER#ENUM", sk="PROFILE", status=Status.ACTIVE)
-user.save()
-# Stored as "active" in DynamoDB
+async def main():
+    # Create with enum value
+    user = User(pk="USER#ENUM", sk="PROFILE", status=Status.ACTIVE)
+    await user.save()
+    # Stored as "active" in DynamoDB
 
-# Load it back - returns the enum
-loaded = User.get(pk="USER#ENUM", sk="PROFILE")
-print(loaded.status)  # Status.ACTIVE
-print(loaded.status == Status.ACTIVE)  # True
+    # Load it back - returns the enum
+    loaded = await User.get(pk="USER#ENUM", sk="PROFILE")
+    print(loaded.status)  # Status.ACTIVE
+    print(loaded.status == Status.ACTIVE)  # True
 
-# Default value works
-user2 = User(pk="USER#ENUM2", sk="PROFILE")
-print(user2.status)  # Status.PENDING
+    # Default value works
+    user2 = User(pk="USER#ENUM2", sk="PROFILE")
+    print(user2.status)  # Status.PENDING
+
+
+asyncio.run(main())

@@ -1,14 +1,21 @@
 """PartiQL SELECT specific columns."""
 
+import asyncio
+
 from pydynox import DynamoDBClient
 
-client = DynamoDBClient()
 
-# Select only name and age columns
-result = client.execute_statement(
-    "SELECT name, age FROM users WHERE pk = ? AND sk = ?",
-    parameters=["USER#1", "PROFILE"],
-)
+async def main():
+    client = DynamoDBClient()
 
-for item in result:
-    print(f"{item['name']} is {item['age']} years old")
+    # Select only name and age columns
+    result = await client.execute_statement(
+        "SELECT name, age FROM users WHERE pk = ? AND sk = ?",
+        parameters=["USER#1", "PROFILE"],
+    )
+
+    for item in result:
+        print(f"{item['name']} is {item['age']} years old")
+
+
+asyncio.run(main())

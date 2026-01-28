@@ -71,6 +71,30 @@ Pass credentials directly. Good for testing or when credentials come from a secr
 
 These work automatically via the default credential chain. The env vars are injected by EKS or GitHub Actions. Just use `DynamoDBClient()` with no config. Good for Kubernetes and CI/CD pipelines.
 
+## Environment variables
+
+pydynox uses the [AWS SDK for Rust](https://docs.aws.amazon.com/sdk-for-rust/latest/dg/environment-variables.html), which supports standard AWS environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `AWS_ACCESS_KEY_ID` | Access key for authentication |
+| `AWS_SECRET_ACCESS_KEY` | Secret key for authentication |
+| `AWS_SESSION_TOKEN` | Session token for temporary credentials |
+| `AWS_REGION` / `AWS_DEFAULT_REGION` | Default region |
+| `AWS_PROFILE` | Profile name from `~/.aws/credentials` |
+| `AWS_ENDPOINT_URL` | Custom endpoint (for local dev) |
+| `AWS_MAX_ATTEMPTS` | Max retry attempts |
+| `AWS_RETRY_MODE` | Retry mode: `standard` or `adaptive` |
+
+These work automatically - no code changes needed. Set them in your shell, `.env` file, or CI/CD pipeline.
+
+```bash
+export AWS_REGION=us-east-1
+export AWS_PROFILE=my-profile
+```
+
+For the full list, see the [AWS SDK environment variables documentation](https://docs.aws.amazon.com/sdk-for-rust/latest/dg/environment-variables.html).
+
 ## Configuration
 
 ### Timeouts and retries
@@ -164,21 +188,21 @@ Table operations follow the async-first pattern. Async methods have no prefix, s
 
 See [table operations](tables.md) for details.
 
-### Sync methods
+### Item operations
 
-| Method | Description |
-|--------|-------------|
-| `ping()` | Check if the client can connect to DynamoDB. Returns `True` or `False`. |
-| `get_region()` | Get the AWS region this client is configured for. |
-| `put_item(table, item, ...)` | Save an item to a table. Overwrites if the key exists. |
-| `get_item(table, key)` | Get a single item by its primary key. Returns `None` if not found. |
-| `delete_item(table, key, ...)` | Delete an item by its primary key. |
-| `update_item(table, key, updates, ...)` | Update specific attributes without replacing the whole item. |
-| `query(table, key_condition, ...)` | Find items by partition key. Supports filtering and pagination. |
-| `batch_write(table, put_items, delete_keys)` | Write up to 25 items in one request. Faster than individual puts. |
-| `batch_get(table, keys)` | Get up to 100 items in one request. Faster than individual gets. |
-| `transact_write(operations)` | Write multiple items atomically. All succeed or all fail. |
-| `transact_get(gets)` | Read multiple items atomically. Consistent snapshot. |
+Item operations also follow async-first. Async methods have no prefix, sync methods have `sync_` prefix.
+
+| Async (default) | Sync | Description |
+|-----------------|------|-------------|
+| `put_item(table, item, ...)` | `sync_put_item(...)` | Save an item. Overwrites if key exists. |
+| `get_item(table, key)` | `sync_get_item(...)` | Get item by primary key. |
+| `delete_item(table, key, ...)` | `sync_delete_item(...)` | Delete item by primary key. |
+| `update_item(table, key, updates, ...)` | `sync_update_item(...)` | Update specific attributes. |
+| `query(table, key_condition, ...)` | `sync_query(...)` | Find items by partition key. |
+| `batch_write(table, put_items, delete_keys)` | `sync_batch_write(...)` | Write up to 25 items at once. |
+| `batch_get(table, keys)` | `sync_batch_get(...)` | Get up to 100 items at once. |
+| `transact_write(operations)` | `sync_transact_write(...)` | Atomic multi-item write. |
+| `transact_get(gets)` | `sync_transact_get(...)` | Atomic multi-item read. |
 
 Write methods (`put_item`, `update_item`, `delete_item`) support these optional parameters:
 
@@ -189,17 +213,12 @@ Write methods (`put_item`, `update_item`, `delete_item`) support these optional 
 | `expression_attribute_values` | Placeholders for values |
 | `return_values_on_condition_check_failure` | If `True`, get the existing item on `ConditionalCheckFailedException` |
 
-### Async methods
+### Utility methods
 
 | Method | Description |
 |--------|-------------|
-| `async_put_item(table, item)` | Async version of put_item. |
-| `async_get_item(table, key)` | Async version of get_item. |
-| `async_delete_item(table, key)` | Async version of delete_item. |
-| `async_update_item(table, key, updates)` | Async version of update_item. |
-| `async_query(table, key_condition, ...)` | Async version of query. |
-| `async_transact_write(operations)` | Async version of transact_write. |
-| `async_transact_get(gets)` | Async version of transact_get. |
+| `ping()` | Check if the client can connect to DynamoDB. Returns `True` or `False`. |
+| `get_region()` | Get the AWS region this client is configured for. |
 
 See [async operations](async.md) for examples and best practices.
 

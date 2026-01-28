@@ -33,14 +33,14 @@ def create_customer(customer_id: str, name: str, email: str) -> dict:
         name=name,
         email=email,
     )
-    customer.save()
+    customer.sync_save()
     return {"success": True, "customer_id": customer_id}
 
 
 @tool
 def update_customer(customer_id: str, name: str = None, email: str = None) -> dict:
     """Update customer details."""
-    customer = Customer.get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
+    customer = Customer.sync_get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
     if not customer:
         return {"error": "Customer not found"}
 
@@ -51,7 +51,7 @@ def update_customer(customer_id: str, name: str = None, email: str = None) -> di
         updates["email"] = email
 
     if updates:
-        customer.update(**updates)
+        customer.sync_update(**updates)
 
     return {"success": True}
 
@@ -59,11 +59,11 @@ def update_customer(customer_id: str, name: str = None, email: str = None) -> di
 @tool
 def delete_customer(customer_id: str) -> dict:
     """Delete a customer."""
-    customer = Customer.get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
+    customer = Customer.sync_get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
     if not customer:
         return {"error": "Customer not found"}
 
-    customer.delete()
+    customer.sync_delete()
     return {"success": True}
 
 
@@ -89,7 +89,7 @@ def search_orders(customer_id: str, status: str = None, limit: int = 10) -> list
         query_params["filter_condition"] = "status = :status"
         query_params["expression_values"][":status"] = status
 
-    orders = Order.query(**query_params)
+    orders = list(Order.sync_query(**query_params))
     return [{"order_id": o.order_id, "status": o.status} for o in orders]
 
 
@@ -106,10 +106,12 @@ def get_order_status(order_id: str) -> dict:
     Returns:
         Order status including: status, tracking number, estimated delivery.
     """
-    orders = Order.scan(
-        filter_condition="order_id = :order_id",
-        expression_values={":order_id": order_id},
-        limit=1,
+    orders = list(
+        Order.sync_scan(
+            filter_condition="order_id = :order_id",
+            expression_values={":order_id": order_id},
+            limit=1,
+        )
     )
 
     if not orders:

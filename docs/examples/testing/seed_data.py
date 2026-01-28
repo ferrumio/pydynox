@@ -1,4 +1,4 @@
-"""Using seed data with pydynox_memory_backend_factory."""
+"""Using seed data with pydynox_memory_backend_factory (async - default)."""
 
 import pytest
 from pydynox import Model, ModelConfig
@@ -19,7 +19,8 @@ class Order(Model):
     total = NumberAttribute()
 
 
-def test_with_seed_data(pydynox_memory_backend_factory):
+@pytest.mark.asyncio
+async def test_with_seed_data(pydynox_memory_backend_factory):
     """Test with pre-populated data."""
     seed = {
         "users": [
@@ -30,14 +31,15 @@ def test_with_seed_data(pydynox_memory_backend_factory):
 
     with pydynox_memory_backend_factory(seed=seed):
         # Data is already there!
-        alice = User.get(pk="USER#1")
+        alice = await User.get(pk="USER#1")
         assert alice.name == "Alice"
 
-        bob = User.get(pk="USER#2")
+        bob = await User.get(pk="USER#2")
         assert bob.name == "Bob"
 
 
-def test_with_multiple_tables(pydynox_memory_backend_factory):
+@pytest.mark.asyncio
+async def test_with_multiple_tables(pydynox_memory_backend_factory):
     """Seed multiple tables at once."""
     seed = {
         "users": [{"pk": "USER#1", "name": "John", "age": 30}],
@@ -48,10 +50,10 @@ def test_with_multiple_tables(pydynox_memory_backend_factory):
     }
 
     with pydynox_memory_backend_factory(seed=seed):
-        user = User.get(pk="USER#1")
+        user = await User.get(pk="USER#1")
         assert user is not None
 
-        orders = list(Order.query(hash_key="USER#1"))
+        orders = [order async for order in Order.query(hash_key="USER#1")]
         assert len(orders) == 2
 
 
@@ -66,7 +68,8 @@ def pydynox_seed():
     }
 
 
-def test_with_seeded_fixture(pydynox_memory_backend_seeded):
+@pytest.mark.asyncio
+async def test_with_seeded_fixture(pydynox_memory_backend_seeded):
     """Uses seed data from pydynox_seed fixture."""
-    admin = User.get(pk="ADMIN#1")
+    admin = await User.get(pk="ADMIN#1")
     assert admin.name == "Admin"

@@ -1,5 +1,7 @@
 """StringSetAttribute and NumberSetAttribute examples."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import (
     NumberSetAttribute,
@@ -17,24 +19,28 @@ class User(Model):
     scores = NumberSetAttribute()
 
 
-# Create with sets
-user = User(
-    pk="USER#SET",
-    sk="PROFILE",
-    tags={"admin", "verified", "premium"},
-    scores={100, 95, 88},
-)
-user.save()
+async def main():
+    # Create with sets
+    user = User(
+        pk="USER#SET",
+        sk="PROFILE",
+        tags={"admin", "verified", "premium"},
+        scores={100, 95, 88},
+    )
+    await user.save()
 
-# Load it back - returns Python sets
-loaded = User.get(pk="USER#SET", sk="PROFILE")
-print(loaded.tags)  # {'admin', 'verified', 'premium'}
-print(loaded.scores)  # {100, 95, 88}
+    # Load it back - returns Python sets
+    loaded = await User.get(pk="USER#SET", sk="PROFILE")
+    print(loaded.tags)  # {'admin', 'verified', 'premium'}
+    print(loaded.scores)  # {100, 95, 88}
 
-# Check membership
-print("admin" in loaded.tags)  # True
-print(100 in loaded.scores)  # True
+    # Check membership
+    print("admin" in loaded.tags)  # True
+    print(100 in loaded.scores)  # True
 
-# Sets don't allow duplicates
-user2 = User(pk="USER#SET2", sk="PROFILE", tags={"a", "a", "b"})
-print(user2.tags)  # {'a', 'b'}
+    # Sets don't allow duplicates
+    user2 = User(pk="USER#SET2", sk="PROFILE", tags={"a", "a", "b"})
+    print(user2.tags)  # {'a', 'b'}
+
+
+asyncio.run(main())

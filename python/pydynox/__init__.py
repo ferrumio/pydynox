@@ -33,7 +33,7 @@ from pydynox.generators import AutoGenerate
 from pydynox.integrations.functions import dynamodb_model
 from pydynox.model import Model
 from pydynox.transaction import SyncTransaction, Transaction
-from pydynox.version import VERSION
+from pydynox.version import VERSION, version_info
 
 __version__ = VERSION
 
@@ -65,4 +65,5 @@ __all__ = [
     "disable_tracing",
     # Version
     "__version__",
+    "version_info",
 ]

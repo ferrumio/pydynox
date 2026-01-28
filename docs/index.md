@@ -1,116 +1,156 @@
 # pydynox
 
-A fast DynamoDB ORM for Python with a Rust core.
-
-pydynox lets you work with DynamoDB using Python classes instead of raw dictionaries. The heavy lifting (serialization, deserialization) happens in Rust, so it's fast.
+An async-first DynamoDB ORM for Python with a Rust core.
 
 !!! info "📢 Stable Release: March 2-6, 2026"
     We're in the final stretch! The API is stabilizing, performance is being polished, and we're building the remaining features. We might release earlier if everything goes well. Stay tuned!
 
-## Key features
+## The problem
 
-- **Fast serialization** - Rust handles the heavy lifting
-- **Simple API** - Define models like Django or SQLAlchemy
-- **Type hints** - Full IDE support with autocomplete
-- **Rate limiting** - Control throughput to avoid throttling
-- **Lifecycle hooks** - Run code before/after operations
-- **TTL support** - Auto-delete items after expiration
-- **Native async** - Built-in async/await support
-- **Pydantic integration** - Use your existing Pydantic models
+DynamoDB's API is verbose. Every value needs a type annotation:
 
-## Getting started
-
-### Installation
-
-=== "pip"
-    ```bash
-    pip install pydynox
-    ```
-
-=== "uv"
-    ```bash
-    uv add pydynox
-    ```
-
-For Pydantic support:
-
-```bash
-pip install pydynox[pydantic]
+```python
+# boto3
+response = table.put_item(Item={
+    'pk': {'S': 'USER#123'},
+    'name': {'S': 'John'},
+    'age': {'N': '30'},
+    'tags': {'L': [{'S': 'admin'}, {'S': 'active'}]}
+})
 ```
 
-### Define a model
+This gets old fast. You write the same boilerplate for every operation, and typos in type annotations (`'S'` vs `'N'`) cause runtime errors.
 
-A model is a Python class that maps to a DynamoDB table. You define attributes with their types, and pydynox handles the rest:
+## The solution
 
-=== "basic_model.py"
-    ```python
-    --8<-- "docs/examples/models/basic_model.py"
-    ```
+pydynox gives you a Pythonic API:
 
-### CRUD operations
+```python
+# pydynox
+user = User(pk="USER#123", name="John", age=30, tags=["admin", "active"])
+await user.save()
+```
 
-Once you have a model, you can create, read, update, and delete items:
+You define models with typed attributes. pydynox handles serialization, validation, and all the DynamoDB quirks.
 
-=== "crud_operations.py"
-    ```python
-    --8<-- "docs/examples/models/crud_operations.py"
-    ```
+## Why Rust?
 
-That's it! You're now using DynamoDB with a clean, typed API.
+The slow part of any ORM is serialization - converting Python objects to DynamoDB format and back. Pure Python ORMs do this with loops and dictionary operations, which is slow.
 
-## What's next?
+pydynox does serialization in Rust. Even for a single item, you get faster serialization and the GIL is released during network calls. For batch operations with thousands of items, the difference is 10-50x.
 
-Now that you have the basics, explore these guides:
+## GIL-free async
+
+Python has a Global Interpreter Lock (GIL). Only one thread runs Python code at a time. When you call `await` on a network operation, Python should be free to run other coroutines. But if the library holds the GIL while waiting, nothing else can run.
+
+pydynox releases the GIL before making network calls. The Rust core uses [tokio](https://tokio.rs/) (an async runtime for Rust) to handle the actual HTTP requests. When you `await` a pydynox operation, PyO3's [`future_into_py`](https://docs.rs/pyo3/latest/pyo3/coroutine/fn.future_into_py.html) bridges Python's asyncio with tokio, and the GIL is released during the entire network call.
+
+```
+Python                    Rust (tokio)              DynamoDB
+  |                         |                          |
+  |-- await user.save() --->|                          |
+  |   (GIL released)        |-- HTTP request --------->|
+  |                         |                          |
+  |   (other coroutines     |   (waiting)              |
+  |    can run here)        |                          |
+  |                         |<-- HTTP response --------|
+  |<-- result --------------|                          |
+  |   (GIL reacquired)      |                          |
+```
+
+This means your FastAPI or aiohttp app can handle other requests while waiting for DynamoDB.
+
+!!! note "Python 3.13+ free-threaded mode"
+    Python 3.13 introduced experimental free-threaded mode (no GIL), and 3.14 improves it. Even with free-threading, pydynox benefits from having the heavy work in Rust - serialization runs in parallel without competing for Python's interpreter. When free-threaded Python becomes mainstream, pydynox will work even better.
+
+## Built on AWS SDK for Rust
+
+pydynox uses the official [AWS SDK for Rust](https://aws.amazon.com/sdk-for-rust/) under the hood. This is the same SDK that AWS uses internally and recommends for production workloads.
+
+What this means for you:
+
+- **Official support** - The SDK is maintained by AWS, not a third-party library
+- **Battle-tested** - Used in production across AWS services
+- **Correct behavior** - Retry logic, error handling, and edge cases follow AWS best practices
+- **Future-proof** - As DynamoDB evolves, the SDK evolves with it
+
+You get the ergonomics of a Python ORM with the reliability of an AWS-maintained SDK.
+
+## Key features
+
+pydynox does what you'd expect from a DynamoDB ORM: models, CRUD, queries, batch operations, transactions, and indexes. The interesting parts are:
+
+**Async-first** - Methods are async by default. Use `sync_` prefix for sync code.
+
+**Rust core** - Serialization happens in Rust. This matters for batch operations and queries with thousands of items.
+
+**Auto pagination** - Query and scan iterate through all pages automatically. No more `LastEvaluatedKey` loops.
+
+**Rate limiting** - Built-in RCU/WCU control. No more throttling surprises.
+
+**Pydantic integration** - Use your existing Pydantic models with a decorator. Validation included.
+
+**Memory backend for tests** - Test your code without DynamoDB. Just add a pytest fixture.
+
+**Lifecycle hooks** - Run validation or logging before/after any operation.
+
+**Field encryption** - KMS encryption for sensitive attributes. Transparent to your code.
+
+**S3 attribute** - Store files larger than 400KB. Upload on save, download on demand.
+
+## Get started
+
+Ready to try it? Head to [Getting started](getting-started.md) for installation and your first model.
+
+## Guides
 
 ### Core
 
 | Guide | Description |
 |-------|-------------|
+| [Getting started](getting-started.md) | Installation and first model |
 | [Client](guides/client.md) | Configure the DynamoDB client |
-| [Models](guides/models.md) | Attributes, keys, defaults, and CRUD operations |
-| [Attributes](guides/attributes.md) | All available attribute types |
-| [Indexes](guides/indexes.md) | Query by non-key attributes with GSIs |
+| [Models](guides/models.md) | Attributes, keys, defaults, and CRUD |
+| [Attributes](guides/attributes.md) | All attribute types |
+| [Query](guides/query.md) | Query items with conditions |
+| [Scan](guides/scan.md) | Scan and count items |
+| [Indexes](guides/indexes.md) | GSI and LSI |
 | [Conditions](guides/conditions.md) | Filter and conditional writes |
-| [Atomic updates](guides/atomic-updates.md) | Increment, append, and other atomic operations |
-| [Observability](guides/observability.md) | Logging and metrics |
 
 ### Operations
 
 | Guide | Description |
 |-------|-------------|
-| [Async support](guides/async.md) | Async/await for high-concurrency apps |
-| [Batch operations](guides/batch.md) | Work with multiple items at once |
-| [Transactions](guides/transactions.md) | All-or-nothing operations |
+| [Async](guides/async.md) | Async-first API |
+| [Batch](guides/batch.md) | Batch get and write |
+| [Transactions](guides/transactions.md) | All-or-nothing writes |
 | [Tables](guides/tables.md) | Create and manage tables |
+| [Atomic updates](guides/atomic-updates.md) | Increment, append, remove |
 
 ### Features
 
 | Guide | Description |
 |-------|-------------|
-| [Lifecycle hooks](guides/hooks.md) | Run code before/after operations |
-| [Rate limiting](guides/rate-limiting.md) | Control throughput |
-| [TTL](guides/ttl.md) | Auto-delete items after expiration |
-| [Optimistic locking](guides/optimistic-locking.md) | Prevent concurrent update conflicts |
-| [Encryption](guides/encryption.md) | Field-level encryption with KMS |
-| [Projections](guides/projections.md) | Fetch only the fields you need |
-| [Size calculator](guides/size-calculator.md) | Calculate item sizes |
-| [PartiQL](guides/partiql.md) | SQL-like queries for DynamoDB |
+| [Hooks](guides/hooks.md) | Before/after operation hooks |
+| [Rate limiting](guides/rate-limiting.md) | RCU/WCU control |
+| [TTL](guides/ttl.md) | Auto-expire items |
+| [Optimistic locking](guides/optimistic-locking.md) | Version-based concurrency |
+| [Encryption](guides/encryption.md) | KMS field encryption |
+| [S3 attribute](guides/s3-attribute.md) | Large file storage |
+| [Projections](guides/projections.md) | Fetch specific fields |
+| [Testing](guides/testing.md) | Memory backend for tests |
 
 ### Integrations
 
 | Guide | Description |
 |-------|-------------|
 | [Pydantic](guides/pydantic.md) | Use Pydantic models |
+| [Dataclass](guides/dataclass.md) | Use dataclasses |
 
-### Diagnostics
-
-| Guide | Description |
-|-------|-------------|
-| [Hot partition detection](guides/diagnostics/hot-partition.md) | Detect partition key hotspots |
-
-### Troubleshooting
+### Reference
 
 | Guide | Description |
 |-------|-------------|
 | [Exceptions](guides/exceptions.md) | Error handling |
 | [IAM permissions](guides/iam-permissions.md) | Required AWS permissions |
+| [Observability](guides/observability.md) | Logging and metrics |

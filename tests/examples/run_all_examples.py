@@ -35,11 +35,11 @@ SKIP_DIRS = {"agentic"}
 
 # Files to skip (incomplete snippets, extra deps, LocalStack limitations, pytest-only)
 SKIP_FILES = {
-    "filter_condition.py",
-    "query_gsi.py",
+    # Incomplete snippets - no model definition, just code fragments
     "query_multi_attr.py",
-    "range_key_condition.py",
+    # Extra dependencies
     "fastapi_example.py",
+    # LocalStack limitations
     "create_table_multi_attr.py",
     "sdk_debug.py",
     # Testing examples - these use pytest fixtures, not standalone scripts
@@ -47,6 +47,11 @@ SKIP_FILES = {
     "testing_scan.py",
     "testing_ttl.py",
     "query_scan.py",
+    "basic_fixture.py",
+    "basic_fixture_sync.py",
+    "seed_data.py",
+    "inspect_data.py",
+    "lambda_handler.py",
     # Client projection examples - need specific table setup
     "client_projection.py",
     "nested_projection.py",

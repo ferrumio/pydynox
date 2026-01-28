@@ -42,7 +42,7 @@ async def main():
         )
 
     # Create an order
-    Order(
+    await Order(
         customer_id="CUST#1",
         order_id="ORD#001",
         status="pending",
@@ -51,12 +51,13 @@ async def main():
 
     # Query with consistent read (LSI-specific feature)
     # GSIs do NOT support consistent reads, but LSIs do!
-    results = list(
-        Order.status_index.query(
+    results = [
+        o
+        async for o in Order.status_index.query(
             customer_id="CUST#1",
             consistent_read=True,  # Strongly consistent read
         )
-    )
+    ]
 
     print(f"Found {len(results)} orders with consistent read")
 

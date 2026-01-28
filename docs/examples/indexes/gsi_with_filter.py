@@ -46,7 +46,7 @@ async def main():
         )
 
     # Create users
-    User(
+    await User(
         pk="USER#1",
         sk="PROFILE",
         email="john@example.com",
@@ -54,7 +54,7 @@ async def main():
         name="John",
         age=30,
     ).save()
-    User(
+    await User(
         pk="USER#2",
         sk="PROFILE",
         email="jane@example.com",
@@ -62,7 +62,7 @@ async def main():
         name="Jane",
         age=25,
     ).save()
-    User(
+    await User(
         pk="USER#3",
         sk="PROFILE",
         email="bob@example.com",
@@ -73,7 +73,7 @@ async def main():
 
     # Query active users over 30
     print("Active users age >= 30:")
-    for user in User.status_index.query(
+    async for user in User.status_index.query(
         status="active",
         filter_condition=User.age >= 30,
     ):

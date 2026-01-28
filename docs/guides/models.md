@@ -6,7 +6,7 @@ Models define the structure of your DynamoDB items and provide CRUD operations.
 
 - Typed attributes with defaults
 - Hash key and range key support
-- Required fields with `null=False`
+- Required fields with `required=True`
 - Save, get, update, delete operations
 - Convert to/from dict
 
@@ -52,11 +52,16 @@ class User(Model):
 
 ## CRUD operations
 
-Here's a complete example showing all CRUD operations:
+pydynox uses an async-first API. Methods without prefix are async (default), methods with `sync_` prefix are sync.
 
-=== "crud_operations.py"
+=== "Async (default)"
     ```python
     --8<-- "docs/examples/models/crud_operations.py"
+    ```
+
+=== "Sync (use sync_ prefix)"
+    ```python
+    --8<-- "docs/examples/models/sync_crud_operations.py"
     ```
 
 ### Create
@@ -65,7 +70,8 @@ To create a new item, instantiate your model and call `save()`:
 
 ```python
 user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
-user.save()
+await user.save()  # async
+user.sync_save()   # sync
 ```
 
 If an item with the same key already exists, `save()` replaces it completely. This is how DynamoDB works - there's no separate "create" vs "update" at the API level.
@@ -75,11 +81,15 @@ If an item with the same key already exists, `save()` replaces it completely. Th
 To get an item by its key, use the class method `get()`:
 
 ```python
-user = User.get(pk="USER#123", sk="PROFILE")
+# Async
+user = await User.get(pk="USER#123", sk="PROFILE")
 if user:
     print(user.name)
 else:
     print("User not found")
+
+# Sync
+user = User.sync_get(pk="USER#123", sk="PROFILE")
 ```
 
 `get()` returns `None` if the item doesn't exist. Always check for `None` before using the result.
@@ -87,16 +97,21 @@ else:
 If your table has only a hash key (no range key), you only need to pass the hash key:
 
 ```python
-user = User.get(pk="USER#123")
+user = await User.get(pk="USER#123")
 ```
 
 #### Consistent reads
 
 By default, `get()` uses eventually consistent reads. For strongly consistent reads, use `consistent_read=True`:
 
-=== "consistent_read.py"
+=== "Async (default)"
     ```python
     --8<-- "docs/examples/models/consistent_read.py"
+    ```
+
+=== "Sync (use sync_ prefix)"
+    ```python
+    --8<-- "docs/examples/models/sync_consistent_read.py"
     ```
 
 **When to use strongly consistent reads:**
@@ -122,17 +137,25 @@ There are two ways to update an item:
 **Full update with save()**: Change attributes and call `save()`. This replaces the entire item:
 
 ```python
-user = User.get(pk="USER#123", sk="PROFILE")
+user = await User.get(pk="USER#123", sk="PROFILE")
 user.name = "Jane"
 user.age = 31
-user.save()
+await user.save()
+
+# Sync
+user = User.sync_get(pk="USER#123", sk="PROFILE")
+user.name = "Jane"
+user.sync_save()
 ```
 
 **Partial update with update()**: Update specific fields without touching others:
 
 ```python
-user = User.get(pk="USER#123", sk="PROFILE")
-user.update(name="Jane", age=31)
+user = await User.get(pk="USER#123", sk="PROFILE")
+await user.update(name="Jane", age=31)
+
+# Sync
+user.sync_update(name="Jane", age=31)
 ```
 
 The difference matters when you have many attributes. With `save()`, you send all attributes to DynamoDB. With `update()`, you only send the changed ones.
@@ -144,8 +167,11 @@ The difference matters when you have many attributes. With `save()`, you send al
 To delete an item, call `delete()` on an instance:
 
 ```python
-user = User.get(pk="USER#123", sk="PROFILE")
-user.delete()
+user = await User.get(pk="USER#123", sk="PROFILE")
+await user.delete()
+
+# Sync
+user.sync_delete()
 ```
 
 After deletion, the object still exists in Python, but the item is gone from DynamoDB.
@@ -155,15 +181,20 @@ After deletion, the object still exists in Python, but the item is gone from Dyn
 Sometimes you want to update or delete an item without fetching it first. The traditional approach requires two DynamoDB calls:
 
 ```python
-user = User.get(pk="USER#123", sk="PROFILE")  # Call 1
-user.update(name="Jane")                       # Call 2
+user = await User.get(pk="USER#123", sk="PROFILE")  # Call 1
+await user.update(name="Jane")                       # Call 2
 ```
 
 Use `update_by_key()` and `delete_by_key()` to do it in one call:
 
-=== "key_operations.py"
+=== "Async (default)"
     ```python
     --8<-- "docs/examples/models/key_operations.py"
+    ```
+
+=== "Sync (use sync_ prefix)"
+    ```python
+    --8<-- "docs/examples/models/sync_key_operations.py"
     ```
 
 This is about 2x faster because you skip the read operation.
@@ -283,25 +314,34 @@ class User(Model):
 
 DynamoDB operations can fail for various reasons. Common errors:
 
-| Error | Cause |
-|-------|-------|
+| Exception | Cause |
+|-----------|-------|
 | `ResourceNotFoundException` | Table doesn't exist |
-| `ProvisionedThroughputExceededException` | Exceeded capacity |
-| `ValidationException` | Invalid data (item too large, etc.) |
+| `ProvisionedThroughputExceededException` | Exceeded capacity (throttled) |
+| `ValidationException` | Invalid data (item too large, bad key, etc.) |
 | `ConditionalCheckFailedException` | Conditional write failed |
+| `ItemTooLargeException` | Item exceeds `max_size` (Python-only, before DynamoDB call) |
 
-Wrap operations in try/except if you need to handle errors:
+Wrap operations in try/except:
 
 ```python
-from pydynox.exceptions import ResourceNotFoundException, ProvisionedThroughputExceededException
+from pydynox.exceptions import (
+    ResourceNotFoundException,
+    ProvisionedThroughputExceededException,
+    PydynoxException,
+)
 
 try:
-    user.save()
+    await user.save()
 except ResourceNotFoundException:
     print("Table doesn't exist")
 except ProvisionedThroughputExceededException:
     print("Rate limited, try again")
+except PydynoxException as e:
+    print(f"DynamoDB error: {e}")
 ```
+
+See [Exceptions](exceptions.md) for the full list.
 
 ## Testing your code
 

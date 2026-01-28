@@ -23,7 +23,6 @@ nav = [
         "guides/observability.md",
     ] },
     { "Operations" = [
-        "guides/async.md",
         "guides/batch.md",
         "guides/transactions.md",
         "guides/partiql.md",

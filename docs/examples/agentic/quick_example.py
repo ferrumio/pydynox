@@ -17,7 +17,7 @@ class Customer(Model):
 @tool
 def get_customer(customer_id: str) -> dict:
     """Get customer by ID."""
-    customer = Customer.get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
+    customer = Customer.sync_get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
 
     if not customer:
         return {"error": "Not found"}

@@ -1,3 +1,5 @@
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
 from pydynox.exceptions import ConditionalCheckFailedException
@@ -11,24 +13,28 @@ class Document(Model):
     version = VersionAttribute()
 
 
-# Create document
-doc = Document(pk="DOC#CONDITION", status="draft", content="Hello")
-doc.save()
+async def main():
+    # Create document
+    doc = Document(pk="DOC#CONDITION", status="draft", content="Hello")
+    await doc.save()
 
-# Update only if status is "draft"
-# This combines with version check: (status = "draft" AND version = 1)
-doc.content = "Updated content"
-doc.save(condition=Document.status == "draft")
-print(f"Updated! Version: {doc.version}")  # 2
+    # Update only if status is "draft"
+    # This combines with version check: (status = "draft" AND version = 1)
+    doc.content = "Updated content"
+    await doc.save(condition=Document.status == "draft")
+    print(f"Updated! Version: {doc.version}")  # 2
 
-# Change status
-doc.status = "published"
-doc.save()
-print(f"Published! Version: {doc.version}")  # 3
+    # Change status
+    doc.status = "published"
+    await doc.save()
+    print(f"Published! Version: {doc.version}")  # 3
 
-# Try to update draft-only - fails because status is "published"
-doc.content = "Another update"
-try:
-    doc.save(condition=Document.status == "draft")
-except ConditionalCheckFailedException:
-    print("Can't update - not a draft")
+    # Try to update draft-only - fails because status is "published"
+    doc.content = "Another update"
+    try:
+        await doc.save(condition=Document.status == "draft")
+    except ConditionalCheckFailedException:
+        print("Can't update - not a draft")
+
+
+asyncio.run(main())

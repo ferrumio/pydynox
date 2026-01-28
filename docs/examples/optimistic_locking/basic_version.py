@@ -1,3 +1,5 @@
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
 
@@ -9,18 +11,22 @@ class Document(Model):
     version = VersionAttribute()
 
 
-# Create new document
-doc = Document(pk="DOC#VERSION", content="Hello")
-print(doc.version)  # None
+async def main():
+    # Create new document
+    doc = Document(pk="DOC#VERSION", content="Hello")
+    print(doc.version)  # None
 
-doc.save()
-print(doc.version)  # 1
+    await doc.save()
+    print(doc.version)  # 1
 
-# Update document
-doc.content = "Hello World"
-doc.save()
-print(doc.version)  # 2
+    # Update document
+    doc.content = "Hello World"
+    await doc.save()
+    print(doc.version)  # 2
 
-# Load from DB - version is preserved
-loaded = Document.get(pk="DOC#VERSION")
-print(loaded.version)  # 2
+    # Load from DB - version is preserved
+    loaded = await Document.get(pk="DOC#VERSION")
+    print(loaded.version)  # 2
+
+
+asyncio.run(main())

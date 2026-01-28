@@ -1,5 +1,7 @@
 """Each Model class has isolated metrics."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 from pydynox.testing import MemoryBackend
@@ -17,18 +19,22 @@ class Order(Model):
     total = StringAttribute()
 
 
-with MemoryBackend():
-    # Reset both
-    User.reset_metrics()
-    Order.reset_metrics()
+async def main():
+    with MemoryBackend():
+        # Reset both
+        User.reset_metrics()
+        Order.reset_metrics()
 
-    # Operations on User
-    User(pk="USER#1", name="John").save()
-    User.get(pk="USER#1")
+        # Operations on User
+        await User(pk="USER#1", name="John").save()
+        await User.get(pk="USER#1")
 
-    # Operations on Order
-    Order(pk="ORDER#1", total="100").save()
+        # Operations on Order
+        await Order(pk="ORDER#1", total="100").save()
 
-    # Metrics are isolated per class
-    print(f"User: {User.get_total_metrics().operation_count} ops")  # 2
-    print(f"Order: {Order.get_total_metrics().operation_count} ops")  # 1
+        # Metrics are isolated per class
+        print(f"User: {User.get_total_metrics().operation_count} ops")  # 2
+        print(f"Order: {Order.get_total_metrics().operation_count} ops")  # 1
+
+
+asyncio.run(main())

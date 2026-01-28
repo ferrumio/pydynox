@@ -44,7 +44,7 @@ async def main():
 
     # Create 25 orders for one customer
     for i in range(25):
-        Order(
+        await Order(
             pk="CUSTOMER#1",
             sk=f"ORDER#{i:03d}",
             created_at=f"2024-01-{i + 1:02d}",
@@ -56,17 +56,18 @@ async def main():
     # page_size = items per DynamoDB request (controls pagination)
 
     # Example 1: Get exactly 10 orders for a customer
-    orders = list(
-        Order.created_at_index.query(
+    orders = [
+        o
+        async for o in Order.created_at_index.query(
             pk="CUSTOMER#1",
             limit=10,
         )
-    )
+    ]
     print(f"limit=10: Got {len(orders)} orders")
 
     # Example 2: Get all orders, fetching 5 per page
     count = 0
-    for order in Order.created_at_index.query(
+    async for order in Order.created_at_index.query(
         pk="CUSTOMER#1",
         page_size=5,
     ):
@@ -74,13 +75,14 @@ async def main():
     print(f"page_size=5 (no limit): Got {count} orders")
 
     # Example 3: Get 15 orders, fetching 5 per page (3 requests)
-    orders = list(
-        Order.created_at_index.query(
+    orders = [
+        o
+        async for o in Order.created_at_index.query(
             pk="CUSTOMER#1",
             limit=15,
             page_size=5,
         )
-    )
+    ]
     print(f"limit=15, page_size=5: Got {len(orders)} orders")
 
     # Example 4: Manual pagination with consistent reads (LSI supports this!)
@@ -90,7 +92,7 @@ async def main():
         page_size=10,
         consistent_read=True,
     )
-    first_page = list(result)
+    first_page = [o async for o in result]
     print(f"First page (consistent): {len(first_page)} items")
 
     if result.last_evaluated_key:
@@ -101,7 +103,7 @@ async def main():
             consistent_read=True,
             last_evaluated_key=result.last_evaluated_key,
         )
-        second_page = list(result)
+        second_page = [o async for o in result]
         print(f"Second page (consistent): {len(second_page)} items")
 
 

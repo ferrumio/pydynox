@@ -20,14 +20,14 @@ class Document(Model):
 
 
 async def main():
-    # Upload (Model uses async_save)
+    # Upload
     doc = Document(pk="DOC#async", sk="v1", name="async.txt")
     doc.content = S3File(b"Async content", name="async.txt")
-    await doc.async_save()
+    await doc.save()
     print(f"Uploaded: {doc.content.key}")
 
-    # Get (Model uses async_get)
-    loaded = await Document.async_get(pk="DOC#async", sk="v1")
+    # Get
+    loaded = await Document.get(pk="DOC#async", sk="v1")
     if loaded and loaded.content:
         # S3Value methods are async-first (no prefix = async)
         data = await loaded.content.get_bytes()
@@ -38,8 +38,8 @@ async def main():
         url = await loaded.content.presigned_url(3600)
         print(f"URL: {url}")
 
-    # Delete (Model uses async_delete)
-    await doc.async_delete()
+    # Delete
+    await doc.delete()
     print("Deleted")
 
 

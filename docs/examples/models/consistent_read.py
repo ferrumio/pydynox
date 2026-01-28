@@ -1,4 +1,6 @@
-"""Consistent read examples."""
+"""Consistent read examples (async - default)."""
+
+import asyncio
 
 from pydynox import DynamoDBClient, Model, ModelConfig
 from pydynox.attributes import StringAttribute
@@ -15,13 +17,6 @@ class User(Model):
     name = StringAttribute()
 
 
-# Eventually consistent (default)
-user = User.get(pk="USER#123", sk="PROFILE")
-
-# Strongly consistent
-user = User.get(pk="USER#123", sk="PROFILE", consistent_read=True)
-
-
 # Option 2: Model-level default
 class Order(Model):
     model_config = ModelConfig(
@@ -34,8 +29,19 @@ class Order(Model):
     sk = StringAttribute(range_key=True)
 
 
-# Uses strongly consistent read (from model_config)
-order = Order.get(pk="ORDER#456", sk="ITEM#1")
+async def main():
+    # Eventually consistent (default)
+    _user = await User.get(pk="USER#123", sk="PROFILE")
 
-# Override to eventually consistent for this call
-order = Order.get(pk="ORDER#456", sk="ITEM#1", consistent_read=False)
+    # Strongly consistent
+    _user = await User.get(pk="USER#123", sk="PROFILE", consistent_read=True)
+
+    # Uses strongly consistent read (from model_config)
+    _order = await Order.get(pk="ORDER#456", sk="ITEM#1")
+
+    # Override to eventually consistent for this call
+    _order = await Order.get(pk="ORDER#456", sk="ITEM#1", consistent_read=False)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

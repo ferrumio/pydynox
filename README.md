@@ -90,53 +90,88 @@ class User(Model):
     tags = ListAttribute()
 ```
 
-### CRUD Operations
+### CRUD Operations (async - default)
 
 ```python
 # Create
 user = User(pk="USER#123", sk="PROFILE", name="John", email="john@test.com")
-user.save()
+await user.save()
 
 # Read
-user = User.get(pk="USER#123", sk="PROFILE")
+user = await User.get(pk="USER#123", sk="PROFILE")
 
 # Update - full save
 user.name = "John Doe"
-user.save()
+await user.save()
 
 # Update - partial
-user.update(name="John Doe", age=31)
+await user.update(name="John Doe", age=31)
 
 # Delete
-user.delete()
+await user.delete()
 ```
 
-### Query
+### CRUD Operations (sync - use sync_ prefix)
+
+```python
+# Create
+user = User(pk="USER#123", sk="PROFILE", name="John", email="john@test.com")
+user.sync_save()
+
+# Read
+user = User.sync_get(pk="USER#123", sk="PROFILE")
+
+# Update - full save
+user.name = "John Doe"
+user.sync_save()
+
+# Update - partial
+user.sync_update(name="John Doe", age=31)
+
+# Delete
+user.sync_delete()
+```
+
+### Query (async - default)
 
 ```python
 # Query by hash key
-for user in User.query(hash_key="USER#123"):
+async for user in User.query(hash_key="USER#123"):
     print(user.name)
 
 # With range key condition
-for user in User.query(
+async for user in User.query(
     hash_key="USER#123",
     range_key_condition=User.sk.begins_with("ORDER#")
 ):
     print(user.sk)
 
 # With filter
-for user in User.query(
+async for user in User.query(
     hash_key="USER#123",
     filter_condition=User.age > 18
 ):
     print(user.name)
 
 # Get first result
-first = User.query(hash_key="USER#123").first()
+first = await User.query(hash_key="USER#123").first()
 
 # Collect all
-users = list(User.query(hash_key="USER#123"))
+users = [user async for user in User.query(hash_key="USER#123")]
+```
+
+### Query (sync - use sync_ prefix)
+
+```python
+# Query by hash key
+for user in User.sync_query(hash_key="USER#123"):
+    print(user.name)
+
+# Get first result
+first = User.sync_query(hash_key="USER#123").first()
+
+# Collect all
+users = list(User.sync_query(hash_key="USER#123"))
 ```
 
 ### Conditions
@@ -144,16 +179,20 @@ users = list(User.query(hash_key="USER#123"))
 Conditions use attribute operators directly:
 
 ```python
-# Save only if item doesn't exist
-user.save(condition=User.pk.not_exists())
+# Save only if item doesn't exist (async)
+await user.save(condition=User.pk.not_exists())
 
-# Delete with condition
-user.delete(condition=User.version == 5)
+# Delete with condition (async)
+await user.delete(condition=User.version == 5)
 
 # Combine conditions with & (AND) and | (OR)
-user.save(
+await user.save(
     condition=User.pk.not_exists() | (User.version == 1)
 )
+
+# Sync versions use sync_ prefix
+user.sync_save(condition=User.pk.not_exists())
+user.sync_delete(condition=User.version == 5)
 ```
 
 Available condition methods:
@@ -170,32 +209,35 @@ Available condition methods:
 - `User.field.between(low, high)` - value in range
 - `User.field.is_in(val1, val2, ...)` - value in list
 
-### Atomic Updates
+### Atomic updates (async - default)
 
 ```python
 # Increment a number
-user.update(atomic=[User.age.add(1)])
+await user.update(atomic=[User.age.add(1)])
 
 # Append to list
-user.update(atomic=[User.tags.append(["verified"])])
+await user.update(atomic=[User.tags.append(["verified"])])
 
 # Remove from list
-user.update(atomic=[User.tags.remove([0])])  # Remove first element
+await user.update(atomic=[User.tags.remove([0])])  # Remove first element
 
 # Set if not exists
-user.update(atomic=[User.views.if_not_exists(0)])
+await user.update(atomic=[User.views.if_not_exists(0)])
 
 # Multiple atomic operations
-user.update(atomic=[
+await user.update(atomic=[
     User.age.add(1),
     User.tags.append(["premium"]),
 ])
 
 # With condition
-user.update(
+await user.update(
     atomic=[User.age.add(1)],
     condition=User.status == "active"
 )
+
+# Sync versions use sync_ prefix
+user.sync_update(atomic=[User.age.add(1)])
 ```
 
 ### Batch operations
@@ -216,7 +258,7 @@ with SyncBatchWriter(client, "users") as batch:
     batch.delete({"pk": "USER#2", "sk": "PROFILE"})
 ```
 
-### Global Secondary Index
+### Global Secondary Index (async - default)
 
 ```python
 from pydynox import Model, ModelConfig
@@ -244,8 +286,12 @@ class User(Model):
         range_key="pk",
     )
 
-# Query on index
-for user in User.email_index.query(hash_key="john@test.com"):
+# Query on index (async)
+async for user in User.email_index.query(hash_key="john@test.com"):
+    print(user.name)
+
+# Sync version
+for user in User.email_index.sync_query(hash_key="john@test.com"):
     print(user.name)
 ```
 
@@ -265,21 +311,33 @@ async def create_order():
 asyncio.run(create_order())
 ```
 
-### Async support
+### Async-first API
+
+pydynox uses an async-first API. Methods without prefix are async (default), methods with `sync_` prefix are sync.
 
 ```python
-# All methods have async versions with async_ prefix
-user = await User.async_get(pk="USER#123", sk="PROFILE")
-await user.async_save()
-await user.async_update(name="Jane")
-await user.async_delete()
+# Async (default - no prefix)
+user = await User.get(pk="USER#123", sk="PROFILE")
+await user.save()
+await user.update(name="Jane")
+await user.delete()
 
 # Async iteration
-async for user in User.async_query(hash_key="USER#123"):
+async for user in User.query(hash_key="USER#123"):
+    print(user.name)
+
+# Sync (use sync_ prefix)
+user = User.sync_get(pk="USER#123", sk="PROFILE")
+user.sync_save()
+user.sync_update(name="Jane")
+user.sync_delete()
+
+# Sync iteration
+for user in User.sync_query(hash_key="USER#123"):
     print(user.name)
 ```
 
-### Pydantic Integration
+### Pydantic integration (async - default)
 
 ```python
 from pydantic import BaseModel, EmailStr
@@ -298,10 +356,14 @@ class User(BaseModel):
 
 # Pydantic validation works
 user = User(pk="USER#123", sk="PROFILE", name="John", email="john@test.com")
-user.save()
+await user.save()
 
-# Get
-user = User.get(pk="USER#123", sk="PROFILE")
+# Get (async)
+user = await User.get(pk="USER#123", sk="PROFILE")
+
+# Sync versions use sync_ prefix
+user.sync_save()
+user = User.sync_get(pk="USER#123", sk="PROFILE")
 ```
 
 ### S3 attribute (large files)

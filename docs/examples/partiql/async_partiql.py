@@ -8,7 +8,7 @@ from pydynox import DynamoDBClient
 async def main():
     client = DynamoDBClient()
 
-    result = await client.async_execute_statement(
+    result = await client.execute_statement(
         "SELECT * FROM users WHERE pk = ?",
         parameters=["USER#123"],
     )

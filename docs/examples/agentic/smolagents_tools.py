@@ -65,7 +65,7 @@ def get_employee(employee_id: str) -> dict:
         Employee info with name, email, and department.
         Sensitive data like salary and SSN are not returned.
     """
-    emp = Employee.get(pk=f"EMP#{employee_id}", sk="PROFILE")
+    emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
 
     if not emp:
         return {"error": f"Employee {employee_id} not found"}
@@ -89,7 +89,7 @@ def search_employees_by_department(department: str) -> list:
         List of employees with name and email.
     """
     employees = list(
-        Employee.scan(
+        Employee.sync_scan(
             filter_condition=Employee.department == department,
         )
     )
@@ -115,7 +115,7 @@ def get_time_off_balance(employee_id: str) -> dict:
         Time off balance and list of recent requests.
     """
     requests = list(
-        TimeOff.query(
+        TimeOff.sync_query(
             hash_key=f"EMP#{employee_id}",
             scan_index_forward=False,
             limit=10,
@@ -175,7 +175,7 @@ def submit_time_off_request(
         status="pending",
         notes=notes,
     )
-    request.save()
+    request.sync_save()
 
     return {
         "success": True,
@@ -197,7 +197,7 @@ def get_department_info(department_name: str) -> dict:
     Returns:
         Department info with manager, headcount, and budget.
     """
-    dept = Department.get(pk=f"DEPT#{department_name}", sk="METADATA")
+    dept = Department.sync_get(pk=f"DEPT#{department_name}", sk="METADATA")
 
     if not dept:
         return {"error": f"Department {department_name} not found"}
@@ -221,13 +221,13 @@ def update_employee_department(employee_id: str, new_department: str) -> dict:
     Returns:
         Confirmation of the department change.
     """
-    emp = Employee.get(pk=f"EMP#{employee_id}", sk="PROFILE")
+    emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
 
     if not emp:
         return {"error": f"Employee {employee_id} not found"}
 
     old_department = emp.department
-    emp.update(department=new_department)
+    emp.sync_update(department=new_department)
 
     return {
         "success": True,
@@ -364,11 +364,11 @@ if __name__ == "__main__":
         ]
 
         for emp in sample_employees:
-            emp.save()
+            emp.sync_save()
         for req in sample_timeoff:
-            req.save()
+            req.sync_save()
         for dept in sample_departments:
-            dept.save()
+            dept.sync_save()
 
         print("Sample data inserted!")
 

@@ -1,5 +1,6 @@
 """Basic dataclass integration example."""
 
+import asyncio
 from dataclasses import dataclass
 
 from pydynox import DynamoDBClient, dynamodb_model
@@ -18,16 +19,20 @@ class User:
     age: int = 0
 
 
-# Create and save
-user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
-user.save()
+async def main():
+    # Create and save
+    user = User(pk="USER#1", sk="PROFILE", name="John", age=30)
+    await user.save()
 
-# Get by key
-user = User.get(pk="USER#1", sk="PROFILE")
-print(user.name)  # John
+    # Get by key
+    user = await User.get(pk="USER#1", sk="PROFILE")
+    print(user.name)  # John
 
-# Update
-user.update(name="Jane", age=31)
+    # Update
+    await user.update(name="Jane", age=31)
 
-# Delete
-user.delete()
+    # Delete
+    await user.delete()
+
+
+asyncio.run(main())

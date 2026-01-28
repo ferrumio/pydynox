@@ -16,9 +16,9 @@ class MemoryTestModel(Model):
     model_config = ModelConfig(table="memory_test_table")
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
-    name = StringAttribute(null=True)
-    data = StringAttribute(null=True)
-    count = NumberAttribute(null=True)
+    name = StringAttribute()
+    data = StringAttribute()
+    count = NumberAttribute()
 
 
 @pytest.fixture(scope="module")

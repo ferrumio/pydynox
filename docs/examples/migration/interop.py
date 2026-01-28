@@ -1,5 +1,7 @@
 """Using boto3 and pydynox together during migration."""
 
+import asyncio
+
 import boto3
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
@@ -17,17 +19,21 @@ def legacy_function(data: dict) -> None:
     print(f"As dict: {data}")
 
 
-# boto3 client for legacy code
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table("users")
+async def main():
+    # boto3 client for legacy code
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table("users")
 
-# Read with boto3, use as pydynox Model
-response = table.get_item(Key={"pk": "USER#123", "sk": "PROFILE"})
-if item := response.get("Item"):
-    user = User(**item)  # boto3 dict -> pydynox Model
-    print(f"Loaded from boto3: {user.name}")
+    # Read with boto3, use as pydynox Model
+    response = table.get_item(Key={"pk": "USER#123", "sk": "PROFILE"})
+    if item := response.get("Item"):
+        user = User(**item)  # boto3 dict -> pydynox Model
+        print(f"Loaded from boto3: {user.name}")
 
-# Read with pydynox, pass to legacy code expecting dict
-user = User.get(pk="USER#123", sk="PROFILE")
-if user:
-    legacy_function(user.to_dict())  # pydynox Model -> dict
+    # Read with pydynox, pass to legacy code expecting dict
+    user = await User.get(pk="USER#123", sk="PROFILE")
+    if user:
+        legacy_function(user.to_dict())  # pydynox Model -> dict
+
+
+asyncio.run(main())

@@ -44,21 +44,21 @@ async def main():
         )
 
     # Create some orders
-    Order(
+    await Order(
         customer_id="CUST#1",
         order_id="ORD#001",
         status="pending",
         total=100,
         created_at="2024-01-01",
     ).save()
-    Order(
+    await Order(
         customer_id="CUST#1",
         order_id="ORD#002",
         status="shipped",
         total=250,
         created_at="2024-01-02",
     ).save()
-    Order(
+    await Order(
         customer_id="CUST#1",
         order_id="ORD#003",
         status="pending",
@@ -68,12 +68,12 @@ async def main():
 
     # Query all orders for customer (using main table)
     print("All orders for CUST#1:")
-    for order in Order.query(hash_key="CUST#1"):
+    async for order in Order.query(hash_key="CUST#1"):
         print(f"  {order.order_id}: {order.status} - ${order.total}")
 
     # Query orders by status using LSI
     print("\nPending orders for CUST#1 (via LSI):")
-    for order in Order.status_index.query(
+    async for order in Order.status_index.query(
         customer_id="CUST#1", range_key_condition=Order.status == "pending"
     ):
         print(f"  {order.order_id}: ${order.total}")

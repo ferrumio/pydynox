@@ -68,15 +68,15 @@ def test_attribute_default():
     assert attr.default == "default_value"
 
 
-def test_attribute_null():
-    """Attribute null flag controls if None is allowed."""
-    # WHEN we create nullable and required attributes
-    nullable = StringAttribute(null=True)
-    required = StringAttribute(null=False)
+def test_attribute_required():
+    """Attribute required flag controls if None is allowed."""
+    # WHEN we create optional and required attributes
+    optional = StringAttribute(required=False)
+    required = StringAttribute(required=True)
 
-    # THEN null flag should be set correctly
-    assert nullable.null is True
-    assert required.null is False
+    # THEN required flag should be set correctly
+    assert optional.required is False
+    assert required.required is True
 
 
 def test_attribute_serialize():

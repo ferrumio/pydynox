@@ -18,9 +18,8 @@ class TimeOff(Model):
 @tool
 def get_time_off_balance(employee_id: str) -> dict:
     """Get employee's time off balance."""
-    requests = TimeOff.query(
-        key_condition="pk = :pk",
-        expression_values={":pk": f"EMP#{employee_id}"},
+    requests = TimeOff.sync_query(
+        hash_key=f"EMP#{employee_id}",
     )
 
     # Sum up days using NumberAttribute
@@ -52,6 +51,6 @@ def submit_time_off(
         days=days,  # NumberAttribute handles int/float
         status="pending",
     )
-    request.save()
+    request.sync_save()
 
     return {"success": True, "days": days, "status": "pending"}

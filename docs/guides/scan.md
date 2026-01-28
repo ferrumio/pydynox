@@ -16,20 +16,27 @@ Scan reads every item in a DynamoDB table. Use it when you need all items or don
 
 ## Getting started
 
+pydynox uses an async-first API. Methods without prefix are async (default), methods with `sync_` prefix are sync.
+
 ### Basic scan
 
 Use `Model.scan()` to read all items:
 
-=== "basic_scan.py"
+=== "Async (default)"
     ```python
     --8<-- "docs/examples/scan/basic_scan.py"
     ```
 
-The scan returns a `ModelScanResult` that you can:
+=== "Sync (use sync_ prefix)"
+    ```python
+    --8<-- "docs/examples/scan/sync_basic_scan.py"
+    ```
 
-- Iterate with `for` loop
-- Get first result with `.first()`
-- Collect all with `list()`
+The scan returns a result that you can:
+
+- Iterate with `async for` (async) or `for` (sync)
+- Get first result with `await .first()` (async) or `.first()` (sync)
+- Collect all with `[x async for x in ...]` (async) or `list()` (sync)
 
 ### Filter conditions
 
@@ -100,8 +107,12 @@ This is a common pattern in DynamoDB libraries.
 By default, the iterator fetches all pages automatically:
 
 ```python
-# This fetches ALL users, automatically handling pagination
-for user in User.scan():
+# Async - fetches ALL users, automatically handling pagination
+async for user in User.scan():
+    print(user.name)
+
+# Sync
+for user in User.sync_scan():
     print(user.name)
 ```
 
@@ -110,8 +121,9 @@ for user in User.scan():
 For "load more" buttons or batch processing:
 
 ```python
+# Async
 result = User.scan(limit=100, page_size=100)
-users = list(result)
+users = [user async for user in result]
 
 # Get the last key for next page
 last_key = result.last_evaluated_key
@@ -122,6 +134,10 @@ if last_key:
         page_size=100,
         last_evaluated_key=last_key,
     )
+
+# Sync
+result = User.sync_scan(limit=100, page_size=100)
+users = list(result)
 ```
 
 ## Advanced
@@ -147,16 +163,16 @@ For large tables, split the scan across multiple segments to speed it up. Parall
 
 **Performance**: 4 segments = ~4x faster, 8 segments = ~8x faster. RCU cost is the same (you're reading the same data).
 
-=== "parallel_scan.py"
+=== "Async (default)"
     ```python
     --8<-- "docs/examples/scan/parallel_scan.py"
     ```
 
-**Async version**:
-
-=== "async_parallel_scan.py"
+=== "Sync (use sync_ prefix)"
     ```python
-    --8<-- "docs/examples/scan/async_parallel_scan.py"
+    # Sync parallel scan
+    users, metrics = User.sync_parallel_scan(total_segments=4)
+    print(f"Found {len(users)} users in {metrics.duration_ms:.2f}ms")
     ```
 
 **How many segments?**
@@ -170,33 +186,55 @@ Experiment to find what works best for your table size.
 **Important**: Parallel scan returns all items at once (not paginated). For very large tables that don't fit in memory, use regular `scan()` with segments for streaming:
 
 ```python
-# Stream items one page at a time
-for user in User.scan(segment=0, total_segments=4):
+# Stream items one page at a time (async)
+async for user in User.scan(segment=0, total_segments=4):
+    process(user)
+
+# Sync
+for user in User.sync_scan(segment=0, total_segments=4):
     process(user)
 ```
 
-### Async scan
+### Async and sync usage
 
-Use `async_scan()` and `async_count()` for async code:
+Async is the default. Use `async for` to iterate:
 
-=== "async_scan.py"
-    ```python
-    --8<-- "docs/examples/scan/async_scan.py"
-    ```
+```python
+# Async scan
+async for user in User.scan():
+    print(user.name)
 
-Async parallel scan:
+# Async count
+count, metrics = await User.count()
 
-=== "async_parallel_scan.py"
-    ```python
-    --8<-- "docs/examples/scan/async_parallel_scan.py"
-    ```
+# Async parallel scan
+users, metrics = await User.parallel_scan(total_segments=4)
+```
+
+For sync code, use `sync_` prefix:
+
+```python
+# Sync scan
+for user in User.sync_scan():
+    print(user.name)
+
+# Sync count
+count, metrics = User.sync_count()
+
+# Sync parallel scan
+users, metrics = User.sync_parallel_scan(total_segments=4)
+```
 
 ### Consistent reads
 
 For strongly consistent reads:
 
 ```python
-users = list(User.scan(consistent_read=True))
+# Async
+users = [user async for user in User.scan(consistent_read=True)]
+
+# Sync
+users = list(User.sync_scan(consistent_read=True))
 ```
 
 ### Metrics

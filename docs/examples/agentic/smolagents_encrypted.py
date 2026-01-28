@@ -18,7 +18,7 @@ class Employee(Model):
 @tool
 def get_employee(employee_id: str) -> dict:
     """Get employee info (excludes sensitive data)."""
-    emp = Employee.get(pk=f"EMP#{employee_id}", sk="PROFILE")
+    emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
 
     if not emp:
         return {"error": "Not found"}
@@ -42,7 +42,7 @@ def verify_ssn_last_four(employee_id: str, last_four: str) -> dict:
     Returns:
         Whether the SSN matches.
     """
-    emp = Employee.get(pk=f"EMP#{employee_id}", sk="PROFILE")
+    emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
 
     if not emp:
         return {"error": "Not found"}
