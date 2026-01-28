@@ -1,3 +1,7 @@
+"""Async batch write example."""
+
+import asyncio
+
 from pydynox import BatchWriter, DynamoDBClient
 
 client = DynamoDBClient()
@@ -14,3 +18,8 @@ async def main():
         batch.put({"pk": "USER#1", "sk": "PROFILE", "name": "John"})
         batch.put({"pk": "USER#2", "sk": "PROFILE", "name": "Jane"})
         batch.delete({"pk": "USER#3", "sk": "PROFILE"})
+
+    print("Batch write complete")
+
+
+asyncio.run(main())

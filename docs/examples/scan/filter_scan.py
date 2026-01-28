@@ -1,4 +1,6 @@
-"""Scan with filter condition."""
+"""Scan with filter condition (async - default)."""
+
+import asyncio
 
 from pydynox import DynamoDBClient, Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
@@ -10,18 +12,22 @@ class User(Model):
     model_config = ModelConfig(table="users", client=client)
     pk = StringAttribute(hash_key=True)
     name = StringAttribute()
-    age = NumberAttribute()
-    status = StringAttribute()
+    age = NumberAttribute(default=0)
+    status = StringAttribute(default="active")
 
 
-# Filter by status
-for user in User.scan(filter_condition=User.status == "active"):
-    print(f"Active user: {user.name}")
+async def main():
+    # Filter by status
+    async for user in User.scan(filter_condition=User.status == "active"):
+        print(f"Active user: {user.name}")
 
-# Filter by age
-for user in User.scan(filter_condition=User.age >= 18):
-    print(f"Adult: {user.name}")
+    # Filter by age
+    async for user in User.scan(filter_condition=User.age >= 18):
+        print(f"Adult: {user.name}")
 
-# Complex filter
-for user in User.scan(filter_condition=(User.status == "active") & (User.age >= 21)):
-    print(f"Active adult: {user.name}")
+    # Complex filter
+    async for user in User.scan(filter_condition=(User.status == "active") & (User.age >= 21)):
+        print(f"Active adult: {user.name}")
+
+
+asyncio.run(main())

@@ -1,5 +1,7 @@
 """Basic field encryption example."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import EncryptedAttribute, StringAttribute
 
@@ -13,16 +15,20 @@ class User(Model):
     ssn = EncryptedAttribute(key_id="alias/my-app-key")
 
 
-# Create a user with sensitive data
-user = User(
-    pk="USER#ENC",
-    sk="PROFILE",
-    email="john@example.com",
-    ssn="123-45-6789",
-)
-user.save()
+async def main():
+    # Create a user with sensitive data
+    user = User(
+        pk="USER#ENC",
+        sk="PROFILE",
+        email="john@example.com",
+        ssn="123-45-6789",
+    )
+    await user.save()
 
-# The SSN is encrypted in DynamoDB as "ENC:base64data..."
-# When you read it back, it's decrypted automatically
-loaded = User.get(pk="USER#ENC", sk="PROFILE")
-print(loaded.ssn)  # "123-45-6789"
+    # The SSN is encrypted in DynamoDB as "ENC:base64data..."
+    # When you read it back, it's decrypted automatically
+    loaded = await User.get(pk="USER#ENC", sk="PROFILE")
+    print(loaded.ssn)  # "123-45-6789"
+
+
+asyncio.run(main())

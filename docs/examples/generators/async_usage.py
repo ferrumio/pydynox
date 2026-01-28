@@ -12,15 +12,15 @@ class Order(Model):
     total = NumberAttribute()
 
 
-async def create_orders():
+async def main():
     """Create multiple orders concurrently. Each gets a unique ID."""
     tasks = []
     for i in range(10):
         order = Order(sk=f"ORDER#{i}", total=i * 10)
-        tasks.append(order.async_save())
+        tasks.append(order.save())  # save() is async
 
     await asyncio.gather(*tasks)
     print("Created 10 orders with unique ULIDs")
 
 
-asyncio.run(create_orders())
+asyncio.run(main())

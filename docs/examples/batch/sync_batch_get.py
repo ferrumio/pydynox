@@ -1,3 +1,5 @@
+"""Sync batch get example."""
+
 from pydynox import DynamoDBClient, Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
@@ -9,25 +11,34 @@ class User(Model):
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     name = StringAttribute()
-    age = NumberAttribute()
+    age = NumberAttribute(default=0)
 
 
-# Client-level sync batch get
-keys = [
-    {"pk": "USER#1", "sk": "PROFILE"},
-    {"pk": "USER#2", "sk": "PROFILE"},
-    {"pk": "USER#3", "sk": "PROFILE"},
-]
-items = client.sync_batch_get("users", keys)
-for item in items:
-    print(item["name"])
+def main():
+    # First create some users
+    client.sync_put_item("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John", "age": 30})
+    client.sync_put_item("users", {"pk": "USER#2", "sk": "PROFILE", "name": "Jane", "age": 25})
+    client.sync_put_item("users", {"pk": "USER#3", "sk": "PROFILE", "name": "Bob", "age": 35})
 
-# Model-level sync batch get - returns typed instances
-users = User.sync_batch_get(keys)
-for user in users:
-    print(user.name, user.age)
+    # Client-level sync batch get
+    keys = [
+        {"pk": "USER#1", "sk": "PROFILE"},
+        {"pk": "USER#2", "sk": "PROFILE"},
+        {"pk": "USER#3", "sk": "PROFILE"},
+    ]
+    items = client.sync_batch_get("users", keys)
+    for item in items:
+        print(item["name"])
 
-# Return as dicts for better performance
-users_dict = User.sync_batch_get(keys, as_dict=True)
-for user in users_dict:
-    print(user["name"])
+    # Model-level sync batch get - returns typed instances
+    users = User.sync_batch_get(keys)
+    for user in users:
+        print(user.name, user.age)
+
+    # Return as dicts for better performance
+    users_dict = User.sync_batch_get(keys, as_dict=True)
+    for user in users_dict:
+        print(user["name"])
+
+
+main()

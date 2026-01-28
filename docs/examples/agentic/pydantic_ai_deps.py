@@ -39,7 +39,7 @@ async def get_document_cached(ctx, doc_id: str) -> dict:
     if cache_key in ctx.deps.cache:
         return ctx.deps.cache[cache_key]
 
-    doc = await Document.get_async(pk=f"DOC#{doc_id}", sk="VERSION#latest")
+    doc = await Document.get(pk=f"DOC#{doc_id}", sk="VERSION#latest")
     if doc:
         result = {"title": doc.title, "author": doc.author}
         ctx.deps.cache[cache_key] = result
@@ -52,11 +52,11 @@ async def get_document_cached(ctx, doc_id: str) -> dict:
 async def safe_delete(ctx, doc_id: str) -> dict:
     """Safely delete a document."""
     try:
-        doc = await Document.get_async(pk=f"DOC#{doc_id}", sk="VERSION#latest")
+        doc = await Document.get(pk=f"DOC#{doc_id}", sk="VERSION#latest")
         if not doc:
             return {"success": False, "error": "Not found"}
 
-        await doc.delete_async()
+        await doc.delete()
         return {"success": True}
 
     except Exception as e:

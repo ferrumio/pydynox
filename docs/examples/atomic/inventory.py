@@ -1,5 +1,7 @@
 """Inventory management with atomic updates."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.exceptions import ConditionalCheckFailedException
@@ -17,10 +19,10 @@ class OutOfStock(Exception):
     pass
 
 
-def reserve_stock(product: Product, quantity: int) -> None:
+async def reserve_stock(product: Product, quantity: int) -> None:
     """Reserve stock for an order."""
     try:
-        product.update(
+        await product.update(
             atomic=[
                 Product.stock.add(-quantity),
                 Product.reserved.add(quantity),
@@ -31,9 +33,9 @@ def reserve_stock(product: Product, quantity: int) -> None:
         raise OutOfStock(f"Not enough stock for {product.pk}")
 
 
-def release_stock(product: Product, quantity: int) -> None:
+async def release_stock(product: Product, quantity: int) -> None:
     """Release reserved stock (order cancelled)."""
-    product.update(
+    await product.update(
         atomic=[
             Product.stock.add(quantity),
             Product.reserved.add(-quantity),
@@ -41,20 +43,24 @@ def release_stock(product: Product, quantity: int) -> None:
     )
 
 
-# Usage
-product = Product(pk="SKU#ABC123", stock=10, reserved=0)
-product.save()
+async def main():
+    # Usage
+    product = Product(pk="SKU#ABC123", stock=10, reserved=0)
+    await product.save()
 
-# Reserve 3 units
-reserve_stock(product, 3)
-# stock: 7, reserved: 3
+    # Reserve 3 units
+    await reserve_stock(product, 3)
+    # stock: 7, reserved: 3
 
-# Try to reserve 10 more - fails
-try:
-    reserve_stock(product, 10)
-except OutOfStock:
-    print("Cannot reserve - not enough stock")
+    # Try to reserve 10 more - fails
+    try:
+        await reserve_stock(product, 10)
+    except OutOfStock:
+        print("Cannot reserve - not enough stock")
 
-# Cancel order - release the 3 units
-release_stock(product, 3)
-# stock: 10, reserved: 0
+    # Cancel order - release the 3 units
+    await release_stock(product, 3)
+    # stock: 10, reserved: 0
+
+
+asyncio.run(main())

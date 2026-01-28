@@ -45,15 +45,15 @@ pip install pydynox pydantic-ai
 
 ### Use async methods
 
-Pydantic AI is async-first. Use pydynox async methods for better performance:
+Pydantic AI is async-first. pydynox is also async-first, so they work great together:
 
-| Sync | Async |
-|------|-------|
-| `Model.get()` | `Model.get_async()` |
-| `Model.query()` | `Model.query_async()` |
-| `Model.scan()` | `Model.scan_async()` |
-| `model.save()` | `model.save_async()` |
-| `model.delete()` | `model.delete_async()` |
+| Async (default) | Sync |
+|-----------------|------|
+| `await Model.get()` | `Model.sync_get()` |
+| `async for x in Model.query()` | `for x in Model.sync_query()` |
+| `async for x in Model.scan()` | `for x in Model.sync_scan()` |
+| `await model.save()` | `model.sync_save()` |
+| `await model.delete()` | `model.sync_delete()` |
 
 ### The ctx parameter
 

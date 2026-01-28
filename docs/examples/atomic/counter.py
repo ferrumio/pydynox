@@ -1,5 +1,7 @@
 """Atomic counter example."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
@@ -12,14 +14,18 @@ class PageView(Model):
     views = NumberAttribute()
 
 
-# Increment counter without reading first
-page = PageView(pk="/home", sk="2024-01-15", views=0)
-page.save()
+async def main():
+    # Increment counter without reading first
+    page = PageView(pk="/home", sk="2024-01-15", views=0)
+    await page.save()
 
-# Each request increments atomically
-page.update(atomic=[PageView.views.add(1)])
+    # Each request increments atomically
+    await page.update(atomic=[PageView.views.add(1)])
 
-# Multiple increments are safe - no race conditions
-# Request 1: views = 0 + 1 = 1
-# Request 2: views = 1 + 1 = 2
-# Request 3: views = 2 + 1 = 3
+    # Multiple increments are safe - no race conditions
+    # Request 1: views = 0 + 1 = 1
+    # Request 2: views = 1 + 1 = 2
+    # Request 3: views = 2 + 1 = 3
+
+
+asyncio.run(main())

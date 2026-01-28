@@ -31,7 +31,7 @@ All attributes share these parameters:
 | `hash_key` | bool | False | Is this the partition key |
 | `range_key` | bool | False | Is this the sort key |
 | `default` | Any | None | Default value or `AutoGenerate` strategy |
-| `null` | bool | True | Allow None values |
+| `required` | bool | False | Field must have a value (not None) |
 
 !!! tip
     Use `AutoGenerate` strategies for automatic ID and timestamp generation. See [Auto-generate strategies](auto-generate.md).
@@ -51,7 +51,7 @@ class User(Model):
     
     pk = StringAttribute(hash_key=True)
     name = StringAttribute()
-    email = StringAttribute(null=False)  # Required
+    email = StringAttribute(required=True)  # Required
 ```
 
 ### NumberAttribute
@@ -193,7 +193,7 @@ class Session(Model):
 
 # Create session that expires in 1 hour
 session = Session(pk="SESSION#123", expires_at=ExpiresIn.hours(1))
-session.save()
+await session.save()
 ```
 
 `ExpiresIn` helpers:
@@ -234,7 +234,7 @@ class User(Model):
     roles = StringSetAttribute()
 
 user = User(pk="USER#1", roles={"admin", "editor"})
-user.save()
+await user.save()
 
 # Check membership
 print("admin" in user.roles)  # True

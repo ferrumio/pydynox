@@ -1,3 +1,7 @@
+"""Example: CRUD operations (async - default)."""
+
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
@@ -11,21 +15,26 @@ class User(Model):
     age = NumberAttribute(default=0)
 
 
-# Create
-user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
-user.save()
+async def main():
+    # Create
+    user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
+    await user.save()
 
-# Read
-user = User.get(pk="USER#123", sk="PROFILE")
-if user:
-    print(user.name)  # John
+    # Read
+    user = await User.get(pk="USER#123", sk="PROFILE")
+    if user:
+        print(user.name)  # John
 
-# Update - full
-user.name = "Jane"
-user.save()
+    # Update - full
+    user.name = "Jane"
+    await user.save()
 
-# Update - partial
-user.update(name="Jane", age=31)
+    # Update - partial
+    await user.update(name="Jane", age=31)
 
-# Delete
-user.delete()
+    # Delete
+    await user.delete()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

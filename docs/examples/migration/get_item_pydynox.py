@@ -1,5 +1,7 @@
 """pydynox: Get item from DynamoDB."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 
@@ -11,7 +13,11 @@ class User(Model):
     name = StringAttribute()
 
 
-user = User.get(pk="USER#123", sk="PROFILE")
+async def main():
+    user = await User.get(pk="USER#123", sk="PROFILE")
 
-if user:
-    print(f"Name: {user.name}")
+    if user:
+        print(f"Name: {user.name}")
+
+
+asyncio.run(main())

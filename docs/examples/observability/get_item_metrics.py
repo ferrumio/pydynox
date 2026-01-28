@@ -1,14 +1,21 @@
+import asyncio
+
 from pydynox import DynamoDBClient
 
-client = DynamoDBClient()
 
-# get_item returns a plain dict
-item = client.get_item("users", {"pk": "USER#1", "sk": "PROFILE"})
+async def main():
+    client = DynamoDBClient()
 
-if item:
-    print(item["name"])  # Works like a normal dict
+    # get_item returns a plain dict
+    item = await client.get_item("users", {"pk": "USER#1", "sk": "PROFILE"})
 
-# Access metrics via client.get_last_metrics()
-metrics = client.get_last_metrics()
-print(metrics.duration_ms)  # 12.1
-print(metrics.consumed_rcu)  # 0.5
+    if item:
+        print(item["name"])  # Works like a normal dict
+
+    # Access metrics via client.get_last_metrics()
+    metrics = client.get_last_metrics()
+    print(metrics.duration_ms)  # 12.1
+    print(metrics.consumed_rcu)  # 0.5
+
+
+asyncio.run(main())

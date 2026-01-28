@@ -35,7 +35,7 @@ class CompressedAttribute(Attribute[str]):
         hash_key: True if this is the partition key.
         range_key: True if this is the sort key.
         default: Default value when not provided.
-        null: Whether None is allowed.
+        required: Whether this field is required.
 
     Example:
         >>> from pydynox import Model, ModelConfig
@@ -59,7 +59,7 @@ class CompressedAttribute(Attribute[str]):
         hash_key: bool = False,
         range_key: bool = False,
         default: str | None = None,
-        null: bool = True,
+        required: bool = False,
     ):
         """Create a compressed attribute.
 
@@ -71,13 +71,13 @@ class CompressedAttribute(Attribute[str]):
             hash_key: True if this is the partition key.
             range_key: True if this is the sort key.
             default: Default value when not provided.
-            null: Whether None is allowed.
+            required: Whether this field is required.
         """
         super().__init__(
             hash_key=hash_key,
             range_key=range_key,
             default=default,
-            null=null,
+            required=required,
         )
         self.algorithm = algorithm
         self.level = level

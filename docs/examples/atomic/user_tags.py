@@ -1,5 +1,7 @@
 """Managing user tags with list operations."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import ListAttribute, StringAttribute
 
@@ -12,14 +14,18 @@ class User(Model):
     tags = ListAttribute()
 
 
-# Create user with initial tags
-user = User(pk="USER#123", sk="PROFILE", tags=["member"])
-user.save()
+async def main():
+    # Create user with initial tags
+    user = User(pk="USER#123", sk="PROFILE", tags=["member"])
+    await user.save()
 
-# Add tags to the end
-user.update(atomic=[User.tags.append(["premium", "verified"])])
-# tags: ["member", "premium", "verified"]
+    # Add tags to the end
+    await user.update(atomic=[User.tags.append(["premium", "verified"])])
+    # tags: ["member", "premium", "verified"]
 
-# Add tags to the beginning
-user.update(atomic=[User.tags.prepend(["vip"])])
-# tags: ["vip", "member", "premium", "verified"]
+    # Add tags to the beginning
+    await user.update(atomic=[User.tags.prepend(["vip"])])
+    # tags: ["vip", "member", "premium", "verified"]
+
+
+asyncio.run(main())

@@ -49,7 +49,7 @@ class Attribute(Generic[T]):
         hash_key: bool = False,
         range_key: bool = False,
         default: T | None = None,
-        null: bool = True,
+        required: bool = False,
     ):
         """Create an attribute.
 
@@ -57,12 +57,12 @@ class Attribute(Generic[T]):
             hash_key: True if this is the partition key.
             range_key: True if this is the sort key.
             default: Default value when not provided.
-            null: Whether None is allowed.
+            required: Whether this field is required (cannot be None).
         """
         self.hash_key = hash_key
         self.range_key = range_key
         self.default = default
-        self.null = null
+        self.required = required
         self.attr_name: str | None = None
 
     def __set__(self, instance: Any, value: T | None) -> None:

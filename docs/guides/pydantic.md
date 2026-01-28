@@ -28,13 +28,16 @@ Use the `@dynamodb_model` decorator on a Pydantic model:
     --8<-- "docs/examples/integrations/basic_pydantic.py"
     ```
 
-The decorator adds these methods to your model:
+The decorator adds DynamoDB methods to your model. Async is the default:
 
-- `save()` - Save to DynamoDB
-- `get()` - Get by key
-- `delete()` - Delete from DynamoDB
-- `update()` - Update specific fields
-- `_set_client()` - Set client after creation
+| Async (default) | Sync |
+|-----------------|------|
+| `await model.save()` | `model.sync_save()` |
+| `await model.delete()` | `model.sync_delete()` |
+| `await model.update()` | `model.sync_update()` |
+| `await Model.get()` | `Model.sync_get()` |
+
+Plus `_set_client()` to set the client after creation.
 
 Your Pydantic model works exactly as before - validation, serialization, and all other Pydantic features still work.
 
@@ -94,7 +97,7 @@ client = DynamoDBClient(region="us-east-1")
 User._set_client(client)
 
 # Now you can use it
-user = User.get(pk="USER#1")
+user = await User.get(pk="USER#1")
 ```
 
 ### Alternative: from_pydantic function
@@ -111,7 +114,7 @@ class User(BaseModel):
 
 UserDB = from_pydantic(User, table="users", hash_key="pk", range_key="sk", client=client)
 user = UserDB(pk="USER#1", sk="PROFILE", name="John")
-user.save()
+await user.save()
 ```
 
 ### Why use Pydantic integration?

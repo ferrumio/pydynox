@@ -16,20 +16,27 @@ Query items from DynamoDB using typed conditions. Returns model instances with f
 
 ## Getting started
 
+pydynox uses an async-first API. Methods without prefix are async (default), methods with `sync_` prefix are sync.
+
 ### Basic query
 
 Use `Model.query()` to fetch items by hash key:
 
-=== "basic_query.py"
+=== "Async (default)"
     ```python
     --8<-- "docs/examples/query/basic_query.py"
     ```
 
-The query returns a `ModelQueryResult` that you can:
+=== "Sync (use sync_ prefix)"
+    ```python
+    --8<-- "docs/examples/query/sync_basic_query.py"
+    ```
 
-- Iterate with `for` loop
-- Get first result with `.first()`
-- Collect all with `list()`
+The query returns a result that you can:
+
+- Iterate with `async for` (async) or `for` (sync)
+- Get first result with `await .first()` (async) or `.first()` (sync)
+- Collect all with `[x async for x in ...]` (async) or `list()` (sync)
 
 ### Range key conditions
 
@@ -113,8 +120,12 @@ This is a common pattern in DynamoDB libraries.
 By default, the iterator fetches all pages automatically:
 
 ```python
-# This fetches ALL orders, automatically handling pagination
-for order in Order.query(hash_key="CUSTOMER#123"):
+# Async - fetches ALL orders, automatically handling pagination
+async for order in Order.query(hash_key="CUSTOMER#123"):
+    print(order.sk)
+
+# Sync
+for order in Order.sync_query(hash_key="CUSTOMER#123"):
     print(order.sk)
 ```
 
@@ -140,8 +151,18 @@ Use `last_evaluated_key` to:
 For strongly consistent reads:
 
 ```python
+# Async
+orders = [
+    order
+    async for order in Order.query(
+        hash_key="CUSTOMER#123",
+        consistent_read=True,
+    )
+]
+
+# Sync
 orders = list(
-    Order.query(
+    Order.sync_query(
         hash_key="CUSTOMER#123",
         consistent_read=True,
     )
@@ -178,12 +199,33 @@ For more details, see [Observability](observability.md).
 
 ### Async queries
 
-Use `async_query()` for async code:
+Async is the default. Use `async for` to iterate:
 
-=== "async_query.py"
-    ```python
-    --8<-- "docs/examples/query/async_query.py"
-    ```
+```python
+async for order in Order.query(hash_key="CUSTOMER#123"):
+    print(order.sk)
+
+# Get first
+first = await Order.query(hash_key="CUSTOMER#123").first()
+
+# Collect all
+orders = [order async for order in Order.query(hash_key="CUSTOMER#123")]
+```
+
+### Sync queries
+
+Use `sync_query()` for sync code:
+
+```python
+for order in Order.sync_query(hash_key="CUSTOMER#123"):
+    print(order.sk)
+
+# Get first
+first = Order.sync_query(hash_key="CUSTOMER#123").first()
+
+# Collect all
+orders = list(Order.sync_query(hash_key="CUSTOMER#123"))
+```
 
 ### Return dicts instead of models
 
@@ -239,12 +281,19 @@ Use `Model.query()` when querying by the table's hash key.
 Use [GSI query](indexes.md) when querying by a different attribute:
 
 ```python
-# Table query - by pk
-for order in Order.query(hash_key="CUSTOMER#123"):
+# Table query - by pk (async)
+async for order in Order.query(hash_key="CUSTOMER#123"):
     print(order.sk)
 
-# GSI query - by status
-for order in Order.status_index.query(status="shipped"):
+# GSI query - by status (async)
+async for order in Order.status_index.query(status="shipped"):
+    print(order.pk)
+
+# Sync versions
+for order in Order.sync_query(hash_key="CUSTOMER#123"):
+    print(order.sk)
+
+for order in Order.status_index.sync_query(status="shipped"):
     print(order.pk)
 ```
 

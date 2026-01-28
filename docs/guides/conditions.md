@@ -139,7 +139,7 @@ When a condition fails, DynamoDB raises `ConditionalCheckFailedException`:
 from pydynox.exceptions import ConditionalCheckFailedException
 
 try:
-    user.save(condition=User.pk.not_exists())
+    await user.save(condition=User.pk.not_exists())
 except ConditionalCheckFailedException:
     print("User already exists")
 ```
@@ -150,7 +150,7 @@ Use `return_values_on_condition_check_failure=True` to get the existing item wit
 
 ```python
 try:
-    client.put_item(
+    await client.put_item(
         "users",
         {"pk": "USER#123", "name": "Bob"},
         condition_expression="attribute_not_exists(pk)",

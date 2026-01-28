@@ -1,39 +1,69 @@
-from pydynox import Model, ModelConfig
+"""Pagination examples (async - default)."""
+
+import asyncio
+
+from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
+
+client = get_default_client()
+
+CUSTOMER_PK = "CUSTOMER#123"
 
 
 class Order(Model):
-    model_config = ModelConfig(table="orders")
+    model_config = ModelConfig(table="orders_page")
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
 
-# Automatic pagination - iterator fetches all pages
-for order in Order.query(hash_key="CUSTOMER#123"):
-    print(f"Order: {order.sk}")
+async def main():
+    # Setup: create table and data
+    if not await client.table_exists("orders_page"):
+        await client.create_table(
+            "orders_page",
+            hash_key=("pk", "S"),
+            range_key=("sk", "S"),
+        )
 
-# Manual pagination - control page size
-result = Order.query(hash_key="CUSTOMER#123", limit=10)
+    # Create 25 orders
+    for i in range(25):
+        await Order(
+            pk=CUSTOMER_PK,
+            sk=f"ORDER#{i:03d}",
+            total=100 + i,
+            status="pending",
+        ).save()
 
-# Process first page
-page_count = 0
-for order in result:
-    print(f"Order: {order.sk}")
-    page_count += 1
-    if page_count >= 10:
-        break
+    # Automatic pagination - iterator fetches all pages
+    print("All orders:")
+    async for order in Order.query(hash_key=CUSTOMER_PK):
+        print(f"  {order.sk}")
 
-# Check if there are more pages
-if result.last_evaluated_key:
-    print("More pages available")
+    # Manual pagination - control page size
+    result = Order.query(hash_key=CUSTOMER_PK, limit=10)
 
-    # Fetch next page
-    next_result = Order.query(
-        hash_key="CUSTOMER#123",
-        limit=10,
-        last_evaluated_key=result.last_evaluated_key,
-    )
-    for order in next_result:
-        print(f"Next page order: {order.sk}")
+    # Process first page
+    page_count = 0
+    async for order in result:
+        print(f"Page 1: {order.sk}")
+        page_count += 1
+        if page_count >= 10:
+            break
+
+    # Check if there are more pages
+    if result.last_evaluated_key:
+        print("More pages available")
+
+        # Fetch next page
+        next_result = Order.query(
+            hash_key=CUSTOMER_PK,
+            limit=10,
+            last_evaluated_key=result.last_evaluated_key,
+        )
+        async for order in next_result:
+            print(f"Page 2: {order.sk}")
+
+
+asyncio.run(main())

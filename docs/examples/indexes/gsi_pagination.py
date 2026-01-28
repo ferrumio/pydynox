@@ -47,7 +47,7 @@ async def main():
 
     # Create 25 active users
     for i in range(25):
-        User(
+        await User(
             pk=f"USER#{i:03d}",
             sk="PROFILE",
             email=f"user{i}@example.com",
@@ -60,28 +60,29 @@ async def main():
     # page_size = items per DynamoDB request (controls pagination)
 
     # Example 1: Get exactly 10 active users
-    users = list(User.status_index.query(status="active", limit=10))
+    users = [u async for u in User.status_index.query(status="active", limit=10)]
     print(f"limit=10: Got {len(users)} users")
 
     # Example 2: Get all active users, fetching 5 per page
     count = 0
-    for user in User.status_index.query(status="active", page_size=5):
+    async for user in User.status_index.query(status="active", page_size=5):
         count += 1
     print(f"page_size=5 (no limit): Got {count} users")
 
     # Example 3: Get 15 active users, fetching 5 per page (3 requests)
-    users = list(
-        User.status_index.query(
+    users = [
+        u
+        async for u in User.status_index.query(
             status="active",
             limit=15,
             page_size=5,
         )
-    )
+    ]
     print(f"limit=15, page_size=5: Got {len(users)} users")
 
     # Example 4: Manual pagination for "load more" UI
     result = User.status_index.query(status="active", limit=10, page_size=10)
-    first_page = list(result)
+    first_page = [u async for u in result]
     print(f"First page: {len(first_page)} items")
 
     if result.last_evaluated_key:
@@ -91,7 +92,7 @@ async def main():
             page_size=10,
             last_evaluated_key=result.last_evaluated_key,
         )
-        second_page = list(result)
+        second_page = [u async for u in result]
         print(f"Second page: {len(second_page)} items")
 
 

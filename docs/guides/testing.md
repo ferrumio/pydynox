@@ -1,8 +1,6 @@
 # Testing
 
-Testing DynamoDB code is hard. You need a real database, or moto, or localstack, or Docker. Setup takes time. Tests are slow. CI/CD pipelines get complicated.
-
-pydynox solves this with a built-in in-memory backend. No extra dependencies. No setup. Just pytest fixtures that work out of the box.
+Testing DynamoDB code usually means moto, localstack, or Docker. pydynox has a simpler option: an in-memory backend. No setup, no extra dependencies, just fast tests.
 
 ## Why use this?
 
@@ -25,9 +23,14 @@ pydynox solves this with a built-in in-memory backend. No extra dependencies. No
 
 Just add `pydynox_memory_backend` to your test function. That's it.
 
-=== "basic_fixture.py"
+=== "Async (default)"
     ```python
     --8<-- "docs/examples/testing/basic_fixture.py"
+    ```
+
+=== "Sync"
+    ```python
+    --8<-- "docs/examples/testing/basic_fixture_sync.py"
     ```
 
 The fixture is auto-discovered by pytest. No imports needed, no conftest.py setup.
@@ -58,10 +61,13 @@ pydynox provides three fixtures:
 The simplest option. Each test starts with empty tables.
 
 ```python
-def test_create_user(pydynox_memory_backend):
+import pytest
+
+@pytest.mark.asyncio
+async def test_create_user(pydynox_memory_backend):
     user = User(pk="USER#1", name="John")
-    user.save()
-    assert User.get(pk="USER#1") is not None
+    await user.save()
+    assert await User.get(pk="USER#1") is not None
 ```
 
 ### pydynox_memory_backend_factory
@@ -94,8 +100,11 @@ def pydynox_seed():
 Then use `pydynox_memory_backend_seeded` in your tests:
 
 ```python
-def test_admin_exists(pydynox_memory_backend_seeded):
-    admin = User.get(pk="ADMIN#1")
+import pytest
+
+@pytest.mark.asyncio
+async def test_admin_exists(pydynox_memory_backend_seeded):
+    admin = await User.get(pk="ADMIN#1")
     assert admin.role == "admin"
 ```
 
@@ -197,16 +206,17 @@ pytest -n auto  # with pytest-xdist
 ```python
 import pytest
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("name,age", [
     ("Alice", 30),
     ("Bob", 25),
     ("Charlie", 35),
 ])
-def test_create_users(pydynox_memory_backend, name, age):
+async def test_create_users(pydynox_memory_backend, name, age):
     user = User(pk=f"USER#{name}", name=name, age=age)
-    user.save()
+    await user.save()
     
-    found = User.get(pk=f"USER#{name}")
+    found = await User.get(pk=f"USER#{name}")
     assert found.age == age
 ```
 

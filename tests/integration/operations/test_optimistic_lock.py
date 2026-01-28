@@ -14,7 +14,7 @@ class VersionedDoc(Model):
     model_config = ModelConfig(table="test_table")
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
-    content = StringAttribute(null=True)
+    content = StringAttribute()
     version = VersionAttribute()
 
 

@@ -1,5 +1,7 @@
 """pydynox: Update item in DynamoDB."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 
@@ -12,5 +14,10 @@ class User(Model):
     email = StringAttribute()
 
 
-user = User.get(pk="USER#123", sk="PROFILE")
-user.update(name="Jane Doe", email="jane@example.com")
+async def main():
+    user = await User.get(pk="USER#123", sk="PROFILE")
+    if user:
+        await user.update(name="Jane Doe", email="jane@example.com")
+
+
+asyncio.run(main())

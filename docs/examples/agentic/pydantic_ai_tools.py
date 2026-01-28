@@ -74,7 +74,7 @@ async def search_documents(ctx, query: str, limit: int = 10) -> list:
     Returns:
         List of matching documents with title, author, and size.
     """
-    scan_result = Document.async_scan(
+    scan_result = Document.scan(
         filter_condition=Document.title.contains(query),
         limit=limit,
     )
@@ -104,7 +104,7 @@ async def get_document(ctx, doc_id: str, version: str = "latest") -> dict:
         Document info with download URL.
     """
     if version == "latest":
-        query_result = Document.async_query(
+        query_result = Document.query(
             hash_key=f"DOC#{doc_id}",
             scan_index_forward=False,
             limit=1,
@@ -114,7 +114,7 @@ async def get_document(ctx, doc_id: str, version: str = "latest") -> dict:
             return {"error": f"Document {doc_id} not found"}
         doc = docs[0]
     else:
-        doc = await Document.async_get(pk=f"DOC#{doc_id}", sk=f"VERSION#{version}")
+        doc = await Document.get(pk=f"DOC#{doc_id}", sk=f"VERSION#{version}")
         if not doc:
             return {"error": f"Document {doc_id} version {version} not found"}
 
@@ -139,7 +139,7 @@ async def list_document_versions(ctx, doc_id: str) -> list:
     Returns:
         List of versions with size and author.
     """
-    query_result = Document.async_query(
+    query_result = Document.query(
         hash_key=f"DOC#{doc_id}",
         scan_index_forward=False,
     )
@@ -166,7 +166,7 @@ async def get_project_stats(ctx, project_id: str) -> dict:
     Returns:
         Project info with document count.
     """
-    project = await Project.async_get(pk=f"PROJECT#{project_id}", sk="METADATA")
+    project = await Project.get(pk=f"PROJECT#{project_id}", sk="METADATA")
 
     if not project:
         return {"error": f"Project {project_id} not found"}
@@ -211,7 +211,7 @@ async def upload_document(
         size_bytes=len(content_bytes),
     )
     doc.content = S3File(content_bytes, name=f"{doc_id}.txt", content_type="text/plain")
-    await doc.async_save()
+    await doc.save()
 
     return {
         "success": True,
@@ -290,9 +290,9 @@ if __name__ == "__main__":
         ]
 
         for doc in sample_docs:
-            await doc.async_save()
+            await doc.save()
         for proj in sample_projects:
-            await proj.async_save()
+            await proj.save()
 
         print("Sample data inserted!")
 

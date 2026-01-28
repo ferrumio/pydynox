@@ -52,15 +52,15 @@ class Document(Model):
 # Upload
 doc = Document(pk="DOC#1")
 doc.content = S3File(b"file content", name="report.pdf")
-doc.save()
+await doc.save()
 
-# Download (async)
-doc = Document.get(pk="DOC#1")
+# Download
+doc = await Document.get(pk="DOC#1")
 data = await doc.content.get_bytes()
 await doc.content.save_to("/tmp/report.pdf")
 url = await doc.content.presigned_url(3600)
 
-# Download (sync alternative)
+# Sync alternative (use sync_ prefix)
 data = doc.content.sync_get_bytes()
 doc.content.sync_save_to("/tmp/report.pdf")
 url = doc.content.sync_presigned_url(3600)
@@ -74,7 +74,7 @@ Use `S3File` to wrap your data. The `name` parameter is required.
 
 ```python
 doc.content = S3File(b"file content here", name="report.pdf")
-doc.save()
+await doc.save()
 ```
 
 ### From file path
@@ -85,7 +85,7 @@ Pass a `Path` object. The filename is used automatically.
 from pathlib import Path
 
 doc.content = S3File(Path("/path/to/report.pdf"))
-doc.save()
+await doc.save()
 ```
 
 ### With content type
@@ -117,7 +117,7 @@ doc.content = S3File(
 After loading a model, `content` is an `S3Value`. Use async methods by default.
 
 ```python
-doc = Document.get(pk="DOC#1")
+doc = await Document.get(pk="DOC#1")
 
 # Download to memory (careful with large files)
 data = await doc.content.get_bytes()
@@ -140,7 +140,7 @@ Use presigned URLs when:
 Metadata is always available without downloading the file.
 
 ```python
-doc = Document.get(pk="DOC#1")
+doc = await Document.get(pk="DOC#1")
 
 # These don't make S3 calls
 print(doc.content.bucket)        # "my-bucket"
@@ -158,15 +158,15 @@ print(doc.content.metadata)      # {"author": "John", "version": "1.0"}
 When you delete the model, the S3 file is also deleted.
 
 ```python
-doc = Document.get(pk="DOC#1")
-doc.delete()  # Deletes from DynamoDB AND S3
+doc = await Document.get(pk="DOC#1")
+await doc.delete()  # Deletes from DynamoDB AND S3
 ```
 
 To remove the file reference without deleting from S3:
 
 ```python
 doc.content = None
-doc.save()  # Updates DynamoDB, S3 file remains
+await doc.save()  # Updates DynamoDB, S3 file remains
 ```
 
 ## S3 region
@@ -238,7 +238,7 @@ Files larger than 10MB are automatically uploaded using multipart upload. This i
 S3Attribute can be null by default. If you want to require a file:
 
 ```python
-content = S3Attribute(bucket="my-bucket", null=False)
+content = S3Attribute(bucket="my-bucket", required=True)
 ```
 
 ## Error handling
@@ -248,7 +248,7 @@ from pydynox.exceptions import S3AttributeException
 
 try:
     doc.content = S3File(b"...", name="file.txt")
-    doc.save()
+    await doc.save()
 except S3AttributeException as e:
     print(f"S3 error: {e}")
 ```
@@ -322,13 +322,13 @@ doc.content = S3File(
     content_type="application/pdf",
     metadata={"department": "finance"}
 )
-doc.save()
+await doc.save()
 
 # List documents (fast, no S3 calls)
-for doc in Document.query(hash_key="DOC#invoice-2024-001"):
+async for doc in Document.query(hash_key="DOC#invoice-2024-001"):
     print(f"{doc.name}: {doc.content.size} bytes")
 
-# Generate download link (async)
+# Generate download link
 url = await doc.content.presigned_url(expires=3600)
 print(f"Download: {url}")
 ```

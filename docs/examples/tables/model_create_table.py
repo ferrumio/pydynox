@@ -1,5 +1,7 @@
 """Example: Create table from Model schema (sync version)."""
 
+import asyncio
+
 from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.indexes import GlobalSecondaryIndex
@@ -27,21 +29,25 @@ class User(Model):
     )
 
 
-# Create table from model schema (includes hash key, range key, and GSIs)
-if not User.sync_table_exists():
-    User.sync_create_table(wait=True)
+async def main():
+    # Create table from model schema (includes hash key, range key, and GSIs)
+    if not await User.table_exists():
+        await User.create_table(wait=True)
 
-# Verify table exists
-assert User.sync_table_exists()
+    # Verify table exists
+    assert await User.table_exists()
 
-# Save and query to verify GSI works
-user = User(pk="USER#1", sk="PROFILE", email="test@example.com", status="active", age=30)
-user.save()
+    # Save and query to verify GSI works
+    user = User(pk="USER#1", sk="PROFILE", email="test@example.com", status="active", age=30)
+    await user.save()
 
-# Query by GSI
-results = list(User.email_index.query(email="test@example.com"))
-assert len(results) == 1
-assert results[0].pk == "USER#1"
+    # Query by GSI
+    results = [u async for u in User.email_index.query(email="test@example.com")]
+    assert len(results) == 1
+    assert results[0].pk == "USER#1"
 
-# Cleanup
-User.sync_delete_table()
+    # Cleanup
+    await User.delete_table()
+
+
+asyncio.run(main())

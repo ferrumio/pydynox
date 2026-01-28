@@ -1,3 +1,7 @@
+"""Async batch get example."""
+
+import asyncio
+
 from pydynox import DynamoDBClient, Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
@@ -9,10 +13,15 @@ class User(Model):
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     name = StringAttribute()
-    age = NumberAttribute()
+    age = NumberAttribute(default=0)
 
 
 async def main():
+    # First create some users
+    await client.put_item("users", {"pk": "USER#1", "sk": "PROFILE", "name": "John", "age": 30})
+    await client.put_item("users", {"pk": "USER#2", "sk": "PROFILE", "name": "Jane", "age": 25})
+    await client.put_item("users", {"pk": "USER#3", "sk": "PROFILE", "name": "Bob", "age": 35})
+
     # Client-level batch get (async by default)
     keys = [
         {"pk": "USER#1", "sk": "PROFILE"},
@@ -32,3 +41,6 @@ async def main():
     users_dict = await User.batch_get(keys, as_dict=True)
     for user in users_dict:
         print(user["name"])
+
+
+asyncio.run(main())

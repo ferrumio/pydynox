@@ -1,5 +1,6 @@
 """Multiple atomic operations in one request."""
 
+import asyncio
 from datetime import datetime
 
 from pydynox import Model, ModelConfig
@@ -16,32 +17,36 @@ class User(Model):
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     login_count = NumberAttribute()
-    last_login = StringAttribute(null=True)
+    last_login = StringAttribute()
     badges = ListAttribute()
-    temp_token = StringAttribute(null=True)
+    temp_token = StringAttribute()
 
 
-user = User(
-    pk="USER#123",
-    sk="PROFILE",
-    login_count=0,
-    badges=[],
-    temp_token="abc123",
-)
-user.save()
+async def main():
+    user = User(
+        pk="USER#123",
+        sk="PROFILE",
+        login_count=0,
+        badges=[],
+        temp_token="abc123",
+    )
+    await user.save()
 
-# Multiple operations in one request
-user.update(
-    atomic=[
-        User.login_count.add(1),
-        User.last_login.set(datetime.now().isoformat()),
-        User.badges.append(["first_login"]),
-        User.temp_token.remove(),
-    ]
-)
+    # Multiple operations in one request
+    await user.update(
+        atomic=[
+            User.login_count.add(1),
+            User.last_login.set(datetime.now().isoformat()),
+            User.badges.append(["first_login"]),
+            User.temp_token.remove(),
+        ]
+    )
 
-# Result:
-# login_count: 1
-# last_login: "2024-01-15T10:30:00"
-# badges: ["first_login"]
-# temp_token: None (removed)
+    # Result:
+    # login_count: 1
+    # last_login: "2024-01-15T10:30:00"
+    # badges: ["first_login"]
+    # temp_token: None (removed)
+
+
+asyncio.run(main())

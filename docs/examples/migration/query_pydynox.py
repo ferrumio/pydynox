@@ -1,5 +1,7 @@
 """pydynox: Query items from DynamoDB."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
@@ -11,11 +13,15 @@ class Order(Model):
     amount = NumberAttribute()
 
 
-orders = Order.query(
-    hash_key="CUSTOMER#123",
-    range_key_condition=Order.sk.begins_with("ORDER#"),
-    filter_condition=Order.amount > 100,
-)
+async def main():
+    orders = Order.query(
+        hash_key="CUSTOMER#123",
+        range_key_condition=Order.sk.begins_with("ORDER#"),
+        filter_condition=Order.amount > 100,
+    )
 
-for order in orders:
-    print(f"Order: {order.sk}, Amount: {order.amount}")
+    async for order in orders:
+        print(f"Order: {order.sk}, Amount: {order.amount}")
+
+
+asyncio.run(main())

@@ -1,3 +1,5 @@
+"""Model async operations (async is default - no prefix needed)."""
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
@@ -13,13 +15,13 @@ class User(Model):
 async def main():
     # Create and save
     user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
-    await user.async_save()
+    await user.save()
 
     # Get by key
-    user = await User.async_get(pk="USER#123", sk="PROFILE")
+    user = await User.get(pk="USER#123", sk="PROFILE")
 
     # Update
-    await user.async_update(name="Jane", age=31)
+    await user.update(name="Jane", age=31)
 
     # Delete
-    await user.async_delete()
+    await user.delete()

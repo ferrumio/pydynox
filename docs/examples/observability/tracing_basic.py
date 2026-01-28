@@ -1,5 +1,7 @@
 """Basic OpenTelemetry tracing example."""
 
+import asyncio
+
 from pydynox import DynamoDBClient, Model, ModelConfig, enable_tracing
 from pydynox.attributes import StringAttribute
 
@@ -16,8 +18,12 @@ class User(Model):
     name = StringAttribute()
 
 
-# All operations now create spans automatically
-user = User(pk="USER#123", sk="PROFILE", name="John")
-user.save()  # Span: "PutItem users"
+async def main():
+    # All operations now create spans automatically
+    user = User(pk="USER#123", sk="PROFILE", name="John")
+    await user.save()  # Span: "PutItem users"
 
-result = User.get(pk="USER#123", sk="PROFILE")  # Span: "GetItem users"
+    await User.get(pk="USER#123", sk="PROFILE")  # Span: "GetItem users"
+
+
+asyncio.run(main())

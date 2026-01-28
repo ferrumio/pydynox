@@ -3,6 +3,8 @@
 Shows how to track S3 upload/download metrics when using S3Attribute.
 """
 
+import asyncio
+
 from pydynox import DynamoDBClient, Model, ModelConfig
 from pydynox._internal._s3 import S3File
 from pydynox.attributes import S3Attribute, StringAttribute
@@ -22,14 +24,14 @@ class Document(Model):
     content = S3Attribute(bucket="my-bucket", prefix="docs/")
 
 
-def main():
+async def main():
     # Reset metrics
     Document.reset_metrics()
 
     # Save document with S3 content
     doc = Document(pk="DOC#1", sk="v1", name="report.pdf")
     doc.content = S3File(b"PDF content here...", name="report.pdf")
-    doc.save()
+    await doc.save()
 
     # Check S3 metrics
     metrics = Document.get_total_metrics()
@@ -48,5 +50,4 @@ def main():
     print(f"WCU consumed: {metrics.total_wcu}")
 
 
-if __name__ == "__main__":
-    main()
+asyncio.run(main())

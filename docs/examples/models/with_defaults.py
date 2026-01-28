@@ -12,7 +12,7 @@ class User(Model):
     model_config = ModelConfig(table="users")
 
     pk = StringAttribute(hash_key=True)
-    email = StringAttribute(null=False)  # Required field
+    email = StringAttribute(required=True)  # Required field
     name = StringAttribute(default="")
     age = NumberAttribute(default=0)
     active = BooleanAttribute(default=True)

@@ -1,3 +1,5 @@
+"""FastAPI example (async is default - no prefix needed)."""
+
 from fastapi import FastAPI
 from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
 from pydynox.attributes import StringAttribute
@@ -16,7 +18,7 @@ class User(Model):
 
 @app.get("/users/{user_id}")
 async def get_user(user_id: str):
-    user = await User.async_get(pk=f"USER#{user_id}", sk="PROFILE")
+    user = await User.get(pk=f"USER#{user_id}", sk="PROFILE")
     if not user:
         return {"error": "User not found"}
     return {"name": user.name}
@@ -25,5 +27,5 @@ async def get_user(user_id: str):
 @app.post("/users/{user_id}")
 async def create_user(user_id: str, name: str):
     user = User(pk=f"USER#{user_id}", sk="PROFILE", name=name)
-    await user.async_save()
+    await user.save()
     return {"status": "created"}

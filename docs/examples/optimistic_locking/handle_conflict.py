@@ -1,3 +1,5 @@
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute, VersionAttribute
 from pydynox.exceptions import ConditionalCheckFailedException
@@ -10,10 +12,10 @@ class Counter(Model):
     version = VersionAttribute()
 
 
-def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
+async def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
     """Increment counter with retry on conflict."""
     for attempt in range(max_retries):
-        counter = Counter.get(pk=pk)
+        counter = await Counter.get(pk=pk)
         if counter is None:
             counter = Counter(pk=pk, count=0)
 
@@ -21,7 +23,7 @@ def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
         counter.count = counter.count + 1
 
         try:
-            counter.save()
+            await counter.save()
             return counter
         except ConditionalCheckFailedException:
             if attempt == max_retries - 1:
@@ -31,6 +33,9 @@ def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
     raise RuntimeError("Should not reach here")
 
 
-# Usage
-counter = increment_with_retry("COUNTER#RETRY")
-print(f"Count: {counter.count}, Version: {counter.version}")
+async def main():
+    counter = await increment_with_retry("COUNTER#RETRY")
+    print(f"Count: {counter.count}, Version: {counter.version}")
+
+
+asyncio.run(main())

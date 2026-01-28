@@ -28,7 +28,7 @@ class AsyncUser(Model):
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     name = StringAttribute()
-    age = NumberAttribute(null=True)
+    age = NumberAttribute()
 
 
 # ========== Client batch_get tests (async default) ==========

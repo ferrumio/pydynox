@@ -67,19 +67,19 @@ Reserved words like `name` and `status` are handled automatically. The library c
 ```python
 # "name" is a reserved word in DynamoDB
 # This works without issues:
-for user in User.query(pk="USER#123", fields=["name", "status"]):
+async for user in User.query(pk="USER#123", fields=["name", "status"]):
     print(user.name)
 ```
 
-### Async support
+### Sync usage
 
-Async methods work the same way:
+Use `sync_query` and `sync_scan` for sync code:
 
 ```python
-async for user in User.async_query(pk="USER#123", fields=["name"]):
+for user in User.sync_query(pk="USER#123", fields=["name"]):
     print(user.name)
 
-async for user in User.async_scan(fields=["pk", "status"]):
+for user in User.sync_scan(fields=["pk", "status"]):
     print(user.status)
 ```
 
@@ -118,6 +118,7 @@ async for user in User.async_scan(fields=["pk", "status"]):
 Use the `pydynox_memory_backend` fixture to test projections without DynamoDB:
 
 ```python
+import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
@@ -130,12 +131,13 @@ class User(Model):
     age = NumberAttribute()
 
 
-def test_query_with_projection(pydynox_memory_backend):
+@pytest.mark.asyncio
+async def test_query_with_projection(pydynox_memory_backend):
     """Test query returns only projected fields."""
-    User(pk="USER#1", name="Alice", email="alice@example.com", age=30).save()
-    User(pk="USER#1", name="Bob", email="bob@example.com", age=25).save()
+    await User(pk="USER#1", name="Alice", email="alice@example.com", age=30).save()
+    await User(pk="USER#1", name="Bob", email="bob@example.com", age=25).save()
 
-    results = list(User.query(hash_key="USER#1", fields=["name"]))
+    results = [u async for u in User.query(hash_key="USER#1", fields=["name"])]
 
     assert len(results) == 2
     for user in results:
@@ -145,11 +147,12 @@ def test_query_with_projection(pydynox_memory_backend):
         assert user.age is None
 
 
-def test_scan_with_projection(pydynox_memory_backend):
+@pytest.mark.asyncio
+async def test_scan_with_projection(pydynox_memory_backend):
     """Test scan returns only projected fields."""
-    User(pk="USER#1", name="Alice", email="alice@example.com", age=30).save()
+    await User(pk="USER#1", name="Alice", email="alice@example.com", age=30).save()
 
-    results = list(User.scan(fields=["pk", "name"]))
+    results = [u async for u in User.scan(fields=["pk", "name"])]
 
     assert len(results) == 1
     assert results[0].pk == "USER#1"

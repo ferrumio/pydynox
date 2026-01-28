@@ -127,7 +127,7 @@ class ModelBase(metaclass=ModelMeta):
                     setattr(self, attr_name, None)
                 else:
                     setattr(self, attr_name, attr.default)
-            elif not attr.null:
+            elif attr.required:
                 raise ValueError(f"Attribute '{attr_name}' is required")
             else:
                 setattr(self, attr_name, None)

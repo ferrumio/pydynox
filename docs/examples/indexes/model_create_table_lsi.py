@@ -36,7 +36,7 @@ async def main():
         print("Table created with LSI")
 
     # Use the model
-    Order(
+    await Order(
         customer_id="CUST#1",
         order_id="ORD#001",
         status="pending",
@@ -44,8 +44,11 @@ async def main():
     ).save()
 
     # Query using LSI
-    for order in Order.status_index.query(customer_id="CUST#1"):
+    async for order in Order.status_index.query(customer_id="CUST#1"):
         print(f"Order: {order.order_id} - {order.status}")
+
+
+asyncio.run(main())
 
 
 asyncio.run(main())

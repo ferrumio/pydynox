@@ -29,6 +29,8 @@ All pydynox exceptions inherit from `PydynoxException`. You can catch specific e
 | `SerializationException` | Cannot convert data to/from DynamoDB format |
 | `ConnectionException` | Cannot connect to DynamoDB |
 | `EncryptionException` | KMS encryption/decryption failed |
+| `S3AttributeException` | S3 upload/download failed |
+| `ItemTooLargeException` | Item exceeds max_size limit (Python-only) |
 
 ### Basic error handling
 

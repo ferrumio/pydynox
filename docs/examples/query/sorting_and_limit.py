@@ -1,37 +1,70 @@
-from pydynox import Model, ModelConfig
+"""Sorting and limit examples (async - default)."""
+
+import asyncio
+
+from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
+
+client = get_default_client()
+
+CUSTOMER_PK = "CUSTOMER#123"
 
 
 class Order(Model):
-    model_config = ModelConfig(table="orders")
+    model_config = ModelConfig(table="orders_sort")
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
 
-# Ascending order (default)
-for order in Order.query(
-    hash_key="CUSTOMER#123",
-    scan_index_forward=True,
-):
-    print(f"Order: {order.sk}")
+async def main():
+    # Setup: create table and data
+    if not await client.table_exists("orders_sort"):
+        await client.create_table(
+            "orders_sort",
+            hash_key=("pk", "S"),
+            range_key=("sk", "S"),
+        )
 
-# Descending order
-for order in Order.query(
-    hash_key="CUSTOMER#123",
-    scan_index_forward=False,
-):
-    print(f"Order: {order.sk}")
+    # Create 10 orders
+    for i in range(10):
+        await Order(
+            pk=CUSTOMER_PK,
+            sk=f"ORDER#{i:03d}",
+            total=100 + i * 10,
+            status="pending",
+        ).save()
 
-# Get the 5 most recent orders (descending)
-recent_orders = list(
-    Order.query(
-        hash_key="CUSTOMER#123",
+    # Ascending order (default)
+    print("Ascending:")
+    async for order in Order.query(
+        hash_key=CUSTOMER_PK,
+        scan_index_forward=True,
+    ):
+        print(f"  {order.sk}")
+
+    # Descending order
+    print("Descending:")
+    async for order in Order.query(
+        hash_key=CUSTOMER_PK,
         scan_index_forward=False,
-        limit=5,
-    )
-)
+    ):
+        print(f"  {order.sk}")
 
-for order in recent_orders:
-    print(f"Recent order: {order.sk}")
+    # Get the 5 most recent orders (descending)
+    print("5 most recent:")
+    recent_orders = [
+        order
+        async for order in Order.query(
+            hash_key=CUSTOMER_PK,
+            scan_index_forward=False,
+            limit=5,
+        )
+    ]
+
+    for order in recent_orders:
+        print(f"  {order.sk}")
+
+
+asyncio.run(main())

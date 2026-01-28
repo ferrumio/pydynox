@@ -1,5 +1,6 @@
 """Upload file from disk."""
 
+import asyncio
 import tempfile
 from pathlib import Path
 
@@ -15,17 +16,21 @@ class Document(Model):
     content = S3Attribute(bucket="my-bucket")
 
 
-# Create a temp file for demo
-with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-    f.write("This is a test file content")
-    file_path = Path(f.name)
+async def main():
+    # Create a temp file for demo
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write("This is a test file content")
+        file_path = Path(f.name)
 
-# Upload from file path
-doc = Document(pk="DOC#FILE", name=file_path.name)
-doc.content = S3File(file_path)  # Name is taken from file
-doc.save()
+    # Upload from file path
+    doc = Document(pk="DOC#FILE", name=file_path.name)
+    doc.content = S3File(file_path)  # Name is taken from file
+    await doc.save()
 
-print(f"Uploaded: {doc.content.key}")
+    print(f"Uploaded: {doc.content.key}")
 
-# Cleanup
-file_path.unlink()
+    # Cleanup
+    file_path.unlink()
+
+
+asyncio.run(main())

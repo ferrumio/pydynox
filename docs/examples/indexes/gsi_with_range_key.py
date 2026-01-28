@@ -47,7 +47,7 @@ async def main():
         )
 
     # Create users with different statuses
-    User(
+    await User(
         pk="USER#1",
         sk="PROFILE",
         email="john@example.com",
@@ -55,7 +55,7 @@ async def main():
         name="John",
         age=30,
     ).save()
-    User(
+    await User(
         pk="USER#2",
         sk="PROFILE",
         email="jane@example.com",
@@ -63,7 +63,7 @@ async def main():
         name="Jane",
         age=25,
     ).save()
-    User(
+    await User(
         pk="USER#3",
         sk="PROFILE",
         email="bob@example.com",
@@ -71,7 +71,7 @@ async def main():
         name="Bob",
         age=35,
     ).save()
-    User(
+    await User(
         pk="ADMIN#1",
         sk="PROFILE",
         email="admin@example.com",
@@ -82,12 +82,12 @@ async def main():
 
     # Query all active users
     print("All active users:")
-    for user in User.status_index.query(status="active"):
+    async for user in User.status_index.query(status="active"):
         print(f"  {user.name} (pk={user.pk})")
 
     # Query active users with pk starting with "USER#"
     print("\nActive users (not admins):")
-    for user in User.status_index.query(
+    async for user in User.status_index.query(
         status="active",
         range_key_condition=User.pk.begins_with("USER#"),
     ):
@@ -95,7 +95,7 @@ async def main():
 
     # Query in descending order
     print("\nActive users (descending by pk):")
-    for user in User.status_index.query(status="active", scan_index_forward=False):
+    async for user in User.status_index.query(status="active", scan_index_forward=False):
         print(f"  {user.name} (pk={user.pk})")
 
 

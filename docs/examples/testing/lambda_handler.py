@@ -1,5 +1,7 @@
 """Testing AWS Lambda handlers with pydynox."""
 
+import asyncio
+
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
 
@@ -10,27 +12,35 @@ class User(Model):
     name = StringAttribute()
 
 
-# Your Lambda handler
+# Lambda handlers are sync, but can run async code inside
 def create_user_handler(event, context):
     """Lambda handler that creates a user."""
-    user_id = event["user_id"]
-    name = event["name"]
 
-    user = User(pk=f"USER#{user_id}", name=name)
-    user.save()
+    async def _create():
+        user_id = event["user_id"]
+        name = event["name"]
 
-    return {"statusCode": 201, "body": f"Created user {user_id}"}
+        user = User(pk=f"USER#{user_id}", name=name)
+        await user.save()
+
+        return {"statusCode": 201, "body": f"Created user {user_id}"}
+
+    return asyncio.run(_create())
 
 
 def get_user_handler(event, context):
     """Lambda handler that gets a user."""
-    user_id = event["user_id"]
 
-    user = User.get(pk=f"USER#{user_id}")
-    if not user:
-        return {"statusCode": 404, "body": "User not found"}
+    async def _get():
+        user_id = event["user_id"]
 
-    return {"statusCode": 200, "body": {"name": user.name}}
+        user = await User.get(pk=f"USER#{user_id}")
+        if not user:
+            return {"statusCode": 404, "body": "User not found"}
+
+        return {"statusCode": 200, "body": {"name": user.name}}
+
+    return asyncio.run(_get())
 
 
 # Tests - no moto, no localstack, no DynamoDB Local!
@@ -42,8 +52,8 @@ def test_create_user_handler(pydynox_memory_backend):
 
     assert response["statusCode"] == 201
 
-    # Verify user was created
-    user = User.get(pk="USER#123")
+    # Verify user was created (sync in test)
+    user = User.sync_get(pk="USER#123")
     assert user is not None
     assert user.name == "John"
 
@@ -51,7 +61,7 @@ def test_create_user_handler(pydynox_memory_backend):
 def test_get_user_handler(pydynox_memory_backend):
     """Test the get user Lambda handler."""
     # Setup: create a user first
-    User(pk="USER#123", name="Jane").save()
+    User(pk="USER#123", name="Jane").sync_save()
 
     event = {"user_id": "123"}
     response = get_user_handler(event, None)

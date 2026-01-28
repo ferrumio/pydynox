@@ -9,7 +9,7 @@ class User(Model):
     pk = StringAttribute(hash_key=True)
     sk = StringAttribute(range_key=True)
     name = StringAttribute()
-    bio = StringAttribute(null=True)
+    bio = StringAttribute()
 
 
 user = User(pk="USER#123", sk="PROFILE", name="John", bio="Hello world!")

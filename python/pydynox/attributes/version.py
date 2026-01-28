@@ -59,7 +59,7 @@ class VersionAttribute(Attribute[int]):
             hash_key=False,
             range_key=False,
             default=None,  # Will be set to 1 on first save
-            null=True,
+            required=False,
         )
 
     def serialize(self, value: int | None) -> int | None:

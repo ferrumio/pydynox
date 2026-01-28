@@ -9,8 +9,8 @@ class Document(Model):
     pk = StringAttribute(hash_key=True)
     title = StringAttribute()
     body = StringAttribute()
-    tags = ListAttribute(null=True)
-    metadata = MapAttribute(null=True)
+    tags = ListAttribute()
+    metadata = MapAttribute()
 
 
 doc = Document(

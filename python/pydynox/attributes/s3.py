@@ -50,7 +50,7 @@ class S3Attribute(Attribute[S3Value | None]):
         hash_key: bool = False,
         range_key: bool = False,
         default: S3Value | None = None,
-        null: bool = True,
+        required: bool = False,
     ):
         """Create an S3Attribute.
 
@@ -61,12 +61,12 @@ class S3Attribute(Attribute[S3Value | None]):
             hash_key: Not supported for S3Attribute.
             range_key: Not supported for S3Attribute.
             default: Default value (usually None).
-            null: Whether None is allowed.
+            required: Whether this field is required.
         """
         if hash_key or range_key:
             raise ValueError("S3Attribute cannot be a hash_key or range_key")
 
-        super().__init__(hash_key=False, range_key=False, default=default, null=null)
+        super().__init__(hash_key=False, range_key=False, default=default, required=required)
         self.bucket = bucket
         self.prefix = prefix.rstrip("/") + "/" if prefix else ""
         self.region = region

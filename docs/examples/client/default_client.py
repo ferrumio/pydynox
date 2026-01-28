@@ -1,5 +1,6 @@
 """Setting a default client for all models."""
 
+import asyncio
 import os
 
 from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
@@ -28,6 +29,11 @@ class Order(Model):
     total = StringAttribute()
 
 
-# No need to pass client to each model
-user = User(pk="USER#1", sk="PROFILE", name="John")
-user.save()  # Uses the default client
+async def main():
+    # No need to pass client to each model
+    user = User(pk="USER#1", sk="PROFILE", name="John")
+    await user.save()  # Uses the default client
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

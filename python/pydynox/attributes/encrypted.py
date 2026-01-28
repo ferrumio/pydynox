@@ -70,7 +70,7 @@ class EncryptedAttribute(Attribute[str]):
             region: AWS region (optional).
             context: Encryption context dict (optional).
         """
-        super().__init__(hash_key=False, range_key=False, default=None, null=True)
+        super().__init__(hash_key=False, range_key=False, default=None, required=False)
         self.key_id = key_id
         self.mode = mode
         self.region = region
