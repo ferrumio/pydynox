@@ -1,6 +1,48 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.22.0] - 2026-01-29
+
+
+### CI/CD
+
+- bump actions/setup-python from 6.1.0 to 6.2.0 (#217)
+- bump CodSpeedHQ/action from 4.7.0 to 4.8.2 (#219)
+- bump github/codeql-action from 4.31.10 to 4.32.0 (#216)
+- bump actions/checkout from 6.0.1 to 6.0.2 (#218)
+
+
+### Documentation
+
+- update changelog for v0.21.0 (#186)
+- refactoring table operations async first (#197)
+- refactoring s3 operations async first (#201)
+- refactoring kms operations async first (#205)
+- refactoring transaction operations async first (#209)
+- refactoring batch operations async first (#213)
+- refactoring all operations async first (#222)
+- refactoring all operations async first
+
+
+### Features
+
+- add batch get support (#190)
+
+
+### Refactoring
+
+- start adding async as first design (#193)
+- refactoring table operations async first (#196)
+- refactoring s3 operations async first (#200)
+- refactoring km operations async first (#204)
+- refactoring transaction operations async first (#208)
+- refactoring batch operations async first (#212)
+- refactoring model/client operations async first (#221)
+
+
+### Deps
+
+- bump the rust-dependencies group with 2 updates (#220)
 ## [0.21.0] - 2026-01-22
 
 
