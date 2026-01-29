@@ -16,6 +16,7 @@ nav = [
         "guides/models.md",
         "guides/attributes.md",
         "guides/indexes.md",
+        "guides/single-table.md",
         "guides/conditions.md",
         "guides/query.md",
         "guides/scan.md",

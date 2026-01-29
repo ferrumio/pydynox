@@ -407,7 +407,7 @@ class Model(ModelBase, metaclass=ModelMeta):
     @classmethod
     def sync_query(
         cls: type[M],
-        hash_key: Any,
+        hash_key: Any = None,
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
@@ -417,11 +417,12 @@ class Model(ModelBase, metaclass=ModelMeta):
         last_evaluated_key: dict[str, Any] | None = None,
         as_dict: bool = False,
         fields: list[str] | None = None,
+        **kwargs: Any,
     ) -> ModelQueryResult[M]:
         """Query items by hash key with optional conditions (sync).
 
         Args:
-            hash_key: The hash key value to query.
+            hash_key: The hash key value to query. Can be omitted if using template.
             range_key_condition: Optional condition on range key.
             filter_condition: Optional filter applied after query.
             limit: Max total items to return across all pages.
@@ -431,12 +432,18 @@ class Model(ModelBase, metaclass=ModelMeta):
             last_evaluated_key: Start key for pagination.
             as_dict: If True, return dicts instead of Model instances.
             fields: List of fields to return. Saves RCU.
+            **kwargs: Template placeholder values (e.g., user_id="123").
 
         Returns:
             Iterable result that auto-paginates.
 
         Example:
+            >>> # Direct hash key
             >>> for order in Order.sync_query(hash_key="USER#1"):
+            ...     print(order.order_id)
+            >>>
+            >>> # Using template (if pk has template="USER#{user_id}")
+            >>> for order in Order.sync_query(user_id="1"):
             ...     print(order.order_id)
         """
         return sync_query(
@@ -451,6 +458,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             last_evaluated_key=last_evaluated_key,
             as_dict=as_dict,
             fields=fields,
+            **kwargs,
         )
 
     @classmethod
@@ -575,7 +583,7 @@ class Model(ModelBase, metaclass=ModelMeta):
     @classmethod
     def query(
         cls: type[M],
-        hash_key: Any,
+        hash_key: Any = None,
         range_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
@@ -585,11 +593,12 @@ class Model(ModelBase, metaclass=ModelMeta):
         last_evaluated_key: dict[str, Any] | None = None,
         as_dict: bool = False,
         fields: list[str] | None = None,
+        **kwargs: Any,
     ) -> AsyncModelQueryResult[M]:
         """Query items by hash key with optional conditions (async, default).
 
         Args:
-            hash_key: The hash key value to query.
+            hash_key: The hash key value to query. Can be omitted if using template.
             range_key_condition: Optional condition on range key.
             filter_condition: Optional filter applied after query.
             limit: Max total items to return across all pages.
@@ -599,12 +608,18 @@ class Model(ModelBase, metaclass=ModelMeta):
             last_evaluated_key: Start key for pagination.
             as_dict: If True, return dicts instead of Model instances.
             fields: List of fields to return. Saves RCU.
+            **kwargs: Template placeholder values (e.g., user_id="123").
 
         Returns:
             Async iterable result that auto-paginates.
 
         Example:
+            >>> # Direct hash key
             >>> async for order in Order.query(hash_key="USER#1"):
+            ...     print(order.order_id)
+            >>>
+            >>> # Using template (if pk has template="USER#{user_id}")
+            >>> async for order in Order.query(user_id="1"):
             ...     print(order.order_id)
         """
         return async_query(
@@ -619,6 +634,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             last_evaluated_key=last_evaluated_key,
             as_dict=as_dict,
             fields=fields,
+            **kwargs,
         )
 
     @classmethod

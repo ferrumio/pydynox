@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar
 
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox.attributes import Attribute
@@ -16,6 +16,15 @@ if TYPE_CHECKING:
     from pydynox._internal._metrics import MetricsStorage
 
 M = TypeVar("M", bound="ModelBase")
+
+
+class _TemplateAttr(Protocol):
+    """Protocol for attributes with template support."""
+
+    has_template: bool
+    placeholders: list[str]
+
+    def build_key(self, values: dict[str, Any]) -> str: ...
 
 
 class ModelMeta(type):
@@ -119,7 +128,12 @@ class ModelBase(metaclass=ModelMeta):
     model_config: ClassVar[ModelConfig]
 
     def __init__(self, **kwargs: Any) -> None:
+        # First pass: set all regular attributes
         for attr_name, attr in self._attributes.items():
+            # Skip template keys in first pass - they'll be built later
+            if hasattr(attr, "has_template") and attr.has_template:
+                continue
+
             if attr_name in kwargs:
                 setattr(self, attr_name, kwargs[attr_name])
             elif attr.default is not None:
@@ -132,6 +146,29 @@ class ModelBase(metaclass=ModelMeta):
             else:
                 setattr(self, attr_name, None)
 
+        # Second pass: build template keys from other attributes
+        for attr_name, attr in self._attributes.items():
+            if not (hasattr(attr, "has_template") and attr.has_template):
+                continue
+
+            # Cast to template protocol for type checker
+            tattr: _TemplateAttr = attr  # type: ignore[assignment]
+
+            # If user explicitly passed the key value, validate it matches template
+            if attr_name in kwargs:
+                # Allow direct assignment for now (e.g., from_dict)
+                setattr(self, attr_name, kwargs[attr_name])
+            else:
+                # Build key from template using other attribute values
+                values = {k: getattr(self, k, None) for k in tattr.placeholders}
+                # Check if all placeholders have values
+                missing = [k for k, v in values.items() if v is None]
+                if missing:
+                    # Can't build yet - will be built in _apply_auto_generate or save
+                    setattr(self, attr_name, None)
+                else:
+                    setattr(self, attr_name, tattr.build_key(values))
+
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
         for attr_name, attr in self._attributes.items():
@@ -140,6 +177,29 @@ class ModelBase(metaclass=ModelMeta):
                 if current_value is None:
                     generated = generate_value(attr.default)
                     setattr(self, attr_name, generated)
+
+        # Rebuild template keys after auto-generate (placeholders may now have values)
+        self._build_template_keys()
+
+    def _build_template_keys(self) -> None:
+        """Build template key values from placeholder attributes."""
+        for attr_name, attr in self._attributes.items():
+            if not (hasattr(attr, "has_template") and attr.has_template):
+                continue
+
+            # Cast to template protocol for type checker
+            tattr: _TemplateAttr = attr  # type: ignore[assignment]
+
+            # Collect values for all placeholders
+            values = {}
+            for placeholder in tattr.placeholders:
+                val = getattr(self, placeholder, None)
+                if val is None:
+                    raise ValueError(f"Cannot build {attr_name}: missing value for '{placeholder}'")
+                values[placeholder] = val
+
+            # Build and set the key
+            setattr(self, attr_name, tattr.build_key(values))
 
     @classmethod
     def _get_client(cls) -> DynamoDBClient:

@@ -156,7 +156,7 @@ def test_gsi_query_requires_hash_key() -> None:
 
     # WHEN we query without the hash key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="requires all hash key attributes"):
+    with pytest.raises(ValueError, match="GSI query requires 'email'"):
         User.email_index.query(status="active")  # type: ignore[call-arg]
 
 
@@ -226,12 +226,12 @@ def test_multi_attr_gsi_query_requires_all_hash_keys() -> None:
 
     # WHEN we query with missing region
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="Missing: \\['region'\\]"):
+    with pytest.raises(ValueError, match="GSI query requires 'region'"):
         User.location_index.query(tenant_id="ACME")
 
     # WHEN we query with missing tenant_id
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="Missing: \\['tenant_id'\\]"):
+    with pytest.raises(ValueError, match="GSI query requires 'tenant_id'"):
         User.location_index.query(region="us-east-1")
 
 
