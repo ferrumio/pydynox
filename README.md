@@ -48,8 +48,8 @@ from pydynox.attributes import StringAttribute, NumberAttribute
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     age = NumberAttribute(default=0)
 ```
@@ -73,7 +73,7 @@ async def main():
     await user.update(name="Jane", age=30)
 
     # Query
-    async for user in User.query(hash_key="USER#123"):
+    async for user in User.query(partition_key="USER#123"):
         print(user.name)
 
     # Delete
@@ -98,7 +98,7 @@ user = User.sync_get(pk="USER#123", sk="PROFILE")
 user.sync_update(name="Jane", age=30)
 
 # Query
-for user in User.sync_query(hash_key="USER#123"):
+for user in User.sync_query(partition_key="USER#123"):
     print(user.name)
 
 # Delete
@@ -176,20 +176,20 @@ from pydynox.indexes import GlobalSecondaryIndex
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     email = StringAttribute()
     
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
-        hash_key="email",
+        partition_key="email",
     )
 
 # Async
-async for user in User.email_index.query(hash_key="john@test.com"):
+async for user in User.email_index.query(partition_key="john@test.com"):
     print(user.name)
 
 # Sync
-for user in User.email_index.sync_query(hash_key="john@test.com"):
+for user in User.email_index.sync_query(partition_key="john@test.com"):
     print(user.name)
 ```
 
@@ -214,7 +214,7 @@ from pydynox.integrations.pydantic import dynamodb_model
 
 client = DynamoDBClient()
 
-@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
+@dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=client)
 class User(BaseModel):
     pk: str
     sk: str
@@ -241,7 +241,7 @@ from pydynox.attributes import S3Attribute, S3File
 class Document(Model):
     model_config = ModelConfig(table="documents")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     content = S3Attribute(bucket="my-bucket", prefix="docs/")
 
 # Upload
