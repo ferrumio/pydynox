@@ -147,12 +147,23 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return sync_get(cls, consistent_read, as_dict, **keys)
 
-    def sync_save(self, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
+    def sync_save(
+        self,
+        condition: Condition | None = None,
+        skip_hooks: bool | None = None,
+        full_replace: bool = False,
+    ) -> None:
         """Save the model to DynamoDB (sync).
+
+        Uses smart update by default: only sends changed fields to DynamoDB,
+        saving WCU costs. For items loaded from DB, uses UpdateItem. For new
+        items, uses PutItem.
 
         Args:
             condition: Optional condition that must be true for the write.
             skip_hooks: If True, skip before/after save hooks.
+            full_replace: If True, use PutItem with all fields instead of
+                smart update. Use when you need to delete fields not in model.
 
         Raises:
             ConditionalCheckFailedException: If the condition is not met.
@@ -161,8 +172,13 @@ class Model(ModelBase, metaclass=ModelMeta):
         Example:
             >>> user = User(pk="USER#1", sk="PROFILE", name="John")
             >>> user.sync_save()
+            >>>
+            >>> # Check what changed before saving
+            >>> user.name = "Jane"
+            >>> print(user.is_dirty)  # True
+            >>> print(user.changed_fields)  # ["name"]
         """
-        sync_save(self, condition, skip_hooks)
+        sync_save(self, condition, skip_hooks, full_replace)
 
     def sync_delete(
         self, condition: Condition | None = None, skip_hooks: bool | None = None
@@ -315,13 +331,22 @@ class Model(ModelBase, metaclass=ModelMeta):
         return await async_get(cls, consistent_read, as_dict, **keys)
 
     async def save(
-        self, condition: Condition | None = None, skip_hooks: bool | None = None
+        self,
+        condition: Condition | None = None,
+        skip_hooks: bool | None = None,
+        full_replace: bool = False,
     ) -> None:
         """Save the model to DynamoDB (async, default).
+
+        Uses smart update by default: only sends changed fields to DynamoDB,
+        saving WCU costs. For items loaded from DB, uses UpdateItem. For new
+        items, uses PutItem.
 
         Args:
             condition: Optional condition that must be true for the write.
             skip_hooks: If True, skip before/after save hooks.
+            full_replace: If True, use PutItem with all fields instead of
+                smart update. Use when you need to delete fields not in model.
 
         Raises:
             ConditionalCheckFailedException: If the condition is not met.
@@ -330,8 +355,13 @@ class Model(ModelBase, metaclass=ModelMeta):
         Example:
             >>> user = User(pk="USER#1", sk="PROFILE", name="John")
             >>> await user.save()
+            >>>
+            >>> # Check what changed before saving
+            >>> user.name = "Jane"
+            >>> print(user.is_dirty)  # True
+            >>> print(user.changed_fields)  # ["name"]
         """
-        await async_save(self, condition, skip_hooks)
+        await async_save(self, condition, skip_hooks, full_replace)
 
     async def delete(
         self, condition: Condition | None = None, skip_hooks: bool | None = None

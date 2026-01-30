@@ -131,7 +131,7 @@ async def test_model_delete_creates_span(
 async def test_model_update_creates_span(
     otel_exporter: InMemorySpanExporter, user_model: type[Model]
 ):
-    """Model.save() after modification should create a PutItem span."""
+    """Model.save() after modification should create an UpdateItem span (smart save)."""
     enable_tracing()
 
     # First save a user
@@ -141,13 +141,41 @@ async def test_model_update_creates_span(
 
     otel_exporter.clear()
 
-    # Now update and save again
+    # Now update and save again - smart save uses UpdateItem
     user.name = "Alice Updated"
     await user.save()
 
     spans = otel_exporter.get_finished_spans()
     assert len(spans) >= 1
 
+    # Smart save uses UpdateItem for changed fields only
+    update_span = next((s for s in spans if "UpdateItem" in s.name), None)
+    assert update_span is not None
+    assert update_span.attributes["db.operation.name"] == "UpdateItem"
+
+
+@pytest.mark.asyncio
+async def test_model_full_replace_creates_putitem_span(
+    otel_exporter: InMemorySpanExporter, user_model: type[Model]
+):
+    """Model.save(full_replace=True) should create a PutItem span."""
+    enable_tracing()
+
+    # First save a user
+    pk = f"USER#{uuid.uuid4()}"
+    user = user_model(pk=pk, sk="PROFILE", name="Bob")
+    await user.save()
+
+    otel_exporter.clear()
+
+    # Update and save with full_replace=True - forces PutItem
+    user.name = "Bob Updated"
+    await user.save(full_replace=True)
+
+    spans = otel_exporter.get_finished_spans()
+    assert len(spans) >= 1
+
+    # full_replace=True forces PutItem instead of UpdateItem
     put_span = next((s for s in spans if "PutItem" in s.name), None)
     assert put_span is not None
     assert put_span.attributes["db.operation.name"] == "PutItem"

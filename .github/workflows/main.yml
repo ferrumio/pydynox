@@ -1,0 +1,84 @@
+name: Main
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "src/**"
+            - "python/**"
+            - "tests/**"
+            - "Cargo.toml"
+            - "Cargo.lock"
+            - "pyproject.toml"
+            - "uv.lock"
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    build:
+        name: Build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+            - name: Set up Python
+              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+              with:
+                  python-version: "3.14"
+                  allow-prereleases: true
+
+            - name: Build wheel
+              uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+              with:
+                  command: build
+                  args: --release --out dist
+                  sccache: true
+
+            - name: Upload wheel
+              uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+              with:
+                  name: wheel
+                  path: dist/*.whl
+                  retention-days: 1
+
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+        needs: build
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+            - name: Set up Python
+              uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+              with:
+                  python-version: "3.14"
+                  allow-prereleases: true
+
+            - name: Download wheel
+              uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+              with:
+                  name: wheel
+                  path: dist
+
+            - name: Create venv
+              run: python -m venv .venv
+
+            - name: Install wheel and dependencies
+              run: |
+                  source .venv/bin/activate
+                  pip install dist/*.whl
+                  pip install pytest pytest-asyncio pytest-cov hypothesis testcontainers boto3 pydantic opentelemetry-api opentelemetry-sdk
+
+            - name: Run tests with coverage
+              run: |
+                  source .venv/bin/activate
+                  pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark --ignore=tests/memory
+
+            - name: Upload coverage
+              uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  files: coverage.xml
+                  fail_ci_if_error: false
+                  name: pydynox-main

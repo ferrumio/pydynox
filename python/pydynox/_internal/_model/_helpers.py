@@ -26,6 +26,17 @@ SaveResult = tuple[
     dict[str, Any] | None,
     bool,
 ]
+SmartSaveResult = tuple[
+    "DynamoDBClient",
+    str,
+    dict[str, Any],  # key or item
+    str | None,  # condition_expr
+    dict[str, str] | None,  # attr_names
+    dict[str, Any] | None,  # attr_values
+    bool,  # skip_hooks
+    bool,  # use_update (True = UpdateItem, False = PutItem)
+    dict[str, Any] | None,  # updates (for UpdateItem)
+]
 UpdateResult = tuple[
     "DynamoDBClient",
     str,
@@ -128,9 +139,101 @@ def prepare_save(self: Model, condition: Condition | None, skip_hooks: bool | No
 
 
 def finalize_save(self: Model, skip: bool) -> None:
-    """Finalize save operation - run after hooks."""
+    """Finalize save operation - run after hooks and reset change tracking."""
     if not skip:
         self._run_hooks(HookType.AFTER_SAVE)
+    # Reset change tracking after successful save
+    self._reset_change_tracking()
+
+
+def prepare_smart_save(
+    self: Model, condition: Condition | None, skip_hooks: bool | None, full_replace: bool
+) -> SmartSaveResult:
+    """Prepare smart save - uses UpdateItem for changed fields only.
+
+    Returns SmartSaveResult tuple with use_update flag indicating which operation to use.
+    """
+    skip = self._should_skip_hooks(skip_hooks)
+
+    if not skip:
+        self._run_hooks(HookType.BEFORE_SAVE)
+
+    self._apply_auto_generate()
+
+    version_attr = self._get_version_attr_name()
+    version_condition, new_version = self._build_version_condition()
+
+    final_condition = condition
+    if version_condition is not None:
+        final_condition = (
+            final_condition & version_condition if final_condition else version_condition
+        )
+
+    if version_attr is not None:
+        setattr(self, version_attr, new_version)
+
+    max_size = (
+        getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
+    )
+    if max_size is not None:
+        size = self.calculate_size()
+        if size.bytes > max_size:
+            raise ItemTooLargeException(
+                size=size.bytes,
+                max_size=max_size,
+                item_key=self._get_key(),
+            )
+
+    client = self._get_client()
+    table = self._get_table()
+
+    # Decide: UpdateItem (smart) or PutItem (full)
+    # Use UpdateItem if: has original (loaded from DB), has changes, not full_replace
+    use_update = self._original is not None and len(self._changed) > 0 and not full_replace
+
+    if use_update:
+        # Smart update: only send changed fields
+        key = self._get_key()
+        updates = {}
+        for field_name in self._changed:
+            if field_name in self._attributes:
+                value = getattr(self, field_name, None)
+                # Serialize the value - handles special types like S3Value
+                attr = self._attributes[field_name]
+                updates[field_name] = attr.serialize(value)
+
+        # Also include version field if it changed
+        if version_attr is not None and version_attr not in updates:
+            updates[version_attr] = new_version
+
+        if final_condition is not None:
+            names: dict[str, str] = {}
+            values: dict[str, Any] = {}
+            expr = final_condition.serialize(names, values)
+            attr_names = {v: k for k, v in names.items()}
+            # Rename condition value placeholders to avoid collision with update placeholders
+            # Rust build_set_expression uses :v0, :v1, etc. for updates
+            renamed_values: dict[str, Any] = {}
+            renamed_expr = expr
+            for old_key, val in values.items():
+                new_key = old_key.replace(":v", ":cond")
+                renamed_values[new_key] = val
+                renamed_expr = renamed_expr.replace(old_key, new_key)
+            return client, table, key, renamed_expr, attr_names, renamed_values, skip, True, updates
+
+        return client, table, key, None, None, None, skip, True, updates
+
+    # Full replace: PutItem with all fields
+    item = self.to_dict()
+
+    if final_condition is not None:
+        names = {}
+        values: dict[str, Any] = {}
+        expr = final_condition.serialize(names, values)
+        attr_names = {v: k for k, v in names.items()}
+        return client, table, item, expr, attr_names, values, skip, False, None
+
+    return client, table, item, None, None, None, skip, False, None
 
 
 def prepare_delete(self: Model, condition: Condition | None, skip_hooks: bool | None) -> SaveResult:
