@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from pydynox._internal._results import (
     AsyncModelQueryResult,
@@ -20,12 +20,55 @@ if TYPE_CHECKING:
 M = TypeVar("M", bound="Model")
 
 
+class _TemplateAttr(Protocol):
+    """Protocol for attributes with template support."""
+
+    has_template: bool
+    placeholders: list[str]
+
+    def build_key(self, values: dict[str, Any]) -> str: ...
+
+
+def _resolve_hash_key(cls: type[M], hash_key: Any | None, kwargs: dict[str, Any]) -> Any:
+    """Resolve hash key value, building from template if needed.
+
+    If hash_key is provided directly, use it.
+    Otherwise, check if the hash key attribute has a template and build from kwargs.
+    """
+    if hash_key is not None:
+        return hash_key
+
+    # Check if hash key has template
+    if cls._hash_key is None:
+        raise ValueError(f"Model {cls.__name__} has no hash_key defined")
+
+    hash_attr = cls._attributes.get(cls._hash_key)
+    if hash_attr is None:
+        raise ValueError(f"Hash key attribute {cls._hash_key} not found")
+
+    # If no template, can't build from kwargs
+    if not (hasattr(hash_attr, "has_template") and hash_attr.has_template):
+        raise ValueError(f"hash_key is required. Model {cls.__name__} hash key has no template.")
+
+    # Cast to template protocol for type checker
+    tattr: _TemplateAttr = hash_attr  # type: ignore[assignment]
+
+    # Build from template using kwargs
+    values = {}
+    for placeholder in tattr.placeholders:
+        if placeholder not in kwargs:
+            raise ValueError(f"Missing value for template placeholder: {placeholder}")
+        values[placeholder] = kwargs[placeholder]
+
+    return tattr.build_key(values)
+
+
 # ========== SYNC METHODS ==========
 
 
 def sync_query(
     cls: type[M],
-    hash_key: Any,
+    hash_key: Any = None,
     range_key_condition: Condition | None = None,
     filter_condition: Condition | None = None,
     limit: int | None = None,
@@ -35,11 +78,24 @@ def sync_query(
     last_evaluated_key: dict[str, Any] | None = None,
     as_dict: bool = False,
     fields: list[str] | None = None,
+    **kwargs: Any,
 ) -> ModelQueryResult[M]:
-    """Query items by hash key with optional conditions (sync)."""
+    """Query items by hash key with optional conditions (sync).
+
+    The hash_key can be provided directly or built from template placeholders.
+
+    Examples:
+        # Direct hash key
+        Order.sync_query(hash_key="USER#123")
+
+        # Using template placeholders (if pk has template="USER#{user_id}")
+        Order.sync_query(user_id="123")
+    """
+    resolved_hash_key = _resolve_hash_key(cls, hash_key, kwargs)
+
     return ModelQueryResult(
         model_class=cls,
-        hash_key_value=hash_key,
+        hash_key_value=resolved_hash_key,
         range_key_condition=range_key_condition,
         filter_condition=filter_condition,
         limit=limit,
@@ -177,7 +233,7 @@ def sync_parallel_scan(
 
 def query(
     cls: type[M],
-    hash_key: Any,
+    hash_key: Any = None,
     range_key_condition: Condition | None = None,
     filter_condition: Condition | None = None,
     limit: int | None = None,
@@ -187,11 +243,26 @@ def query(
     last_evaluated_key: dict[str, Any] | None = None,
     as_dict: bool = False,
     fields: list[str] | None = None,
+    **kwargs: Any,
 ) -> AsyncModelQueryResult[M]:
-    """Query items by hash key with optional conditions (async, default)."""
+    """Query items by hash key with optional conditions (async, default).
+
+    The hash_key can be provided directly or built from template placeholders.
+
+    Examples:
+        # Direct hash key
+        async for order in Order.query(hash_key="USER#123"):
+            print(order)
+
+        # Using template placeholders (if pk has template="USER#{user_id}")
+        async for order in Order.query(user_id="123"):
+            print(order)
+    """
+    resolved_hash_key = _resolve_hash_key(cls, hash_key, kwargs)
+
     return AsyncModelQueryResult(
         model_class=cls,
-        hash_key_value=hash_key,
+        hash_key_value=resolved_hash_key,
         range_key_condition=range_key_condition,
         filter_condition=filter_condition,
         limit=limit,

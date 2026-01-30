@@ -2,15 +2,131 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from typing import Any
 
 from pydynox.attributes.base import Attribute
 
 
+@dataclass
+class _TemplatePart:
+    """Part of a parsed template."""
+
+    is_placeholder: bool
+    value: str  # literal text or attribute name
+
+
+def _parse_template(template: str) -> list[_TemplatePart]:
+    """Parse template like 'USER#{email}' into parts."""
+    parts: list[_TemplatePart] = []
+    pattern = r"\{(\w+)\}|([^{]+)"
+    for match in re.finditer(pattern, template):
+        if match.group(1):  # placeholder
+            parts.append(_TemplatePart(is_placeholder=True, value=match.group(1)))
+        else:  # literal
+            parts.append(_TemplatePart(is_placeholder=False, value=match.group(2)))
+    return parts
+
+
+def _build_key(parts: list[_TemplatePart], values: dict[str, Any]) -> str:
+    """Build key from template parts and values."""
+    result = ""
+    for part in parts:
+        if part.is_placeholder:
+            if part.value not in values:
+                raise ValueError(f"Missing value for template placeholder: {part.value}")
+            result += str(values[part.value])
+        else:
+            result += part.value
+    return result
+
+
 class StringAttribute(Attribute[str]):
-    """String attribute (DynamoDB type S)."""
+    """String attribute (DynamoDB type S).
+
+    Supports optional template for single-table design patterns.
+
+    Example:
+        >>> class User(Model):
+        ...     model_config = ModelConfig(table="app")
+        ...     pk = StringAttribute(hash_key=True, template="USER#{email}")
+        ...     sk = StringAttribute(range_key=True, template="PROFILE")
+        ...     email = StringAttribute()
+        ...     name = StringAttribute()
+        >>>
+        >>> user = User(email="john@example.com", name="John")
+        >>> # pk is auto-built as "USER#john@example.com"
+    """
 
     attr_type = "S"
+
+    def __init__(
+        self,
+        hash_key: bool = False,
+        range_key: bool = False,
+        default: str | None = None,
+        required: bool = False,
+        template: str | None = None,
+    ):
+        """Create a StringAttribute.
+
+        Args:
+            hash_key: True if this is the partition key.
+            range_key: True if this is the sort key.
+            default: Default value when not provided.
+            required: Whether this field is required.
+            template: Template for building key (e.g., "USER#{email}").
+        """
+        super().__init__(hash_key=hash_key, range_key=range_key, default=default, required=required)
+        self.template = template
+        self._template_parts: list[_TemplatePart] | None = None
+        self._placeholders: list[str] | None = None
+
+        if template:
+            self._template_parts = _parse_template(template)
+            self._placeholders = [p.value for p in self._template_parts if p.is_placeholder]
+
+    @property
+    def has_template(self) -> bool:
+        """Check if this attribute has a template."""
+        return self.template is not None
+
+    @property
+    def placeholders(self) -> list[str]:
+        """Get list of placeholder names in the template."""
+        return self._placeholders or []
+
+    def build_key(self, values: dict[str, Any]) -> str:
+        """Build key value from template and provided values.
+
+        Args:
+            values: Dict mapping placeholder names to values.
+
+        Returns:
+            The built key string.
+
+        Raises:
+            ValueError: If template is not defined or placeholder is missing.
+        """
+        if not self._template_parts:
+            raise ValueError("No template defined for this attribute")
+        return _build_key(self._template_parts, values)
+
+    def get_prefix(self) -> str:
+        """Get static prefix from template (e.g., 'USER#' from 'USER#{email}').
+
+        Returns:
+            The prefix string, or empty string if no template.
+        """
+        if not self._template_parts:
+            return ""
+        prefix = ""
+        for part in self._template_parts:
+            if part.is_placeholder:
+                break
+            prefix += part.value
+        return prefix
 
 
 class NumberAttribute(Attribute[float]):

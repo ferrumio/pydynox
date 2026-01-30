@@ -6,13 +6,22 @@ Public API is exported from pydynox.indexes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 
 if TYPE_CHECKING:
     from pydynox.conditions import Condition
     from pydynox.model import Model
 
 M = TypeVar("M", bound="Model")
+
+
+class _TemplateAttr(Protocol):
+    """Protocol for attributes with template support."""
+
+    has_template: bool
+    placeholders: list[str]
+
+    def build_key(self, values: dict[str, Any]) -> str: ...
 
 
 class GlobalSecondaryIndex(Generic[M]):
@@ -105,6 +114,49 @@ class GlobalSecondaryIndex(Generic[M]):
             )
         return self._model_class
 
+    def _resolve_hash_key_values(
+        self, model_class: type[M], key_values: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Resolve hash key values, building from templates if needed.
+
+        For inverted indexes where hash_key="sk", this detects that the user
+        passed template placeholders (e.g., order_id="456") and builds the
+        actual key value using the template (e.g., "ORDER#456").
+        """
+        resolved: dict[str, Any] = {}
+        attributes = model_class._attributes
+
+        for attr_name in self.hash_keys:
+            # Direct value provided
+            if attr_name in key_values:
+                resolved[attr_name] = key_values[attr_name]
+                continue
+
+            # Check if attribute has template
+            attr = attributes.get(attr_name)
+            if attr is None:
+                raise ValueError(f"Attribute '{attr_name}' not found on {model_class.__name__}")
+
+            if hasattr(attr, "has_template") and attr.has_template:
+                # Cast to template protocol for type checker
+                tattr: _TemplateAttr = attr  # type: ignore[assignment]
+                # Try to build from template placeholders
+                placeholders = tattr.placeholders
+                missing = [p for p in placeholders if p not in key_values]
+                if not missing:
+                    # All placeholders provided, build the key
+                    values = {p: key_values[p] for p in placeholders}
+                    resolved[attr_name] = tattr.build_key(values)
+                    continue
+
+            # Neither direct value nor template placeholders provided
+            raise ValueError(
+                f"GSI query requires '{attr_name}' or its template placeholders. "
+                f"Got: {list(key_values.keys())}"
+            )
+
+        return resolved
+
     def sync_query(
         self,
         range_key_condition: Condition | None = None,
@@ -115,21 +167,21 @@ class GlobalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> GSIQueryResult[M]:
-        """Sync query the GSI."""
-        model_class = self._get_model_class()
+        """Sync query the GSI.
 
-        missing_hash_keys = [k for k in self.hash_keys if k not in key_values]
-        if missing_hash_keys:
-            raise ValueError(
-                f"GSI sync_query requires all hash key attributes: {self.hash_keys}. "
-                f"Missing: {missing_hash_keys}"
-            )
+        For inverted indexes with templates, you can pass template placeholders:
+            # If sk has template="ORDER#{order_id}" and GSI has hash_key="sk"
+            inverted_index.sync_query(order_id="456")
+            # Internally builds: sk="ORDER#456"
+        """
+        model_class = self._get_model_class()
+        resolved_values = self._resolve_hash_key_values(model_class, key_values)
 
         return GSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
             hash_keys=self.hash_keys,
-            hash_key_values={k: key_values[k] for k in self.hash_keys},
+            hash_key_values=resolved_values,
             range_keys=self.range_keys,
             range_key_condition=range_key_condition,
             filter_condition=filter_condition,
@@ -149,21 +201,22 @@ class GlobalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> AsyncGSIQueryResult[M]:
-        """Query the GSI (async)."""
-        model_class = self._get_model_class()
+        """Query the GSI (async).
 
-        missing_hash_keys = [k for k in self.hash_keys if k not in key_values]
-        if missing_hash_keys:
-            raise ValueError(
-                f"GSI query requires all hash key attributes: {self.hash_keys}. "
-                f"Missing: {missing_hash_keys}"
-            )
+        For inverted indexes with templates, you can pass template placeholders:
+            # If sk has template="ORDER#{order_id}" and GSI has hash_key="sk"
+            async for item in inverted_index.query(order_id="456"):
+                print(item)
+            # Internally builds: sk="ORDER#456"
+        """
+        model_class = self._get_model_class()
+        resolved_values = self._resolve_hash_key_values(model_class, key_values)
 
         return AsyncGSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
             hash_keys=self.hash_keys,
-            hash_key_values={k: key_values[k] for k in self.hash_keys},
+            hash_key_values=resolved_values,
             range_keys=self.range_keys,
             range_key_condition=range_key_condition,
             filter_condition=filter_condition,

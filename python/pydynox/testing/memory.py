@@ -920,6 +920,20 @@ class MemoryClient:
         """Always returns True for memory backend."""
         return True
 
+    def _get_client_config(self) -> dict[str, str | float | int | None]:
+        """Get client config for S3/KMS compatibility.
+
+        Returns minimal config for memory backend.
+        S3Attribute uses this to create S3 client with same credentials.
+        """
+        return {
+            "region": "us-east-1",
+            "endpoint_url": None,
+            "access_key_id": None,
+            "secret_access_key": None,
+            "session_token": None,
+        }
+
     def _check_condition(
         self,
         item: dict[str, Any] | None,
