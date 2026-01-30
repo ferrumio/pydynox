@@ -46,17 +46,28 @@ jobs:
           python-version: ${{ matrix.python }}
           allow-prereleases: true
 
+      - name: Create venv
+        run: python -m venv .venv
+
       - name: Install tools
-        run: pip install ruff ty pydantic opentelemetry-api
+        run: |
+          source .venv/bin/activate
+          pip install ruff ty pydantic opentelemetry-api
 
       - name: Ruff check
-        run: ruff check python/ tests/ benchmarks/
+        run: |
+          source .venv/bin/activate
+          ruff check python/ tests/ benchmarks/
 
       - name: Ruff format
-        run: ruff format --check python/ tests/ benchmarks/
+        run: |
+          source .venv/bin/activate
+          ruff format --check python/ tests/ benchmarks/
 
       - name: Type check (ty)
-        run: ty check python/pydynox/
+        run: |
+          source .venv/bin/activate
+          ty check python/pydynox/
 
   build:
     name: Build (${{ matrix.os }} / py${{ matrix.python }})
