@@ -1,6 +1,22 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.23.0] - 2026-01-30
+
+
+### Documentation
+
+- update changelog for v0.22.0 (#225)
+
+
+### Features
+
+- adding single table design (#226)
+
+
+### Refactoring
+
+- breaking change - rename hash e range key names (#228)
 ## [0.22.0] - 2026-01-29
 
 
