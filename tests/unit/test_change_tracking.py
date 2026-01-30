@@ -1,6 +1,5 @@
 """Unit tests for change tracking (smart updates)."""
 
-import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.testing import MemoryBackend

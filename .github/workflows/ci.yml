@@ -30,9 +30,38 @@ jobs:
       - name: Rust clippy
         run: cargo clippy --all-targets -- -D warnings
 
+  python-lint:
+    name: Python lint (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
+
+      - name: Install tools
+        run: pip install ruff ty
+
+      - name: Ruff check
+        run: ruff check python/ tests/ benchmarks/
+
+      - name: Ruff format
+        run: ruff format --check python/ tests/ benchmarks/
+
+      - name: Type check (ty)
+        run: ty check python/pydynox/
+
   build:
     name: Build (${{ matrix.os }} / py${{ matrix.python }})
     runs-on: ${{ matrix.os }}
+    needs: [rust-lint, python-lint]
     strategy:
       fail-fast: false
       matrix:
@@ -94,24 +123,13 @@ jobs:
         run: |
           source .venv/bin/activate
           pip install dist/*.whl
-          pip install pytest pytest-asyncio hypothesis pydantic ty ruff opentelemetry-api opentelemetry-sdk
+          pip install pytest pytest-asyncio hypothesis pydantic opentelemetry-api opentelemetry-sdk
 
       - name: Install integration test dependencies
         if: runner.os == 'Linux'
         run: |
           source .venv/bin/activate
           pip install testcontainers boto3
-
-      - name: Ruff check
-        run: |
-          source .venv/bin/activate
-          ruff check python/ tests/ benchmarks/
-          ruff format --check python/ tests/ benchmarks/
-
-      - name: Type check (ty)
-        run: |
-          source .venv/bin/activate
-          ty check python/pydynox/
 
       - name: Run unit tests
         run: |
