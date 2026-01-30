@@ -9,8 +9,8 @@ from pydynox.attributes import NumberAttribute, StringAttribute
 class PageView(Model):
     model_config = ModelConfig(table="analytics")
 
-    pk = StringAttribute(hash_key=True)  # page_url
-    sk = StringAttribute(range_key=True)  # date
+    pk = StringAttribute(partition_key=True)  # page_url
+    sk = StringAttribute(sort_key=True)  # date
     views = NumberAttribute()
 
 

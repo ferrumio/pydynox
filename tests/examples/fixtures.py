@@ -9,7 +9,7 @@ import time
 
 from pydynox import DynamoDBClient
 
-# Table schemas: name -> (hash_key, range_key or None)
+# Table schemas: name -> (partition_key, sort_key or None)
 TABLE_SCHEMAS = {
     # Tables with pk + sk
     "users": ("pk", "sk"),
@@ -36,13 +36,13 @@ TABLE_SCHEMAS = {
 
 def create_tables(client: DynamoDBClient) -> None:
     """Create all test tables."""
-    for name, (hash_key, range_key) in TABLE_SCHEMAS.items():
+    for name, (partition_key, sort_key) in TABLE_SCHEMAS.items():
         if client.sync_table_exists(name):
             continue
         client.sync_create_table(
             name,
-            hash_key=(hash_key, "S"),
-            range_key=(range_key, "S") if range_key else None,
+            partition_key=(partition_key, "S"),
+            sort_key=(sort_key, "S") if sort_key else None,
             wait=True,
         )
 

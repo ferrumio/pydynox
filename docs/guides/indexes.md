@@ -36,9 +36,9 @@ Use the index attribute to query:
 
 When your GSI has a range key, you can add conditions:
 
-=== "range_key_condition.py"
+=== "sort_key_condition.py"
     ```python
-    --8<-- "docs/examples/indexes/range_key_condition.py"
+    --8<-- "docs/examples/indexes/sort_key_condition.py"
     ```
 
 ## Filter conditions
@@ -166,10 +166,10 @@ All partition key attributes are required. Sort key attributes are optional.
 
 | Use case | Example |
 |----------|---------|
-| Multi-tenant apps | `hash_key=["tenant_id", "entity_type"]` |
-| Hierarchical data | `hash_key=["country", "state"]` |
-| Time-series | `range_key=["year", "month", "day"]` |
-| Composite sorting | `range_key=["priority", "created_at"]` |
+| Multi-tenant apps | `partition_key=["tenant_id", "entity_type"]` |
+| Hierarchical data | `partition_key=["country", "state"]` |
+| Time-series | `sort_key=["year", "month", "day"]` |
+| Composite sorting | `sort_key=["priority", "created_at"]` |
 
 !!! tip
     Multi-attribute keys avoid the need to create synthetic composite keys like `tenant_id#region`. DynamoDB handles the composition for you.
@@ -185,7 +185,7 @@ When creating tables programmatically, include GSI definitions:
 
 ### Multi-attribute GSI in create_table
 
-Use `hash_keys` and `range_keys` (plural) for multi-attribute keys:
+Use `partition_keys` and `sort_keys` (plural) for multi-attribute keys:
 
 === "create_table_multi_attr.py"
     ```python
@@ -206,14 +206,14 @@ Control which attributes are copied to the index:
 # Keys only - smallest index, lowest cost
 {
     "index_name": "status-index",
-    "hash_key": ("status", "S"),
+    "partition_key": ("status", "S"),
     "projection": "KEYS_ONLY",
 }
 
 # Include specific attributes
 {
     "index_name": "email-index",
-    "hash_key": ("email", "S"),
+    "partition_key": ("email", "S"),
     "projection": "INCLUDE",
     "non_key_attributes": ["name", "created_at"],
 }

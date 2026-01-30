@@ -44,8 +44,8 @@ def user_model(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         age = NumberAttribute()
 
@@ -64,8 +64,8 @@ def test_model_collects_attributes(user_model):
 
 def test_model_identifies_keys(user_model):
     """Model metaclass identifies hash and range keys."""
-    assert user_model._hash_key == "pk"
-    assert user_model._range_key == "sk"
+    assert user_model._partition_key == "pk"
+    assert user_model._sort_key == "sk"
 
 
 def test_model_init_sets_attributes(user_model):
@@ -221,7 +221,7 @@ async def test_model_with_default_client(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -249,16 +249,16 @@ async def test_update_by_key(user_model, mock_client):
 
 
 @pytest.mark.asyncio
-async def test_update_by_key_missing_hash_key(user_model):
-    """update_by_key() raises error when hash_key is missing."""
-    with pytest.raises(ValueError, match="Missing required hash_key"):
+async def test_update_by_key_missing_partition_key(user_model):
+    """update_by_key() raises error when partition_key is missing."""
+    with pytest.raises(ValueError, match="Missing required partition_key"):
         await user_model.update_by_key(sk="PROFILE", name="Jane")
 
 
 @pytest.mark.asyncio
-async def test_update_by_key_missing_range_key(user_model):
-    """update_by_key() raises error when range_key is missing."""
-    with pytest.raises(ValueError, match="Missing required range_key"):
+async def test_update_by_key_missing_sort_key(user_model):
+    """update_by_key() raises error when sort_key is missing."""
+    with pytest.raises(ValueError, match="Missing required sort_key"):
         await user_model.update_by_key(pk="USER#1", name="Jane")
 
 
@@ -286,16 +286,16 @@ async def test_delete_by_key(user_model, mock_client):
 
 
 @pytest.mark.asyncio
-async def test_delete_by_key_missing_hash_key(user_model):
-    """delete_by_key() raises error when hash_key is missing."""
-    with pytest.raises(ValueError, match="Missing required hash_key"):
+async def test_delete_by_key_missing_partition_key(user_model):
+    """delete_by_key() raises error when partition_key is missing."""
+    with pytest.raises(ValueError, match="Missing required partition_key"):
         await user_model.delete_by_key(sk="PROFILE")
 
 
 @pytest.mark.asyncio
-async def test_delete_by_key_missing_range_key(user_model):
-    """delete_by_key() raises error when range_key is missing."""
-    with pytest.raises(ValueError, match="Missing required range_key"):
+async def test_delete_by_key_missing_sort_key(user_model):
+    """delete_by_key() raises error when sort_key is missing."""
+    with pytest.raises(ValueError, match="Missing required sort_key"):
         await user_model.delete_by_key(pk="USER#1")
 
 
@@ -430,15 +430,15 @@ def test_sync_update_by_key(user_model, mock_client):
     )
 
 
-def test_sync_update_by_key_missing_hash_key(user_model):
-    """sync_update_by_key() raises error when hash_key is missing."""
-    with pytest.raises(ValueError, match="Missing required hash_key"):
+def test_sync_update_by_key_missing_partition_key(user_model):
+    """sync_update_by_key() raises error when partition_key is missing."""
+    with pytest.raises(ValueError, match="Missing required partition_key"):
         user_model.sync_update_by_key(sk="PROFILE", name="Jane")
 
 
-def test_sync_update_by_key_missing_range_key(user_model):
-    """sync_update_by_key() raises error when range_key is missing."""
-    with pytest.raises(ValueError, match="Missing required range_key"):
+def test_sync_update_by_key_missing_sort_key(user_model):
+    """sync_update_by_key() raises error when sort_key is missing."""
+    with pytest.raises(ValueError, match="Missing required sort_key"):
         user_model.sync_update_by_key(pk="USER#1", name="Jane")
 
 
@@ -462,15 +462,15 @@ def test_sync_delete_by_key(user_model, mock_client):
     mock_client.sync_delete_item.assert_called_once_with("users", {"pk": "USER#1", "sk": "PROFILE"})
 
 
-def test_sync_delete_by_key_missing_hash_key(user_model):
-    """sync_delete_by_key() raises error when hash_key is missing."""
-    with pytest.raises(ValueError, match="Missing required hash_key"):
+def test_sync_delete_by_key_missing_partition_key(user_model):
+    """sync_delete_by_key() raises error when partition_key is missing."""
+    with pytest.raises(ValueError, match="Missing required partition_key"):
         user_model.sync_delete_by_key(sk="PROFILE")
 
 
-def test_sync_delete_by_key_missing_range_key(user_model):
-    """sync_delete_by_key() raises error when range_key is missing."""
-    with pytest.raises(ValueError, match="Missing required range_key"):
+def test_sync_delete_by_key_missing_sort_key(user_model):
+    """sync_delete_by_key() raises error when sort_key is missing."""
+    with pytest.raises(ValueError, match="Missing required sort_key"):
         user_model.sync_delete_by_key(pk="USER#1")
 
 

@@ -113,8 +113,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         >>>
         >>> class User(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
-        ...     sk = StringAttribute(range_key=True)
+        ...     pk = StringAttribute(partition_key=True)
+        ...     sk = StringAttribute(sort_key=True)
         ...     name = StringAttribute()
         >>>
         >>> user = User(pk="USER#1", sk="PROFILE", name="John")
@@ -135,7 +135,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         Args:
             consistent_read: Use strongly consistent read. Defaults to model_config value.
             as_dict: If True, return dict instead of Model instance.
-            **keys: The key attributes (hash_key and optional range_key).
+            **keys: The key attributes (partition_key and optional sort_key).
 
         Returns:
             The model instance (or dict if as_dict=True) if found, None otherwise.
@@ -222,7 +222,7 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         Args:
             condition: Optional condition that must be true for the delete.
-            **kwargs: The key attributes (hash_key and optional range_key).
+            **kwargs: The key attributes (partition_key and optional sort_key).
 
         Example:
             >>> User.sync_delete_by_key(pk="USER#1", sk="PROFILE")
@@ -239,7 +239,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         """Sync batch get multiple items by their keys.
 
         Args:
-            keys: List of key dicts (each with hash_key and optional range_key).
+            keys: List of key dicts (each with partition_key and optional sort_key).
             consistent_read: Use strongly consistent read.
             as_dict: If True, return dicts instead of Model instances.
 
@@ -270,7 +270,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         """Async batch get multiple items by their keys (default).
 
         Args:
-            keys: List of key dicts (each with hash_key and optional range_key).
+            keys: List of key dicts (each with partition_key and optional sort_key).
             consistent_read: Use strongly consistent read.
             as_dict: If True, return dicts instead of Model instances.
 
@@ -302,7 +302,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         Args:
             consistent_read: Use strongly consistent read. Defaults to model_config value.
             as_dict: If True, return dict instead of Model instance.
-            **keys: The key attributes (hash_key and optional range_key).
+            **keys: The key attributes (partition_key and optional sort_key).
 
         Returns:
             The model instance (or dict if as_dict=True) if found, None otherwise.
@@ -395,7 +395,7 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         Args:
             condition: Optional condition that must be true for the delete.
-            **kwargs: The key attributes (hash_key and optional range_key).
+            **kwargs: The key attributes (partition_key and optional sort_key).
 
         Example:
             >>> await User.delete_by_key(pk="USER#1", sk="PROFILE")
@@ -407,8 +407,8 @@ class Model(ModelBase, metaclass=ModelMeta):
     @classmethod
     def sync_query(
         cls: type[M],
-        hash_key: Any = None,
-        range_key_condition: Condition | None = None,
+        partition_key: Any = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -422,8 +422,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         """Query items by hash key with optional conditions (sync).
 
         Args:
-            hash_key: The hash key value to query. Can be omitted if using template.
-            range_key_condition: Optional condition on range key.
+            partition_key: The hash key value to query. Can be omitted if using template.
+            sort_key_condition: Optional condition on range key.
             filter_condition: Optional filter applied after query.
             limit: Max total items to return across all pages.
             page_size: Items per page (passed as Limit to DynamoDB).
@@ -439,7 +439,7 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         Example:
             >>> # Direct hash key
-            >>> for order in Order.sync_query(hash_key="USER#1"):
+            >>> for order in Order.sync_query(partition_key="USER#1"):
             ...     print(order.order_id)
             >>>
             >>> # Using template (if pk has template="USER#{user_id}")
@@ -448,8 +448,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return sync_query(
             cls,
-            hash_key=hash_key,
-            range_key_condition=range_key_condition,
+            partition_key=partition_key,
+            sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
             limit=limit,
             page_size=page_size,
@@ -583,8 +583,8 @@ class Model(ModelBase, metaclass=ModelMeta):
     @classmethod
     def query(
         cls: type[M],
-        hash_key: Any = None,
-        range_key_condition: Condition | None = None,
+        partition_key: Any = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -598,8 +598,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         """Query items by hash key with optional conditions (async, default).
 
         Args:
-            hash_key: The hash key value to query. Can be omitted if using template.
-            range_key_condition: Optional condition on range key.
+            partition_key: The hash key value to query. Can be omitted if using template.
+            sort_key_condition: Optional condition on range key.
             filter_condition: Optional filter applied after query.
             limit: Max total items to return across all pages.
             page_size: Items per page (passed as Limit to DynamoDB).
@@ -615,7 +615,7 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         Example:
             >>> # Direct hash key
-            >>> async for order in Order.query(hash_key="USER#1"):
+            >>> async for order in Order.query(partition_key="USER#1"):
             ...     print(order.order_id)
             >>>
             >>> # Using template (if pk has template="USER#{user_id}")
@@ -624,8 +624,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         """
         return async_query(
             cls,
-            hash_key=hash_key,
-            range_key_condition=range_key_condition,
+            partition_key=partition_key,
+            sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
             limit=limit,
             page_size=page_size,
@@ -867,27 +867,27 @@ class Model(ModelBase, metaclass=ModelMeta):
             wait: If True, wait for table to become active.
 
         Raises:
-            ValueError: If model has no hash_key defined.
+            ValueError: If model has no partition_key defined.
             ResourceInUseException: If table already exists.
 
         Example:
             >>> await User.create_table(wait=True)
         """
-        if cls._hash_key is None:
-            raise ValueError(f"Model {cls.__name__} has no hash_key defined")
+        if cls._partition_key is None:
+            raise ValueError(f"Model {cls.__name__} has no partition_key defined")
 
         client = cls._get_client()
         table = cls._get_table()
 
         # Get hash key type
-        hash_key_attr = cls._attributes[cls._hash_key]
-        hash_key = (cls._hash_key, hash_key_attr.attr_type)
+        partition_key_attr = cls._attributes[cls._partition_key]
+        partition_key = (cls._partition_key, partition_key_attr.attr_type)
 
         # Get range key type if defined
-        range_key = None
-        if cls._range_key:
-            range_key_attr = cls._attributes[cls._range_key]
-            range_key = (cls._range_key, range_key_attr.attr_type)
+        sort_key = None
+        if cls._sort_key:
+            sort_key_attr = cls._attributes[cls._sort_key]
+            sort_key = (cls._sort_key, sort_key_attr.attr_type)
 
         # Build GSI definitions
         gsis = None
@@ -901,8 +901,8 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         await client.create_table(
             table,
-            hash_key=hash_key,
-            range_key=range_key,
+            partition_key=partition_key,
+            sort_key=sort_key,
             billing_mode=billing_mode,
             read_capacity=read_capacity,
             write_capacity=write_capacity,
@@ -971,27 +971,27 @@ class Model(ModelBase, metaclass=ModelMeta):
             wait: If True, wait for table to become active.
 
         Raises:
-            ValueError: If model has no hash_key defined.
+            ValueError: If model has no partition_key defined.
             ResourceInUseException: If table already exists.
 
         Example:
             >>> User.sync_create_table(wait=True)
         """
-        if cls._hash_key is None:
-            raise ValueError(f"Model {cls.__name__} has no hash_key defined")
+        if cls._partition_key is None:
+            raise ValueError(f"Model {cls.__name__} has no partition_key defined")
 
         client = cls._get_client()
         table = cls._get_table()
 
         # Get hash key type
-        hash_key_attr = cls._attributes[cls._hash_key]
-        hash_key = (cls._hash_key, hash_key_attr.attr_type)
+        partition_key_attr = cls._attributes[cls._partition_key]
+        partition_key = (cls._partition_key, partition_key_attr.attr_type)
 
         # Get range key type if defined
-        range_key = None
-        if cls._range_key:
-            range_key_attr = cls._attributes[cls._range_key]
-            range_key = (cls._range_key, range_key_attr.attr_type)
+        sort_key = None
+        if cls._sort_key:
+            sort_key_attr = cls._attributes[cls._sort_key]
+            sort_key = (cls._sort_key, sort_key_attr.attr_type)
 
         # Build GSI definitions
         gsis = None
@@ -1005,8 +1005,8 @@ class Model(ModelBase, metaclass=ModelMeta):
 
         client.sync_create_table(
             table,
-            hash_key=hash_key,
-            range_key=range_key,
+            partition_key=partition_key,
+            sort_key=sort_key,
             billing_mode=billing_mode,
             read_capacity=read_capacity,
             write_capacity=write_capacity,

@@ -77,13 +77,13 @@ def test_encrypted_attribute_default_mode():
 
 
 def test_encrypted_attribute_no_key_flags():
-    """EncryptedAttribute cannot be hash_key or range_key."""
+    """EncryptedAttribute cannot be partition_key or sort_key."""
     # GIVEN an encrypted attribute
     attr = EncryptedAttribute(key_id="alias/test")
 
     # THEN it should not be a key
-    assert attr.hash_key is False
-    assert attr.range_key is False
+    assert attr.partition_key is False
+    assert attr.sort_key is False
 
 
 def test_encrypted_attribute_none_value():

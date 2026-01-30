@@ -21,7 +21,7 @@ async def batch_get(
     """Async batch get items by keys (default, no prefix).
 
     Args:
-        keys: List of key dicts (each with hash_key and optional range_key).
+        keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
 
@@ -64,7 +64,7 @@ def sync_batch_get(
     """Sync batch get items by keys.
 
     Args:
-        keys: List of key dicts (each with hash_key and optional range_key).
+        keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
 

@@ -11,8 +11,8 @@ def test_calculate_size_simple_item(dynamo):
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         age = NumberAttribute()
 
@@ -36,8 +36,8 @@ def test_calculate_size_with_nested_data(dynamo):
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         tags = ListAttribute()
         metadata = MapAttribute()
@@ -62,8 +62,8 @@ def test_calculate_size_detailed_breakdown(dynamo):
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         bio = StringAttribute()
 
@@ -88,8 +88,8 @@ async def test_save_succeeds_under_limit(dynamo):
 
     class LimitedUser(Model):
         model_config = ModelConfig(table="test_table", client=dynamo, max_size=500)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         bio = StringAttribute()
 
     LimitedUser._client_instance = None
@@ -108,8 +108,8 @@ async def test_save_raises_when_over_limit(dynamo):
 
     class LimitedUser(Model):
         model_config = ModelConfig(table="test_table", client=dynamo, max_size=500)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         bio = StringAttribute()
 
     LimitedUser._client_instance = None
@@ -137,8 +137,8 @@ async def test_save_without_limit_allows_large_items(dynamo):
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         bio = StringAttribute()
 
     User._client_instance = None

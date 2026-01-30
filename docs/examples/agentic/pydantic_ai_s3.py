@@ -9,8 +9,8 @@ from pydynox.attributes import NumberAttribute, S3Attribute, S3File, StringAttri
 class Document(Model):
     model_config = ModelConfig(table="documents")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     title = StringAttribute()
     author = StringAttribute()
     size_bytes = NumberAttribute(default=0)

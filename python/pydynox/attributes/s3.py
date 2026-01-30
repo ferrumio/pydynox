@@ -21,7 +21,7 @@ class S3Attribute(Attribute[S3Value | None]):
         class Document(Model):
             model_config = ModelConfig(table="documents")
 
-            pk = StringAttribute(hash_key=True)
+            pk = StringAttribute(partition_key=True)
             name = StringAttribute()
             content = S3Attribute(bucket="my-bucket", prefix="docs/")
 
@@ -47,8 +47,8 @@ class S3Attribute(Attribute[S3Value | None]):
         bucket: str,
         prefix: str = "",
         region: str | None = None,
-        hash_key: bool = False,
-        range_key: bool = False,
+        partition_key: bool = False,
+        sort_key: bool = False,
         default: S3Value | None = None,
         required: bool = False,
     ):
@@ -58,15 +58,15 @@ class S3Attribute(Attribute[S3Value | None]):
             bucket: S3 bucket name.
             prefix: Key prefix for uploaded files.
             region: S3 region (optional, inherits from DynamoDB client).
-            hash_key: Not supported for S3Attribute.
-            range_key: Not supported for S3Attribute.
+            partition_key: Not supported for S3Attribute.
+            sort_key: Not supported for S3Attribute.
             default: Default value (usually None).
             required: Whether this field is required.
         """
-        if hash_key or range_key:
-            raise ValueError("S3Attribute cannot be a hash_key or range_key")
+        if partition_key or sort_key:
+            raise ValueError("S3Attribute cannot be a partition_key or sort_key")
 
-        super().__init__(hash_key=False, range_key=False, default=default, required=required)
+        super().__init__(partition_key=False, sort_key=False, default=default, required=required)
         self.bucket = bucket
         self.prefix = prefix.rstrip("/") + "/" if prefix else ""
         self.region = region
@@ -114,10 +114,10 @@ class S3Attribute(Attribute[S3Value | None]):
         """Generate S3 key for the file."""
         # Use model's primary key as part of the S3 key
         pk_value = ""
-        if hasattr(model_instance, "_hash_key") and model_instance._hash_key:
-            pk_value = str(getattr(model_instance, model_instance._hash_key, ""))
-        if hasattr(model_instance, "_range_key") and model_instance._range_key:
-            sk_value = str(getattr(model_instance, model_instance._range_key, ""))
+        if hasattr(model_instance, "_partition_key") and model_instance._partition_key:
+            pk_value = str(getattr(model_instance, model_instance._partition_key, ""))
+        if hasattr(model_instance, "_sort_key") and model_instance._sort_key:
+            sk_value = str(getattr(model_instance, model_instance._sort_key, ""))
             pk_value = f"{pk_value}/{sk_value}"
 
         # Clean up the key

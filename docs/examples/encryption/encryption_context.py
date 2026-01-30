@@ -7,7 +7,7 @@ from pydynox.attributes import EncryptedAttribute, StringAttribute
 class User(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     ssn = EncryptedAttribute(
         key_id="alias/my-app-key",
         context={"tenant": "acme-corp", "purpose": "pii"},

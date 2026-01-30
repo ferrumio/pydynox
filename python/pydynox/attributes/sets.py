@@ -19,7 +19,7 @@ class StringSetAttribute(Attribute[set[str]]):
         >>>
         >>> class User(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     tags = StringSetAttribute()
         >>>
         >>> user = User(pk="USER#1", tags={"admin", "verified"})
@@ -67,7 +67,7 @@ class NumberSetAttribute(Attribute[set[int | float]]):
         >>>
         >>> class User(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     scores = NumberSetAttribute()
         >>>
         >>> user = User(pk="USER#1", scores={100, 95, 88})

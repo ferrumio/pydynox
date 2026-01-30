@@ -35,8 +35,8 @@ class TableOperations:  # pragma: no cover
     def create_table(
         self,
         table_name: str,
-        hash_key: tuple[str, str],
-        range_key: tuple[str, str] | None = None,
+        partition_key: tuple[str, str],
+        sort_key: tuple[str, str] | None = None,
         billing_mode: str = "PAY_PER_REQUEST",
         read_capacity: int | None = None,
         write_capacity: int | None = None,
@@ -51,8 +51,8 @@ class TableOperations:  # pragma: no cover
 
         Args:
             table_name: Name of the table to create.
-            hash_key: Tuple of (attribute_name, attribute_type). Type is "S", "N", or "B".
-            range_key: Optional tuple of (attribute_name, attribute_type).
+            partition_key: Tuple of (attribute_name, attribute_type). Type is "S", "N", or "B".
+            sort_key: Optional tuple of (attribute_name, attribute_type).
             billing_mode: "PAY_PER_REQUEST" (default) or "PROVISIONED".
             read_capacity: Read capacity units (only for PROVISIONED).
             write_capacity: Write capacity units (only for PROVISIONED).
@@ -67,12 +67,12 @@ class TableOperations:  # pragma: no cover
             Awaitable that completes when table is created.
 
         Example:
-            await client.create_table("users", hash_key=("pk", "S"))
+            await client.create_table("users", partition_key=("pk", "S"))
         """
         return self._client.create_table(  # type: ignore[attr-defined, no-any-return]
             table_name,
-            hash_key,
-            range_key=range_key,
+            partition_key,
+            range_key=sort_key,  # Rust uses range_key
             billing_mode=billing_mode,
             read_capacity=read_capacity,
             write_capacity=write_capacity,
@@ -138,8 +138,8 @@ class TableOperations:  # pragma: no cover
     def sync_create_table(
         self,
         table_name: str,
-        hash_key: tuple[str, str],
-        range_key: tuple[str, str] | None = None,
+        partition_key: tuple[str, str],
+        sort_key: tuple[str, str] | None = None,
         billing_mode: str = "PAY_PER_REQUEST",
         read_capacity: int | None = None,
         write_capacity: int | None = None,
@@ -154,8 +154,8 @@ class TableOperations:  # pragma: no cover
 
         Args:
             table_name: Name of the table to create.
-            hash_key: Tuple of (attribute_name, attribute_type). Type is "S", "N", or "B".
-            range_key: Optional tuple of (attribute_name, attribute_type).
+            partition_key: Tuple of (attribute_name, attribute_type). Type is "S", "N", or "B".
+            sort_key: Optional tuple of (attribute_name, attribute_type).
             billing_mode: "PAY_PER_REQUEST" (default) or "PROVISIONED".
             read_capacity: Read capacity units (only for PROVISIONED).
             write_capacity: Write capacity units (only for PROVISIONED).
@@ -167,12 +167,12 @@ class TableOperations:  # pragma: no cover
             wait: If True, wait for table to become active.
 
         Example:
-            client.sync_create_table("users", hash_key=("pk", "S"))
+            client.sync_create_table("users", partition_key=("pk", "S"))
         """
         self._client.sync_create_table(  # type: ignore[attr-defined]
             table_name,
-            hash_key,
-            range_key=range_key,
+            partition_key,
+            range_key=sort_key,  # Rust uses range_key
             billing_mode=billing_mode,
             read_capacity=read_capacity,
             write_capacity=write_capacity,

@@ -36,8 +36,8 @@ def _get_consistent_read(model_class: type[M], explicit: bool | None) -> bool:
 
 def _build_query_params(
     model_class: type[M],
-    hash_key_value: Any,
-    range_key_condition: Condition | None,
+    partition_key_value: Any,
+    sort_key_condition: Condition | None,
     filter_condition: Condition | None,
     consistent_read: bool | None,
     fields: list[str] | None = None,
@@ -46,8 +46,8 @@ def _build_query_params(
 
     Returns (key_cond, filter_expr, projection_expr, attr_names, attr_values, consistent).
     """
-    hash_key_name = model_class._hash_key
-    if hash_key_name is None:
+    partition_key_name = model_class._partition_key
+    if partition_key_name is None:
         raise ValueError(f"Model {model_class.__name__} has no hash key defined")
 
     names: dict[str, str] = {}
@@ -56,12 +56,12 @@ def _build_query_params(
     # Build key condition
     hk_placeholder = "#pk"
     hk_val_placeholder = ":pkv"
-    names[hash_key_name] = hk_placeholder
-    values[hk_val_placeholder] = hash_key_value
+    names[partition_key_name] = hk_placeholder
+    values[hk_val_placeholder] = partition_key_value
     key_condition = f"{hk_placeholder} = {hk_val_placeholder}"
 
-    if range_key_condition is not None:
-        rk_expr = range_key_condition.serialize(names, values)
+    if sort_key_condition is not None:
+        rk_expr = sort_key_condition.serialize(names, values)
         key_condition = f"{key_condition} AND {rk_expr}"
 
     filter_expr = _serialize_filter(filter_condition, names, values)
@@ -185,8 +185,8 @@ class ModelQueryResult(BaseModelResult[M]):
     def __init__(
         self,
         model_class: type[M],
-        hash_key_value: Any,
-        range_key_condition: Condition | None = None,
+        partition_key_value: Any,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -197,8 +197,8 @@ class ModelQueryResult(BaseModelResult[M]):
         fields: list[str] | None = None,
     ) -> None:
         self._model_class = model_class
-        self._hash_key_value = hash_key_value
-        self._range_key_condition = range_key_condition
+        self._partition_key_value = partition_key_value
+        self._sort_key_condition = sort_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
         self._page_size = page_size
@@ -218,8 +218,8 @@ class ModelQueryResult(BaseModelResult[M]):
         key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
             _build_query_params(
                 self._model_class,
-                self._hash_key_value,
-                self._range_key_condition,
+                self._partition_key_value,
+                self._sort_key_condition,
                 self._filter_condition,
                 self._consistent_read,
                 self._fields,
@@ -266,8 +266,8 @@ class AsyncModelQueryResult(BaseModelResult[M]):
     def __init__(
         self,
         model_class: type[M],
-        hash_key_value: Any,
-        range_key_condition: Condition | None = None,
+        partition_key_value: Any,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -278,8 +278,8 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         fields: list[str] | None = None,
     ) -> None:
         self._model_class = model_class
-        self._hash_key_value = hash_key_value
-        self._range_key_condition = range_key_condition
+        self._partition_key_value = partition_key_value
+        self._sort_key_condition = sort_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
         self._page_size = page_size
@@ -298,8 +298,8 @@ class AsyncModelQueryResult(BaseModelResult[M]):
         key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
             _build_query_params(
                 self._model_class,
-                self._hash_key_value,
-                self._range_key_condition,
+                self._partition_key_value,
+                self._sort_key_condition,
                 self._filter_condition,
                 self._consistent_read,
                 self._fields,

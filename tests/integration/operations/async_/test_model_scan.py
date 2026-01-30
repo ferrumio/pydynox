@@ -17,8 +17,8 @@ def scan_table(dynamo):
     if not dynamo.sync_table_exists(SCAN_TABLE):
         dynamo.sync_create_table(
             SCAN_TABLE,
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             wait=True,
         )
     yield dynamo
@@ -35,8 +35,8 @@ def user_model(scan_table):
 
     class User(Model):
         model_config = ModelConfig(table=SCAN_TABLE)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         age = NumberAttribute()
         status = StringAttribute()
@@ -167,16 +167,16 @@ async def test_model_scan_empty_result(scan_table, user_model):
     # Create a model pointing to a different table
     class EmptyUser(Model):
         model_config = ModelConfig(table="empty_test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
 
     EmptyUser._client_instance = None
 
     # Create the empty table
     scan_table.sync_create_table(
         "empty_test_table",
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
     )
 
     users = [u async for u in EmptyUser.scan()]
@@ -281,16 +281,16 @@ async def test_model_count_empty_table(scan_table, user_model):
     # Create a model pointing to a different table
     class EmptyUser(Model):
         model_config = ModelConfig(table="empty_count_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
 
     EmptyUser._client_instance = None
 
     # Create the empty table
     scan_table.sync_create_table(
         "empty_count_table",
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
     )
 
     count, _ = await EmptyUser.count()

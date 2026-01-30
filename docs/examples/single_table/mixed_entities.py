@@ -8,16 +8,16 @@ from pydynox.attributes import StringAttribute
 
 class User(Model):
     model_config = ModelConfig(table="app")
-    pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-    sk = StringAttribute(range_key=True, template="PROFILE")
+    pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+    sk = StringAttribute(sort_key=True, template="PROFILE")
     user_id = StringAttribute()
     name = StringAttribute()
 
 
 class Order(Model):
     model_config = ModelConfig(table="app")
-    pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-    sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+    pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+    sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
     user_id = StringAttribute()
     order_id = StringAttribute()
     total = StringAttribute()
@@ -41,7 +41,7 @@ async def main():
     print("Orders:")
     async for order in Order.query(
         user_id="alice",
-        range_key_condition=Order.sk.begins_with("ORDER#"),
+        sort_key_condition=Order.sk.begins_with("ORDER#"),
     ):
         print(f"  {order.order_id}: ${order.total}")
 

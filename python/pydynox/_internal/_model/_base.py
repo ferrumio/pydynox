@@ -31,8 +31,8 @@ class ModelMeta(type):
     """Metaclass that collects attributes and builds schema."""
 
     _attributes: dict[str, Attribute[Any]]
-    _hash_key: str | None
-    _range_key: str | None
+    _partition_key: str | None
+    _sort_key: str | None
     _hooks: dict[HookType, list[Any]]
     _indexes: dict[str, GlobalSecondaryIndex[Any]]
     _local_indexes: dict[str, LocalSecondaryIndex[Any]]
@@ -40,8 +40,8 @@ class ModelMeta(type):
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> ModelMeta:
         attributes: dict[str, Attribute[Any]] = {}
-        hash_key: str | None = None
-        range_key: str | None = None
+        partition_key: str | None = None
+        sort_key: str | None = None
         hooks: dict[HookType, list[Any]] = {hook_type: [] for hook_type in HookType}
         indexes: dict[str, GlobalSecondaryIndex[Any]] = {}
         local_indexes: dict[str, LocalSecondaryIndex[Any]] = {}
@@ -50,12 +50,12 @@ class ModelMeta(type):
             base_attrs = getattr(base, "_attributes", None)
             if base_attrs is not None:
                 attributes.update(base_attrs)
-            base_hash_key = getattr(base, "_hash_key", None)
-            if base_hash_key:
-                hash_key = base_hash_key
-            base_range_key = getattr(base, "_range_key", None)
-            if base_range_key:
-                range_key = base_range_key
+            base_partition_key = getattr(base, "_partition_key", None)
+            if base_partition_key:
+                partition_key = base_partition_key
+            base_sort_key = getattr(base, "_sort_key", None)
+            if base_sort_key:
+                sort_key = base_sort_key
             base_hooks = getattr(base, "_hooks", None)
             if base_hooks is not None:
                 for hook_type, hook_list in base_hooks.items():
@@ -72,10 +72,10 @@ class ModelMeta(type):
                 attr_value.attr_name = attr_name
                 attributes[attr_name] = attr_value
 
-                if attr_value.hash_key:
-                    hash_key = attr_name
-                if attr_value.range_key:
-                    range_key = attr_name
+                if attr_value.partition_key:
+                    partition_key = attr_name
+                if attr_value.sort_key:
+                    sort_key = attr_name
 
             if callable(attr_value) and hasattr(attr_value, "_hook_type"):
                 hooks[getattr(attr_value, "_hook_type")].append(attr_value)
@@ -89,8 +89,8 @@ class ModelMeta(type):
         cls = super().__new__(mcs, name, bases, namespace)
 
         cls._attributes = attributes
-        cls._hash_key = hash_key
-        cls._range_key = range_key
+        cls._partition_key = partition_key
+        cls._sort_key = sort_key
         cls._hooks = hooks
         cls._indexes = indexes
         cls._local_indexes = local_indexes
@@ -117,8 +117,8 @@ class ModelBase(metaclass=ModelMeta):
     """
 
     _attributes: ClassVar[dict[str, Attribute[Any]]]
-    _hash_key: ClassVar[str | None]
-    _range_key: ClassVar[str | None]
+    _partition_key: ClassVar[str | None]
+    _sort_key: ClassVar[str | None]
     _hooks: ClassVar[dict[HookType, list[Any]]]
     _indexes: ClassVar[dict[str, GlobalSecondaryIndex[Any]]]
     _local_indexes: ClassVar[dict[str, LocalSecondaryIndex[Any]]]
@@ -263,10 +263,10 @@ class ModelBase(metaclass=ModelMeta):
 
     def _get_key(self) -> dict[str, Any]:
         key = {}
-        if self._hash_key:
-            key[self._hash_key] = getattr(self, self._hash_key)
-        if self._range_key:
-            key[self._range_key] = getattr(self, self._range_key)
+        if self._partition_key:
+            key[self._partition_key] = getattr(self, self._partition_key)
+        if self._sort_key:
+            key[self._sort_key] = getattr(self, self._sort_key)
         return key
 
     def to_dict(self) -> dict[str, Any]:
@@ -308,24 +308,24 @@ class ModelBase(metaclass=ModelMeta):
         cls, kwargs: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Split kwargs into key attributes and updates."""
-        if cls._hash_key is None:
-            raise ValueError(f"Model {cls.__name__} has no hash_key defined")
+        if cls._partition_key is None:
+            raise ValueError(f"Model {cls.__name__} has no partition_key defined")
 
         key: dict[str, Any] = {}
         updates: dict[str, Any] = {}
 
         for attr_name, value in kwargs.items():
-            if attr_name == cls._hash_key:
+            if attr_name == cls._partition_key:
                 key[attr_name] = value
-            elif attr_name == cls._range_key:
+            elif attr_name == cls._sort_key:
                 key[attr_name] = value
             else:
                 updates[attr_name] = value
 
-        if cls._hash_key not in key:
-            raise ValueError(f"Missing required hash_key: {cls._hash_key}")
+        if cls._partition_key not in key:
+            raise ValueError(f"Missing required partition_key: {cls._partition_key}")
 
-        if cls._range_key is not None and cls._range_key not in key:
-            raise ValueError(f"Missing required range_key: {cls._range_key}")
+        if cls._sort_key is not None and cls._sort_key not in key:
+            raise ValueError(f"Missing required sort_key: {cls._sort_key}")
 
         return key, updates

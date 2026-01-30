@@ -10,7 +10,7 @@ def test_sync_pydantic_save_and_get(dynamo):
     """Sync save and retrieve a Pydantic model."""
     pk = f"SYNC_PYD#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     class User(BaseModel):
         pk: str
         sk: str
@@ -35,7 +35,7 @@ def test_sync_pydantic_update(dynamo):
     """Sync update a Pydantic model."""
     pk = f"SYNC_PYD#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     class User(BaseModel):
         pk: str
         sk: str
@@ -59,7 +59,7 @@ def test_sync_pydantic_delete(dynamo):
     """Sync delete a Pydantic model."""
     pk = f"SYNC_PYD#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     class User(BaseModel):
         pk: str
         sk: str
@@ -81,7 +81,7 @@ def test_sync_pydantic_validation_on_save(dynamo):
     """Pydantic validates data before sync save."""
     pk = f"SYNC_PYD#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     class User(BaseModel):
         pk: str
         sk: str
@@ -98,7 +98,7 @@ def test_sync_pydantic_with_optional_fields(dynamo):
     """Sync Pydantic model with optional fields."""
     pk = f"SYNC_PYD#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     class User(BaseModel):
         pk: str
         sk: str
@@ -117,7 +117,7 @@ def test_sync_pydantic_with_complex_types(dynamo):
     """Sync Pydantic model with list and dict fields."""
     pk = f"SYNC_PYD#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     class ComplexItem(BaseModel):
         pk: str
         sk: str

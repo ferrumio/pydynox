@@ -15,8 +15,8 @@ class User(Model):
 
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     age = NumberAttribute()
@@ -25,26 +25,26 @@ class User(Model):
     # GSI for comparison
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
-        hash_key="email",
+        partition_key="email",
     )
 
     # LSI with status as alternate sort key
     status_index = LocalSecondaryIndex(
         index_name="status-index",
-        range_key="status",
+        sort_key="status",
     )
 
     # LSI with custom projection
     age_index = LocalSecondaryIndex(
         index_name="age-index",
-        range_key="age",
+        sort_key="age",
         projection=["email", "status"],
     )
 
     # LSI with KEYS_ONLY projection
     created_index = LocalSecondaryIndex(
         index_name="created-index",
-        range_key="created_at",
+        sort_key="created_at",
         projection="KEYS_ONLY",
     )
 
@@ -56,7 +56,7 @@ def test_lsi_definition() -> None:
     # THEN LSI should be accessible and have correct config
     assert hasattr(User, "status_index")
     assert User.status_index.index_name == "status-index"
-    assert User.status_index.range_key == "status"
+    assert User.status_index.sort_key == "status"
 
 
 def test_lsi_collected_in_model() -> None:
@@ -86,7 +86,7 @@ def test_lsi_to_create_table_definition_all_projection() -> None:
     # WHEN we convert to create_table definition
     definition = User.status_index.to_create_table_definition(User)
 
-    # THEN it should have correct format
+    # THEN it should have correct format (Rust expects range_key)
     assert definition["index_name"] == "status-index"
     assert definition["range_key"] == ("status", "S")
     assert definition["projection"] == "ALL"
@@ -99,7 +99,7 @@ def test_lsi_to_create_table_definition_custom_projection() -> None:
     # WHEN we convert to create_table definition
     definition = User.age_index.to_create_table_definition(User)
 
-    # THEN projection should be INCLUDE with specified attributes
+    # THEN projection should be INCLUDE with specified attributes (Rust expects range_key)
     assert definition["index_name"] == "age-index"
     assert definition["range_key"] == ("age", "N")
     assert definition["projection"] == "INCLUDE"
@@ -113,13 +113,13 @@ def test_lsi_to_create_table_definition_keys_only() -> None:
     # WHEN we convert to create_table definition
     definition = User.created_index.to_create_table_definition(User)
 
-    # THEN projection should be KEYS_ONLY
+    # THEN projection should be KEYS_ONLY (Rust expects range_key)
     assert definition["index_name"] == "created-index"
     assert definition["range_key"] == ("created_at", "S")
     assert definition["projection"] == "KEYS_ONLY"
 
 
-def test_lsi_query_requires_hash_key() -> None:
+def test_lsi_query_requires_partition_key() -> None:
     """LSI query raises error if hash key not provided."""
     # GIVEN an LSI that requires the table's hash key
 
@@ -134,7 +134,7 @@ def test_lsi_unbound_raises_error() -> None:
     # GIVEN an unbound LSI
     unbound_lsi: LocalSecondaryIndex[Any] = LocalSecondaryIndex(
         index_name="test",
-        range_key="test",
+        sort_key="test",
     )
 
     # WHEN we try to query
@@ -156,18 +156,18 @@ def test_lsi_inheritance() -> None:
     assert AdminUser.status_index._model_class is AdminUser
 
 
-def test_lsi_invalid_range_key() -> None:
+def test_lsi_invalid_sort_key() -> None:
     """LSI raises error for invalid range key attribute."""
 
     # GIVEN a model with LSI referencing nonexistent attribute
     class BadModel(Model):
         model_config = ModelConfig(table="bad")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
 
         bad_index = LocalSecondaryIndex(
             index_name="bad-index",
-            range_key="nonexistent",
+            sort_key="nonexistent",
         )
 
     # WHEN we try to convert to create_table definition

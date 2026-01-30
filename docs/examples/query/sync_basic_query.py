@@ -8,8 +8,8 @@ client = get_default_client()
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -19,8 +19,8 @@ def main():
     if not client.sync_table_exists("orders"):
         client.sync_create_table(
             "orders",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create some orders
@@ -33,16 +33,16 @@ def main():
         ).sync_save()
 
     # Query all orders for a customer
-    for order in Order.sync_query(hash_key="CUSTOMER#123"):
+    for order in Order.sync_query(partition_key="CUSTOMER#123"):
         print(f"Order: {order.sk}, Total: {order.total}")
 
     # Get first result only
-    first_order = Order.sync_query(hash_key="CUSTOMER#123").first()
+    first_order = Order.sync_query(partition_key="CUSTOMER#123").first()
     if first_order:
         print(f"First order: {first_order.sk}")
 
     # Collect all results into a list
-    orders = list(Order.sync_query(hash_key="CUSTOMER#123"))
+    orders = list(Order.sync_query(partition_key="CUSTOMER#123"))
     print(f"Found {len(orders)} orders")
 
 

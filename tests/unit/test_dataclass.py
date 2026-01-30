@@ -12,7 +12,7 @@ def test_decorator_adds_metadata():
     """Decorator adds pydynox metadata to the class."""
 
     # GIVEN a dataclass decorated with dynamodb_model
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk")
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk")
     @dataclass
     class User:
         pk: str
@@ -21,15 +21,15 @@ def test_decorator_adds_metadata():
 
     # THEN pydynox metadata should be added
     assert User._pydynox_table == "users"
-    assert User._pydynox_hash_key == "pk"
-    assert User._pydynox_range_key == "sk"
+    assert User._pydynox_partition_key == "pk"
+    assert User._pydynox_sort_key == "sk"
 
 
 def test_decorator_adds_methods():
     """Decorator adds CRUD methods to the class."""
 
     # GIVEN a dataclass decorated with dynamodb_model
-    @dynamodb_model(table="users", hash_key="pk")
+    @dynamodb_model(table="users", partition_key="pk")
     @dataclass
     class User:
         pk: str
@@ -48,7 +48,7 @@ def test_dataclass_still_works():
     """Dataclass still works normally."""
 
     # GIVEN a decorated dataclass
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk")
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk")
     @dataclass
     class User:
         pk: str
@@ -69,7 +69,7 @@ def test_get_key_returns_hash_and_range():
     """_get_key returns both hash and range key."""
 
     # GIVEN a decorated dataclass with hash and range key
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk")
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk")
     @dataclass
     class User:
         pk: str
@@ -96,7 +96,7 @@ def test_get_fetches_from_dynamodb():
         "age": 30,
     }
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     @dataclass
     class User:
         pk: str
@@ -121,7 +121,7 @@ def test_get_returns_none_when_not_found():
     mock_client = MagicMock()
     mock_client.sync_get_item.return_value = None
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     @dataclass
     class User:
         pk: str
@@ -140,7 +140,7 @@ def test_save_puts_to_dynamodb():
     # GIVEN a mock client
     mock_client = MagicMock()
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     @dataclass
     class User:
         pk: str
@@ -164,7 +164,7 @@ def test_delete_removes_from_dynamodb():
     # GIVEN a mock client
     mock_client = MagicMock()
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     @dataclass
     class User:
         pk: str
@@ -185,7 +185,7 @@ def test_update_updates_dynamodb():
     # GIVEN a mock client
     mock_client = MagicMock()
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     @dataclass
     class User:
         pk: str
@@ -219,11 +219,11 @@ def test_from_dataclass_creates_model():
         price: float
 
     # WHEN we call from_dataclass
-    ProductDB = from_dataclass(Product, table="products", hash_key="pk")
+    ProductDB = from_dataclass(Product, table="products", partition_key="pk")
 
     # THEN a DynamoDB-enabled class should be created
     assert ProductDB._pydynox_table == "products"
-    assert ProductDB._pydynox_hash_key == "pk"
+    assert ProductDB._pydynox_partition_key == "pk"
     assert hasattr(ProductDB, "save")
 
 
@@ -233,16 +233,16 @@ def test_decorator_requires_dataclass_or_pydantic():
     # THEN TypeError should be raised
     with pytest.raises(TypeError, match="must be a dataclass or Pydantic BaseModel"):
 
-        @dynamodb_model(table="test", hash_key="id")
+        @dynamodb_model(table="test", partition_key="id")
         class NotSupported:
             id: str
 
 
-def test_hash_key_only_model():
+def test_partition_key_only_model():
     """Model with only hash key (no range key) works."""
 
     # GIVEN a model with only hash key
-    @dynamodb_model(table="simple", hash_key="id")
+    @dynamodb_model(table="simple", partition_key="id")
     @dataclass
     class SimpleModel:
         id: str
@@ -261,7 +261,7 @@ def test_set_client_after_creation():
     """_set_client() allows setting client after model creation."""
 
     # GIVEN a model without client
-    @dynamodb_model(table="users", hash_key="pk")
+    @dynamodb_model(table="users", partition_key="pk")
     @dataclass
     class User:
         pk: str
@@ -283,7 +283,7 @@ def test_no_client_raises_error():
     """Operations without client raise RuntimeError."""
 
     # GIVEN a model without client
-    @dynamodb_model(table="users", hash_key="pk")
+    @dynamodb_model(table="users", partition_key="pk")
     @dataclass
     class User:
         pk: str
@@ -297,25 +297,25 @@ def test_no_client_raises_error():
         user.sync_save()
 
 
-def test_invalid_hash_key_raises_error():
-    """Invalid hash_key raises ValueError."""
-    # WHEN we try to create a model with invalid hash_key
+def test_invalid_partition_key_raises_error():
+    """Invalid partition_key raises ValueError."""
+    # WHEN we try to create a model with invalid partition_key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="hash_key 'invalid' not found"):
+    with pytest.raises(ValueError, match="partition_key 'invalid' not found"):
 
-        @dynamodb_model(table="test", hash_key="invalid")
+        @dynamodb_model(table="test", partition_key="invalid")
         @dataclass
         class Model:
             pk: str
 
 
-def test_invalid_range_key_raises_error():
-    """Invalid range_key raises ValueError."""
-    # WHEN we try to create a model with invalid range_key
+def test_invalid_sort_key_raises_error():
+    """Invalid sort_key raises ValueError."""
+    # WHEN we try to create a model with invalid sort_key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="range_key 'invalid' not found"):
+    with pytest.raises(ValueError, match="sort_key 'invalid' not found"):
 
-        @dynamodb_model(table="test", hash_key="pk", range_key="invalid")
+        @dynamodb_model(table="test", partition_key="pk", sort_key="invalid")
         @dataclass
         class Model:
             pk: str
@@ -326,7 +326,7 @@ def test_update_invalid_attribute_raises_error():
     # GIVEN a model with known attributes
     mock_client = MagicMock()
 
-    @dynamodb_model(table="users", hash_key="pk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", client=mock_client)
     @dataclass
     class User:
         pk: str

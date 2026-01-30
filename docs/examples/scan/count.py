@@ -10,7 +10,7 @@ client = DynamoDBClient()
 
 class User(Model):
     model_config = ModelConfig(table="users", client=client)
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     age = NumberAttribute(default=0)
     status = StringAttribute(default="active")

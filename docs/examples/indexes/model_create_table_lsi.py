@@ -16,15 +16,15 @@ class Order(Model):
 
     model_config = ModelConfig(table="orders_model_lsi")
 
-    customer_id = StringAttribute(hash_key=True)
-    order_id = StringAttribute(range_key=True)
+    customer_id = StringAttribute(partition_key=True)
+    order_id = StringAttribute(sort_key=True)
     status = StringAttribute()
     total = NumberAttribute()
 
     # LSI defined on model
     status_index = LocalSecondaryIndex(
         index_name="status-index",
-        range_key="status",
+        sort_key="status",
     )
 
 

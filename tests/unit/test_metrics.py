@@ -233,7 +233,7 @@ def test_model_has_metrics_storage():
 
     class TestModel(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     # THEN it should have _metrics_storage
     assert hasattr(TestModel, "_metrics_storage")
@@ -248,7 +248,7 @@ def test_model_get_last_metrics_none_initially():
 
     class TestModel(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     # THEN get_last_metrics should return None
     assert TestModel.get_last_metrics() is None
@@ -262,7 +262,7 @@ def test_model_get_total_metrics_empty_initially():
 
     class TestModel(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     # THEN get_total_metrics should return empty metrics
     metrics = TestModel.get_total_metrics()
@@ -279,7 +279,7 @@ def test_model_reset_metrics():
 
     class TestModel(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     op = pydynox_core.OperationMetrics(duration_ms=10.0)
     TestModel._record_metrics(op, "get")
@@ -303,11 +303,11 @@ def test_model_metrics_isolated_per_class():
 
     class UserModel(Model):
         model_config = ModelConfig(table="users")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     class OrderModel(Model):
         model_config = ModelConfig(table="orders")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     # WHEN we record metrics on UserModel
     op = pydynox_core.OperationMetrics(duration_ms=10.0)
@@ -330,7 +330,7 @@ def test_model_record_metrics():
 
     class TestModel(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     # WHEN we record multiple operations
     op1 = pydynox_core.OperationMetrics(duration_ms=10.0)

@@ -18,13 +18,13 @@ Without templates, you manually build keys and can make mistakes:
 ```python
 class User(Model):
     model_config = ModelConfig(table="app")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
 
 class Order(Model):
     model_config = ModelConfig(table="app")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
 
 # Bug: Order with User's key pattern - no error!
 Order(pk="USER#john@example.com", sk="PROFILE")
@@ -62,7 +62,7 @@ Query using placeholder names instead of building keys manually:
 
 ```python
 # Without template - you build the key yourself
-async for order in Order.query(hash_key="USER#123"):
+async for order in Order.query(partition_key="USER#123"):
     print(order)
 
 # With template - pass the placeholder value
@@ -144,13 +144,13 @@ client = DynamoDBClient()
 
 await client.create_table(
     "app",
-    hash_key=("pk", "S"),
-    range_key=("sk", "S"),
+    partition_key=("pk", "S"),
+    sort_key=("sk", "S"),
     global_secondary_indexes=[
         {
             "index_name": "inverted",
-            "hash_key": ("sk", "S"),
-            "range_key": ("pk", "S"),
+            "partition_key": ("sk", "S"),
+            "sort_key": ("pk", "S"),
             "projection": "ALL",
         },
     ],

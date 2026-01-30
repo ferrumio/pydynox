@@ -42,7 +42,7 @@ async def test_model_get_uses_config_consistent_read():
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client, consistent_read=True)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -70,7 +70,7 @@ async def test_model_get_override_consistent_read():
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client, consistent_read=True)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -98,7 +98,7 @@ async def test_model_get_default_eventually_consistent():
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -126,7 +126,7 @@ async def test_model_get_explicit_consistent_read():
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None

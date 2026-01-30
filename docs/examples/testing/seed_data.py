@@ -7,15 +7,15 @@ from pydynox.attributes import NumberAttribute, StringAttribute
 
 class User(Model):
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     age = NumberAttribute(default=0)
 
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
 
 
@@ -53,7 +53,7 @@ async def test_with_multiple_tables(pydynox_memory_backend_factory):
         user = await User.get(pk="USER#1")
         assert user is not None
 
-        orders = [order async for order in Order.query(hash_key="USER#1")]
+        orders = [order async for order in Order.query(partition_key="USER#1")]
         assert len(orders) == 2
 
 

@@ -144,7 +144,7 @@ pydynox has two APIs:
 | Put item | `table.put_item(Item={...})` | `model.save()` |
 | Delete item | `table.delete_item(Key={...})` | `model.delete()` |
 | Update item | `table.update_item(...)` | `model.update(name="new")` |
-| Query | `table.query(...)` | `for item in Model.query(hash_key=...):` |
+| Query | `table.query(...)` | `for item in Model.query(partition_key=...):` |
 | Scan | `table.scan()` | `for item in Model.scan():` |
 | Batch get | `dynamodb.batch_get_item(...)` | `Model.batch_get([keys])` |
 | Conditional | `ConditionExpression=...` | `model.save(condition=Model.pk.not_exists())` |

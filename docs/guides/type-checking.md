@@ -68,7 +68,7 @@ If you know a value is not None, use assertion or narrowing:
 `query()` and `scan()` return items that can be `Model` or `dict` because of the `as_dict` parameter. Use `isinstance` to narrow:
 
 ```python
-for item in User.query(hash_key="USER#1"):
+for item in User.query(partition_key="USER#1"):
     if isinstance(item, User):
         # mypy knows item is User
         print(item.name)
@@ -79,7 +79,7 @@ Or if you know you're not using `as_dict=True`:
 ```python
 from typing import cast
 
-for item in User.query(hash_key="USER#1"):
+for item in User.query(partition_key="USER#1"):
     user = cast(User, item)
     print(user.name)
 ```
@@ -102,7 +102,7 @@ Pydantic models have native type support:
 from pydantic import BaseModel
 from pydynox.integrations.pydantic import dynamodb_model
 
-@dynamodb_model(table="products", hash_key="pk")
+@dynamodb_model(table="products", partition_key="pk")
 class Product(BaseModel):
     pk: str
     name: str

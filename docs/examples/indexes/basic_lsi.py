@@ -11,8 +11,8 @@ class Order(Model):
     model_config = ModelConfig(table="orders")
 
     # Primary key: customer_id (hash) + order_id (range)
-    customer_id = StringAttribute(hash_key=True)
-    order_id = StringAttribute(range_key=True)
+    customer_id = StringAttribute(partition_key=True)
+    order_id = StringAttribute(sort_key=True)
 
     # Other attributes
     status = StringAttribute()
@@ -23,11 +23,11 @@ class Order(Model):
     # Same hash key (customer_id), different sort key (status)
     status_index = LocalSecondaryIndex(
         index_name="status-index",
-        range_key="status",
+        sort_key="status",
     )
 
     # LSI: query orders by customer_id + created_at
     created_index = LocalSecondaryIndex(
         index_name="created-index",
-        range_key="created_at",
+        sort_key="created_at",
     )

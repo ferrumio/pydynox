@@ -8,8 +8,8 @@ from strands import tool
 class Order(Model):
     model_config = ModelConfig(table="orders")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     order_id = StringAttribute()
     status = StringAttribute()
     total = NumberAttribute()
@@ -18,8 +18,8 @@ class Order(Model):
 class Customer(Model):
     model_config = ModelConfig(table="customers")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     email = StringAttribute()
 
@@ -27,8 +27,8 @@ class Customer(Model):
 class Employee(Model):
     model_config = ModelConfig(table="employees")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     department = StringAttribute()
     ssn = EncryptedAttribute(key_id="alias/hr-key")

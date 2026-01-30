@@ -106,8 +106,8 @@ from pydynox.hooks import before_save
 class AuditLog(Model):
     model_config = ModelConfig(table="audit")
 
-    pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+    sk = StringAttribute(sort_key=True)
     created_at = StringAttribute(default=AutoGenerate.ISO8601)
     created_by = StringAttribute()
 
@@ -132,8 +132,8 @@ from pydynox.attributes import NumberAttribute, StringAttribute
 class Order(Model):
     model_config = ModelConfig(table="orders")
 
-    pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+    sk = StringAttribute(sort_key=True)
     created_at = StringAttribute(default=AutoGenerate.ISO8601)
     total = NumberAttribute()
 
@@ -151,8 +151,8 @@ ULIDs are great for event sourcing because they're time-sortable:
 class Event(Model):
     model_config = ModelConfig(table="events")
 
-    pk = StringAttribute(hash_key=True)  # Aggregate ID
-    sk = StringAttribute(range_key=True, default=AutoGenerate.ULID)
+    pk = StringAttribute(partition_key=True)  # Aggregate ID
+    sk = StringAttribute(sort_key=True, default=AutoGenerate.ULID)
     event_type = StringAttribute()
     data = MapAttribute()
 
@@ -176,8 +176,8 @@ from pydynox.attributes import TTLAttribute, ExpiresIn
 class Session(Model):
     model_config = ModelConfig(table="sessions")
 
-    pk = StringAttribute(hash_key=True, default=AutoGenerate.UUID4)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True, default=AutoGenerate.UUID4)
+    sk = StringAttribute(sort_key=True)
     created_at = NumberAttribute(default=AutoGenerate.EPOCH)
     expires_at = TTLAttribute()
 

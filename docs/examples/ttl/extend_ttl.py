@@ -8,7 +8,7 @@ from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
 
 class Session(Model):
     model_config = ModelConfig(table="sessions")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     expires_at = TTLAttribute()
 
 

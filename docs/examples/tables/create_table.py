@@ -8,7 +8,7 @@ client = DynamoDBClient()
 if not client.sync_table_exists("example_users"):
     client.sync_create_table(
         "example_users",
-        hash_key=("pk", "S"),
+        partition_key=("pk", "S"),
         wait=True,
     )
 
@@ -16,8 +16,8 @@ if not client.sync_table_exists("example_users"):
 if not client.sync_table_exists("example_orders"):
     client.sync_create_table(
         "example_orders",
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
         wait=True,
     )
 

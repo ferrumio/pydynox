@@ -5,7 +5,7 @@ from pydynox.attributes import CompressedAttribute, StringAttribute
 class LogEntry(Model):
     model_config = ModelConfig(table="logs")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
 
     # Custom compression settings
     message = CompressedAttribute(

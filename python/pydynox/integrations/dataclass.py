@@ -8,7 +8,7 @@ Example:
     >>>
     >>> client = DynamoDBClient(region="us-east-1")
     >>>
-    >>> @dynamodb_model(table="users", hash_key="pk", client=client)
+    >>> @dynamodb_model(table="users", partition_key="pk", client=client)
     ... @dataclass
     ... class User:
     ...     pk: str
@@ -36,8 +36,8 @@ __all__ = ["from_dataclass"]
 def from_dataclass(
     cls: type[T],
     table: str,
-    hash_key: str,
-    range_key: str | None = None,
+    partition_key: str,
+    sort_key: str | None = None,
     client: DynamoDBClient | None = None,
 ) -> type[T]:
     """Add DynamoDB operations to a dataclass.
@@ -45,8 +45,8 @@ def from_dataclass(
     Args:
         cls: The dataclass to enhance.
         table: DynamoDB table name.
-        hash_key: Name of the hash key attribute.
-        range_key: Name of the range key attribute (optional).
+        partition_key: Name of the hash key attribute.
+        sort_key: Name of the range key attribute (optional).
         client: DynamoDBClient instance (optional).
 
     Returns:
@@ -57,10 +57,10 @@ def from_dataclass(
 
     # Validate keys exist
     field_names = {f.name for f in fields(cls)}
-    if hash_key not in field_names:
-        raise ValueError(f"hash_key '{hash_key}' not found in dataclass fields")
-    if range_key and range_key not in field_names:
-        raise ValueError(f"range_key '{range_key}' not found in dataclass fields")
+    if partition_key not in field_names:
+        raise ValueError(f"partition_key '{partition_key}' not found in dataclass fields")
+    if sort_key and sort_key not in field_names:
+        raise ValueError(f"sort_key '{sort_key}' not found in dataclass fields")
 
     def to_dict(instance: T) -> dict[str, Any]:
         return asdict(instance)  # type: ignore
@@ -68,4 +68,4 @@ def from_dataclass(
     def from_dict(klass: type[T], data: dict[str, Any]) -> T:
         return klass(**data)
 
-    return add_dynamodb_methods(cls, table, hash_key, range_key, client, to_dict, from_dict)
+    return add_dynamodb_methods(cls, table, partition_key, sort_key, client, to_dict, from_dict)

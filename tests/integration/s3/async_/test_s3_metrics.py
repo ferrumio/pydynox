@@ -16,8 +16,8 @@ def s3_model(dynamo: DynamoDBClient, s3_bucket: str):
     class Document(Model):
         model_config = ModelConfig(table="test_table")
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         content = S3Attribute(bucket=s3_bucket, prefix="docs/")
 
@@ -95,8 +95,8 @@ async def test_s3_metrics_zero_without_s3_operations(dynamo: DynamoDBClient):
     class SimpleModel(Model):
         model_config = ModelConfig(table="test_table")
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
 
     SimpleModel.reset_metrics()

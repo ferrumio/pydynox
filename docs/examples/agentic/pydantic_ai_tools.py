@@ -22,8 +22,8 @@ set_default_client(client)
 class Document(Model):
     model_config = ModelConfig(table="documents")
 
-    pk = StringAttribute(hash_key=True)  # DOC#<id>
-    sk = StringAttribute(range_key=True)  # VERSION#<version>
+    pk = StringAttribute(partition_key=True)  # DOC#<id>
+    sk = StringAttribute(sort_key=True)  # VERSION#<version>
     title = StringAttribute()
     author = StringAttribute()
     size_bytes = NumberAttribute(default=0)
@@ -33,8 +33,8 @@ class Document(Model):
 class Project(Model):
     model_config = ModelConfig(table="projects")
 
-    pk = StringAttribute(hash_key=True)  # PROJECT#<id>
-    sk = StringAttribute(range_key=True)  # METADATA
+    pk = StringAttribute(partition_key=True)  # PROJECT#<id>
+    sk = StringAttribute(sort_key=True)  # METADATA
     name = StringAttribute()
     owner = StringAttribute()
     doc_count = NumberAttribute(default=0)
@@ -105,7 +105,7 @@ async def get_document(ctx, doc_id: str, version: str = "latest") -> dict:
     """
     if version == "latest":
         query_result = Document.query(
-            hash_key=f"DOC#{doc_id}",
+            partition_key=f"DOC#{doc_id}",
             scan_index_forward=False,
             limit=1,
         )
@@ -140,7 +140,7 @@ async def list_document_versions(ctx, doc_id: str) -> list:
         List of versions with size and author.
     """
     query_result = Document.query(
-        hash_key=f"DOC#{doc_id}",
+        partition_key=f"DOC#{doc_id}",
         scan_index_forward=False,
     )
     docs = [doc async for doc in query_result]
@@ -231,8 +231,8 @@ if __name__ == "__main__":
         if not client.table_exists("documents"):
             client.create_table(
                 table_name="documents",
-                hash_key=("pk", "S"),
-                range_key=("sk", "S"),
+                partition_key=("pk", "S"),
+                sort_key=("sk", "S"),
                 wait=True,
             )
             print("Table 'documents' created!")
@@ -240,8 +240,8 @@ if __name__ == "__main__":
         if not client.table_exists("projects"):
             client.create_table(
                 table_name="projects",
-                hash_key=("pk", "S"),
-                range_key=("sk", "S"),
+                partition_key=("pk", "S"),
+                sort_key=("sk", "S"),
                 wait=True,
             )
             print("Table 'projects' created!")

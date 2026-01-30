@@ -10,7 +10,7 @@ from pydynox.attributes import DatetimeAttribute, StringAttribute
 class Event(Model):
     model_config = ModelConfig(table="events")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     created_at = DatetimeAttribute()
 
 

@@ -32,8 +32,8 @@ class CompressedAttribute(Attribute[str]):
             Smaller values are stored as-is.
         threshold: Compression ratio threshold (default 0.9).
             Only compress if result is smaller by this ratio.
-        hash_key: True if this is the partition key.
-        range_key: True if this is the sort key.
+        partition_key: True if this is the partition key.
+        sort_key: True if this is the sort key.
         default: Default value when not provided.
         required: Whether this field is required.
 
@@ -43,7 +43,7 @@ class CompressedAttribute(Attribute[str]):
         >>>
         >>> class Document(Model):
         ...     model_config = ModelConfig(table="documents")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     body = CompressedAttribute()  # Uses zstd by default
         ...     logs = CompressedAttribute(algorithm=CompressionAlgorithm.Lz4)
     """
@@ -56,8 +56,8 @@ class CompressedAttribute(Attribute[str]):
         level: int | None = None,
         min_size: int = 100,
         threshold: float = 0.9,
-        hash_key: bool = False,
-        range_key: bool = False,
+        partition_key: bool = False,
+        sort_key: bool = False,
         default: str | None = None,
         required: bool = False,
     ):
@@ -68,14 +68,14 @@ class CompressedAttribute(Attribute[str]):
             level: Compression level.
             min_size: Minimum bytes to trigger compression.
             threshold: Only compress if ratio is below this.
-            hash_key: True if this is the partition key.
-            range_key: True if this is the sort key.
+            partition_key: True if this is the partition key.
+            sort_key: True if this is the sort key.
             default: Default value when not provided.
             required: Whether this field is required.
         """
         super().__init__(
-            hash_key=hash_key,
-            range_key=range_key,
+            partition_key=partition_key,
+            sort_key=sort_key,
             default=default,
             required=required,
         )

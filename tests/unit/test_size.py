@@ -180,7 +180,7 @@ def test_item_too_large_error_on_save(monkeypatch):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client, max_size=100)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         bio = StringAttribute()
 
     User._client_instance = None

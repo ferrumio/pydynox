@@ -8,15 +8,15 @@ from pydynox.attributes import NumberAttribute, StringAttribute
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     amount = NumberAttribute()
 
 
 async def main():
     orders = Order.query(
-        hash_key="CUSTOMER#123",
-        range_key_condition=Order.sk.begins_with("ORDER#"),
+        partition_key="CUSTOMER#123",
+        sort_key_condition=Order.sk.begins_with("ORDER#"),
         filter_condition=Order.amount > 100,
     )
 

@@ -303,13 +303,13 @@ def test_compressed_attribute_threshold():
 
 
 def test_compressed_attribute_key_flags():
-    """CompressedAttribute supports hash_key and range_key."""
+    """CompressedAttribute supports partition_key and sort_key."""
     # WHEN we create compressed attributes with key flags
-    hash_attr = CompressedAttribute(hash_key=True)
-    range_attr = CompressedAttribute(range_key=True)
+    hash_attr = CompressedAttribute(partition_key=True)
+    range_attr = CompressedAttribute(sort_key=True)
 
     # THEN key flags should be set correctly
-    assert hash_attr.hash_key is True
-    assert hash_attr.range_key is False
-    assert range_attr.hash_key is False
-    assert range_attr.range_key is True
+    assert hash_attr.partition_key is True
+    assert hash_attr.sort_key is False
+    assert range_attr.partition_key is False
+    assert range_attr.sort_key is True

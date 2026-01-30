@@ -39,24 +39,24 @@ def test_attribute_types(attr_class, expected_type):
     assert attr.attr_type == expected_type
 
 
-def test_attribute_hash_key():
+def test_attribute_partition_key():
     """Attribute can be marked as hash key."""
-    # WHEN we create an attribute with hash_key=True
-    attr = StringAttribute(hash_key=True)
+    # WHEN we create an attribute with partition_key=True
+    attr = StringAttribute(partition_key=True)
 
-    # THEN hash_key should be True and range_key False
-    assert attr.hash_key is True
-    assert attr.range_key is False
+    # THEN partition_key should be True and sort_key False
+    assert attr.partition_key is True
+    assert attr.sort_key is False
 
 
-def test_attribute_range_key():
+def test_attribute_sort_key():
     """Attribute can be marked as range key."""
-    # WHEN we create an attribute with range_key=True
-    attr = StringAttribute(range_key=True)
+    # WHEN we create an attribute with sort_key=True
+    attr = StringAttribute(sort_key=True)
 
-    # THEN range_key should be True and hash_key False
-    assert attr.hash_key is False
-    assert attr.range_key is True
+    # THEN sort_key should be True and partition_key False
+    assert attr.partition_key is False
+    assert attr.sort_key is True
 
 
 def test_attribute_default():

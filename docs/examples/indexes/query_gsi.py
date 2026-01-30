@@ -12,15 +12,15 @@ client = get_default_client()
 class User(Model):
     model_config = ModelConfig(table="users_gsi")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     name = StringAttribute()
 
     # Define GSIs
-    email_index = GlobalSecondaryIndex("email-index", hash_key="email")
-    status_index = GlobalSecondaryIndex("status-index", hash_key="status")
+    email_index = GlobalSecondaryIndex("email-index", partition_key="email")
+    status_index = GlobalSecondaryIndex("status-index", partition_key="status")
 
 
 async def main():
@@ -28,8 +28,8 @@ async def main():
     if not await client.table_exists("users_gsi"):
         await client.create_table(
             "users_gsi",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             global_secondary_indexes=[
                 {"index_name": "email-index", "hash_key": ("email", "S")},
                 {"index_name": "status-index", "hash_key": ("status", "S")},

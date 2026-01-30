@@ -32,12 +32,12 @@ class Attribute(Generic[T]):
     """Base attribute class for Model fields.
 
     Attributes define the schema of a DynamoDB item. They can be marked
-    as hash_key or range_key to define the table's primary key.
+    as partition_key or sort_key to define the table's primary key.
 
     Example:
         >>> class User(Model):
-        ...     pk = StringAttribute(hash_key=True)
-        ...     sk = StringAttribute(range_key=True)
+        ...     pk = StringAttribute(partition_key=True)
+        ...     sk = StringAttribute(sort_key=True)
         ...     name = StringAttribute()
         ...     age = NumberAttribute()
     """
@@ -46,21 +46,21 @@ class Attribute(Generic[T]):
 
     def __init__(
         self,
-        hash_key: bool = False,
-        range_key: bool = False,
+        partition_key: bool = False,
+        sort_key: bool = False,
         default: T | None = None,
         required: bool = False,
     ):
         """Create an attribute.
 
         Args:
-            hash_key: True if this is the partition key.
-            range_key: True if this is the sort key.
+            partition_key: True if this is the partition key.
+            sort_key: True if this is the sort key.
             default: Default value when not provided.
             required: Whether this field is required (cannot be None).
         """
-        self.hash_key = hash_key
-        self.range_key = range_key
+        self.partition_key = partition_key
+        self.sort_key = sort_key
         self.default = default
         self.required = required
         self.attr_name: str | None = None

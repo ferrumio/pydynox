@@ -10,7 +10,7 @@ from pydynox.exceptions import ConditionalCheckFailedException
 class Account(Model):
     model_config = ModelConfig(table="accounts")
 
-    pk = StringAttribute(hash_key=True)  # account_id
+    pk = StringAttribute(partition_key=True)  # account_id
     balance = NumberAttribute()
 
 

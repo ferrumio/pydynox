@@ -14,8 +14,8 @@ class User(Model):
 
     model_config = ModelConfig(table="users_gsi_pagination")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     created_at = StringAttribute()
@@ -23,8 +23,8 @@ class User(Model):
 
     status_index = GlobalSecondaryIndex(
         index_name="status-index",
-        hash_key="status",
-        range_key="created_at",
+        partition_key="status",
+        sort_key="created_at",
     )
 
 
@@ -33,8 +33,8 @@ async def main():
     if not await client.table_exists("users_gsi_pagination"):
         await client.create_table(
             "users_gsi_pagination",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             global_secondary_indexes=[
                 {
                     "index_name": "status-index",

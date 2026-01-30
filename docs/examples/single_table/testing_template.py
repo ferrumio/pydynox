@@ -10,16 +10,16 @@ from pydynox.testing import MemoryBackend
 class UserOrder(Model):
     model_config = ModelConfig(table="app")
 
-    pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-    sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+    pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+    sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
     user_id = StringAttribute()
     order_id = StringAttribute()
     status = StringAttribute()
 
     by_order = GlobalSecondaryIndex(
         index_name="inverted",
-        hash_key="sk",
-        range_key="pk",
+        partition_key="sk",
+        sort_key="pk",
     )
 
 

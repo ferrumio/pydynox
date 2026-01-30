@@ -7,7 +7,7 @@ from pydynox.exceptions import ConditionalCheckFailedException
 
 class Counter(Model):
     model_config = ModelConfig(table="counters")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     count = NumberAttribute()
     version = VersionAttribute()
 

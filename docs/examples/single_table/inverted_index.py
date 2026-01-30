@@ -11,8 +11,8 @@ class UserOrder(Model):
     model_config = ModelConfig(table="app")
 
     # Main table: pk=USER#123, sk=ORDER#456
-    pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-    sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+    pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+    sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
     user_id = StringAttribute()
     order_id = StringAttribute()
     status = StringAttribute()
@@ -20,8 +20,8 @@ class UserOrder(Model):
     # Inverted index: sk becomes hash key, pk becomes sort key
     by_order = GlobalSecondaryIndex(
         index_name="inverted",
-        hash_key="sk",
-        range_key="pk",
+        partition_key="sk",
+        sort_key="pk",
     )
 
 

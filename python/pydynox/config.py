@@ -84,7 +84,7 @@ class ModelConfig:
         ...         table="users",
         ...         client=client,
         ...     )
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     name = StringAttribute()
         >>>
         >>> # Model with higher hot partition thresholds (high traffic expected)
@@ -94,7 +94,7 @@ class ModelConfig:
         ...         hot_partition_writes=2000,
         ...         hot_partition_reads=5000,
         ...     )
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
     """
 
     table: str

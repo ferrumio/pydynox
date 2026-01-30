@@ -13,21 +13,21 @@ Example:
     >>>
     >>> class User(Model):
     ...     model_config = ModelConfig(table="users")
-    ...     pk = StringAttribute(hash_key=True)
-    ...     sk = StringAttribute(range_key=True)
+    ...     pk = StringAttribute(partition_key=True)
+    ...     sk = StringAttribute(sort_key=True)
     ...     email = StringAttribute()
     ...     status = StringAttribute()
     ...
     ...     # GSI - different hash key
     ...     email_index = GlobalSecondaryIndex(
     ...         index_name="email-index",
-    ...         hash_key="email",
+    ...         partition_key="email",
     ...     )
     ...
     ...     # LSI - same hash key, different sort key
     ...     status_index = LocalSecondaryIndex(
     ...         index_name="status-index",
-    ...         range_key="status",
+    ...         sort_key="status",
     ...     )
     >>>
     >>> # Query GSI

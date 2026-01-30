@@ -14,8 +14,8 @@ class Order(Model):
 
     model_config = ModelConfig(table="orders_lsi")
 
-    customer_id = StringAttribute(hash_key=True)
-    order_id = StringAttribute(range_key=True)
+    customer_id = StringAttribute(partition_key=True)
+    order_id = StringAttribute(sort_key=True)
     status = StringAttribute()
     total = NumberAttribute()
     created_at = StringAttribute()
@@ -23,7 +23,7 @@ class Order(Model):
     # LSI for querying by status
     status_index = LocalSecondaryIndex(
         index_name="status-index",
-        range_key="status",
+        sort_key="status",
     )
 
 
@@ -32,8 +32,8 @@ async def main():
     if not await client.table_exists("orders_lsi"):
         await client.create_table(
             "orders_lsi",
-            hash_key=("customer_id", "S"),
-            range_key=("order_id", "S"),
+            partition_key=("customer_id", "S"),
+            sort_key=("order_id", "S"),
             local_secondary_indexes=[
                 {
                     "index_name": "status-index",
@@ -68,13 +68,13 @@ async def main():
 
     # Query all orders for customer (using main table)
     print("All orders for CUST#1:")
-    async for order in Order.query(hash_key="CUST#1"):
+    async for order in Order.query(partition_key="CUST#1"):
         print(f"  {order.order_id}: {order.status} - ${order.total}")
 
     # Query orders by status using LSI
     print("\nPending orders for CUST#1 (via LSI):")
     async for order in Order.status_index.query(
-        customer_id="CUST#1", range_key_condition=Order.status == "pending"
+        customer_id="CUST#1", sort_key_condition=Order.status == "pending"
     ):
         print(f"  {order.order_id}: ${order.total}")
 

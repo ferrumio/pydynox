@@ -21,8 +21,8 @@ def projection_table(localstack_endpoint):
 
     client.sync_create_table(
         table_name,
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
         wait=True,
     )
 
@@ -164,8 +164,8 @@ def user_model(localstack_endpoint):
 
     class User(Model):
         model_config = ModelConfig(table=table_name, client=client)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         email = StringAttribute()
         age = NumberAttribute()
@@ -198,7 +198,7 @@ async def test_model_query_with_fields(user_model):
 
     # Query with fields - returns dicts with only specified fields
     results = [
-        item async for item in User.query(hash_key=pk, as_dict=True, fields=["name", "email"])
+        item async for item in User.query(partition_key=pk, as_dict=True, fields=["name", "email"])
     ]
 
     assert len(results) == 3

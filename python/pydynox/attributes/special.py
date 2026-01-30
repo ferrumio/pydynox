@@ -26,7 +26,7 @@ class JSONAttribute(Attribute[dict[str, Any] | list[Any]]):
         >>>
         >>> class Config(Model):
         ...     model_config = ModelConfig(table="configs")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     settings = JSONAttribute()
         >>>
         >>> config = Config(pk="CFG#1", settings={"theme": "dark", "notifications": True})
@@ -74,8 +74,8 @@ class EnumAttribute(Attribute[E], Generic[E]):
 
     Args:
         enum_class: The Enum class to use.
-        hash_key: True if this is the partition key.
-        range_key: True if this is the sort key.
+        partition_key: True if this is the partition key.
+        sort_key: True if this is the sort key.
         default: Default enum value.
         required: Whether this field is required.
 
@@ -90,7 +90,7 @@ class EnumAttribute(Attribute[E], Generic[E]):
         >>>
         >>> class User(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     status = EnumAttribute(Status, default=Status.PENDING)
         >>>
         >>> user = User(pk="USER#1", status=Status.ACTIVE)
@@ -103,8 +103,8 @@ class EnumAttribute(Attribute[E], Generic[E]):
     def __init__(
         self,
         enum_class: type[E],
-        hash_key: bool = False,
-        range_key: bool = False,
+        partition_key: bool = False,
+        sort_key: bool = False,
         default: E | None = None,
         required: bool = False,
     ):
@@ -112,14 +112,14 @@ class EnumAttribute(Attribute[E], Generic[E]):
 
         Args:
             enum_class: The Enum class to use.
-            hash_key: True if this is the partition key.
-            range_key: True if this is the sort key.
+            partition_key: True if this is the partition key.
+            sort_key: True if this is the sort key.
             default: Default enum value.
             required: Whether this field is required.
         """
         super().__init__(
-            hash_key=hash_key,
-            range_key=range_key,
+            partition_key=partition_key,
+            sort_key=sort_key,
             default=default,
             required=required,
         )
@@ -165,7 +165,7 @@ class DatetimeAttribute(Attribute[datetime]):
         >>>
         >>> class Event(Model):
         ...     model_config = ModelConfig(table="events")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     created_at = DatetimeAttribute()
         >>>
         >>> event = Event(pk="EVT#1", created_at=datetime.now(timezone.utc))
@@ -179,7 +179,7 @@ class DatetimeAttribute(Attribute[datetime]):
         >>>
         >>> class Event(Model):
         ...     model_config = ModelConfig(table="events")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     created_at = DatetimeAttribute(required=False)
         ...
         ...     @before_save

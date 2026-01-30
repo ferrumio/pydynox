@@ -15,8 +15,8 @@ class User(Model):
 
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     age = NumberAttribute()
@@ -27,32 +27,32 @@ class User(Model):
 
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
-        hash_key="email",
+        partition_key="email",
     )
 
     status_index = GlobalSecondaryIndex(
         index_name="status-index",
-        hash_key="status",
-        range_key="pk",
+        partition_key="status",
+        sort_key="pk",
     )
 
     custom_projection_index = GlobalSecondaryIndex(
         index_name="custom-index",
-        hash_key="status",
+        partition_key="status",
         projection=["email", "age"],
     )
 
     keys_only_index = GlobalSecondaryIndex(
         index_name="keys-only-index",
-        hash_key="email",
+        partition_key="email",
         projection="KEYS_ONLY",
     )
 
     # Multi-attribute GSI (new in Nov 2025)
     location_index = GlobalSecondaryIndex(
         index_name="location-index",
-        hash_key=["tenant_id", "region"],
-        range_key=["created_at", "item_id"],
+        partition_key=["tenant_id", "region"],
+        sort_key=["created_at", "item_id"],
     )
 
 
@@ -64,18 +64,18 @@ def test_gsi_definition() -> None:
     assert hasattr(User, "email_index")
     assert hasattr(User, "status_index")
     assert User.email_index.index_name == "email-index"
-    assert User.email_index.hash_key == "email"
-    assert User.email_index.range_key is None
+    assert User.email_index.partition_key == "email"
+    assert User.email_index.sort_key is None
 
 
-def test_gsi_with_range_key() -> None:
+def test_gsi_with_sort_key() -> None:
     """Test GSI with range key."""
     # GIVEN a GSI with range key
 
     # THEN both hash and range key should be set
     assert User.status_index.index_name == "status-index"
-    assert User.status_index.hash_key == "status"
-    assert User.status_index.range_key == "pk"
+    assert User.status_index.partition_key == "status"
+    assert User.status_index.sort_key == "pk"
 
 
 def test_gsi_collected_in_model() -> None:
@@ -110,7 +110,7 @@ def test_gsi_to_dynamodb_definition_all_projection() -> None:
     assert definition["Projection"] == {"ProjectionType": "ALL"}
 
 
-def test_gsi_to_dynamodb_definition_with_range_key() -> None:
+def test_gsi_to_dynamodb_definition_with_sort_key() -> None:
     """Test GSI converts to DynamoDB format with range key."""
     # GIVEN a GSI with range key
 
@@ -150,7 +150,7 @@ def test_gsi_to_dynamodb_definition_keys_only() -> None:
     assert definition["Projection"] == {"ProjectionType": "KEYS_ONLY"}
 
 
-def test_gsi_query_requires_hash_key() -> None:
+def test_gsi_query_requires_partition_key() -> None:
     """Test GSI query raises error if hash key not provided."""
     # GIVEN a GSI that requires email as hash key
 
@@ -165,7 +165,7 @@ def test_gsi_unbound_raises_error() -> None:
     # GIVEN an unbound GSI
     unbound_gsi: GlobalSecondaryIndex[Any] = GlobalSecondaryIndex(
         index_name="test",
-        hash_key="test",
+        partition_key="test",
     )
 
     # WHEN we try to query
@@ -196,11 +196,11 @@ def test_multi_attr_gsi_definition() -> None:
 
     # THEN it should have multiple hash and range keys
     assert User.location_index.index_name == "location-index"
-    assert User.location_index.hash_keys == ["tenant_id", "region"]
-    assert User.location_index.range_keys == ["created_at", "item_id"]
-    # Backward compat: first attribute accessible via hash_key/range_key
-    assert User.location_index.hash_key == "tenant_id"
-    assert User.location_index.range_key == "created_at"
+    assert User.location_index.partition_keys == ["tenant_id", "region"]
+    assert User.location_index.sort_keys == ["created_at", "item_id"]
+    # Backward compat: first attribute accessible via partition_key/sort_key
+    assert User.location_index.partition_key == "tenant_id"
+    assert User.location_index.sort_key == "created_at"
 
 
 def test_multi_attr_gsi_to_dynamodb_definition() -> None:
@@ -220,7 +220,7 @@ def test_multi_attr_gsi_to_dynamodb_definition() -> None:
     ]
 
 
-def test_multi_attr_gsi_query_requires_all_hash_keys() -> None:
+def test_multi_attr_gsi_query_requires_all_partition_keys() -> None:
     """Test multi-attribute GSI query requires all hash key attributes."""
     # GIVEN a multi-attribute GSI requiring tenant_id and region
 
@@ -235,37 +235,37 @@ def test_multi_attr_gsi_query_requires_all_hash_keys() -> None:
         User.location_index.query(region="us-east-1")
 
 
-def test_multi_attr_gsi_validation_max_4_hash_keys() -> None:
+def test_multi_attr_gsi_validation_max_4_partition_keys() -> None:
     """Test GSI rejects more than 4 hash key attributes."""
     # WHEN we try to create a GSI with 5 hash keys
     # THEN ValueError should be raised
     with pytest.raises(ValueError, match="at most 4 attributes"):
         GlobalSecondaryIndex(
             index_name="too-many-hash",
-            hash_key=["a", "b", "c", "d", "e"],  # 5 attributes
+            partition_key=["a", "b", "c", "d", "e"],  # 5 attributes
         )
 
 
-def test_multi_attr_gsi_validation_max_4_range_keys() -> None:
+def test_multi_attr_gsi_validation_max_4_sort_keys() -> None:
     """Test GSI rejects more than 4 range key attributes."""
     # WHEN we try to create a GSI with 5 range keys
     # THEN ValueError should be raised
     with pytest.raises(ValueError, match="at most 4 attributes"):
         GlobalSecondaryIndex(
             index_name="too-many-range",
-            hash_key="pk",
-            range_key=["a", "b", "c", "d", "e"],  # 5 attributes
+            partition_key="pk",
+            sort_key=["a", "b", "c", "d", "e"],  # 5 attributes
         )
 
 
-def test_multi_attr_gsi_validation_empty_hash_key() -> None:
+def test_multi_attr_gsi_validation_empty_partition_key() -> None:
     """Test GSI rejects empty hash key."""
     # WHEN we try to create a GSI with empty hash key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="hash_key is required"):
+    with pytest.raises(ValueError, match="partition_key is required"):
         GlobalSecondaryIndex(
             index_name="empty-hash",
-            hash_key=[],  # type: ignore[arg-type]
+            partition_key=[],  # type: ignore[arg-type]
         )
 
 
@@ -274,14 +274,14 @@ def test_single_attr_gsi_backward_compat() -> None:
     # GIVEN a single-attribute GSI
     gsi = GlobalSecondaryIndex(
         index_name="test",
-        hash_key="email",
-        range_key="created_at",
+        partition_key="email",
+        sort_key="created_at",
     )
 
     # THEN it should be normalized to lists internally
-    assert gsi.hash_keys == ["email"]
-    assert gsi.range_keys == ["created_at"]
+    assert gsi.partition_keys == ["email"]
+    assert gsi.sort_keys == ["created_at"]
 
     # AND still accessible via old properties
-    assert gsi.hash_key == "email"
-    assert gsi.range_key == "created_at"
+    assert gsi.partition_key == "email"
+    assert gsi.sort_key == "created_at"

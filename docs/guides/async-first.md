@@ -73,7 +73,7 @@ from pydynox.attributes import StringAttribute
 
 class User(Model):
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
 
 async def main():
@@ -85,7 +85,7 @@ async def main():
     user = await User.get(pk="USER#123")
 
     # Query
-    async for user in User.query(hash_key="USER#123"):
+    async for user in User.query(partition_key="USER#123"):
         print(user.name)
 
     # Delete
@@ -183,7 +183,7 @@ async def get_user_with_orders(user_id: str):
     # Both calls run concurrently - total time is max(user_time, orders_time)
     user, orders = await asyncio.gather(
         User.get(pk=user_id),
-        Order.query(hash_key=user_id).all(),
+        Order.query(partition_key=user_id).all(),
     )
     return user, orders
 ```

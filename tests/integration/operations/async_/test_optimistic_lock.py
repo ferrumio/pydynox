@@ -12,8 +12,8 @@ class VersionedDoc(Model):
     """Test model with version attribute."""
 
     model_config = ModelConfig(table="test_table")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     content = StringAttribute()
     version = VersionAttribute()
 

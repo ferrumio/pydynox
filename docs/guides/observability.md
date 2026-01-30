@@ -225,7 +225,7 @@ if last:
 Find slow operations:
 
 ```python
-for order in Order.query(hash_key="CUSTOMER#123"):
+for order in Order.query(partition_key="CUSTOMER#123"):
     print(order.total)
 
 last = Order.get_last_metrics()

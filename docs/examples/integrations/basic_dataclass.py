@@ -10,7 +10,7 @@ client = DynamoDBClient(region="us-east-1")
 
 
 # Define your dataclass with the decorator
-@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
+@dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=client)
 @dataclass
 class User:
     pk: str

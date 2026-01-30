@@ -14,8 +14,8 @@ class User(Model):
 
     model_config = ModelConfig(table="users_filter")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     name = StringAttribute()
@@ -23,8 +23,8 @@ class User(Model):
 
     status_index = GlobalSecondaryIndex(
         index_name="status-index",
-        hash_key="status",
-        range_key="pk",
+        partition_key="status",
+        sort_key="pk",
     )
 
 
@@ -33,8 +33,8 @@ async def main():
     if not await client.table_exists("users_filter"):
         await client.create_table(
             "users_filter",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             global_secondary_indexes=[
                 {
                     "index_name": "status-index",

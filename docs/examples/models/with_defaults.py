@@ -11,7 +11,7 @@ from pydynox.attributes import (
 class User(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     email = StringAttribute(required=True)  # Required field
     name = StringAttribute(default="")
     age = NumberAttribute(default=0)

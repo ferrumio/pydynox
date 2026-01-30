@@ -15,7 +15,7 @@ class User(Model):
     """Test model."""
 
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     age = NumberAttribute(default=0)
 
@@ -134,8 +134,8 @@ def test_query():
 
     class Order(Model):
         model_config = ModelConfig(table="orders")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         total = NumberAttribute()
 
     with MemoryBackend():
@@ -143,7 +143,7 @@ def test_query():
         Order(pk="USER#1", sk="ORDER#002", total=200).sync_save()
         Order(pk="USER#2", sk="ORDER#001", total=50).sync_save()
 
-        results = list(Order.sync_query(hash_key="USER#1"))
+        results = list(Order.sync_query(partition_key="USER#1"))
 
         assert len(results) == 2
 
@@ -201,7 +201,7 @@ def test_multiple_tables():
 
     class Product(Model):
         model_config = ModelConfig(table="products")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     with MemoryBackend():

@@ -11,7 +11,7 @@ def test_decorator_adds_metadata():
     """Decorator adds pydynox metadata to the class."""
 
     # GIVEN a Pydantic model decorated with dynamodb_model
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk")
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk")
     class User(BaseModel):
         pk: str
         sk: str
@@ -19,15 +19,15 @@ def test_decorator_adds_metadata():
 
     # THEN pydynox metadata should be added
     assert User._pydynox_table == "users"
-    assert User._pydynox_hash_key == "pk"
-    assert User._pydynox_range_key == "sk"
+    assert User._pydynox_partition_key == "pk"
+    assert User._pydynox_sort_key == "sk"
 
 
 def test_decorator_adds_methods():
     """Decorator adds CRUD methods to the class."""
 
     # GIVEN a decorated Pydantic model
-    @dynamodb_model(table="users", hash_key="pk")
+    @dynamodb_model(table="users", partition_key="pk")
     class User(BaseModel):
         pk: str
         name: str
@@ -45,7 +45,7 @@ def test_model_still_works_as_pydantic():
     """Model still works as a normal Pydantic model."""
 
     # GIVEN a decorated Pydantic model
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk")
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk")
     class User(BaseModel):
         pk: str
         sk: str
@@ -69,7 +69,7 @@ def test_model_validates_with_pydantic():
     """Model validates data with Pydantic."""
 
     # GIVEN a decorated Pydantic model with int field
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk")
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk")
     class User(BaseModel):
         pk: str
         sk: str
@@ -86,7 +86,7 @@ def test_get_key_returns_hash_and_range():
     """_get_key returns both hash and range key."""
 
     # GIVEN a decorated model with hash and range key
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk")
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk")
     class User(BaseModel):
         pk: str
         sk: str
@@ -112,7 +112,7 @@ def test_get_fetches_from_dynamodb():
         "age": 30,
     }
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     class User(BaseModel):
         pk: str
         sk: str
@@ -136,7 +136,7 @@ def test_get_returns_none_when_not_found():
     mock_client = MagicMock()
     mock_client.sync_get_item.return_value = None
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     class User(BaseModel):
         pk: str
         sk: str
@@ -154,7 +154,7 @@ def test_save_puts_to_dynamodb():
     # GIVEN a mock client
     mock_client = MagicMock()
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     class User(BaseModel):
         pk: str
         sk: str
@@ -177,7 +177,7 @@ def test_delete_removes_from_dynamodb():
     # GIVEN a mock client
     mock_client = MagicMock()
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     class User(BaseModel):
         pk: str
         sk: str
@@ -197,7 +197,7 @@ def test_update_updates_dynamodb():
     # GIVEN a mock client
     mock_client = MagicMock()
 
-    @dynamodb_model(table="users", hash_key="pk", range_key="sk", client=mock_client)
+    @dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=mock_client)
     class User(BaseModel):
         pk: str
         sk: str
@@ -229,11 +229,11 @@ def test_from_pydantic_creates_model():
         price: float
 
     # WHEN we call from_pydantic
-    ProductDB = from_pydantic(Product, table="products", hash_key="pk")
+    ProductDB = from_pydantic(Product, table="products", partition_key="pk")
 
     # THEN a DynamoDB-enabled class should be created
     assert ProductDB._pydynox_table == "products"
-    assert ProductDB._pydynox_hash_key == "pk"
+    assert ProductDB._pydynox_partition_key == "pk"
     assert hasattr(ProductDB, "save")
 
 
@@ -243,16 +243,16 @@ def test_decorator_requires_basemodel():
     # THEN TypeError should be raised
     with pytest.raises(TypeError, match="must be a Pydantic BaseModel"):
 
-        @dynamodb_model(table="test", hash_key="id")
+        @dynamodb_model(table="test", partition_key="id")
         class NotAModel:
             id: str
 
 
-def test_hash_key_only_model():
+def test_partition_key_only_model():
     """Model with only hash key (no range key) works."""
 
     # GIVEN a model with only hash key
-    @dynamodb_model(table="simple", hash_key="id")
+    @dynamodb_model(table="simple", partition_key="id")
     class SimpleModel(BaseModel):
         id: str
         data: str
@@ -270,7 +270,7 @@ def test_pydantic_field_validation():
     """Pydantic Field validation still works."""
 
     # GIVEN a model with Field validation
-    @dynamodb_model(table="validated", hash_key="id")
+    @dynamodb_model(table="validated", partition_key="id")
     class ValidatedModel(BaseModel):
         id: str
         age: int = Field(ge=0, le=150)
@@ -288,7 +288,7 @@ def test_set_client_after_creation():
     """_set_client() allows setting client after model creation."""
 
     # GIVEN a model without client
-    @dynamodb_model(table="users", hash_key="pk")
+    @dynamodb_model(table="users", partition_key="pk")
     class User(BaseModel):
         pk: str
         name: str
@@ -309,7 +309,7 @@ def test_no_client_raises_error():
     """Operations without client raise RuntimeError."""
 
     # GIVEN a model without client
-    @dynamodb_model(table="users", hash_key="pk")
+    @dynamodb_model(table="users", partition_key="pk")
     class User(BaseModel):
         pk: str
         name: str

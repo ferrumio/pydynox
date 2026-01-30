@@ -34,8 +34,8 @@ async def test_json_attribute_roundtrip(setup_client, table):
 
     class Config(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         settings = JSONAttribute()
 
     # GIVEN a model with JSON data
@@ -60,8 +60,8 @@ async def test_json_attribute_with_list(setup_client, table):
 
     class Config(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         items = JSONAttribute()
 
     config = Config(pk="CFG#2", sk="ITEMS", items=["a", "b", "c"])
@@ -78,8 +78,8 @@ async def test_enum_attribute_roundtrip(setup_client, table):
 
     class User(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         status = EnumAttribute(Status)
 
     # GIVEN a model with enum value
@@ -100,8 +100,8 @@ async def test_enum_attribute_with_default(setup_client, table):
 
     class User(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         status = EnumAttribute(Status, default=Status.PENDING)
 
     user = User(pk="USER#2", sk="PROFILE")
@@ -118,8 +118,8 @@ async def test_datetime_attribute_roundtrip(setup_client, table):
 
     class Event(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         created_at = DatetimeAttribute()
 
     # GIVEN a model with datetime value
@@ -141,8 +141,8 @@ async def test_string_set_attribute_roundtrip(setup_client, table):
 
     class User(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         tags = StringSetAttribute()
 
     # GIVEN a model with string set
@@ -163,8 +163,8 @@ async def test_number_set_attribute_roundtrip(setup_client, table):
 
     class User(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         scores = NumberSetAttribute()
 
     user = User(pk="USER#4", sk="PROFILE", scores={100, 95, 88})
@@ -181,8 +181,8 @@ async def test_number_set_attribute_with_floats(setup_client, table):
 
     class User(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         ratings = NumberSetAttribute()
 
     user = User(pk="USER#5", sk="PROFILE", ratings={4.5, 3.8, 5.0})

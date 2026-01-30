@@ -10,7 +10,7 @@ client = DynamoDBClient(region="us-east-1")
 
 
 # Define your Pydantic model with the decorator
-@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
+@dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=client)
 class User(BaseModel):
     pk: str
     sk: str

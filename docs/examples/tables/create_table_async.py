@@ -12,7 +12,7 @@ async def main():
     if not await client.table_exists("example_users"):
         await client.create_table(
             "example_users",
-            hash_key=("pk", "S"),
+            partition_key=("pk", "S"),
             wait=True,
         )
 
@@ -20,8 +20,8 @@ async def main():
     if not await client.table_exists("example_orders"):
         await client.create_table(
             "example_orders",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             wait=True,
         )
 

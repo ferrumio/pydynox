@@ -12,8 +12,8 @@ async def main():
     if not await client.table_exists("users_with_gsi"):
         await client.create_table(
             "users_with_gsi",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             global_secondary_indexes=[
                 {
                     "index_name": "email-index",

@@ -13,7 +13,7 @@ class User(Model):
     """Test model for fixture tests."""
 
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     age = NumberAttribute(default=0)
 
@@ -22,8 +22,8 @@ class Order(Model):
     """Test model with composite key."""
 
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
 
 
@@ -85,7 +85,7 @@ async def test_pydynox_memory_backend_query(pydynox_memory_backend):
     await Order(pk="USER#2", sk="ORDER#001", total=50).save()
 
     # WHEN we query for USER#1
-    results = [order async for order in Order.query(hash_key="USER#1")]
+    results = [order async for order in Order.query(partition_key="USER#1")]
 
     # THEN only USER#1 orders are returned
     assert len(results) == 2

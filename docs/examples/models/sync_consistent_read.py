@@ -10,8 +10,8 @@ client = DynamoDBClient(region="us-east-1")
 class User(Model):
     model_config = ModelConfig(table="users", client=client)
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
 
 
@@ -30,8 +30,8 @@ class Order(Model):
         consistent_read=True,  # All reads are strongly consistent
     )
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
 
 
 # Uses strongly consistent read (from model_config)

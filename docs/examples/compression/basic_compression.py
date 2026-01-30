@@ -7,7 +7,7 @@ from pydynox.attributes import CompressedAttribute, StringAttribute
 class Article(Model):
     model_config = ModelConfig(table="articles")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     content = CompressedAttribute()  # Auto-compresses large text
 
 

@@ -50,8 +50,8 @@ class StringAttribute(Attribute[str]):
     Example:
         >>> class User(Model):
         ...     model_config = ModelConfig(table="app")
-        ...     pk = StringAttribute(hash_key=True, template="USER#{email}")
-        ...     sk = StringAttribute(range_key=True, template="PROFILE")
+        ...     pk = StringAttribute(partition_key=True, template="USER#{email}")
+        ...     sk = StringAttribute(sort_key=True, template="PROFILE")
         ...     email = StringAttribute()
         ...     name = StringAttribute()
         >>>
@@ -63,8 +63,8 @@ class StringAttribute(Attribute[str]):
 
     def __init__(
         self,
-        hash_key: bool = False,
-        range_key: bool = False,
+        partition_key: bool = False,
+        sort_key: bool = False,
         default: str | None = None,
         required: bool = False,
         template: str | None = None,
@@ -72,13 +72,15 @@ class StringAttribute(Attribute[str]):
         """Create a StringAttribute.
 
         Args:
-            hash_key: True if this is the partition key.
-            range_key: True if this is the sort key.
+            partition_key: True if this is the partition key.
+            sort_key: True if this is the sort key.
             default: Default value when not provided.
             required: Whether this field is required.
             template: Template for building key (e.g., "USER#{email}").
         """
-        super().__init__(hash_key=hash_key, range_key=range_key, default=default, required=required)
+        super().__init__(
+            partition_key=partition_key, sort_key=sort_key, default=default, required=required
+        )
         self.template = template
         self._template_parts: list[_TemplatePart] | None = None
         self._placeholders: list[str] | None = None

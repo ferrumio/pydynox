@@ -12,8 +12,8 @@ def order_model(dynamo):
 
     class Order(Model):
         model_config = ModelConfig(table="test_table")
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         total = NumberAttribute()
         status = StringAttribute()
 
@@ -37,12 +37,12 @@ def populated_orders(dynamo, order_model):
 
 
 @pytest.mark.asyncio
-async def test_model_query_by_hash_key(populated_orders):
+async def test_model_query_by_partition_key(populated_orders):
     """Test Model.query returns typed instances."""
     Order = populated_orders
 
     # WHEN we query by hash key
-    orders = [order async for order in Order.query(hash_key="CUSTOMER#1")]
+    orders = [order async for order in Order.query(partition_key="CUSTOMER#1")]
 
     # THEN typed model instances are returned
     assert len(orders) == 4
@@ -52,15 +52,15 @@ async def test_model_query_by_hash_key(populated_orders):
 
 
 @pytest.mark.asyncio
-async def test_model_query_with_range_key_condition(populated_orders):
-    """Test Model.query with range_key_condition."""
+async def test_model_query_with_sort_key_condition(populated_orders):
+    """Test Model.query with sort_key_condition."""
     Order = populated_orders
 
     orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key="CUSTOMER#1",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
         )
     ]
 
@@ -78,7 +78,7 @@ async def test_model_query_with_filter_condition(populated_orders):
     orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             filter_condition=Order.status == "shipped",
         )
     ]
@@ -91,14 +91,14 @@ async def test_model_query_with_filter_condition(populated_orders):
 
 @pytest.mark.asyncio
 async def test_model_query_with_range_and_filter(populated_orders):
-    """Test Model.query with both range_key_condition and filter_condition."""
+    """Test Model.query with both sort_key_condition and filter_condition."""
     Order = populated_orders
 
     orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key="CUSTOMER#1",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
             filter_condition=Order.total >= 100,
         )
     ]
@@ -117,8 +117,8 @@ async def test_model_query_descending_order(populated_orders):
     asc_orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key="CUSTOMER#1",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
             scan_index_forward=True,
         )
     ]
@@ -126,8 +126,8 @@ async def test_model_query_descending_order(populated_orders):
     desc_orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key="CUSTOMER#1",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
             scan_index_forward=False,
         )
     ]
@@ -148,7 +148,7 @@ async def test_model_query_with_limit(populated_orders):
     orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             limit=2,
         )
     ]
@@ -163,8 +163,8 @@ async def test_model_query_first(populated_orders):
     Order = populated_orders
 
     order = await Order.query(
-        hash_key="CUSTOMER#1",
-        range_key_condition=Order.sk.begins_with("ORDER#"),
+        partition_key="CUSTOMER#1",
+        sort_key_condition=Order.sk.begins_with("ORDER#"),
     ).first()
 
     assert order is not None
@@ -177,7 +177,7 @@ async def test_model_query_first_empty(populated_orders):
     """Test Model.query().first() returns None when no results."""
     Order = populated_orders
 
-    order = await Order.query(hash_key="NONEXISTENT").first()
+    order = await Order.query(partition_key="NONEXISTENT").first()
 
     assert order is None
 
@@ -188,7 +188,7 @@ async def test_model_query_iteration(populated_orders):
     Order = populated_orders
 
     count = 0
-    async for order in Order.query(hash_key="CUSTOMER#1"):
+    async for order in Order.query(partition_key="CUSTOMER#1"):
         assert isinstance(order, Order)
         count += 1
 
@@ -200,7 +200,7 @@ async def test_model_query_empty_result(populated_orders):
     """Test Model.query with no matching items."""
     Order = populated_orders
 
-    orders = [order async for order in Order.query(hash_key="NONEXISTENT")]
+    orders = [order async for order in Order.query(partition_key="NONEXISTENT")]
 
     assert orders == []
 
@@ -210,7 +210,7 @@ async def test_model_query_last_evaluated_key(populated_orders):
     """Test Model.query exposes last_evaluated_key."""
     Order = populated_orders
 
-    result = Order.query(hash_key="CUSTOMER#1")
+    result = Order.query(partition_key="CUSTOMER#1")
 
     # None before iteration
     assert result.last_evaluated_key is None
@@ -230,7 +230,7 @@ async def test_model_query_consistent_read(populated_orders):
     orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             consistent_read=True,
         )
     ]
@@ -246,8 +246,8 @@ async def test_model_query_complex_filter(populated_orders):
     orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key="CUSTOMER#1",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
             filter_condition=(Order.status == "shipped") & (Order.total > 50),
         )
     ]
@@ -265,7 +265,7 @@ async def test_model_query_as_dict_returns_dicts(populated_orders):
     """Test Model.query(as_dict=True) returns plain dicts."""
     Order = populated_orders
 
-    orders = [order async for order in Order.query(hash_key="CUSTOMER#1", as_dict=True)]
+    orders = [order async for order in Order.query(partition_key="CUSTOMER#1", as_dict=True)]
 
     assert len(orders) == 4
     for order in orders:
@@ -278,7 +278,7 @@ async def test_model_query_as_dict_false_returns_models(populated_orders):
     """Test Model.query(as_dict=False) returns Model instances."""
     Order = populated_orders
 
-    orders = [order async for order in Order.query(hash_key="CUSTOMER#1", as_dict=False)]
+    orders = [order async for order in Order.query(partition_key="CUSTOMER#1", as_dict=False)]
 
     assert len(orders) == 4
     for order in orders:
@@ -293,7 +293,7 @@ async def test_model_query_as_dict_with_filter(populated_orders):
     orders = [
         order
         async for order in Order.query(
-            hash_key="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             filter_condition=Order.status == "shipped",
             as_dict=True,
         )
@@ -311,8 +311,8 @@ async def test_model_query_as_dict_first(populated_orders):
     Order = populated_orders
 
     order = await Order.query(
-        hash_key="CUSTOMER#1",
-        range_key_condition=Order.sk.begins_with("ORDER#"),
+        partition_key="CUSTOMER#1",
+        sort_key_condition=Order.sk.begins_with("ORDER#"),
         as_dict=True,
     ).first()
 

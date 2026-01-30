@@ -8,7 +8,7 @@ from pydynox.exceptions import ConditionalCheckFailedException
 
 class User(Model):
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     status = StringAttribute(default="active")
     version = NumberAttribute(default=1)

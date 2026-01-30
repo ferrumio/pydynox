@@ -8,7 +8,7 @@ Example:
     >>>
     >>> client = DynamoDBClient(region="us-east-1")
     >>>
-    >>> @dynamodb_model(table="users", hash_key="pk", client=client)
+    >>> @dynamodb_model(table="users", partition_key="pk", client=client)
     ... class User(BaseModel):
     ...     pk: str
     ...     name: str
@@ -46,16 +46,16 @@ def _check_pydantic() -> None:
 
 def dynamodb_model(
     table: str,
-    hash_key: str,
-    range_key: str | None = None,
+    partition_key: str,
+    sort_key: str | None = None,
     client: DynamoDBClient | None = None,
 ) -> Any:
     """Decorator to add DynamoDB operations to a Pydantic model.
 
     Args:
         table: DynamoDB table name.
-        hash_key: Name of the hash key attribute.
-        range_key: Name of the range key attribute (optional).
+        partition_key: Name of the hash key attribute.
+        sort_key: Name of the range key attribute (optional).
         client: DynamoDBClient instance (optional).
 
     Returns:
@@ -64,7 +64,7 @@ def dynamodb_model(
     _check_pydantic()
 
     def decorator(cls: type[T]) -> type[T]:
-        return from_pydantic(cls, table, hash_key, range_key, client)
+        return from_pydantic(cls, table, partition_key, sort_key, client)
 
     return decorator
 
@@ -72,8 +72,8 @@ def dynamodb_model(
 def from_pydantic(
     cls: type[T],
     table: str,
-    hash_key: str,
-    range_key: str | None = None,
+    partition_key: str,
+    sort_key: str | None = None,
     client: DynamoDBClient | None = None,
 ) -> type[T]:
     """Add DynamoDB operations to a Pydantic model.
@@ -81,8 +81,8 @@ def from_pydantic(
     Args:
         cls: The Pydantic model class.
         table: DynamoDB table name.
-        hash_key: Name of the hash key attribute.
-        range_key: Name of the range key attribute (optional).
+        partition_key: Name of the hash key attribute.
+        sort_key: Name of the range key attribute (optional).
         client: DynamoDBClient instance (optional).
 
     Returns:
@@ -106,5 +106,5 @@ def from_pydantic(
         return {k: getattr(validated, k) for k in updates}
 
     return add_dynamodb_methods(
-        cls, table, hash_key, range_key, client, to_dict, from_dict, validate_update
+        cls, table, partition_key, sort_key, client, to_dict, from_dict, validate_update
     )

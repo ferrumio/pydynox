@@ -12,8 +12,8 @@ async def main():
     if not await client.table_exists("orders_with_lsi"):
         await client.create_table(
             "orders_with_lsi",
-            hash_key=("customer_id", "S"),
-            range_key=("order_id", "S"),
+            partition_key=("customer_id", "S"),
+            sort_key=("order_id", "S"),
             local_secondary_indexes=[
                 {
                     "index_name": "status-index",

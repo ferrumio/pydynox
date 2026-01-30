@@ -36,7 +36,7 @@ async def test_async_create_table_basic(model_table_client):
 
     class SimpleUser(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     await SimpleUser.create_table(wait=True)
@@ -54,7 +54,7 @@ async def test_async_table_exists_false(model_table_client):
 
     class NotExistsModel(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     exists = await NotExistsModel.table_exists()
     assert exists is False
@@ -67,12 +67,12 @@ async def test_async_create_table_with_gsi(model_table_client):
 
     class UserWithGSI(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         email = StringAttribute()
 
         email_index = GlobalSecondaryIndex(
             index_name="email-index",
-            hash_key="email",
+            partition_key="email",
         )
 
     await UserWithGSI.create_table(wait=True)
@@ -97,7 +97,7 @@ async def test_async_delete_table(model_table_client):
 
     class DeleteModel(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     await DeleteModel.create_table(wait=True)
     assert await DeleteModel.table_exists() is True

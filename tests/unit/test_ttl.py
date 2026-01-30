@@ -114,7 +114,7 @@ def test_model_is_expired_true(mock_client):
     # GIVEN a model with TTL in the past
     class Session(Model):
         model_config = ModelConfig(table="sessions", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         expires_at = TTLAttribute()
 
     past = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -130,7 +130,7 @@ def test_model_is_expired_false(mock_client):
     # GIVEN a model with TTL in the future
     class Session(Model):
         model_config = ModelConfig(table="sessions", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         expires_at = TTLAttribute()
 
     future = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -146,7 +146,7 @@ def test_model_is_expired_no_ttl_attr(mock_client):
     # GIVEN a model without TTLAttribute
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     user = User(pk="USER#1")
 
@@ -160,7 +160,7 @@ def test_model_is_expired_none_value(mock_client):
     # GIVEN a model with TTL set to None
     class Session(Model):
         model_config = ModelConfig(table="sessions", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         expires_at = TTLAttribute()
 
     session = Session(pk="SESSION#1", expires_at=None)
@@ -175,7 +175,7 @@ def test_model_expires_in_returns_timedelta(mock_client):
     # GIVEN a model with TTL 1 hour in the future
     class Session(Model):
         model_config = ModelConfig(table="sessions", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         expires_at = TTLAttribute()
 
     future = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -196,7 +196,7 @@ def test_model_expires_in_none_when_expired(mock_client):
     # GIVEN a model with TTL in the past
     class Session(Model):
         model_config = ModelConfig(table="sessions", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         expires_at = TTLAttribute()
 
     past = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -212,7 +212,7 @@ def test_model_expires_in_none_when_no_ttl(mock_client):
     # GIVEN a model without TTLAttribute
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     user = User(pk="USER#1")
 
@@ -226,7 +226,7 @@ def test_model_extend_ttl_raises_without_ttl_attr(mock_client):
     # GIVEN a model without TTLAttribute
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     user = User(pk="USER#1")
 
@@ -242,7 +242,7 @@ def test_model_to_dict_serializes_ttl(mock_client):
     # GIVEN a model with TTL datetime
     class Session(Model):
         model_config = ModelConfig(table="sessions", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         expires_at = TTLAttribute()
 
     dt = datetime(2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
@@ -261,7 +261,7 @@ def test_model_from_dict_deserializes_ttl(mock_client):
     # GIVEN a dict with epoch timestamp
     class Session(Model):
         model_config = ModelConfig(table="sessions", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         expires_at = TTLAttribute()
 
     timestamp = 1750075200

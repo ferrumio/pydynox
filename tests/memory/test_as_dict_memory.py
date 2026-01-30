@@ -14,8 +14,8 @@ from pydynox.attributes import NumberAttribute, StringAttribute
 
 class MemoryTestModel(Model):
     model_config = ModelConfig(table="memory_test_table")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     data = StringAttribute()
     count = NumberAttribute()
@@ -60,13 +60,13 @@ def test_query_model_vs_dict_memory(client, memory_table, setup_items):
 
     # WHEN querying as Model instances
     def query_as_model():
-        return list(MemoryTestModel.query(hash_key=pk))
+        return list(MemoryTestModel.query(partition_key=pk))
 
     _, model_memory = measure_memory(query_as_model)
 
     # WHEN querying as dicts
     def query_as_dict():
-        return list(MemoryTestModel.query(hash_key=pk, as_dict=True))
+        return list(MemoryTestModel.query(partition_key=pk, as_dict=True))
 
     _, dict_memory = measure_memory(query_as_dict)
 
@@ -152,19 +152,19 @@ def test_repeated_query_memory_stable(client, memory_table, setup_items):
     pk = setup_items
 
     # GIVEN a warm-up query to stabilize memory
-    list(MemoryTestModel.query(hash_key=pk, as_dict=True))
+    list(MemoryTestModel.query(partition_key=pk, as_dict=True))
 
     # WHEN measuring first batch of 10 queries
     tracemalloc.start()
     for _ in range(10):
-        list(MemoryTestModel.query(hash_key=pk, as_dict=True))
+        list(MemoryTestModel.query(partition_key=pk, as_dict=True))
     _, first_peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
     # WHEN measuring second batch of 10 queries
     tracemalloc.start()
     for _ in range(10):
-        list(MemoryTestModel.query(hash_key=pk, as_dict=True))
+        list(MemoryTestModel.query(partition_key=pk, as_dict=True))
     _, second_peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 

@@ -92,7 +92,7 @@ class TTLAttribute(Attribute[datetime]):
         >>>
         >>> class Session(Model):
         ...     model_config = ModelConfig(table="sessions")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     expires_at = TTLAttribute()
         >>>
         >>> session = Session(pk="SESSION#123", expires_at=ExpiresIn.hours(1))

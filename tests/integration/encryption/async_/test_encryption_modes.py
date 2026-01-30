@@ -23,8 +23,8 @@ def writeonly_model(dynamo, localstack_endpoint, kms_key_id):
     class WriteOnlyModel(Model):
         model_config = ModelConfig(table=table_name)
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         secret = EncryptedAttribute(
             key_id=kms_key_id,
             region="us-east-1",
@@ -55,8 +55,8 @@ def readonly_model(dynamo, localstack_endpoint, kms_key_id):
     class ReadOnlyModel(Model):
         model_config = ModelConfig(table=table_name)
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         secret = EncryptedAttribute(
             key_id=kms_key_id,
             region="us-east-1",
@@ -87,8 +87,8 @@ def readwrite_model(dynamo, localstack_endpoint, kms_key_id):
     class ReadWriteModel(Model):
         model_config = ModelConfig(table=table_name)
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         secret = EncryptedAttribute(
             key_id=kms_key_id,
             region="us-east-1",

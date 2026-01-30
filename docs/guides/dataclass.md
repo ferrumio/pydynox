@@ -35,7 +35,7 @@ Your dataclass works exactly as before - all dataclass features still work.
 Add a range key for composite keys:
 
 ```python
-@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
+@dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=client)
 @dataclass
 class User:
     pk: str
@@ -48,7 +48,7 @@ class User:
 You can set the client after defining the model:
 
 ```python
-@dynamodb_model(table="users", hash_key="pk")
+@dynamodb_model(table="users", partition_key="pk")
 @dataclass
 class User:
     pk: str
@@ -69,8 +69,8 @@ user = User.get(pk="USER#1")
 | Option | Type | Description |
 |--------|------|-------------|
 | `table` | str | DynamoDB table name (required) |
-| `hash_key` | str | Field name for partition key (required) |
-| `range_key` | str | Field name for sort key (optional) |
+| `partition_key` | str | Field name for partition key (required) |
+| `sort_key` | str | Field name for sort key (optional) |
 | `client` | DynamoDBClient | Client instance (optional, can set later) |
 
 ### Alternative: from_dataclass function
@@ -87,7 +87,7 @@ class User:
     sk: str
     name: str
 
-UserDB = from_dataclass(User, table="users", hash_key="pk", range_key="sk", client=client)
+UserDB = from_dataclass(User, table="users", partition_key="pk", sort_key="sk", client=client)
 user = UserDB(pk="USER#1", sk="PROFILE", name="John")
 user.save()
 ```
@@ -111,7 +111,7 @@ Choose Pydantic when:
 Dataclasses work with lists and dicts:
 
 ```python
-@dynamodb_model(table="items", hash_key="pk", client=client)
+@dynamodb_model(table="items", partition_key="pk", client=client)
 @dataclass
 class Item:
     pk: str
@@ -133,7 +133,7 @@ Use dataclass defaults as usual:
 ```python
 from dataclasses import dataclass, field
 
-@dynamodb_model(table="users", hash_key="pk", client=client)
+@dynamodb_model(table="users", partition_key="pk", client=client)
 @dataclass
 class User:
     pk: str

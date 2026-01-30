@@ -67,8 +67,8 @@ async def test_client_operations_with_timeouts(dynamodb_endpoint):
     if not client.sync_table_exists(table_name):
         client.sync_create_table(
             table_name,
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             wait=True,
         )
 

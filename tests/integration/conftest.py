@@ -64,8 +64,8 @@ def _create_table(_session_client):
     if not _session_client.sync_table_exists(table_name):
         _session_client.sync_create_table(
             table_name,
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             wait=True,
         )
 

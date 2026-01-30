@@ -13,8 +13,8 @@ set_default_client(client)
 class Document(Model):
     model_config = ModelConfig(table="documents")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     content = S3Attribute(bucket="my-bucket")
 

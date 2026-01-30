@@ -21,8 +21,8 @@ def document_model(dynamo, s3_bucket, localstack_endpoint):
     class Document(Model):
         model_config = ModelConfig(table=table_name)
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         content = S3Attribute(bucket=s3_bucket)
 

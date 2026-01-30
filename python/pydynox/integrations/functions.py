@@ -10,14 +10,14 @@ Example:
     >>> client = DynamoDBClient(region="us-east-1")
     >>>
     >>> # With dataclass
-    >>> @dynamodb_model(table="users", hash_key="pk", client=client)
+    >>> @dynamodb_model(table="users", partition_key="pk", client=client)
     ... @dataclass
     ... class User:
     ...     pk: str
     ...     name: str
     >>>
     >>> # With Pydantic
-    >>> @dynamodb_model(table="products", hash_key="pk", client=client)
+    >>> @dynamodb_model(table="products", partition_key="pk", client=client)
     ... class Product(BaseModel):
     ...     pk: str
     ...     name: str
@@ -38,8 +38,8 @@ __all__ = ["dynamodb_model"]
 
 def dynamodb_model(
     table: str,
-    hash_key: str,
-    range_key: str | None = None,
+    partition_key: str,
+    sort_key: str | None = None,
     client: DynamoDBClient | None = None,
 ) -> Any:
     """Decorator to add DynamoDB operations to a Pydantic model or dataclass.
@@ -49,8 +49,8 @@ def dynamodb_model(
 
     Args:
         table: DynamoDB table name.
-        hash_key: Name of the hash key attribute.
-        range_key: Name of the range key attribute (optional).
+        partition_key: Name of the hash key attribute.
+        sort_key: Name of the range key attribute (optional).
         client: DynamoDBClient instance (optional for Pydantic, required for dataclass).
 
     Returns:
@@ -62,7 +62,7 @@ def dynamodb_model(
         >>>
         >>> client = DynamoDBClient(region="us-east-1")
         >>>
-        >>> @dynamodb_model(table="users", hash_key="pk", client=client)
+        >>> @dynamodb_model(table="users", partition_key="pk", client=client)
         ... @dataclass
         ... class User:
         ...     pk: str
@@ -78,7 +78,7 @@ def dynamodb_model(
         if is_dataclass(cls):
             from pydynox.integrations.dataclass import from_dataclass
 
-            return from_dataclass(cls, table, hash_key, range_key, client)
+            return from_dataclass(cls, table, partition_key, sort_key, client)
 
         # Check if Pydantic model
         try:
@@ -87,7 +87,7 @@ def dynamodb_model(
             if issubclass(cls, BaseModel):
                 from pydynox.integrations.pydantic import from_pydantic
 
-                return from_pydantic(cls, table, hash_key, range_key, client)
+                return from_pydantic(cls, table, partition_key, sort_key, client)
         except ImportError:
             pass
 
