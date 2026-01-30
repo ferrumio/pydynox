@@ -8,7 +8,7 @@ class Event(Model):
     model_config = ModelConfig(table="events")
 
     # String IDs
-    pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
+    pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
     event_id = StringAttribute(default=AutoGenerate.UUID4)
     trace_id = StringAttribute(default=AutoGenerate.KSUID)
 
@@ -17,7 +17,7 @@ class Event(Model):
     timestamp = NumberAttribute(default=AutoGenerate.EPOCH)
     timestamp_ms = NumberAttribute(default=AutoGenerate.EPOCH_MS)
 
-    sk = StringAttribute(range_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
 
 

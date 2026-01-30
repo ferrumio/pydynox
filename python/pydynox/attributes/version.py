@@ -23,7 +23,7 @@ class VersionAttribute(Attribute[int]):
         >>>
         >>> class Document(Model):
         ...     model_config = ModelConfig(table="documents")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     content = StringAttribute()
         ...     version = VersionAttribute()
         >>>
@@ -56,8 +56,8 @@ class VersionAttribute(Attribute[int]):
     def __init__(self) -> None:
         """Create a version attribute."""
         super().__init__(
-            hash_key=False,
-            range_key=False,
+            partition_key=False,
+            sort_key=False,
             default=None,  # Will be set to 1 on first save
             required=False,
         )

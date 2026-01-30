@@ -12,8 +12,8 @@ CUSTOMER_PK = "CUSTOMER#123"
 
 class Order(Model):
     model_config = ModelConfig(table="orders_limit")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -23,8 +23,8 @@ async def main():
     if not await client.table_exists("orders_limit"):
         await client.create_table(
             "orders_limit",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create 50 orders
@@ -40,12 +40,12 @@ async def main():
     # page_size = items per DynamoDB request (controls pagination)
 
     # Example 1: Get exactly 10 items total
-    orders = [order async for order in Order.query(hash_key=CUSTOMER_PK, limit=10)]
+    orders = [order async for order in Order.query(partition_key=CUSTOMER_PK, limit=10)]
     print(f"Example 1: Got {len(orders)} orders")
 
     # Example 2: Get all items, but fetch 25 per page
     count = 0
-    async for order in Order.query(hash_key=CUSTOMER_PK, page_size=25):
+    async for order in Order.query(partition_key=CUSTOMER_PK, page_size=25):
         count += 1
     print(f"Example 2: Got {count} orders")
 
@@ -53,7 +53,7 @@ async def main():
     orders = [
         order
         async for order in Order.query(
-            hash_key=CUSTOMER_PK,
+            partition_key=CUSTOMER_PK,
             limit=20,
             page_size=5,
         )
@@ -61,13 +61,13 @@ async def main():
     print(f"Example 3: Got {len(orders)} orders")
 
     # Example 4: Manual pagination with page_size
-    result = Order.query(hash_key=CUSTOMER_PK, limit=10, page_size=10)
+    result = Order.query(partition_key=CUSTOMER_PK, limit=10, page_size=10)
     first_page = [order async for order in result]
     print(f"Example 4: First page: {len(first_page)} items")
 
     if result.last_evaluated_key:
         result = Order.query(
-            hash_key=CUSTOMER_PK,
+            partition_key=CUSTOMER_PK,
             limit=10,
             page_size=10,
             last_evaluated_key=result.last_evaluated_key,

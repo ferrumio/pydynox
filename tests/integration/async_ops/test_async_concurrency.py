@@ -17,8 +17,8 @@ def async_table(dynamo: DynamoDBClient):
     if not dynamo.sync_table_exists(TABLE_NAME):
         dynamo.sync_create_table(
             TABLE_NAME,
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             wait=True,
         )
     yield dynamo
@@ -26,8 +26,8 @@ def async_table(dynamo: DynamoDBClient):
 
 class Item(Model):
     model_config = ModelConfig(table=TABLE_NAME)
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     data = StringAttribute()
 
 

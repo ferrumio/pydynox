@@ -8,7 +8,7 @@ Example:
     >>>
     >>> client = DynamoDBClient(region="us-east-1")
     >>>
-    >>> @dynamodb_model(table="users", hash_key="pk", client=client)
+    >>> @dynamodb_model(table="users", partition_key="pk", client=client)
     ... @dataclass
     ... class User:
     ...     pk: str

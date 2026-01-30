@@ -23,8 +23,8 @@ def secret_model(dynamo, localstack_endpoint, kms_key_id):
     class SecretModel(Model):
         model_config = ModelConfig(table=table_name)
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         secret = EncryptedAttribute(
             key_id=kms_key_id,
@@ -56,8 +56,8 @@ def secret_model_with_context(dynamo, localstack_endpoint, kms_key_id):
     class SecretModelWithContext(Model):
         model_config = ModelConfig(table=table_name)
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         secret = EncryptedAttribute(
             key_id=kms_key_id,

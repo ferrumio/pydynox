@@ -46,7 +46,7 @@ Your Pydantic model works exactly as before - validation, serialization, and all
 Add a range key for composite keys:
 
 ```python
-@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
+@dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=client)
 class User(BaseModel):
     pk: str
     sk: str
@@ -60,7 +60,7 @@ All Pydantic validation works. Invalid data raises `ValidationException` before 
 ```python
 from pydantic import BaseModel, EmailStr, Field
 
-@dynamodb_model(table="users", hash_key="pk", client=client)
+@dynamodb_model(table="users", partition_key="pk", client=client)
 class User(BaseModel):
     pk: str
     name: str = Field(min_length=1, max_length=100)
@@ -78,8 +78,8 @@ user = User(pk="USER#1", name="", email="not-an-email", age=-1)
 | Option | Type | Description |
 |--------|------|-------------|
 | `table` | str | DynamoDB table name (required) |
-| `hash_key` | str | Field name for partition key (required) |
-| `range_key` | str | Field name for sort key (optional) |
+| `partition_key` | str | Field name for partition key (required) |
+| `sort_key` | str | Field name for sort key (optional) |
 | `client` | DynamoDBClient | Client instance (optional, can set later) |
 
 ### Setting client later
@@ -87,7 +87,7 @@ user = User(pk="USER#1", name="", email="not-an-email", age=-1)
 You can set the client after defining the model:
 
 ```python
-@dynamodb_model(table="users", hash_key="pk")
+@dynamodb_model(table="users", partition_key="pk")
 class User(BaseModel):
     pk: str
     name: str
@@ -112,7 +112,7 @@ class User(BaseModel):
     sk: str
     name: str
 
-UserDB = from_pydantic(User, table="users", hash_key="pk", range_key="sk", client=client)
+UserDB = from_pydantic(User, table="users", partition_key="pk", sort_key="sk", client=client)
 user = UserDB(pk="USER#1", sk="PROFILE", name="John")
 await user.save()
 ```
@@ -134,7 +134,7 @@ Use Pydantic's `@field_validator` and `@model_validator` for validation:
 ```python
 from pydantic import BaseModel, field_validator, model_validator
 
-@dynamodb_model(table="users", hash_key="pk", client=client)
+@dynamodb_model(table="users", partition_key="pk", client=client)
 class User(BaseModel):
     pk: str
     email: str
@@ -175,7 +175,7 @@ For TTL, use a datetime field:
 ```python
 from datetime import datetime, timedelta, timezone
 
-@dynamodb_model(table="sessions", hash_key="pk", client=client)
+@dynamodb_model(table="sessions", partition_key="pk", client=client)
 class Session(BaseModel):
     pk: str
     user_id: str

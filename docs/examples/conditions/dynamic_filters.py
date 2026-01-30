@@ -8,7 +8,7 @@ from pydynox.conditions import And
 class Product(Model):
     model_config = ModelConfig(table="products")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     category = StringAttribute()
     price = NumberAttribute()
     brand = StringAttribute()

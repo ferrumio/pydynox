@@ -6,7 +6,7 @@ class Document(Model):
     class Meta:
         table = "documents"
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     title = StringAttribute()
     body = StringAttribute()
     tags = ListAttribute()

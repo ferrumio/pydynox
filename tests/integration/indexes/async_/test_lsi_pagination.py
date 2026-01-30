@@ -25,8 +25,8 @@ def lsi_pagination_client(dynamodb_endpoint):
     # Create table with LSI
     client.sync_create_table(
         table_name,
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
         local_secondary_indexes=[
             {
                 "index_name": "created-at-index",
@@ -53,13 +53,13 @@ class OrderWithLSI(Model):
 
     model_config = ModelConfig(table="lsi_pagination_table")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     created_at = NumberAttribute()
 
     created_at_index = LocalSecondaryIndex(
         index_name="created-at-index",
-        range_key="created_at",
+        sort_key="created_at",
     )
 
 

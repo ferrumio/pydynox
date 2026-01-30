@@ -10,7 +10,7 @@ from pydynox.exceptions import ConditionalCheckFailedException
 class Product(Model):
     model_config = ModelConfig(table="products")
 
-    pk = StringAttribute(hash_key=True)  # product_id
+    pk = StringAttribute(partition_key=True)  # product_id
     stock = NumberAttribute()
     reserved = NumberAttribute()
 

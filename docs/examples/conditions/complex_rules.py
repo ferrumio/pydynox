@@ -9,7 +9,7 @@ from pydynox.attributes import BooleanAttribute, NumberAttribute, StringAttribut
 class Account(Model):
     model_config = ModelConfig(table="accounts")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     balance = NumberAttribute()
     status = StringAttribute()
     verified = BooleanAttribute()

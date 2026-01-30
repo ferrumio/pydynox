@@ -28,8 +28,8 @@ All attributes share these parameters:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `hash_key` | bool | False | Is this the partition key |
-| `range_key` | bool | False | Is this the sort key |
+| `partition_key` | bool | False | Is this the partition key |
+| `sort_key` | bool | False | Is this the sort key |
 | `default` | Any | None | Default value or `AutoGenerate` strategy |
 | `required` | bool | False | Field must have a value (not None) |
 
@@ -49,7 +49,7 @@ from pydynox.attributes import StringAttribute
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     email = StringAttribute(required=True)  # Required
 ```
@@ -64,7 +64,7 @@ from pydynox.attributes import NumberAttribute
 class Product(Model):
     model_config = ModelConfig(table="products")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     price = NumberAttribute()
     quantity = NumberAttribute(default=0)
 ```
@@ -79,7 +79,7 @@ from pydynox.attributes import BooleanAttribute
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     is_active = BooleanAttribute(default=True)
     is_verified = BooleanAttribute(default=False)
 ```
@@ -94,7 +94,7 @@ from pydynox.attributes import BinaryAttribute
 class Document(Model):
     model_config = ModelConfig(table="documents")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     thumbnail = BinaryAttribute()
 ```
 
@@ -108,7 +108,7 @@ from pydynox.attributes import ListAttribute
 class Post(Model):
     model_config = ModelConfig(table="posts")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     tags = ListAttribute(default=[])
     comments = ListAttribute()
 ```
@@ -123,7 +123,7 @@ from pydynox.attributes import MapAttribute
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     address = MapAttribute()
 
 user = User(
@@ -188,7 +188,7 @@ from pydynox.attributes import TTLAttribute, ExpiresIn
 class Session(Model):
     model_config = ModelConfig(table="sessions")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     expires_at = TTLAttribute()
 
 # Create session that expires in 1 hour
@@ -230,7 +230,7 @@ from pydynox.attributes import StringSetAttribute
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     roles = StringSetAttribute()
 
 user = User(pk="USER#1", roles={"admin", "editor"})
@@ -264,7 +264,7 @@ from pydynox.attributes import CompressedAttribute, CompressionAlgorithm
 class Document(Model):
     model_config = ModelConfig(table="documents")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     body = CompressedAttribute()  # Uses zstd by default
     logs = CompressedAttribute(algorithm=CompressionAlgorithm.Lz4)
 ```
@@ -294,7 +294,7 @@ from pydynox.attributes import EncryptedAttribute, EncryptionMode
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     ssn = EncryptedAttribute(key_id="alias/my-key")
 ```
 

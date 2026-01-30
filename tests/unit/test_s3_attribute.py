@@ -262,20 +262,20 @@ def test_s3attribute_empty_prefix():
     assert attr.prefix == ""
 
 
-def test_s3attribute_cannot_be_hash_key():
-    """S3Attribute cannot be hash_key."""
-    # WHEN we try to create S3Attribute as hash_key
+def test_s3attribute_cannot_be_partition_key():
+    """S3Attribute cannot be partition_key."""
+    # WHEN we try to create S3Attribute as partition_key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="cannot be a hash_key"):
-        S3Attribute(bucket="bucket", hash_key=True)
+    with pytest.raises(ValueError, match="cannot be a partition_key"):
+        S3Attribute(bucket="bucket", partition_key=True)
 
 
-def test_s3attribute_cannot_be_range_key():
-    """S3Attribute cannot be range_key."""
-    # WHEN we try to create S3Attribute as range_key
+def test_s3attribute_cannot_be_sort_key():
+    """S3Attribute cannot be sort_key."""
+    # WHEN we try to create S3Attribute as sort_key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="cannot be a hash_key or range_key"):
-        S3Attribute(bucket="bucket", range_key=True)
+    with pytest.raises(ValueError, match="cannot be a partition_key or sort_key"):
+        S3Attribute(bucket="bucket", sort_key=True)
 
 
 def test_s3attribute_serialize_none():

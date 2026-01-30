@@ -204,8 +204,8 @@ async def test_model_config_overrides_client_threshold(
             hot_partition_writes=50,
             hot_partition_reads=50,
         )
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         data = StringAttribute()
 
     pk = f"MODEL#{uuid.uuid4()}"
@@ -236,8 +236,8 @@ async def test_model_config_lower_threshold_triggers_warning(
             client=client_with_detector,
             hot_partition_writes=3,
         )
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         data = StringAttribute()
 
     pk = f"LOW#{uuid.uuid4()}"

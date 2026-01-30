@@ -13,8 +13,8 @@ from pydynox.attributes import (
 class User(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     tags = StringSetAttribute()
     scores = NumberSetAttribute()
 

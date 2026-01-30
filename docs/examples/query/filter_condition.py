@@ -12,8 +12,8 @@ CUSTOMER_PK = "CUSTOMER#123"
 
 class Order(Model):
     model_config = ModelConfig(table="orders_filter")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -23,8 +23,8 @@ async def main():
     if not await client.table_exists("orders_filter"):
         await client.create_table(
             "orders_filter",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create orders with different statuses and totals
@@ -39,28 +39,28 @@ async def main():
 
     # Filter by status
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
+        partition_key=CUSTOMER_PK,
         filter_condition=Order.status == "shipped",
     ):
         print(f"Shipped order: {order.sk}")
 
     # Filter by total amount
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
+        partition_key=CUSTOMER_PK,
         filter_condition=Order.total >= 100,
     ):
         print(f"Large order: {order.sk}, Total: {order.total}")
 
     # Combine multiple filters with & (AND)
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
+        partition_key=CUSTOMER_PK,
         filter_condition=(Order.status == "shipped") & (Order.total > 50),
     ):
         print(f"Shipped large order: {order.sk}")
 
     # Combine filters with | (OR)
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
+        partition_key=CUSTOMER_PK,
         filter_condition=(Order.status == "shipped") | (Order.status == "delivered"),
     ):
         print(f"Completed order: {order.sk}")

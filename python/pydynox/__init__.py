@@ -8,7 +8,7 @@ Example:
     >>>
     >>> class User(Model):
     ...     model_config = ModelConfig(table="users", client=client)
-    ...     pk = StringAttribute(hash_key=True)
+    ...     pk = StringAttribute(partition_key=True)
     ...     name = StringAttribute()
     >>>
     >>> user = User(pk="USER#1", name="John")

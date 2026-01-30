@@ -17,15 +17,15 @@ set_default_client(client)
 # All models use the default client automatically
 class User(Model):
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
 
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = StringAttribute()
 
 

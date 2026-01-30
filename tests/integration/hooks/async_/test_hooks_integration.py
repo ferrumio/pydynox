@@ -14,8 +14,8 @@ async def test_hooks_run_on_save(dynamo):
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
 
         @before_save
@@ -48,8 +48,8 @@ async def test_hooks_run_on_delete(dynamo):
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
 
         @before_delete
@@ -83,8 +83,8 @@ async def test_skip_hooks_on_save(dynamo):
 
     class User(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
 
         @before_save
@@ -111,8 +111,8 @@ async def test_before_save_validation_blocks_save(dynamo):
     # GIVEN a model with email validation in before_save
     class ValidatedUser(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         email = StringAttribute()
 
         @before_save
@@ -139,8 +139,8 @@ async def test_before_save_can_modify_data(dynamo):
     # GIVEN a model that normalizes name in before_save
     class NormalizedUser(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
 
         @before_save
@@ -167,8 +167,8 @@ async def test_model_config_skip_hooks_default(dynamo):
 
     class BulkModel(Model):
         model_config = ModelConfig(table="test_table", client=dynamo, skip_hooks=True)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
 
         @before_save
         def log_save(self):
@@ -194,8 +194,8 @@ async def test_model_config_skip_hooks_override(dynamo):
 
     class BulkModel(Model):
         model_config = ModelConfig(table="test_table", client=dynamo, skip_hooks=True)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
 
         @before_save
         def log_save(self):

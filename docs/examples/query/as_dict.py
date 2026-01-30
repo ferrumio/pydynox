@@ -12,8 +12,8 @@ CUSTOMER_PK = "CUSTOMER#123"
 
 class Order(Model):
     model_config = ModelConfig(table="orders_dict")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -23,8 +23,8 @@ async def main():
     if not await client.table_exists("orders_dict"):
         await client.create_table(
             "orders_dict",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create some orders
@@ -37,12 +37,12 @@ async def main():
         ).save()
 
     # Return dicts instead of Model instances
-    async for order in Order.query(hash_key=CUSTOMER_PK, as_dict=True):
+    async for order in Order.query(partition_key=CUSTOMER_PK, as_dict=True):
         # order is a plain dict, not an Order instance
         print(order.get("sk"), order.get("total"))
 
     # Useful for read-only operations where you don't need Model methods
-    orders = [order async for order in Order.query(hash_key=CUSTOMER_PK, as_dict=True)]
+    orders = [order async for order in Order.query(partition_key=CUSTOMER_PK, as_dict=True)]
     print(f"Found {len(orders)} orders as dicts")
 
 

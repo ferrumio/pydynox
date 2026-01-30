@@ -18,8 +18,8 @@ class User(Model):
 
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     age = NumberAttribute()
@@ -28,18 +28,18 @@ class User(Model):
 
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
-        hash_key="email",
+        partition_key="email",
     )
 
     status_age_index = GlobalSecondaryIndex(
         index_name="status-age-index",
-        hash_key="status",
-        range_key="age",
+        partition_key="status",
+        sort_key="age",
     )
 
     location_index = GlobalSecondaryIndex(
         index_name="location-index",
-        hash_key=["tenant_id", "region"],
+        partition_key=["tenant_id", "region"],
     )
 
 
@@ -47,7 +47,7 @@ class SimpleModel(Model):
     """Model with only hash key."""
 
     model_config = ModelConfig(table="simple")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
 
 
@@ -75,8 +75,8 @@ def test_sync_create_table_basic(mock_client: MagicMock) -> None:
     # THEN sync_create_table should be called with correct params
     mock_client.sync_create_table.assert_called_once_with(
         "simple",
-        hash_key=("pk", "S"),
-        range_key=None,
+        partition_key=("pk", "S"),
+        sort_key=None,
         billing_mode="PAY_PER_REQUEST",
         read_capacity=None,
         write_capacity=None,
@@ -89,14 +89,14 @@ def test_sync_create_table_basic(mock_client: MagicMock) -> None:
     )
 
 
-def test_sync_create_table_with_range_key(mock_client: MagicMock) -> None:
+def test_sync_create_table_with_sort_key(mock_client: MagicMock) -> None:
     """Test sync_create_table with hash and range key."""
 
     # GIVEN a model with range key
     class WithRange(Model):
         model_config = ModelConfig(table="with_range")
-        pk = StringAttribute(hash_key=True)
-        sk = NumberAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = NumberAttribute(sort_key=True)
 
     with patch.object(WithRange, "_get_client", return_value=mock_client):
         # WHEN we create the table
@@ -106,8 +106,8 @@ def test_sync_create_table_with_range_key(mock_client: MagicMock) -> None:
     mock_client.sync_create_table.assert_called_once()
     call_args = mock_client.sync_create_table.call_args
     assert call_args[0][0] == "with_range"
-    assert call_args[1]["hash_key"] == ("pk", "S")
-    assert call_args[1]["range_key"] == ("sk", "N")
+    assert call_args[1]["partition_key"] == ("pk", "S")
+    assert call_args[1]["sort_key"] == ("sk", "N")
 
 
 def test_sync_create_table_with_gsis(mock_client: MagicMock) -> None:
@@ -128,7 +128,7 @@ def test_sync_create_table_with_gsis(mock_client: MagicMock) -> None:
     # Find each GSI by name
     gsi_by_name = {g["index_name"]: g for g in gsis}
 
-    # Single-attribute GSI
+    # Single-attribute GSI (Rust expects hash_key/range_key)
     email_gsi = gsi_by_name["email-index"]
     assert email_gsi["hash_key"] == ("email", "S")
     assert "range_key" not in email_gsi
@@ -161,8 +161,8 @@ def test_sync_create_table_with_options(mock_client: MagicMock) -> None:
     # THEN all options should be passed
     mock_client.sync_create_table.assert_called_once_with(
         "simple",
-        hash_key=("pk", "S"),
-        range_key=None,
+        partition_key=("pk", "S"),
+        sort_key=None,
         billing_mode="PROVISIONED",
         read_capacity=10,
         write_capacity=5,
@@ -175,7 +175,7 @@ def test_sync_create_table_with_options(mock_client: MagicMock) -> None:
     )
 
 
-def test_sync_create_table_no_hash_key_raises() -> None:
+def test_sync_create_table_no_partition_key_raises() -> None:
     """Test sync_create_table raises error if no hash key defined."""
     # GIVEN a model without hash key
     mock_client = MagicMock(spec=DynamoDBClient)
@@ -183,7 +183,7 @@ def test_sync_create_table_no_hash_key_raises() -> None:
     with patch.object(NoKeyModel, "_get_client", return_value=mock_client):
         # WHEN we try to create the table
         # THEN ValueError should be raised
-        with pytest.raises(ValueError, match="has no hash_key defined"):
+        with pytest.raises(ValueError, match="has no partition_key defined"):
             NoKeyModel.sync_create_table()
 
 
@@ -232,7 +232,7 @@ def test_gsi_to_create_table_definition_single_attr() -> None:
     # WHEN we get the definition
     definition = User.email_index.to_create_table_definition(User)
 
-    # THEN it should have correct format
+    # THEN it should have correct format (Rust expects hash_key/range_key)
     assert definition["index_name"] == "email-index"
     assert definition["hash_key"] == ("email", "S")
     assert "range_key" not in definition
@@ -246,7 +246,7 @@ def test_gsi_to_create_table_definition_with_range() -> None:
     # WHEN we get the definition
     definition = User.status_age_index.to_create_table_definition(User)
 
-    # THEN it should include range key
+    # THEN it should include range key (Rust expects hash_key/range_key)
     assert definition["index_name"] == "status-age-index"
     assert definition["hash_key"] == ("status", "S")
     assert definition["range_key"] == ("age", "N")
@@ -259,7 +259,7 @@ def test_gsi_to_create_table_definition_multi_attr() -> None:
     # WHEN we get the definition
     definition = User.location_index.to_create_table_definition(User)
 
-    # THEN it should use hash_keys (plural)
+    # THEN it should use hash_keys (plural, Rust expects this)
     assert definition["index_name"] == "location-index"
     assert definition["hash_keys"] == [("tenant_id", "S"), ("region", "S")]
     assert "hash_key" not in definition
@@ -271,12 +271,12 @@ def test_gsi_to_create_table_definition_keys_only_projection() -> None:
     # GIVEN a model with KEYS_ONLY projection GSI
     class ModelWithKeysOnly(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         email = StringAttribute()
 
         email_index = GlobalSecondaryIndex(
             index_name="email-index",
-            hash_key="email",
+            partition_key="email",
             projection="KEYS_ONLY",
         )
 
@@ -293,14 +293,14 @@ def test_gsi_to_create_table_definition_include_projection() -> None:
     # GIVEN a model with INCLUDE projection GSI
     class ModelWithInclude(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         email = StringAttribute()
         name = StringAttribute()
         age = NumberAttribute()
 
         email_index = GlobalSecondaryIndex(
             index_name="email-index",
-            hash_key="email",
+            partition_key="email",
             projection=["name", "age"],
         )
 
@@ -318,11 +318,11 @@ def test_gsi_to_create_table_definition_missing_attr_raises() -> None:
     # GIVEN a model with GSI referencing non-existent attribute
     class BadModel(Model):
         model_config = ModelConfig(table="test")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         bad_index = GlobalSecondaryIndex(
             index_name="bad-index",
-            hash_key="nonexistent",
+            partition_key="nonexistent",
         )
 
     # WHEN we try to get the definition

@@ -46,7 +46,7 @@ from pydynox.attributes import S3Attribute, S3File, StringAttribute
 
 class Document(Model):
     model_config = ModelConfig(table="documents")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     content = S3Attribute(bucket="my-bucket", prefix="docs/")
 
 # Upload
@@ -196,7 +196,7 @@ No extra configuration needed.
 Files are stored with this key pattern:
 
 ```
-{prefix}{hash_key}/{range_key}/{filename}
+{prefix}{partition_key}/{sort_key}/{filename}
 ```
 
 For example, with `prefix="docs/"`, `pk="DOC#1"`, `sk="v1"`, and filename `report.pdf`:
@@ -309,8 +309,8 @@ from pydynox._internal._s3 import S3File
 class Document(Model):
     model_config = ModelConfig(table="documents")
     
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True, default="v1")
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True, default="v1")
     name = StringAttribute()
     uploaded_at = DatetimeAttribute(default=AutoGenerate.utc_now())
     content = S3Attribute(bucket="company-docs", prefix="documents/")
@@ -325,7 +325,7 @@ doc.content = S3File(
 await doc.save()
 
 # List documents (fast, no S3 calls)
-async for doc in Document.query(hash_key="DOC#invoice-2024-001"):
+async for doc in Document.query(partition_key="DOC#invoice-2024-001"):
     print(f"{doc.name}: {doc.content.size} bytes")
 
 # Generate download link

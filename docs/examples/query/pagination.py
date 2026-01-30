@@ -12,8 +12,8 @@ CUSTOMER_PK = "CUSTOMER#123"
 
 class Order(Model):
     model_config = ModelConfig(table="orders_page")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -23,8 +23,8 @@ async def main():
     if not await client.table_exists("orders_page"):
         await client.create_table(
             "orders_page",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create 25 orders
@@ -38,11 +38,11 @@ async def main():
 
     # Automatic pagination - iterator fetches all pages
     print("All orders:")
-    async for order in Order.query(hash_key=CUSTOMER_PK):
+    async for order in Order.query(partition_key=CUSTOMER_PK):
         print(f"  {order.sk}")
 
     # Manual pagination - control page size
-    result = Order.query(hash_key=CUSTOMER_PK, limit=10)
+    result = Order.query(partition_key=CUSTOMER_PK, limit=10)
 
     # Process first page
     page_count = 0
@@ -58,7 +58,7 @@ async def main():
 
         # Fetch next page
         next_result = Order.query(
-            hash_key=CUSTOMER_PK,
+            partition_key=CUSTOMER_PK,
             limit=10,
             last_evaluated_key=result.last_evaluated_key,
         )

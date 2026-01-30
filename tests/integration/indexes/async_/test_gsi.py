@@ -28,8 +28,8 @@ def gsi_client(dynamodb_endpoint):
     # Create table with GSIs
     client.sync_create_table(
         "gsi_test_table",
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
         global_secondary_indexes=[
             {
                 "index_name": "email-index",
@@ -54,8 +54,8 @@ class User(Model):
 
     model_config = ModelConfig(table="gsi_test_table")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     name = StringAttribute()
@@ -63,13 +63,13 @@ class User(Model):
 
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
-        hash_key="email",
+        partition_key="email",
     )
 
     status_index = GlobalSecondaryIndex(
         index_name="status-index",
-        hash_key="status",
-        range_key="pk",
+        partition_key="status",
+        sort_key="pk",
     )
 
 
@@ -141,7 +141,7 @@ def test_gsi_sync_query_by_status(gsi_client):
     assert pks == {"USER#1", "USER#2"}
 
 
-def test_gsi_sync_query_with_range_key_condition(gsi_client):
+def test_gsi_sync_query_with_sort_key_condition(gsi_client):
     """Test GSI sync_query with range key condition."""
     User(
         pk="USER#1",
@@ -173,7 +173,7 @@ def test_gsi_sync_query_with_range_key_condition(gsi_client):
     results = list(
         User.status_index.sync_query(
             status="active",
-            range_key_condition=User.pk.begins_with("USER#"),
+            sort_key_condition=User.pk.begins_with("USER#"),
         )
     )
 
@@ -363,7 +363,7 @@ async def test_async_gsi_query_first_empty(gsi_client):
 
 
 @pytest.mark.asyncio
-async def test_async_gsi_query_with_range_key_condition(gsi_client):
+async def test_async_gsi_query_with_sort_key_condition(gsi_client):
     """Test async GSI query with range key condition."""
     for prefix in ["A", "B", "C"]:
         User(
@@ -378,7 +378,7 @@ async def test_async_gsi_query_with_range_key_condition(gsi_client):
     results = []
     async for user in User.status_index.query(
         status="range_async_test",
-        range_key_condition=User.pk.begins_with("B"),
+        sort_key_condition=User.pk.begins_with("B"),
     ):
         results.append(user)
 

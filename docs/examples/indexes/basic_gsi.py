@@ -6,8 +6,8 @@ from pydynox.indexes import GlobalSecondaryIndex
 class User(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     age = NumberAttribute()
@@ -15,12 +15,12 @@ class User(Model):
     # GSI with hash key only
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
-        hash_key="email",
+        partition_key="email",
     )
 
     # GSI with hash and range key
     status_index = GlobalSecondaryIndex(
         index_name="status-index",
-        hash_key="status",
-        range_key="pk",
+        partition_key="status",
+        sort_key="pk",
     )

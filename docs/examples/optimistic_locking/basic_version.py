@@ -6,7 +6,7 @@ from pydynox.attributes import StringAttribute, VersionAttribute
 
 class Document(Model):
     model_config = ModelConfig(table="documents")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     content = StringAttribute()
     version = VersionAttribute()
 

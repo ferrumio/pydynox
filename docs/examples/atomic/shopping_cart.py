@@ -9,7 +9,7 @@ from pydynox.attributes import ListAttribute, NumberAttribute, StringAttribute
 class Cart(Model):
     model_config = ModelConfig(table="carts")
 
-    pk = StringAttribute(hash_key=True)  # user_id
+    pk = StringAttribute(partition_key=True)  # user_id
     items = ListAttribute()
     total = NumberAttribute()
 

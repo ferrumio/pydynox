@@ -48,8 +48,8 @@ Let's create a simple User model. A model is a Python class that represents item
 Here's what each part does:
 
 - `model_config = ModelConfig(table="users")` - Configuration for the model. `table` is the DynamoDB table name.
-- `pk = StringAttribute(hash_key=True)` - The partition key. Every item needs one.
-- `sk = StringAttribute(range_key=True)` - The sort key. Optional, but useful for complex access patterns.
+- `pk = StringAttribute(partition_key=True)` - The partition key. Every item needs one.
+- `sk = StringAttribute(sort_key=True)` - The sort key. Optional, but useful for complex access patterns.
 - Other attributes - Regular fields with their types and optional defaults.
 
 ## Async-first

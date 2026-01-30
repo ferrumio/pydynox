@@ -205,7 +205,7 @@ class MemoryClient:
     def __init__(self, seed: dict[str, list[dict[str, Any]]] | None = None) -> None:
         # tables[table_name][key_string] = item
         self._tables: dict[str, dict[str, dict[str, Any]]] = {}
-        self._table_schemas: dict[str, dict[str, str]] = {}  # table -> {hash_key, range_key}
+        self._table_schemas: dict[str, dict[str, str]] = {}  # table -> {partition_key, sort_key}
         self._rate_limit = None
         self._diagnostics = None
         self._last_metrics: FakeMetrics | None = None
@@ -262,8 +262,8 @@ class MemoryClient:
 
         # Also check for common key patterns
         if not pk:
-            # Try to find hash_key by looking for common patterns
-            for key in ["pk", "PK", "hash_key", "id", "short_code"]:
+            # Try to find partition_key by looking for common patterns
+            for key in ["pk", "PK", "partition_key", "id", "short_code"]:
                 if key in item_or_key:
                     pk = item_or_key[key]
                     break

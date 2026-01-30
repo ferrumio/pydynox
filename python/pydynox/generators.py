@@ -9,7 +9,7 @@ Example:
     >>>
     >>> class Order(Model):
     ...     model_config = ModelConfig(table="orders")
-    ...     pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
+    ...     pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
     ...     created_at = StringAttribute(default=AutoGenerate.ISO8601)
     >>>
     >>> order = Order()
@@ -58,8 +58,8 @@ class AutoGenerate(Enum):
         >>>
         >>> class Event(Model):
         ...     model_config = ModelConfig(table="events")
-        ...     pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-        ...     sk = StringAttribute(range_key=True, default=AutoGenerate.UUID4)
+        ...     pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+        ...     sk = StringAttribute(sort_key=True, default=AutoGenerate.UUID4)
         ...     timestamp = NumberAttribute(default=AutoGenerate.EPOCH_MS)
         ...     created_at = StringAttribute(default=AutoGenerate.ISO8601)
         >>>

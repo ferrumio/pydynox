@@ -14,8 +14,8 @@ async def test_auto_generate_ulid_on_save(dynamo):
     # GIVEN a model with ULID auto-generate on pk
     class Order(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+        sk = StringAttribute(sort_key=True)
         total = NumberAttribute()
 
     Order._client_instance = None
@@ -40,8 +40,8 @@ async def test_auto_generate_uuid4_on_save(dynamo):
     # GIVEN a model with UUID4 auto-generate on sk
     class Event(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True, default=AutoGenerate.UUID4)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True, default=AutoGenerate.UUID4)
         name = StringAttribute()
 
     Event._client_instance = None
@@ -67,8 +67,8 @@ async def test_auto_generate_ksuid_on_save(dynamo):
     # GIVEN a model with KSUID auto-generate
     class Session(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True, default=AutoGenerate.KSUID)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True, default=AutoGenerate.KSUID)
+        sk = StringAttribute(sort_key=True)
 
     Session._client_instance = None
     session = Session(sk="SESSION#DATA")
@@ -90,8 +90,8 @@ async def test_auto_generate_epoch_on_save(dynamo):
     # GIVEN a model with EPOCH auto-generate
     class Log(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         created_at = NumberAttribute(default=AutoGenerate.EPOCH)
 
     Log._client_instance = None
@@ -115,8 +115,8 @@ async def test_auto_generate_epoch_ms_on_save(dynamo):
     # GIVEN a model with EPOCH_MS auto-generate
     class Metric(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         timestamp = NumberAttribute(default=AutoGenerate.EPOCH_MS)
 
     Metric._client_instance = None
@@ -140,8 +140,8 @@ async def test_auto_generate_iso8601_on_save(dynamo):
     # GIVEN a model with ISO8601 auto-generate
     class Audit(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         created_at = StringAttribute(default=AutoGenerate.ISO8601)
 
     Audit._client_instance = None
@@ -165,8 +165,8 @@ async def test_auto_generate_skipped_when_value_provided(dynamo):
     # GIVEN a model with auto-generate and an explicit value
     class Item(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+        sk = StringAttribute(sort_key=True)
 
     Item._client_instance = None
     item = Item(pk="CUSTOM#ID", sk="DATA")
@@ -187,8 +187,8 @@ async def test_auto_generate_multiple_fields(dynamo):
     # GIVEN a model with multiple auto-generate fields
     class Record(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-        sk = StringAttribute(range_key=True, default=AutoGenerate.UUID4)
+        pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+        sk = StringAttribute(sort_key=True, default=AutoGenerate.UUID4)
         created_at = StringAttribute(default=AutoGenerate.ISO8601)
         timestamp = NumberAttribute(default=AutoGenerate.EPOCH_MS)
 
@@ -221,8 +221,8 @@ async def test_auto_generate_concurrent_saves(dynamo):
     # GIVEN a model with auto-generate on pk and sk
     class ConcurrentOrder(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-        sk = StringAttribute(range_key=True, default=AutoGenerate.UUID4)
+        pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+        sk = StringAttribute(sort_key=True, default=AutoGenerate.UUID4)
         seq = NumberAttribute()
 
     ConcurrentOrder._client_instance = None
@@ -260,8 +260,8 @@ async def test_auto_generate_high_concurrency(dynamo):
     # GIVEN a model with ULID auto-generate
     class StressItem(Model):
         model_config = ModelConfig(table="test_table", client=dynamo)
-        pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+        sk = StringAttribute(sort_key=True)
         batch = NumberAttribute()
 
     StressItem._client_instance = None

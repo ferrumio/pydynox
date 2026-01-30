@@ -12,13 +12,13 @@ client = get_default_client()
 class User(Model):
     model_config = ModelConfig(table="users_gsi_range")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     status = StringAttribute()
     name = StringAttribute()
 
     # GSI with status as hash key and pk as range key
-    status_index = GlobalSecondaryIndex("status-index", hash_key="status", range_key="pk")
+    status_index = GlobalSecondaryIndex("status-index", partition_key="status", sort_key="pk")
 
 
 async def main():
@@ -26,8 +26,8 @@ async def main():
     if not await client.table_exists("users_gsi_range"):
         await client.create_table(
             "users_gsi_range",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             global_secondary_indexes=[
                 {
                     "index_name": "status-index",
@@ -47,7 +47,7 @@ async def main():
     print("Active users (pk starts with USER#):")
     async for user in User.status_index.query(
         status="active",
-        range_key_condition=User.pk.begins_with("USER#"),
+        sort_key_condition=User.pk.begins_with("USER#"),
     ):
         print(f"  {user.name} ({user.pk})")
 
@@ -55,7 +55,7 @@ async def main():
     print("\nActive users (pk >= USER#050):")
     async for user in User.status_index.query(
         status="active",
-        range_key_condition=User.pk >= "USER#050",
+        sort_key_condition=User.pk >= "USER#050",
     ):
         print(f"  {user.name} ({user.pk})")
 

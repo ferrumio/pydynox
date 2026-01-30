@@ -30,7 +30,7 @@ class EncryptedAttribute(Attribute[str]):
         >>>
         >>> class IngestService(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     # Write-only: can encrypt, fails on decrypt
         ...     ssn = EncryptedAttribute(
         ...         key_id="alias/my-key",
@@ -39,7 +39,7 @@ class EncryptedAttribute(Attribute[str]):
         >>>
         >>> class ReportService(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     # Read-only: can decrypt, fails on encrypt
         ...     ssn = EncryptedAttribute(
         ...         key_id="alias/my-key",
@@ -48,7 +48,7 @@ class EncryptedAttribute(Attribute[str]):
         >>>
         >>> class FullAccess(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     # Both (default)
         ...     ssn = EncryptedAttribute(key_id="alias/my-key")
     """
@@ -70,7 +70,7 @@ class EncryptedAttribute(Attribute[str]):
             region: AWS region (optional).
             context: Encryption context dict (optional).
         """
-        super().__init__(hash_key=False, range_key=False, default=None, required=False)
+        super().__init__(partition_key=False, sort_key=False, default=None, required=False)
         self.key_id = key_id
         self.mode = mode
         self.region = region

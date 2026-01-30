@@ -9,7 +9,7 @@ from pydynox.attributes import JSONAttribute, StringAttribute
 class Config(Model):
     model_config = ModelConfig(table="configs")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     settings = JSONAttribute()
 
 

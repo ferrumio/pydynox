@@ -10,8 +10,8 @@ client = get_default_client()
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -21,8 +21,8 @@ async def main():
     if not await client.table_exists("orders"):
         await client.create_table(
             "orders",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create some orders
@@ -35,16 +35,16 @@ async def main():
         ).save()
 
     # Query all orders for a customer
-    async for order in Order.query(hash_key="CUSTOMER#123"):
+    async for order in Order.query(partition_key="CUSTOMER#123"):
         print(f"Order: {order.sk}, Total: {order.total}")
 
     # Get first result only
-    first_order = await Order.query(hash_key="CUSTOMER#123").first()
+    first_order = await Order.query(partition_key="CUSTOMER#123").first()
     if first_order:
         print(f"First order: {first_order.sk}")
 
     # Collect all results into a list
-    orders = [order async for order in Order.query(hash_key="CUSTOMER#123")]
+    orders = [order async for order in Order.query(partition_key="CUSTOMER#123")]
     print(f"Found {len(orders)} orders")
 
 

@@ -12,8 +12,8 @@ CUSTOMER_PK = "CUSTOMER#123"
 
 class Order(Model):
     model_config = ModelConfig(table="orders_sort")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -23,8 +23,8 @@ async def main():
     if not await client.table_exists("orders_sort"):
         await client.create_table(
             "orders_sort",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create 10 orders
@@ -39,7 +39,7 @@ async def main():
     # Ascending order (default)
     print("Ascending:")
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
+        partition_key=CUSTOMER_PK,
         scan_index_forward=True,
     ):
         print(f"  {order.sk}")
@@ -47,7 +47,7 @@ async def main():
     # Descending order
     print("Descending:")
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
+        partition_key=CUSTOMER_PK,
         scan_index_forward=False,
     ):
         print(f"  {order.sk}")
@@ -57,7 +57,7 @@ async def main():
     recent_orders = [
         order
         async for order in Order.query(
-            hash_key=CUSTOMER_PK,
+            partition_key=CUSTOMER_PK,
             scan_index_forward=False,
             limit=5,
         )

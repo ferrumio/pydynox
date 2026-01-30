@@ -14,7 +14,7 @@ from pydynox.hooks import (
 class User(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
 
     @before_save

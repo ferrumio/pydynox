@@ -34,9 +34,9 @@ class GlobalSecondaryIndex(Generic[M]):
 
     Args:
         index_name: Name of the GSI in DynamoDB.
-        hash_key: Attribute name(s) for the GSI partition key.
+        partition_key: Attribute name(s) for the GSI partition key.
             Can be a single string or list of up to 4 strings.
-        range_key: Optional attribute name(s) for the GSI sort key.
+        sort_key: Optional attribute name(s) for the GSI sort key.
             Can be a single string or list of up to 4 strings.
         projection: Attributes to project. Options:
             - "ALL" (default): All attributes
@@ -46,12 +46,12 @@ class GlobalSecondaryIndex(Generic[M]):
     Example:
         >>> class User(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
+        ...     pk = StringAttribute(partition_key=True)
         ...     email = StringAttribute()
         ...
         ...     email_index = GlobalSecondaryIndex(
         ...         index_name="email-index",
-        ...         hash_key="email",
+        ...         partition_key="email",
         ...     )
         >>>
         >>> users = User.email_index.query(email="john@example.com")
@@ -60,41 +60,39 @@ class GlobalSecondaryIndex(Generic[M]):
     def __init__(
         self,
         index_name: str,
-        hash_key: str | list[str],
-        range_key: str | list[str] | None = None,
+        partition_key: str | list[str],
+        sort_key: str | list[str] | None = None,
         projection: str | list[str] = "ALL",
     ) -> None:
         self.index_name = index_name
 
         # Normalize to list
-        self.hash_keys = [hash_key] if isinstance(hash_key, str) else list(hash_key)
-        self.range_keys = (
-            []
-            if range_key is None
-            else [range_key]
-            if isinstance(range_key, str)
-            else list(range_key)
+        self.partition_keys = (
+            [partition_key] if isinstance(partition_key, str) else list(partition_key)
+        )
+        self.sort_keys = (
+            [] if sort_key is None else [sort_key] if isinstance(sort_key, str) else list(sort_key)
         )
 
         # Validate max 4 attributes per key
-        if len(self.hash_keys) > 4:
+        if len(self.partition_keys) > 4:
             raise ValueError(
-                f"GSI '{index_name}': hash_key can have at most 4 attributes, "
-                f"got {len(self.hash_keys)}"
+                f"GSI '{index_name}': partition_key can have at most 4 attributes, "
+                f"got {len(self.partition_keys)}"
             )
-        if len(self.range_keys) > 4:
+        if len(self.sort_keys) > 4:
             raise ValueError(
-                f"GSI '{index_name}': range_key can have at most 4 attributes, "
-                f"got {len(self.range_keys)}"
+                f"GSI '{index_name}': sort_key can have at most 4 attributes, "
+                f"got {len(self.sort_keys)}"
             )
-        if not self.hash_keys:
-            raise ValueError(f"GSI '{index_name}': hash_key is required")
+        if not self.partition_keys:
+            raise ValueError(f"GSI '{index_name}': partition_key is required")
 
         self.projection = projection
 
         # For backward compatibility
-        self.hash_key = self.hash_keys[0]
-        self.range_key = self.range_keys[0] if self.range_keys else None
+        self.partition_key = self.partition_keys[0]
+        self.sort_key = self.sort_keys[0] if self.sort_keys else None
 
         # Set by Model metaclass
         self._model_class: type[M] | None = None
@@ -114,19 +112,19 @@ class GlobalSecondaryIndex(Generic[M]):
             )
         return self._model_class
 
-    def _resolve_hash_key_values(
+    def _resolve_partition_key_values(
         self, model_class: type[M], key_values: dict[str, Any]
     ) -> dict[str, Any]:
         """Resolve hash key values, building from templates if needed.
 
-        For inverted indexes where hash_key="sk", this detects that the user
+        For inverted indexes where partition_key="sk", this detects that the user
         passed template placeholders (e.g., order_id="456") and builds the
         actual key value using the template (e.g., "ORDER#456").
         """
         resolved: dict[str, Any] = {}
         attributes = model_class._attributes
 
-        for attr_name in self.hash_keys:
+        for attr_name in self.partition_keys:
             # Direct value provided
             if attr_name in key_values:
                 resolved[attr_name] = key_values[attr_name]
@@ -159,7 +157,7 @@ class GlobalSecondaryIndex(Generic[M]):
 
     def sync_query(
         self,
-        range_key_condition: Condition | None = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -170,20 +168,20 @@ class GlobalSecondaryIndex(Generic[M]):
         """Sync query the GSI.
 
         For inverted indexes with templates, you can pass template placeholders:
-            # If sk has template="ORDER#{order_id}" and GSI has hash_key="sk"
+            # If sk has template="ORDER#{order_id}" and GSI has partition_key="sk"
             inverted_index.sync_query(order_id="456")
             # Internally builds: sk="ORDER#456"
         """
         model_class = self._get_model_class()
-        resolved_values = self._resolve_hash_key_values(model_class, key_values)
+        resolved_values = self._resolve_partition_key_values(model_class, key_values)
 
         return GSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
-            hash_keys=self.hash_keys,
-            hash_key_values=resolved_values,
-            range_keys=self.range_keys,
-            range_key_condition=range_key_condition,
+            partition_keys=self.partition_keys,
+            partition_key_values=resolved_values,
+            sort_keys=self.sort_keys,
+            sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
             limit=limit,
             page_size=page_size,
@@ -193,7 +191,7 @@ class GlobalSecondaryIndex(Generic[M]):
 
     def query(
         self,
-        range_key_condition: Condition | None = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -204,21 +202,21 @@ class GlobalSecondaryIndex(Generic[M]):
         """Query the GSI (async).
 
         For inverted indexes with templates, you can pass template placeholders:
-            # If sk has template="ORDER#{order_id}" and GSI has hash_key="sk"
+            # If sk has template="ORDER#{order_id}" and GSI has partition_key="sk"
             async for item in inverted_index.query(order_id="456"):
                 print(item)
             # Internally builds: sk="ORDER#456"
         """
         model_class = self._get_model_class()
-        resolved_values = self._resolve_hash_key_values(model_class, key_values)
+        resolved_values = self._resolve_partition_key_values(model_class, key_values)
 
         return AsyncGSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
-            hash_keys=self.hash_keys,
-            hash_key_values=resolved_values,
-            range_keys=self.range_keys,
-            range_key_condition=range_key_condition,
+            partition_keys=self.partition_keys,
+            partition_key_values=resolved_values,
+            sort_keys=self.sort_keys,
+            sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
             limit=limit,
             page_size=page_size,
@@ -230,10 +228,10 @@ class GlobalSecondaryIndex(Generic[M]):
         """Convert to DynamoDB GSI definition format."""
         key_schema: list[dict[str, str]] = []
 
-        for attr_name in self.hash_keys:
+        for attr_name in self.partition_keys:
             key_schema.append({"AttributeName": attr_name, "KeyType": "HASH"})
 
-        for attr_name in self.range_keys:
+        for attr_name in self.sort_keys:
             key_schema.append({"AttributeName": attr_name, "KeyType": "RANGE"})
 
         projection: dict[str, Any]
@@ -260,25 +258,25 @@ class GlobalSecondaryIndex(Generic[M]):
         """Convert to format expected by client.create_table()."""
         attributes = model_class._attributes
 
-        hash_keys: list[tuple[str, str]] = []
-        for attr_name in self.hash_keys:
+        partition_keys: list[tuple[str, str]] = []
+        for attr_name in self.partition_keys:
             if attr_name not in attributes:
                 raise ValueError(
                     f"GSI '{self.index_name}' references attribute '{attr_name}' "
                     f"which is not defined on {model_class.__name__}"
                 )
             attr_type = attributes[attr_name].attr_type
-            hash_keys.append((attr_name, attr_type))
+            partition_keys.append((attr_name, attr_type))
 
-        range_keys: list[tuple[str, str]] = []
-        for attr_name in self.range_keys:
+        sort_keys: list[tuple[str, str]] = []
+        for attr_name in self.sort_keys:
             if attr_name not in attributes:
                 raise ValueError(
                     f"GSI '{self.index_name}' references attribute '{attr_name}' "
                     f"which is not defined on {model_class.__name__}"
                 )
             attr_type = attributes[attr_name].attr_type
-            range_keys.append((attr_name, attr_type))
+            sort_keys.append((attr_name, attr_type))
 
         projection_type: str
         non_key_attributes: list[str] | None = None
@@ -298,16 +296,17 @@ class GlobalSecondaryIndex(Generic[M]):
             "projection": projection_type,
         }
 
-        if len(hash_keys) == 1:
-            result["hash_key"] = hash_keys[0]
+        # Rust expects hash_key/hash_keys and range_key/range_keys
+        if len(partition_keys) == 1:
+            result["hash_key"] = partition_keys[0]
         else:
-            result["hash_keys"] = hash_keys
+            result["hash_keys"] = partition_keys
 
-        if range_keys:
-            if len(range_keys) == 1:
-                result["range_key"] = range_keys[0]
+        if sort_keys:
+            if len(sort_keys) == 1:
+                result["range_key"] = sort_keys[0]
             else:
-                result["range_keys"] = range_keys
+                result["range_keys"] = sort_keys
 
         if non_key_attributes:
             result["non_key_attributes"] = non_key_attributes
@@ -322,10 +321,10 @@ class GSIQueryResult(Generic[M]):
         self,
         model_class: type[M],
         index_name: str,
-        hash_keys: list[str],
-        hash_key_values: dict[str, Any],
-        range_keys: list[str] | None = None,
-        range_key_condition: Condition | None = None,
+        partition_keys: list[str],
+        partition_key_values: dict[str, Any],
+        sort_keys: list[str] | None = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -334,10 +333,10 @@ class GSIQueryResult(Generic[M]):
     ) -> None:
         self._model_class = model_class
         self._index_name = index_name
-        self._hash_keys = hash_keys
-        self._hash_key_values = hash_key_values
-        self._range_keys = range_keys or []
-        self._range_key_condition = range_key_condition
+        self._partition_keys = partition_keys
+        self._partition_key_values = partition_key_values
+        self._sort_keys = sort_keys or []
+        self._sort_key_condition = sort_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
         self._page_size = page_size
@@ -365,17 +364,17 @@ class GSIQueryResult(Generic[M]):
         values: dict[str, Any] = {}
 
         key_conditions: list[str] = []
-        for i, attr_name in enumerate(self._hash_keys):
+        for i, attr_name in enumerate(self._partition_keys):
             name_placeholder = f"#gsi_hk{i}"
             value_placeholder = f":gsi_hkv{i}"
             names[attr_name] = name_placeholder
-            values[value_placeholder] = self._hash_key_values[attr_name]
+            values[value_placeholder] = self._partition_key_values[attr_name]
             key_conditions.append(f"{name_placeholder} = {value_placeholder}")
 
         key_condition = " AND ".join(key_conditions)
 
-        if self._range_key_condition is not None:
-            rk_expr = self._range_key_condition.serialize(names, values)
+        if self._sort_key_condition is not None:
+            rk_expr = self._sort_key_condition.serialize(names, values)
             key_condition = f"{key_condition} AND {rk_expr}"
 
         filter_expr = None
@@ -431,10 +430,10 @@ class AsyncGSIQueryResult(Generic[M]):
         self,
         model_class: type[M],
         index_name: str,
-        hash_keys: list[str],
-        hash_key_values: dict[str, Any],
-        range_keys: list[str] | None = None,
-        range_key_condition: Condition | None = None,
+        partition_keys: list[str],
+        partition_key_values: dict[str, Any],
+        sort_keys: list[str] | None = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -443,10 +442,10 @@ class AsyncGSIQueryResult(Generic[M]):
     ) -> None:
         self._model_class = model_class
         self._index_name = index_name
-        self._hash_keys = hash_keys
-        self._hash_key_values = hash_key_values
-        self._range_keys = range_keys or []
-        self._range_key_condition = range_key_condition
+        self._partition_keys = partition_keys
+        self._partition_key_values = partition_key_values
+        self._sort_keys = sort_keys or []
+        self._sort_key_condition = sort_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
         self._page_size = page_size
@@ -474,17 +473,17 @@ class AsyncGSIQueryResult(Generic[M]):
         values: dict[str, Any] = {}
 
         key_conditions: list[str] = []
-        for i, attr_name in enumerate(self._hash_keys):
+        for i, attr_name in enumerate(self._partition_keys):
             name_placeholder = f"#gsi_hk{i}"
             value_placeholder = f":gsi_hkv{i}"
             names[attr_name] = name_placeholder
-            values[value_placeholder] = self._hash_key_values[attr_name]
+            values[value_placeholder] = self._partition_key_values[attr_name]
             key_conditions.append(f"{name_placeholder} = {value_placeholder}")
 
         key_condition = " AND ".join(key_conditions)
 
-        if self._range_key_condition is not None:
-            rk_expr = self._range_key_condition.serialize(names, values)
+        if self._sort_key_condition is not None:
+            rk_expr = self._sort_key_condition.serialize(names, values)
             key_condition = f"{key_condition} AND {rk_expr}"
 
         filter_expr = None
@@ -553,7 +552,7 @@ class LocalSecondaryIndex(Generic[M]):
 
     Args:
         index_name: Name of the LSI in DynamoDB.
-        range_key: Attribute name for the LSI sort key.
+        sort_key: Attribute name for the LSI sort key.
         projection: Attributes to project. Options:
             - "ALL" (default): All attributes
             - "KEYS_ONLY": Only key attributes
@@ -562,13 +561,13 @@ class LocalSecondaryIndex(Generic[M]):
     Example:
         >>> class User(Model):
         ...     model_config = ModelConfig(table="users")
-        ...     pk = StringAttribute(hash_key=True)
-        ...     sk = StringAttribute(range_key=True)
+        ...     pk = StringAttribute(partition_key=True)
+        ...     sk = StringAttribute(sort_key=True)
         ...     status = StringAttribute()
         ...
         ...     status_index = LocalSecondaryIndex(
         ...         index_name="status-index",
-        ...         range_key="status",
+        ...         sort_key="status",
         ...     )
         >>>
         >>> for user in User.status_index.query(pk="USER#1"):
@@ -578,11 +577,11 @@ class LocalSecondaryIndex(Generic[M]):
     def __init__(
         self,
         index_name: str,
-        range_key: str,
+        sort_key: str,
         projection: str | list[str] = "ALL",
     ) -> None:
         self.index_name = index_name
-        self.range_key = range_key
+        self.sort_key = sort_key
         self.projection = projection
 
         self._model_class: type[M] | None = None
@@ -604,7 +603,7 @@ class LocalSecondaryIndex(Generic[M]):
 
     def sync_query(
         self,
-        range_key_condition: Condition | None = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -616,23 +615,23 @@ class LocalSecondaryIndex(Generic[M]):
         """Sync query the LSI."""
         model_class = self._get_model_class()
 
-        hash_key_name = model_class._hash_key
-        if hash_key_name is None:
-            raise ValueError(f"Model {model_class.__name__} has no hash_key defined")
+        partition_key_name = model_class._partition_key
+        if partition_key_name is None:
+            raise ValueError(f"Model {model_class.__name__} has no partition_key defined")
 
-        if hash_key_name not in key_values:
+        if partition_key_name not in key_values:
             raise ValueError(
-                f"LSI sync_query requires the table's hash key '{hash_key_name}'. "
+                f"LSI sync_query requires the table's hash key '{partition_key_name}'. "
                 f"Got: {list(key_values.keys())}"
             )
 
         return LSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
-            hash_key_name=hash_key_name,
-            hash_key_value=key_values[hash_key_name],
-            range_key_name=self.range_key,
-            range_key_condition=range_key_condition,
+            partition_key_name=partition_key_name,
+            partition_key_value=key_values[partition_key_name],
+            sort_key_name=self.sort_key,
+            sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
             limit=limit,
             page_size=page_size,
@@ -643,7 +642,7 @@ class LocalSecondaryIndex(Generic[M]):
 
     def query(
         self,
-        range_key_condition: Condition | None = None,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -655,23 +654,23 @@ class LocalSecondaryIndex(Generic[M]):
         """Query the LSI (async)."""
         model_class = self._get_model_class()
 
-        hash_key_name = model_class._hash_key
-        if hash_key_name is None:
-            raise ValueError(f"Model {model_class.__name__} has no hash_key defined")
+        partition_key_name = model_class._partition_key
+        if partition_key_name is None:
+            raise ValueError(f"Model {model_class.__name__} has no partition_key defined")
 
-        if hash_key_name not in key_values:
+        if partition_key_name not in key_values:
             raise ValueError(
-                f"LSI query requires the table's hash key '{hash_key_name}'. "
+                f"LSI query requires the table's hash key '{partition_key_name}'. "
                 f"Got: {list(key_values.keys())}"
             )
 
         return AsyncLSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
-            hash_key_name=hash_key_name,
-            hash_key_value=key_values[hash_key_name],
-            range_key_name=self.range_key,
-            range_key_condition=range_key_condition,
+            partition_key_name=partition_key_name,
+            partition_key_value=key_values[partition_key_name],
+            sort_key_name=self.sort_key,
+            sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
             limit=limit,
             page_size=page_size,
@@ -684,13 +683,13 @@ class LocalSecondaryIndex(Generic[M]):
         """Convert to format expected by client.create_table()."""
         attributes = model_class._attributes
 
-        if self.range_key not in attributes:
+        if self.sort_key not in attributes:
             raise ValueError(
-                f"LSI '{self.index_name}' references attribute '{self.range_key}' "
+                f"LSI '{self.index_name}' references attribute '{self.sort_key}' "
                 f"which is not defined on {model_class.__name__}"
             )
 
-        attr_type = attributes[self.range_key].attr_type
+        attr_type = attributes[self.sort_key].attr_type
 
         projection_type: str
         non_key_attributes: list[str] | None = None
@@ -707,7 +706,8 @@ class LocalSecondaryIndex(Generic[M]):
 
         result: dict[str, Any] = {
             "index_name": self.index_name,
-            "range_key": (self.range_key, attr_type),
+            # Rust expects range_key for LSI
+            "range_key": (self.sort_key, attr_type),
             "projection": projection_type,
         }
 
@@ -724,10 +724,10 @@ class LSIQueryResult(Generic[M]):
         self,
         model_class: type[M],
         index_name: str,
-        hash_key_name: str,
-        hash_key_value: Any,
-        range_key_name: str,
-        range_key_condition: Condition | None = None,
+        partition_key_name: str,
+        partition_key_value: Any,
+        sort_key_name: str,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -737,10 +737,10 @@ class LSIQueryResult(Generic[M]):
     ) -> None:
         self._model_class = model_class
         self._index_name = index_name
-        self._hash_key_name = hash_key_name
-        self._hash_key_value = hash_key_value
-        self._range_key_name = range_key_name
-        self._range_key_condition = range_key_condition
+        self._partition_key_name = partition_key_name
+        self._partition_key_value = partition_key_value
+        self._sort_key_name = sort_key_name
+        self._sort_key_condition = sort_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
         self._page_size = page_size
@@ -770,12 +770,12 @@ class LSIQueryResult(Generic[M]):
 
         name_placeholder = "#lsi_hk"
         value_placeholder = ":lsi_hkv"
-        names[self._hash_key_name] = name_placeholder
-        values[value_placeholder] = self._hash_key_value
+        names[self._partition_key_name] = name_placeholder
+        values[value_placeholder] = self._partition_key_value
         key_condition = f"{name_placeholder} = {value_placeholder}"
 
-        if self._range_key_condition is not None:
-            rk_expr = self._range_key_condition.serialize(names, values)
+        if self._sort_key_condition is not None:
+            rk_expr = self._sort_key_condition.serialize(names, values)
             key_condition = f"{key_condition} AND {rk_expr}"
 
         filter_expr = None
@@ -832,10 +832,10 @@ class AsyncLSIQueryResult(Generic[M]):
         self,
         model_class: type[M],
         index_name: str,
-        hash_key_name: str,
-        hash_key_value: Any,
-        range_key_name: str,
-        range_key_condition: Condition | None = None,
+        partition_key_name: str,
+        partition_key_value: Any,
+        sort_key_name: str,
+        sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
         page_size: int | None = None,
@@ -845,10 +845,10 @@ class AsyncLSIQueryResult(Generic[M]):
     ) -> None:
         self._model_class = model_class
         self._index_name = index_name
-        self._hash_key_name = hash_key_name
-        self._hash_key_value = hash_key_value
-        self._range_key_name = range_key_name
-        self._range_key_condition = range_key_condition
+        self._partition_key_name = partition_key_name
+        self._partition_key_value = partition_key_value
+        self._sort_key_name = sort_key_name
+        self._sort_key_condition = sort_key_condition
         self._filter_condition = filter_condition
         self._limit = limit
         self._page_size = page_size
@@ -878,12 +878,12 @@ class AsyncLSIQueryResult(Generic[M]):
 
         name_placeholder = "#lsi_hk"
         value_placeholder = ":lsi_hkv"
-        names[self._hash_key_name] = name_placeholder
-        values[value_placeholder] = self._hash_key_value
+        names[self._partition_key_name] = name_placeholder
+        values[value_placeholder] = self._partition_key_value
         key_condition = f"{name_placeholder} = {value_placeholder}"
 
-        if self._range_key_condition is not None:
-            rk_expr = self._range_key_condition.serialize(names, values)
+        if self._sort_key_condition is not None:
+            rk_expr = self._sort_key_condition.serialize(names, values)
             key_condition = f"{key_condition} AND {rk_expr}"
 
         filter_expr = None

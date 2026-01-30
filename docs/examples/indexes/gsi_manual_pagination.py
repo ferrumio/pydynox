@@ -12,13 +12,13 @@ client = get_default_client()
 class User(Model):
     model_config = ModelConfig(table="users_manual_pagination")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     name = StringAttribute()
 
-    status_index = GlobalSecondaryIndex("status-index", hash_key="status", range_key="pk")
+    status_index = GlobalSecondaryIndex("status-index", partition_key="status", sort_key="pk")
 
 
 async def main():
@@ -26,8 +26,8 @@ async def main():
     if not await client.table_exists("users_manual_pagination"):
         await client.create_table(
             "users_manual_pagination",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             global_secondary_indexes=[
                 {
                     "index_name": "status-index",

@@ -23,8 +23,8 @@ def single_table_client(dynamodb_endpoint):
     # Create table with inverted GSI
     client.sync_create_table(
         "single_table_test",
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
         global_secondary_indexes=[
             {
                 "index_name": "inverted",
@@ -44,16 +44,16 @@ def test_user_order_single_table(single_table_client):
 
     class UserOrder(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-        sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+        pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+        sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
         user_id = StringAttribute()
         order_id = StringAttribute()
         status = StringAttribute()
 
         by_order = GlobalSecondaryIndex(
             index_name="inverted",
-            hash_key="sk",
-            range_key="pk",
+            partition_key="sk",
+            sort_key="pk",
         )
 
     # GIVEN orders for multiple users
@@ -82,15 +82,15 @@ def test_follower_following_pattern(single_table_client):
 
     class Follow(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="FOLLOWER#{follower}")
-        sk = StringAttribute(range_key=True, template="FOLLOWING#{following}")
+        pk = StringAttribute(partition_key=True, template="FOLLOWER#{follower}")
+        sk = StringAttribute(sort_key=True, template="FOLLOWING#{following}")
         follower = StringAttribute()
         following = StringAttribute()
 
         followers_index = GlobalSecondaryIndex(
             index_name="inverted",
-            hash_key="sk",
-            range_key="pk",
+            partition_key="sk",
+            sort_key="pk",
         )
 
     # GIVEN alice follows bob and charlie, dave follows bob
@@ -118,8 +118,8 @@ def test_user_profile_static_sk(single_table_client):
 
     class User(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{email}")
-        sk = StringAttribute(range_key=True, template="PROFILE")
+        pk = StringAttribute(partition_key=True, template="USER#{email}")
+        sk = StringAttribute(sort_key=True, template="PROFILE")
         email = StringAttribute()
         name = StringAttribute()
 
@@ -140,8 +140,8 @@ def test_multiple_placeholders(single_table_client):
 
     class Event(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="TENANT#{tenant_id}")
-        sk = StringAttribute(range_key=True, template="EVENT#{date}#{event_id}")
+        pk = StringAttribute(partition_key=True, template="TENANT#{tenant_id}")
+        sk = StringAttribute(sort_key=True, template="EVENT#{date}#{event_id}")
         tenant_id = StringAttribute()
         date = StringAttribute()
         event_id = StringAttribute()
@@ -161,12 +161,12 @@ def test_multiple_placeholders(single_table_client):
 
 
 def test_direct_key_still_works(single_table_client):
-    """Test that direct hash_key still works alongside template."""
+    """Test that direct partition_key still works alongside template."""
 
     class Order(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-        sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+        pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+        sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
         user_id = StringAttribute()
         order_id = StringAttribute()
 
@@ -180,8 +180,8 @@ def test_direct_key_still_works(single_table_client):
     # THEN should return orders
     assert len(orders1) == 2
 
-    # WHEN querying with direct hash_key (already built)
-    orders2 = list(Order.sync_query(hash_key="USER#123"))
+    # WHEN querying with direct partition_key (already built)
+    orders2 = list(Order.sync_query(partition_key="USER#123"))
 
     # THEN should return same results
     assert len(orders2) == 2
@@ -193,15 +193,15 @@ def test_inverted_index_query_with_direct_sk(single_table_client):
 
     class UserOrder(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-        sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+        pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+        sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
         user_id = StringAttribute()
         order_id = StringAttribute()
 
         by_order = GlobalSecondaryIndex(
             index_name="inverted",
-            hash_key="sk",
-            range_key="pk",
+            partition_key="sk",
+            sort_key="pk",
         )
 
     # GIVEN an order
@@ -215,20 +215,20 @@ def test_inverted_index_query_with_direct_sk(single_table_client):
     assert results[0].user_id == "alice"
 
 
-def test_inverted_index_with_range_key_condition(single_table_client):
+def test_inverted_index_with_sort_key_condition(single_table_client):
     """Test inverted index query with range key condition on pk."""
 
     class UserOrder(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-        sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+        pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+        sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
         user_id = StringAttribute()
         order_id = StringAttribute()
 
         by_order = GlobalSecondaryIndex(
             index_name="inverted",
-            hash_key="sk",
-            range_key="pk",
+            partition_key="sk",
+            sort_key="pk",
         )
 
     # GIVEN same order from different users
@@ -240,7 +240,7 @@ def test_inverted_index_with_range_key_condition(single_table_client):
     results = list(
         UserOrder.by_order.sync_query(
             order_id="SHARED",
-            range_key_condition=UserOrder.pk.begins_with("USER#a"),
+            sort_key_condition=UserOrder.pk.begins_with("USER#a"),
         )
     )
 
@@ -254,16 +254,16 @@ def test_inverted_index_with_filter_condition(single_table_client):
 
     class UserOrder(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-        sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+        pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+        sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
         user_id = StringAttribute()
         order_id = StringAttribute()
         status = StringAttribute()
 
         by_order = GlobalSecondaryIndex(
             index_name="inverted",
-            hash_key="sk",
-            range_key="pk",
+            partition_key="sk",
+            sort_key="pk",
         )
 
     # GIVEN orders with different statuses
@@ -288,15 +288,15 @@ def test_mixed_entity_types_single_table(single_table_client):
 
     class User(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-        sk = StringAttribute(range_key=True, template="PROFILE")
+        pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+        sk = StringAttribute(sort_key=True, template="PROFILE")
         user_id = StringAttribute()
         name = StringAttribute()
 
     class Order(Model):
         model_config = ModelConfig(table="single_table_test")
-        pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-        sk = StringAttribute(range_key=True, template="ORDER#{order_id}")
+        pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+        sk = StringAttribute(sort_key=True, template="ORDER#{order_id}")
         user_id = StringAttribute()
         order_id = StringAttribute()
         total = StringAttribute()
@@ -317,7 +317,7 @@ def test_mixed_entity_types_single_table(single_table_client):
     orders = list(
         Order.sync_query(
             user_id="alice",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
         )
     )
 

@@ -9,8 +9,8 @@ from pydynox.exceptions import ConditionalCheckFailedException
 class User(Model):
     model_config = ModelConfig(table="test_table")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     count = NumberAttribute()
     balance = NumberAttribute()

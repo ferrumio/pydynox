@@ -38,18 +38,18 @@ def multi_attr_client(dynamodb_endpoint):
     # Create table with multi-attribute GSI
     client.sync_create_table(
         table_name,
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
         global_secondary_indexes=[
             {
                 "index_name": "location-index",
-                "hash_keys": [("tenant_id", "S"), ("region", "S")],
-                "range_keys": [("created_at", "S"), ("item_id", "S")],
+                "partition_keys": [("tenant_id", "S"), ("region", "S")],
+                "sort_keys": [("created_at", "S"), ("item_id", "S")],
                 "projection": "ALL",
             },
             {
                 "index_name": "category-index",
-                "hash_keys": [("category", "S"), ("subcategory", "S")],
+                "partition_keys": [("category", "S"), ("subcategory", "S")],
                 "projection": "ALL",
             },
         ],
@@ -64,8 +64,8 @@ class Product(Model):
 
     model_config = ModelConfig(table="multi_attr_gsi_test")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     tenant_id = StringAttribute()
     region = StringAttribute()
     created_at = StringAttribute()
@@ -78,14 +78,14 @@ class Product(Model):
     # Multi-attribute GSI with 2 hash keys and 2 range keys
     location_index = GlobalSecondaryIndex(
         index_name="location-index",
-        hash_key=["tenant_id", "region"],
-        range_key=["created_at", "item_id"],
+        partition_key=["tenant_id", "region"],
+        sort_key=["created_at", "item_id"],
     )
 
     # Multi-attribute GSI with 2 hash keys only
     category_index = GlobalSecondaryIndex(
         index_name="category-index",
-        hash_key=["category", "subcategory"],
+        partition_key=["category", "subcategory"],
     )
 
 
@@ -361,7 +361,7 @@ async def test_multi_attr_gsi_query_returns_model_instances(multi_attr_client):
 
 
 @pytest.mark.asyncio
-async def test_multi_attr_gsi_query_requires_all_hash_keys(multi_attr_client):
+async def test_multi_attr_gsi_query_requires_all_partition_keys(multi_attr_client):
     """Test that query fails if not all hash keys provided."""
     # WHEN querying with missing hash key
     # THEN ValueError should be raised

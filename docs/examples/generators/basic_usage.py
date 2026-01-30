@@ -7,8 +7,8 @@ from pydynox.attributes import NumberAttribute, StringAttribute
 class Order(Model):
     model_config = ModelConfig(table="orders")
 
-    pk = StringAttribute(hash_key=True, default=AutoGenerate.ULID)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True, default=AutoGenerate.ULID)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
 
 

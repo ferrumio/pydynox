@@ -48,8 +48,8 @@ def user_model(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         age = NumberAttribute()
 
@@ -62,39 +62,39 @@ def user_model(mock_client):
 
 def test_query_returns_async_model_query_result(user_model):
     """Model.query() returns an AsyncModelQueryResult (async, default)."""
-    result = user_model.query(hash_key="USER#123")
+    result = user_model.query(partition_key="USER#123")
     assert isinstance(result, AsyncModelQueryResult)
 
 
 def test_query_stores_parameters(user_model):
     """AsyncModelQueryResult stores all query parameters."""
     result = user_model.query(
-        hash_key="USER#123",
+        partition_key="USER#123",
         limit=10,
         scan_index_forward=False,
         consistent_read=True,
     )
-    assert result._hash_key_value == "USER#123"
+    assert result._partition_key_value == "USER#123"
     assert result._limit == 10
     assert result._scan_index_forward is False
     assert result._consistent_read is True
 
 
-def test_query_with_range_key_condition(user_model):
-    """Model.query() accepts range_key_condition."""
+def test_query_with_sort_key_condition(user_model):
+    """Model.query() accepts sort_key_condition."""
     condition = user_model.sk.begins_with("ORDER#")
     result = user_model.query(
-        hash_key="USER#123",
-        range_key_condition=condition,
+        partition_key="USER#123",
+        sort_key_condition=condition,
     )
-    assert result._range_key_condition is condition
+    assert result._sort_key_condition is condition
 
 
 def test_query_with_filter_condition(user_model):
     """Model.query() accepts filter_condition."""
     condition = user_model.age > 18
     result = user_model.query(
-        hash_key="USER#123",
+        partition_key="USER#123",
         filter_condition=condition,
     )
     assert result._filter_condition is condition
@@ -104,7 +104,7 @@ def test_query_with_pagination(user_model):
     """Model.query() accepts last_evaluated_key for pagination."""
     last_key = {"pk": "USER#123", "sk": "ORDER#999"}
     result = user_model.query(
-        hash_key="USER#123",
+        partition_key="USER#123",
         last_evaluated_key=last_key,
     )
     assert result._start_key == last_key
@@ -119,7 +119,7 @@ async def test_async_query_first_returns_none_when_empty(user_model, mock_client
         "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
     }
 
-    result = user_model.query(hash_key="USER#123")
+    result = user_model.query(partition_key="USER#123")
     first = await result.first()
 
     assert first is None
@@ -137,7 +137,7 @@ async def test_async_query_to_list(user_model, mock_client):
         "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=2),
     }
 
-    result = user_model.query(hash_key="USER#123")
+    result = user_model.query(partition_key="USER#123")
     users = [user async for user in result]
 
     assert len(users) == 2
@@ -156,7 +156,7 @@ async def test_async_query_iteration(user_model, mock_client):
         "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
     }
 
-    result = user_model.query(hash_key="USER#123")
+    result = user_model.query(partition_key="USER#123")
     users = []
     async for user in result:
         users.append(user)
@@ -167,12 +167,12 @@ async def test_async_query_iteration(user_model, mock_client):
 
 def test_query_last_evaluated_key_before_iteration(user_model):
     """AsyncModelQueryResult.last_evaluated_key is None before iteration."""
-    result = user_model.query(hash_key="USER#123")
+    result = user_model.query(partition_key="USER#123")
     assert result.last_evaluated_key is None
 
 
 @pytest.mark.asyncio
-async def test_query_raises_error_without_hash_key(mock_client):
+async def test_query_raises_error_without_partition_key(mock_client):
     """Model.query() raises error if model has no hash key."""
 
     class BadModel(Model):
@@ -181,7 +181,7 @@ async def test_query_raises_error_without_hash_key(mock_client):
 
     BadModel._client_instance = None
 
-    result = BadModel.query(hash_key="test")
+    result = BadModel.query(partition_key="test")
 
     with pytest.raises(ValueError, match="has no hash key defined"):
         await result.first()
@@ -192,13 +192,13 @@ async def test_query_raises_error_without_hash_key(mock_client):
 
 def test_query_as_dict_default_is_false(user_model):
     """query() defaults as_dict to False."""
-    result = user_model.query(hash_key="USER#123")
+    result = user_model.query(partition_key="USER#123")
     assert result._as_dict is False
 
 
 def test_query_as_dict_stores_parameter(user_model):
     """AsyncModelQueryResult stores as_dict parameter."""
-    result = user_model.query(hash_key="USER#123", as_dict=True)
+    result = user_model.query(partition_key="USER#123", as_dict=True)
     assert result._as_dict is True
 
 
@@ -211,7 +211,7 @@ async def test_query_as_dict_true_returns_dicts(user_model, mock_client):
         "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
     }
 
-    result = user_model.query(hash_key="USER#123", as_dict=True)
+    result = user_model.query(partition_key="USER#123", as_dict=True)
     orders = [order async for order in result]
 
     assert len(orders) == 1
@@ -228,7 +228,7 @@ async def test_query_as_dict_false_returns_model_instances(user_model, mock_clie
         "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
     }
 
-    result = user_model.query(hash_key="USER#123", as_dict=False)
+    result = user_model.query(partition_key="USER#123", as_dict=False)
     orders = [order async for order in result]
 
     assert len(orders) == 1
@@ -240,19 +240,19 @@ async def test_query_as_dict_false_returns_model_instances(user_model, mock_clie
 
 def test_sync_query_returns_model_query_result(user_model):
     """Model.sync_query() returns a ModelQueryResult (sync)."""
-    result = user_model.sync_query(hash_key="USER#123")
+    result = user_model.sync_query(partition_key="USER#123")
     assert isinstance(result, ModelQueryResult)
 
 
 def test_sync_query_stores_parameters(user_model):
     """ModelQueryResult stores all query parameters."""
     result = user_model.sync_query(
-        hash_key="USER#123",
+        partition_key="USER#123",
         limit=10,
         scan_index_forward=False,
         consistent_read=True,
     )
-    assert result._hash_key_value == "USER#123"
+    assert result._partition_key_value == "USER#123"
     assert result._limit == 10
     assert result._scan_index_forward is False
     assert result._consistent_read is True
@@ -266,7 +266,7 @@ def test_sync_query_first_returns_none_when_empty(user_model, mock_client):
         MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
     )
 
-    result = user_model.sync_query(hash_key="USER#123")
+    result = user_model.sync_query(partition_key="USER#123")
     first = result.first()
 
     assert first is None
@@ -283,7 +283,7 @@ def test_sync_query_list(user_model, mock_client):
         MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=2),
     )
 
-    result = user_model.sync_query(hash_key="USER#123")
+    result = user_model.sync_query(partition_key="USER#123")
     users = list(result)
 
     assert len(users) == 2
@@ -299,7 +299,7 @@ def test_sync_query_iteration(user_model, mock_client):
         MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
     )
 
-    result = user_model.sync_query(hash_key="USER#123")
+    result = user_model.sync_query(partition_key="USER#123")
     users = list(result)
 
     assert len(users) == 1
@@ -314,7 +314,7 @@ def test_sync_query_as_dict_true_returns_dicts(user_model, mock_client):
         MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
     )
 
-    result = user_model.sync_query(hash_key="USER#123", as_dict=True)
+    result = user_model.sync_query(partition_key="USER#123", as_dict=True)
     orders = list(result)
 
     assert len(orders) == 1
@@ -330,7 +330,7 @@ def test_sync_query_as_dict_false_returns_model_instances(user_model, mock_clien
         MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
     )
 
-    result = user_model.sync_query(hash_key="USER#123", as_dict=False)
+    result = user_model.sync_query(partition_key="USER#123", as_dict=False)
     orders = list(result)
 
     assert len(orders) == 1

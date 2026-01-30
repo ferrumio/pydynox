@@ -7,8 +7,8 @@ from pydynox.attributes import EncryptedAttribute, StringAttribute
 class SecureUser(Model):
     model_config = ModelConfig(table="users")
 
-    pk: str = StringAttribute(hash_key=True)
-    sk: str = StringAttribute(range_key=True)
+    pk: str = StringAttribute(partition_key=True)
+    sk: str = StringAttribute(sort_key=True)
     ssn: str = EncryptedAttribute(key_id="alias/my-app-key")
 
 

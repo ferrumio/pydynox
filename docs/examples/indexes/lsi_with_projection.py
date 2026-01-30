@@ -10,8 +10,8 @@ class Order(Model):
 
     model_config = ModelConfig(table="orders_projections")
 
-    customer_id = StringAttribute(hash_key=True)
-    order_id = StringAttribute(range_key=True)
+    customer_id = StringAttribute(partition_key=True)
+    order_id = StringAttribute(sort_key=True)
     status = StringAttribute()
     total = NumberAttribute()
     notes = StringAttribute()
@@ -19,7 +19,7 @@ class Order(Model):
     # ALL projection - includes all attributes
     status_index = LocalSecondaryIndex(
         index_name="status-index",
-        range_key="status",
+        sort_key="status",
         projection="ALL",
     )
 
@@ -27,7 +27,7 @@ class Order(Model):
     # Smaller index, faster queries when you only need keys
     total_index = LocalSecondaryIndex(
         index_name="total-index",
-        range_key="total",
+        sort_key="total",
         projection="KEYS_ONLY",
     )
 
@@ -35,6 +35,6 @@ class Order(Model):
     # Balance between size and data availability
     notes_index = LocalSecondaryIndex(
         index_name="notes-index",
-        range_key="notes",
+        sort_key="notes",
         projection=["status", "total"],  # Include these non-key attributes
     )

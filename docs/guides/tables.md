@@ -76,7 +76,7 @@ You can also create tables directly with the client:
     --8<-- "docs/examples/tables/create_table.py"
     ```
 
-The `hash_key` and `range_key` are tuples of `(attribute_name, attribute_type)`. Attribute types:
+The `partition_key` and `sort_key` are tuples of `(attribute_name, attribute_type)`. Attribute types:
 
 | Type | Description |
 |------|-------------|
@@ -97,7 +97,7 @@ Before creating a table, check if it already exists:
     # Using client
     client = DynamoDBClient()
     if not await client.table_exists("users"):
-        await client.create_table("users", hash_key=("pk", "S"), wait=True)
+        await client.create_table("users", partition_key=("pk", "S"), wait=True)
     ```
 
 === "Sync"
@@ -109,7 +109,7 @@ Before creating a table, check if it already exists:
     # Using client
     client = DynamoDBClient()
     if not client.sync_table_exists("users"):
-        client.sync_create_table("users", hash_key=("pk", "S"), wait=True)
+        client.sync_create_table("users", partition_key=("pk", "S"), wait=True)
     ```
 
 ### Delete a table
@@ -200,7 +200,7 @@ Tables take a few seconds to create. Use `wait=True` to block until the table is
     # Table is now ready to use
 
     # Using client
-    await client.create_table("users", hash_key=("pk", "S"), wait=True)
+    await client.create_table("users", partition_key=("pk", "S"), wait=True)
     ```
 
 === "Sync"
@@ -210,21 +210,21 @@ Tables take a few seconds to create. Use `wait=True` to block until the table is
     # Table is now ready to use
 
     # Using client
-    client.sync_create_table("users", hash_key=("pk", "S"), wait=True)
+    client.sync_create_table("users", partition_key=("pk", "S"), wait=True)
     ```
 
 Or wait separately:
 
 === "Async (default)"
     ```python
-    await client.create_table("users", hash_key=("pk", "S"))
+    await client.create_table("users", partition_key=("pk", "S"))
     # Do other setup...
     await client.wait_for_table_active("users", timeout_seconds=30)
     ```
 
 === "Sync"
     ```python
-    client.sync_create_table("users", hash_key=("pk", "S"))
+    client.sync_create_table("users", partition_key=("pk", "S"))
     # Do other setup...
     client.sync_wait_for_table_active("users", timeout_seconds=30)
     ```
@@ -270,8 +270,8 @@ Or wait separately:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `table_name` | str | Required | Name of the table |
-| `hash_key` | tuple | Required | (name, type) for partition key |
-| `range_key` | tuple | None | (name, type) for sort key |
+| `partition_key` | tuple | Required | (name, type) for partition key |
+| `sort_key` | tuple | None | (name, type) for sort key |
 | `billing_mode` | str | `"PAY_PER_REQUEST"` | Billing mode |
 | `read_capacity` | int | 5 | RCU (only for PROVISIONED) |
 | `write_capacity` | int | 5 | WCU (only for PROVISIONED) |

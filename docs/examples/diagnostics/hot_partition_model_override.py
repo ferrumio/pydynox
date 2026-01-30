@@ -20,7 +20,7 @@ set_default_client(client)
 # Normal model uses client's default thresholds
 class User(Model):
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
 
 
@@ -31,5 +31,5 @@ class Event(Model):
         hot_partition_writes=2000,  # Override client's 500
         hot_partition_reads=5000,  # Override client's 1500
     )
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     event_type = StringAttribute()

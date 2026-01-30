@@ -9,8 +9,8 @@ from pydynox.attributes import StringAttribute
 class User(Model):
     model_config = ModelConfig(table="app")
 
-    pk = StringAttribute(hash_key=True, template="USER#{email}")
-    sk = StringAttribute(range_key=True, template="PROFILE")
+    pk = StringAttribute(partition_key=True, template="USER#{email}")
+    sk = StringAttribute(sort_key=True, template="PROFILE")
     email = StringAttribute()
     name = StringAttribute()
 

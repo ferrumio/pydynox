@@ -18,8 +18,8 @@ set_default_client(client)
 class Customer(Model):
     model_config = ModelConfig(table="customers")
 
-    pk = StringAttribute(hash_key=True)  # CUSTOMER#<id>
-    sk = StringAttribute(range_key=True)  # PROFILE
+    pk = StringAttribute(partition_key=True)  # CUSTOMER#<id>
+    sk = StringAttribute(sort_key=True)  # PROFILE
     email = StringAttribute()
     name = StringAttribute()
 
@@ -27,8 +27,8 @@ class Customer(Model):
 class Order(Model):
     model_config = ModelConfig(table="orders")
 
-    pk = StringAttribute(hash_key=True)  # CUSTOMER#<id>
-    sk = StringAttribute(range_key=True)  # ORDER#<timestamp>
+    pk = StringAttribute(partition_key=True)  # CUSTOMER#<id>
+    sk = StringAttribute(sort_key=True)  # ORDER#<timestamp>
     order_id = StringAttribute()
     status = StringAttribute()
     tracking = StringAttribute(default=None)
@@ -95,8 +95,8 @@ def get_recent_orders(customer_id: str, limit: int = 5) -> list:
     """
     orders = list(
         Order.sync_query(
-            hash_key=f"CUSTOMER#{customer_id}",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key=f"CUSTOMER#{customer_id}",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
             scan_index_forward=False,
             limit=limit,
         )
@@ -126,8 +126,8 @@ def get_order_status(customer_id: str, order_id: str) -> dict:
     """
     orders = list(
         Order.sync_query(
-            hash_key=f"CUSTOMER#{customer_id}",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key=f"CUSTOMER#{customer_id}",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
             filter_condition=Order.order_id == order_id,
             limit=1,
         )
@@ -188,8 +188,8 @@ if __name__ == "__main__":
         if not client.table_exists("customers"):
             client.create_table(
                 table_name="customers",
-                hash_key=("pk", "S"),
-                range_key=("sk", "S"),
+                partition_key=("pk", "S"),
+                sort_key=("sk", "S"),
                 wait=True,
             )
             print("Table 'customers' created!")
@@ -197,8 +197,8 @@ if __name__ == "__main__":
         if not client.table_exists("orders"):
             client.create_table(
                 table_name="orders",
-                hash_key=("pk", "S"),
-                range_key=("sk", "S"),
+                partition_key=("pk", "S"),
+                sort_key=("sk", "S"),
                 wait=True,
             )
             print("Table 'orders' created!")

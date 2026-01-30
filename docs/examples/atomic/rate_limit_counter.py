@@ -10,8 +10,8 @@ from pydynox.exceptions import ConditionalCheckFailedException
 class ApiUsage(Model):
     model_config = ModelConfig(table="api_usage")
 
-    pk = StringAttribute(hash_key=True)  # user_id
-    sk = StringAttribute(range_key=True)  # date (YYYY-MM-DD)
+    pk = StringAttribute(partition_key=True)  # user_id
+    sk = StringAttribute(sort_key=True)  # date (YYYY-MM-DD)
     requests = NumberAttribute()
 
 

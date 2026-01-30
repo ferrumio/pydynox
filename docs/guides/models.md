@@ -30,7 +30,7 @@ Every model needs at least a hash key (partition key):
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)  # Required
+    pk = StringAttribute(partition_key=True)  # Required
 ```
 
 Add a range key (sort key) for composite keys:
@@ -39,8 +39,8 @@ Add a range key (sort key) for composite keys:
 class User(Model):
     model_config = ModelConfig(table="users")
     
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)  # Optional
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)  # Optional
 ```
 
 ### Defaults and required fields
@@ -243,11 +243,11 @@ set_default_client(client)
 # All models use this client
 class User(Model):
     model_config = ModelConfig(table="users")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
 ```
 
 ### Override client per model
@@ -266,7 +266,7 @@ class AuditLog(Model):
         table="audit_logs",
         client=audit_client,  # Uses different client
     )
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
 ```
 
 ### Converting to dict

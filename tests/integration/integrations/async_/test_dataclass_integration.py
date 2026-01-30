@@ -12,7 +12,7 @@ async def test_dataclass_save_and_get(dynamo):
     """Save and retrieve a dataclass item."""
     pk = f"DC_TEST#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     @dataclass
     class User:
         pk: str
@@ -39,7 +39,7 @@ async def test_dataclass_update(dynamo):
     """Update a dataclass item."""
     pk = f"DC_TEST#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     @dataclass
     class User:
         pk: str
@@ -65,7 +65,7 @@ async def test_dataclass_delete(dynamo):
     """Delete a dataclass item."""
     pk = f"DC_TEST#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     @dataclass
     class User:
         pk: str
@@ -89,7 +89,7 @@ async def test_dataclass_get_not_found(dynamo):
     """Get returns None for non-existent item."""
     pk = f"DC_TEST#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     @dataclass
     class User:
         pk: str
@@ -105,7 +105,7 @@ async def test_dataclass_with_complex_types(dynamo):
     """Dataclass with list and dict fields."""
     pk = f"DC_TEST#{uuid.uuid4().hex[:8]}"
 
-    @dynamodb_model(table="test_table", hash_key="pk", range_key="sk", client=dynamo)
+    @dynamodb_model(table="test_table", partition_key="pk", sort_key="sk", client=dynamo)
     @dataclass
     class ComplexItem:
         pk: str

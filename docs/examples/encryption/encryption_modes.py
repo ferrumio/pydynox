@@ -8,7 +8,7 @@ from pydynox.attributes import EncryptedAttribute, EncryptionMode, StringAttribu
 class IngestService(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     ssn = EncryptedAttribute(
         key_id="alias/my-app-key",
         mode=EncryptionMode.WriteOnly,
@@ -19,7 +19,7 @@ class IngestService(Model):
 class ReportService(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     ssn = EncryptedAttribute(
         key_id="alias/my-app-key",
         mode=EncryptionMode.ReadOnly,
@@ -30,5 +30,5 @@ class ReportService(Model):
 class AdminService(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     ssn = EncryptedAttribute(key_id="alias/my-app-key")

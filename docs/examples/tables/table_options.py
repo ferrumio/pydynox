@@ -8,7 +8,7 @@ client = DynamoDBClient()
 if not client.sync_table_exists("example_provisioned"):
     client.sync_create_table(
         "example_provisioned",
-        hash_key=("pk", "S"),
+        partition_key=("pk", "S"),
         billing_mode="PROVISIONED",
         read_capacity=5,
         write_capacity=5,
@@ -19,7 +19,7 @@ if not client.sync_table_exists("example_provisioned"):
 if not client.sync_table_exists("example_archive"):
     client.sync_create_table(
         "example_archive",
-        hash_key=("pk", "S"),
+        partition_key=("pk", "S"),
         table_class="STANDARD_INFREQUENT_ACCESS",
         wait=True,
     )

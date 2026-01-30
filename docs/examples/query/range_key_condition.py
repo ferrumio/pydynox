@@ -12,8 +12,8 @@ CUSTOMER_PK = "CUSTOMER#123"
 
 class Order(Model):
     model_config = ModelConfig(table="orders_range")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     total = NumberAttribute()
     status = StringAttribute()
 
@@ -23,8 +23,8 @@ async def main():
     if not await client.table_exists("orders_range"):
         await client.create_table(
             "orders_range",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
         )
 
     # Create orders with different sort keys
@@ -38,22 +38,22 @@ async def main():
 
     # Query orders that start with "ORDER#"
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
-        range_key_condition=Order.sk.begins_with("ORDER#"),
+        partition_key=CUSTOMER_PK,
+        sort_key_condition=Order.sk.begins_with("ORDER#"),
     ):
         print(f"Order: {order.sk}")
 
     # Query orders between two sort keys
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
-        range_key_condition=Order.sk.between("ORDER#001", "ORDER#010"),
+        partition_key=CUSTOMER_PK,
+        sort_key_condition=Order.sk.between("ORDER#001", "ORDER#010"),
     ):
         print(f"Between: {order.sk}")
 
     # Query orders greater than a sort key
     async for order in Order.query(
-        hash_key=CUSTOMER_PK,
-        range_key_condition=Order.sk > "ORDER#010",
+        partition_key=CUSTOMER_PK,
+        sort_key_condition=Order.sk > "ORDER#010",
     ):
         print(f"Greater: {order.sk}")
 

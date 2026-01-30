@@ -7,25 +7,25 @@ from pydynox.conditions import Attr
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     status = StringAttribute()
     total = NumberAttribute()
 
 
-def test_query_by_hash_key(pydynox_memory_backend):
+def test_query_by_partition_key(pydynox_memory_backend):
     """Test querying items by partition key."""
     Order(pk="CUSTOMER#1", sk="ORDER#001", status="pending", total=100).save()
     Order(pk="CUSTOMER#1", sk="ORDER#002", status="shipped", total=200).save()
     Order(pk="CUSTOMER#2", sk="ORDER#001", status="pending", total=50).save()
 
-    results = list(Order.query(hash_key="CUSTOMER#1"))
+    results = list(Order.query(partition_key="CUSTOMER#1"))
 
     assert len(results) == 2
     assert all(r.pk == "CUSTOMER#1" for r in results)
 
 
-def test_query_with_range_key_condition(pydynox_memory_backend):
+def test_query_with_sort_key_condition(pydynox_memory_backend):
     """Test query with range key condition."""
     Order(pk="CUSTOMER#1", sk="ORDER#001", status="pending", total=100).save()
     Order(pk="CUSTOMER#1", sk="ORDER#002", status="shipped", total=200).save()
@@ -33,8 +33,8 @@ def test_query_with_range_key_condition(pydynox_memory_backend):
 
     results = list(
         Order.query(
-            hash_key="CUSTOMER#1",
-            range_key_condition=Order.sk.begins_with("ORDER#"),
+            partition_key="CUSTOMER#1",
+            sort_key_condition=Order.sk.begins_with("ORDER#"),
         )
     )
 
@@ -49,7 +49,7 @@ def test_query_with_filter(pydynox_memory_backend):
 
     results = list(
         Order.query(
-            hash_key="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             filter_condition=Attr("status").eq("pending"),
         )
     )

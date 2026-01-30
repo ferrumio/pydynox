@@ -14,14 +14,14 @@ class Order(Model):
 
     model_config = ModelConfig(table="orders_consistent")
 
-    customer_id = StringAttribute(hash_key=True)
-    order_id = StringAttribute(range_key=True)
+    customer_id = StringAttribute(partition_key=True)
+    order_id = StringAttribute(sort_key=True)
     status = StringAttribute()
     total = NumberAttribute()
 
     status_index = LocalSecondaryIndex(
         index_name="status-index",
-        range_key="status",
+        sort_key="status",
     )
 
 
@@ -30,8 +30,8 @@ async def main():
     if not await client.table_exists("orders_consistent"):
         await client.create_table(
             "orders_consistent",
-            hash_key=("customer_id", "S"),
-            range_key=("order_id", "S"),
+            partition_key=("customer_id", "S"),
+            sort_key=("order_id", "S"),
             local_secondary_indexes=[
                 {
                     "index_name": "status-index",

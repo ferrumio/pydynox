@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "pydynox"
-version = "0.22.0"
+version = "0.23.0"
 description = "A fast DynamoDB ORM for Python with a Rust core"
 readme = "README.md"
 license = { text = "Apache-2.0" }

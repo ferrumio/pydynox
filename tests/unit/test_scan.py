@@ -55,8 +55,8 @@ def user_model(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         age = NumberAttribute()
 

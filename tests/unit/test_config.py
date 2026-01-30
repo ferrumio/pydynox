@@ -120,7 +120,7 @@ async def test_model_uses_config_client():
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -147,7 +147,7 @@ async def test_model_uses_default_client_when_no_config_client():
 
     class User(Model):
         model_config = ModelConfig(table="users")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -185,7 +185,7 @@ async def test_model_config_client_takes_priority_over_default():
 
     class User(Model):
         model_config = ModelConfig(table="users", client=config_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -205,7 +205,7 @@ async def test_model_raises_error_when_no_client():
     # GIVEN a model with no client configured
     class User(Model):
         model_config = ModelConfig(table="users")
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -222,7 +222,7 @@ async def test_model_raises_error_when_no_model_config():
 
     # GIVEN a model without model_config
     class User(Model):
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -242,7 +242,7 @@ def test_model_skip_hooks_from_config():
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client, skip_hooks=True)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     User._client_instance = None
@@ -262,7 +262,7 @@ def test_model_get_table_from_config():
 
     class User(Model):
         model_config = ModelConfig(table="my_users_table", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     # THEN _get_table should return the configured table name
     assert User._get_table() == "my_users_table"

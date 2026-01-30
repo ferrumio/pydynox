@@ -13,8 +13,8 @@ def parallel_scan_table(dynamo):
     if not dynamo.sync_table_exists(PARALLEL_SCAN_TABLE):
         dynamo.sync_create_table(
             PARALLEL_SCAN_TABLE,
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             wait=True,
         )
     yield dynamo
@@ -31,8 +31,8 @@ def user_model(parallel_scan_table):
 
     class User(Model):
         model_config = ModelConfig(table=PARALLEL_SCAN_TABLE)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
         age = NumberAttribute()
         status = StringAttribute()

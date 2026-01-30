@@ -9,8 +9,8 @@ from pydynox.attributes import StringAttribute
 class Order(Model):
     model_config = ModelConfig(table="app")
 
-    pk = StringAttribute(hash_key=True, template="USER#{user_id}")
-    sk = StringAttribute(range_key=True, template="ORDER#{order_id}#{date}")
+    pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+    sk = StringAttribute(sort_key=True, template="ORDER#{order_id}#{date}")
     user_id = StringAttribute()
     order_id = StringAttribute()
     date = StringAttribute()

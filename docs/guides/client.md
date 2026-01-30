@@ -140,7 +140,7 @@ set_default_client(prod_client)
 # Different client for audit logs
 class AuditLog(Model):
     model_config = ModelConfig(table="audit_logs", client=audit_client)
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
 ```
 
 ## Rate limiting

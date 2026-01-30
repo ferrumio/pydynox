@@ -16,8 +16,8 @@ class User(Model):
 
     model_config = ModelConfig(table="example_model_users")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     email = StringAttribute()
     status = StringAttribute()
     age = NumberAttribute()
@@ -25,7 +25,7 @@ class User(Model):
     # GSI for querying by email
     email_index = GlobalSecondaryIndex(
         index_name="email-index",
-        hash_key="email",
+        partition_key="email",
     )
 
 

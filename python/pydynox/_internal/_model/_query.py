@@ -29,26 +29,28 @@ class _TemplateAttr(Protocol):
     def build_key(self, values: dict[str, Any]) -> str: ...
 
 
-def _resolve_hash_key(cls: type[M], hash_key: Any | None, kwargs: dict[str, Any]) -> Any:
+def _resolve_partition_key(cls: type[M], partition_key: Any | None, kwargs: dict[str, Any]) -> Any:
     """Resolve hash key value, building from template if needed.
 
-    If hash_key is provided directly, use it.
+    If partition_key is provided directly, use it.
     Otherwise, check if the hash key attribute has a template and build from kwargs.
     """
-    if hash_key is not None:
-        return hash_key
+    if partition_key is not None:
+        return partition_key
 
     # Check if hash key has template
-    if cls._hash_key is None:
-        raise ValueError(f"Model {cls.__name__} has no hash_key defined")
+    if cls._partition_key is None:
+        raise ValueError(f"Model {cls.__name__} has no partition_key defined")
 
-    hash_attr = cls._attributes.get(cls._hash_key)
+    hash_attr = cls._attributes.get(cls._partition_key)
     if hash_attr is None:
-        raise ValueError(f"Hash key attribute {cls._hash_key} not found")
+        raise ValueError(f"Hash key attribute {cls._partition_key} not found")
 
     # If no template, can't build from kwargs
     if not (hasattr(hash_attr, "has_template") and hash_attr.has_template):
-        raise ValueError(f"hash_key is required. Model {cls.__name__} hash key has no template.")
+        raise ValueError(
+            f"partition_key is required. Model {cls.__name__} hash key has no template."
+        )
 
     # Cast to template protocol for type checker
     tattr: _TemplateAttr = hash_attr  # type: ignore[assignment]
@@ -68,8 +70,8 @@ def _resolve_hash_key(cls: type[M], hash_key: Any | None, kwargs: dict[str, Any]
 
 def sync_query(
     cls: type[M],
-    hash_key: Any = None,
-    range_key_condition: Condition | None = None,
+    partition_key: Any = None,
+    sort_key_condition: Condition | None = None,
     filter_condition: Condition | None = None,
     limit: int | None = None,
     page_size: int | None = None,
@@ -82,21 +84,21 @@ def sync_query(
 ) -> ModelQueryResult[M]:
     """Query items by hash key with optional conditions (sync).
 
-    The hash_key can be provided directly or built from template placeholders.
+    The partition_key can be provided directly or built from template placeholders.
 
     Examples:
         # Direct hash key
-        Order.sync_query(hash_key="USER#123")
+        Order.sync_query(partition_key="USER#123")
 
         # Using template placeholders (if pk has template="USER#{user_id}")
         Order.sync_query(user_id="123")
     """
-    resolved_hash_key = _resolve_hash_key(cls, hash_key, kwargs)
+    resolved_partition_key = _resolve_partition_key(cls, partition_key, kwargs)
 
     return ModelQueryResult(
         model_class=cls,
-        hash_key_value=resolved_hash_key,
-        range_key_condition=range_key_condition,
+        partition_key_value=resolved_partition_key,
+        sort_key_condition=sort_key_condition,
         filter_condition=filter_condition,
         limit=limit,
         page_size=page_size,
@@ -233,8 +235,8 @@ def sync_parallel_scan(
 
 def query(
     cls: type[M],
-    hash_key: Any = None,
-    range_key_condition: Condition | None = None,
+    partition_key: Any = None,
+    sort_key_condition: Condition | None = None,
     filter_condition: Condition | None = None,
     limit: int | None = None,
     page_size: int | None = None,
@@ -247,23 +249,23 @@ def query(
 ) -> AsyncModelQueryResult[M]:
     """Query items by hash key with optional conditions (async, default).
 
-    The hash_key can be provided directly or built from template placeholders.
+    The partition_key can be provided directly or built from template placeholders.
 
     Examples:
         # Direct hash key
-        async for order in Order.query(hash_key="USER#123"):
+        async for order in Order.query(partition_key="USER#123"):
             print(order)
 
         # Using template placeholders (if pk has template="USER#{user_id}")
         async for order in Order.query(user_id="123"):
             print(order)
     """
-    resolved_hash_key = _resolve_hash_key(cls, hash_key, kwargs)
+    resolved_partition_key = _resolve_partition_key(cls, partition_key, kwargs)
 
     return AsyncModelQueryResult(
         model_class=cls,
-        hash_key_value=resolved_hash_key,
-        range_key_condition=range_key_condition,
+        partition_key_value=resolved_partition_key,
+        sort_key_condition=sort_key_condition,
         filter_condition=filter_condition,
         limit=limit,
         page_size=page_size,

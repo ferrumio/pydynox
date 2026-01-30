@@ -8,8 +8,8 @@ from smolagents import tool
 class Employee(Model):
     model_config = ModelConfig(table="employees")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     department = StringAttribute()
     ssn = EncryptedAttribute(key_id="alias/hr-encryption-key")

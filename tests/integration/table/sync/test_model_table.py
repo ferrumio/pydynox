@@ -39,7 +39,7 @@ def test_sync_create_table_basic(model_table_client):
 
     class SimpleUser(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
     SimpleUser.sync_create_table(wait=True)
@@ -50,14 +50,14 @@ def test_sync_create_table_basic(model_table_client):
 
 
 @pytest.mark.asyncio
-async def test_sync_create_table_with_range_key(model_table_client):
+async def test_sync_create_table_with_sort_key(model_table_client):
     """Test Model.sync_create_table() with hash and range key."""
     table_name = unique_table_name()
 
     class UserWithRange(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         name = StringAttribute()
 
     UserWithRange.sync_create_table(wait=True)
@@ -79,7 +79,7 @@ def test_sync_table_exists_true(model_table_client):
 
     class ExistsModel(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     ExistsModel.sync_create_table(wait=True)
 
@@ -94,7 +94,7 @@ def test_sync_table_exists_false(model_table_client):
 
     class NotExistsModel(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     assert NotExistsModel.sync_table_exists() is False
 
@@ -105,7 +105,7 @@ def test_sync_delete_table(model_table_client):
 
     class DeleteModel(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     DeleteModel.sync_create_table(wait=True)
     assert DeleteModel.sync_table_exists() is True
@@ -121,7 +121,7 @@ def test_sync_create_table_provisioned(model_table_client):
 
     class ProvisionedModel(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     ProvisionedModel.sync_create_table(
         billing_mode="PROVISIONED",
@@ -141,7 +141,7 @@ def test_sync_create_table_idempotent_check(model_table_client):
 
     class IdempotentModel(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
     # Pattern: check before create
     if not IdempotentModel.sync_table_exists():
@@ -159,13 +159,13 @@ def test_sync_create_table_idempotent_check(model_table_client):
 
 
 @pytest.mark.asyncio
-async def test_sync_create_table_with_number_hash_key(model_table_client):
+async def test_sync_create_table_with_number_partition_key(model_table_client):
     """Test Model.sync_create_table() with number hash key."""
     table_name = unique_table_name()
 
     class NumberKeyModel(Model):
         model_config = ModelConfig(table=table_name)
-        id = NumberAttribute(hash_key=True)
+        id = NumberAttribute(partition_key=True)
         name = StringAttribute()
 
     NumberKeyModel.sync_create_table(wait=True)
@@ -190,13 +190,13 @@ async def test_sync_create_table_with_gsi(model_table_client):
 
     class UserWithGSI(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         email = StringAttribute()
 
         email_index = GlobalSecondaryIndex(
             index_name="email-index",
-            hash_key="email",
+            partition_key="email",
         )
 
     UserWithGSI.sync_create_table(wait=True)
@@ -211,21 +211,21 @@ async def test_sync_create_table_with_gsi(model_table_client):
 
 
 @pytest.mark.asyncio
-async def test_sync_create_table_with_gsi_and_range_key(model_table_client):
+async def test_sync_create_table_with_gsi_and_sort_key(model_table_client):
     """Test Model.sync_create_table() with GSI that has range key."""
     table_name = unique_table_name()
 
     class UserWithGSIRange(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         status = StringAttribute()
         age = NumberAttribute()
 
         status_index = GlobalSecondaryIndex(
             index_name="status-index",
-            hash_key="status",
-            range_key="age",
+            partition_key="status",
+            sort_key="age",
         )
 
     UserWithGSIRange.sync_create_table(wait=True)
@@ -248,19 +248,19 @@ async def test_sync_create_table_with_multiple_gsis(model_table_client):
 
     class UserMultiGSI(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         email = StringAttribute()
         status = StringAttribute()
 
         email_index = GlobalSecondaryIndex(
             index_name="email-index",
-            hash_key="email",
+            partition_key="email",
         )
 
         status_index = GlobalSecondaryIndex(
             index_name="status-index",
-            hash_key="status",
+            partition_key="status",
         )
 
     UserMultiGSI.sync_create_table(wait=True)
@@ -286,13 +286,13 @@ async def test_sync_create_table_with_lsi(model_table_client):
 
     class UserWithLSI(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         status = StringAttribute()
 
         status_index = LocalSecondaryIndex(
             index_name="status-index",
-            range_key="status",
+            sort_key="status",
         )
 
     UserWithLSI.sync_create_table(wait=True)
@@ -313,13 +313,13 @@ async def test_sync_create_table_with_lsi_range_condition(model_table_client):
 
     class UserWithLSI(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         status = StringAttribute()
 
         status_index = LocalSecondaryIndex(
             index_name="status-index",
-            range_key="status",
+            sort_key="status",
         )
 
     UserWithLSI.sync_create_table(wait=True)
@@ -332,7 +332,7 @@ async def test_sync_create_table_with_lsi_range_condition(model_table_client):
         r
         async for r in UserWithLSI.status_index.query(
             pk="USER#1",
-            range_key_condition=UserWithLSI.status == "active",
+            sort_key_condition=UserWithLSI.status == "active",
         )
     ]
 
@@ -350,19 +350,19 @@ async def test_sync_create_table_with_gsi_and_lsi(model_table_client):
 
     class UserBothIndexes(Model):
         model_config = ModelConfig(table=table_name)
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         email = StringAttribute()
         status = StringAttribute()
 
         email_index = GlobalSecondaryIndex(
             index_name="email-index",
-            hash_key="email",
+            partition_key="email",
         )
 
         status_index = LocalSecondaryIndex(
             index_name="status-index",
-            range_key="status",
+            sort_key="status",
         )
 
     UserBothIndexes.sync_create_table(wait=True)

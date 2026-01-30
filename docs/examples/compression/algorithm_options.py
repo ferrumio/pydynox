@@ -5,7 +5,7 @@ from pydynox.attributes import CompressedAttribute, CompressionAlgorithm, String
 class Document(Model):
     model_config = ModelConfig(table="documents")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
 
     # Best compression ratio (default)
     body = CompressedAttribute(algorithm=CompressionAlgorithm.Zstd)

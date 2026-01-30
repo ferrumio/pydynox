@@ -11,7 +11,7 @@ from pydynox.attributes import S3Attribute, S3File, StringAttribute
 class Document(Model):
     model_config = ModelConfig(table="documents")
 
-    pk = StringAttribute(hash_key=True)
+    pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     content = S3Attribute(bucket="my-bucket")
 

@@ -32,20 +32,20 @@ def user_table(client):
     class User(Model):
         model_config = ModelConfig(table=table_name)
 
-        pk = StringAttribute(hash_key=True)
-        sk = StringAttribute(range_key=True)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
         status = StringAttribute()
         age = NumberAttribute()
         email = StringAttribute()
 
         status_index = LocalSecondaryIndex(
             index_name="status-index",
-            range_key="status",
+            sort_key="status",
         )
 
         age_index = LocalSecondaryIndex(
             index_name="age-index",
-            range_key="age",
+            sort_key="age",
             projection=["email"],
         )
 
@@ -78,7 +78,7 @@ def test_lsi_sync_query_with_range_condition(user_table):
     results = list(
         User.status_index.sync_query(
             pk="USER#1",
-            range_key_condition=User.status == "active",
+            sort_key_condition=User.status == "active",
         )
     )
 
@@ -118,7 +118,7 @@ def test_lsi_sync_query_consistent_read(user_table):
     assert len(results) >= 0
 
 
-def test_lsi_sync_query_different_hash_keys(user_table):
+def test_lsi_sync_query_different_partition_keys(user_table):
     """Query LSI returns only items for the specified hash key."""
     User = user_table
     User(pk="USER#2", sk="PROFILE#1", status="active", age=40, email="d@test.com").sync_save()
@@ -156,7 +156,7 @@ async def test_lsi_async_query_with_range_condition(user_table):
     results = []
     async for user in User.status_index.query(
         pk="ASYNC#2",
-        range_key_condition=User.status == "active",
+        sort_key_condition=User.status == "active",
     ):
         results.append(user)
 

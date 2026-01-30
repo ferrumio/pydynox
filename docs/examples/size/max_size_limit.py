@@ -8,8 +8,8 @@ from pydynox.exceptions import ItemTooLargeException
 class Comment(Model):
     model_config = ModelConfig(table="comments", max_size=10_000)  # 10KB limit
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     text = StringAttribute()
 
 

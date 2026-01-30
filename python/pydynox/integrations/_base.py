@@ -16,8 +16,8 @@ T = TypeVar("T")
 def add_dynamodb_methods(
     cls: type[T],
     table: str,
-    hash_key: str,
-    range_key: str | None,
+    partition_key: str,
+    sort_key: str | None,
     client: DynamoDBClient | None,
     to_dict: Callable[[T], dict[str, Any]],
     from_dict: Callable[[type[T], dict[str, Any]], T],
@@ -28,8 +28,8 @@ def add_dynamodb_methods(
     Args:
         cls: The class to enhance.
         table: DynamoDB table name.
-        hash_key: Name of the hash key attribute.
-        range_key: Name of the range key attribute (optional).
+        partition_key: Name of the hash key attribute.
+        sort_key: Name of the range key attribute (optional).
         client: DynamoDBClient instance (optional).
         to_dict: Function to convert instance to dict.
         from_dict: Function to create instance from dict.
@@ -40,8 +40,8 @@ def add_dynamodb_methods(
     """
     # Store metadata
     cls._pydynox_table = table  # type: ignore
-    cls._pydynox_hash_key = hash_key  # type: ignore
-    cls._pydynox_range_key = range_key  # type: ignore
+    cls._pydynox_partition_key = partition_key  # type: ignore
+    cls._pydynox_sort_key = sort_key  # type: ignore
     cls._pydynox_client = client  # type: ignore
     cls._pydynox_to_dict = staticmethod(to_dict)  # type: ignore
     cls._pydynox_from_dict = staticmethod(from_dict)  # type: ignore
@@ -175,7 +175,7 @@ def _sync_update_method(self: T, **kwargs: Any) -> None:
 def _get_key_method(self: T) -> dict[str, Any]:
     """Get the key dict for this instance."""
     cls = self.__class__
-    key = {cls._pydynox_hash_key: getattr(self, cls._pydynox_hash_key)}  # type: ignore
-    if cls._pydynox_range_key:  # type: ignore
-        key[cls._pydynox_range_key] = getattr(self, cls._pydynox_range_key)  # type: ignore
+    key = {cls._pydynox_partition_key: getattr(self, cls._pydynox_partition_key)}  # type: ignore
+    if cls._pydynox_sort_key:  # type: ignore
+        key[cls._pydynox_sort_key] = getattr(self, cls._pydynox_sort_key)  # type: ignore
     return key

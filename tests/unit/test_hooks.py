@@ -79,7 +79,7 @@ def test_model_collects_hooks(mock_client):
     # GIVEN a model with before_save and after_save hooks
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_save
         def validate(self):
@@ -100,7 +100,7 @@ def test_model_inherits_hooks(mock_client):
     # GIVEN a base model with a hook
     class BaseModel(Model):
         model_config = ModelConfig(table="base", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_save
         def base_validate(self):
@@ -126,7 +126,7 @@ async def test_before_save_hook_runs(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_save
         def validate(self):
@@ -152,7 +152,7 @@ async def test_after_save_hook_runs(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @after_save
         def notify(self):
@@ -177,7 +177,7 @@ async def test_skip_hooks_on_save(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_save
         def validate(self):
@@ -203,7 +203,7 @@ async def test_model_config_skip_hooks_default(mock_client):
 
     class BulkModel(Model):
         model_config = ModelConfig(table="bulk", client=mock_client, skip_hooks=True)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_save
         def validate(self):
@@ -228,7 +228,7 @@ async def test_model_config_skip_hooks_override(mock_client):
 
     class BulkModel(Model):
         model_config = ModelConfig(table="bulk", client=mock_client, skip_hooks=True)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_save
         def validate(self):
@@ -253,7 +253,7 @@ async def test_before_delete_hook_runs(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_delete
         def check_can_delete(self):
@@ -278,7 +278,7 @@ async def test_before_update_hook_runs(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         name = StringAttribute()
 
         @before_update
@@ -303,7 +303,7 @@ async def test_hook_can_raise_exception(mock_client):
     # GIVEN a model with a validating hook that raises on invalid email
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
         email = StringAttribute()
 
         @before_save
@@ -332,7 +332,7 @@ async def test_multiple_hooks_run_in_order(mock_client):
 
     class User(Model):
         model_config = ModelConfig(table="users", client=mock_client)
-        pk = StringAttribute(hash_key=True)
+        pk = StringAttribute(partition_key=True)
 
         @before_save
         def first_hook(self):

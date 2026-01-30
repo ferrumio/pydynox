@@ -8,7 +8,7 @@ from pydynox.integrations.pydantic import dynamodb_model
 client = get_default_client()
 
 
-@dynamodb_model(table="users", hash_key="pk", range_key="sk", client=client)
+@dynamodb_model(table="users", partition_key="pk", sort_key="sk", client=client)
 class User(BaseModel):
     pk: str
     sk: str

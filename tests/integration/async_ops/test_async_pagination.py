@@ -17,8 +17,8 @@ def pagination_table(dynamo: DynamoDBClient):
 
     dynamo.sync_create_table(
         TABLE_NAME,
-        hash_key=("pk", "S"),
-        range_key=("sk", "S"),
+        partition_key=("pk", "S"),
+        sort_key=("sk", "S"),
         wait=True,
         global_secondary_indexes=[
             {
@@ -40,20 +40,20 @@ def pagination_table(dynamo: DynamoDBClient):
 
 class PaginationUser(Model):
     model_config = ModelConfig(table=TABLE_NAME)
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
     status = StringAttribute()
     age = NumberAttribute()
 
     status_index = GlobalSecondaryIndex(
         index_name="status-index",
-        hash_key="status",
+        partition_key="status",
         projection="ALL",
     )
     age_index = LocalSecondaryIndex(
         index_name="age-index",
-        range_key="age",
+        sort_key="age",
         projection="ALL",
     )
 
@@ -82,7 +82,7 @@ async def test_query_last_evaluated_key(seeded_table: DynamoDBClient):
     # GIVEN a table with 25 items
     # WHEN we query with page_size=10
     result = PaginationUser.query(
-        hash_key="USER#pagination",
+        partition_key="USER#pagination",
         page_size=10,
     )
 
@@ -108,7 +108,7 @@ async def test_query_manual_pagination(seeded_table: DynamoDBClient):
     # WHEN we paginate manually
     while True:
         result = PaginationUser.query(
-            hash_key="USER#pagination",
+            partition_key="USER#pagination",
             page_size=10,
             last_evaluated_key=last_key,
         )
@@ -129,7 +129,7 @@ async def test_query_collect(seeded_table: DynamoDBClient):
     """Test collecting all items from query."""
     # GIVEN a table with 25 items
     # WHEN we collect all items
-    result = PaginationUser.query(hash_key="USER#pagination")
+    result = PaginationUser.query(partition_key="USER#pagination")
     all_items = []
     async for user in result:
         all_items.append(user)

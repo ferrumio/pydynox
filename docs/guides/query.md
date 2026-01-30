@@ -42,9 +42,9 @@ The query returns a result that you can:
 
 Filter by sort key using attribute conditions:
 
-=== "range_key_condition.py"
+=== "sort_key_condition.py"
     ```python
-    --8<-- "docs/examples/query/range_key_condition.py"
+    --8<-- "docs/examples/query/sort_key_condition.py"
     ```
 
 Available range key conditions:
@@ -121,11 +121,11 @@ By default, the iterator fetches all pages automatically:
 
 ```python
 # Async - fetches ALL orders, automatically handling pagination
-async for order in Order.query(hash_key="CUSTOMER#123"):
+async for order in Order.query(partition_key="CUSTOMER#123"):
     print(order.sk)
 
 # Sync
-for order in Order.sync_query(hash_key="CUSTOMER#123"):
+for order in Order.sync_query(partition_key="CUSTOMER#123"):
     print(order.sk)
 ```
 
@@ -155,7 +155,7 @@ For strongly consistent reads:
 orders = [
     order
     async for order in Order.query(
-        hash_key="CUSTOMER#123",
+        partition_key="CUSTOMER#123",
         consistent_read=True,
     )
 ]
@@ -163,7 +163,7 @@ orders = [
 # Sync
 orders = list(
     Order.sync_query(
-        hash_key="CUSTOMER#123",
+        partition_key="CUSTOMER#123",
         consistent_read=True,
     )
 )
@@ -181,7 +181,7 @@ class Order(Model):
 Access query metrics using class methods:
 
 ```python
-result = Order.query(hash_key="CUSTOMER#123")
+result = Order.query(partition_key="CUSTOMER#123")
 orders = list(result)
 
 # Get last operation metrics
@@ -202,14 +202,14 @@ For more details, see [Observability](observability.md).
 Async is the default. Use `async for` to iterate:
 
 ```python
-async for order in Order.query(hash_key="CUSTOMER#123"):
+async for order in Order.query(partition_key="CUSTOMER#123"):
     print(order.sk)
 
 # Get first
-first = await Order.query(hash_key="CUSTOMER#123").first()
+first = await Order.query(partition_key="CUSTOMER#123").first()
 
 # Collect all
-orders = [order async for order in Order.query(hash_key="CUSTOMER#123")]
+orders = [order async for order in Order.query(partition_key="CUSTOMER#123")]
 ```
 
 ### Sync queries
@@ -217,14 +217,14 @@ orders = [order async for order in Order.query(hash_key="CUSTOMER#123")]
 Use `sync_query()` for sync code:
 
 ```python
-for order in Order.sync_query(hash_key="CUSTOMER#123"):
+for order in Order.sync_query(partition_key="CUSTOMER#123"):
     print(order.sk)
 
 # Get first
-first = Order.sync_query(hash_key="CUSTOMER#123").first()
+first = Order.sync_query(partition_key="CUSTOMER#123").first()
 
 # Collect all
-orders = list(Order.sync_query(hash_key="CUSTOMER#123"))
+orders = list(Order.sync_query(partition_key="CUSTOMER#123"))
 ```
 
 ### Return dicts instead of models
@@ -264,8 +264,8 @@ Use `as_dict=True` to skip Model instantiation and get plain dicts:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `hash_key` | Any | Required | Hash key value |
-| `range_key_condition` | Condition | None | Condition on sort key |
+| `partition_key` | Any | Required | Hash key value |
+| `sort_key_condition` | Condition | None | Condition on sort key |
 | `filter_condition` | Condition | None | Filter on any attribute |
 | `limit` | int | None | Max total items to return |
 | `page_size` | int | None | Items per DynamoDB request |
@@ -282,7 +282,7 @@ Use [GSI query](indexes.md) when querying by a different attribute:
 
 ```python
 # Table query - by pk (async)
-async for order in Order.query(hash_key="CUSTOMER#123"):
+async for order in Order.query(partition_key="CUSTOMER#123"):
     print(order.sk)
 
 # GSI query - by status (async)
@@ -290,7 +290,7 @@ async for order in Order.status_index.query(status="shipped"):
     print(order.pk)
 
 # Sync versions
-for order in Order.sync_query(hash_key="CUSTOMER#123"):
+for order in Order.sync_query(partition_key="CUSTOMER#123"):
     print(order.sk)
 
 for order in Order.status_index.sync_query(status="shipped"):

@@ -13,8 +13,8 @@ from pydynox.model import ModelQueryResult, ModelScanResult
 class User(Model):
     model_config = ModelConfig(table="users")
 
-    pk = StringAttribute(hash_key=True)
-    sk = StringAttribute(range_key=True)
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
     name = StringAttribute()
 
 
@@ -30,10 +30,10 @@ if TYPE_CHECKING:
     user.update(name="Jane")
 
     # query() returns ModelQueryResult[M]
-    query_result: ModelQueryResult[User] = User.query(hash_key="USER#1")
+    query_result: ModelQueryResult[User] = User.query(partition_key="USER#1")
 
     # Iterating - use isinstance to narrow the type
-    for item in User.query(hash_key="USER#1"):
+    for item in User.query(partition_key="USER#1"):
         if isinstance(item, User):
             name: str | None = item.name
 

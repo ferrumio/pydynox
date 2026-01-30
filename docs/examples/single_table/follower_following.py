@@ -11,16 +11,16 @@ class Follow(Model):
     model_config = ModelConfig(table="social")
 
     # Main: pk=FOLLOWER#alice, sk=FOLLOWING#bob
-    pk = StringAttribute(hash_key=True, template="FOLLOWER#{follower}")
-    sk = StringAttribute(range_key=True, template="FOLLOWING#{following}")
+    pk = StringAttribute(partition_key=True, template="FOLLOWER#{follower}")
+    sk = StringAttribute(sort_key=True, template="FOLLOWING#{following}")
     follower = StringAttribute()
     following = StringAttribute()
 
     # Inverted: pk=FOLLOWING#bob, sk=FOLLOWER#alice
     followers_index = GlobalSecondaryIndex(
         index_name="followers",
-        hash_key="sk",
-        range_key="pk",
+        partition_key="sk",
+        sort_key="pk",
     )
 
 

@@ -18,8 +18,8 @@ set_default_client(client)
 class Employee(Model):
     model_config = ModelConfig(table="employees")
 
-    pk = StringAttribute(hash_key=True)  # EMP#<id>
-    sk = StringAttribute(range_key=True)  # PROFILE
+    pk = StringAttribute(partition_key=True)  # EMP#<id>
+    sk = StringAttribute(sort_key=True)  # PROFILE
     name = StringAttribute()
     email = StringAttribute()
     department = StringAttribute()
@@ -34,8 +34,8 @@ class Employee(Model):
 class TimeOff(Model):
     model_config = ModelConfig(table="timeoff")
 
-    pk = StringAttribute(hash_key=True)  # EMP#<id>
-    sk = StringAttribute(range_key=True)  # REQUEST#<date>
+    pk = StringAttribute(partition_key=True)  # EMP#<id>
+    sk = StringAttribute(sort_key=True)  # REQUEST#<date>
     request_type = StringAttribute()  # vacation, sick, personal
     days = NumberAttribute()
     status = StringAttribute()  # pending, approved, denied
@@ -45,8 +45,8 @@ class TimeOff(Model):
 class Department(Model):
     model_config = ModelConfig(table="departments")
 
-    pk = StringAttribute(hash_key=True)  # DEPT#<name>
-    sk = StringAttribute(range_key=True)  # METADATA
+    pk = StringAttribute(partition_key=True)  # DEPT#<name>
+    sk = StringAttribute(sort_key=True)  # METADATA
     name = StringAttribute()
     manager = StringAttribute()
     headcount = NumberAttribute(default=0)
@@ -116,7 +116,7 @@ def get_time_off_balance(employee_id: str) -> dict:
     """
     requests = list(
         TimeOff.sync_query(
-            hash_key=f"EMP#{employee_id}",
+            partition_key=f"EMP#{employee_id}",
             scan_index_forward=False,
             limit=10,
         )
@@ -261,8 +261,8 @@ if __name__ == "__main__":
         if not client.table_exists("employees"):
             client.create_table(
                 table_name="employees",
-                hash_key=("pk", "S"),
-                range_key=("sk", "S"),
+                partition_key=("pk", "S"),
+                sort_key=("sk", "S"),
                 wait=True,
             )
             print("Table 'employees' created!")
@@ -270,8 +270,8 @@ if __name__ == "__main__":
         if not client.table_exists("timeoff"):
             client.create_table(
                 table_name="timeoff",
-                hash_key=("pk", "S"),
-                range_key=("sk", "S"),
+                partition_key=("pk", "S"),
+                sort_key=("sk", "S"),
                 wait=True,
             )
             print("Table 'timeoff' created!")
@@ -279,8 +279,8 @@ if __name__ == "__main__":
         if not client.table_exists("departments"):
             client.create_table(
                 table_name="departments",
-                hash_key=("pk", "S"),
-                range_key=("sk", "S"),
+                partition_key=("pk", "S"),
+                sort_key=("sk", "S"),
                 wait=True,
             )
             print("Table 'departments' created!")

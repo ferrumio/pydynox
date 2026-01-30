@@ -14,15 +14,15 @@ class Order(Model):
 
     model_config = ModelConfig(table="orders_lsi_pagination")
 
-    pk = StringAttribute(hash_key=True)  # customer_id
-    sk = StringAttribute(range_key=True)  # order_id
+    pk = StringAttribute(partition_key=True)  # customer_id
+    sk = StringAttribute(sort_key=True)  # order_id
     created_at = StringAttribute()
     total = NumberAttribute()
     status = StringAttribute()
 
     created_at_index = LocalSecondaryIndex(
         index_name="created_at-index",
-        range_key="created_at",
+        sort_key="created_at",
     )
 
 
@@ -31,8 +31,8 @@ async def main():
     if not await client.table_exists("orders_lsi_pagination"):
         await client.create_table(
             "orders_lsi_pagination",
-            hash_key=("pk", "S"),
-            range_key=("sk", "S"),
+            partition_key=("pk", "S"),
+            sort_key=("sk", "S"),
             local_secondary_indexes=[
                 {
                     "index_name": "created_at-index",
