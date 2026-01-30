@@ -47,7 +47,7 @@ jobs:
           allow-prereleases: true
 
       - name: Install tools
-        run: pip install ruff ty
+        run: pip install ruff ty pydantic opentelemetry-api
 
       - name: Ruff check
         run: ruff check python/ tests/ benchmarks/
