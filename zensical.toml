@@ -36,6 +36,7 @@ nav = [
         "guides/auto-generate.md",
         "guides/rate-limiting.md",
         "guides/optimistic-locking.md",
+        "guides/smart-save.md",
         "guides/encryption.md",
         "guides/s3-attribute.md",
         "guides/size-calculator.md",

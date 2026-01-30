@@ -127,7 +127,14 @@ class ModelBase(metaclass=ModelMeta):
 
     model_config: ClassVar[ModelConfig]
 
+    # Change tracking
+    _original: dict[str, Any] | None
+    _changed: set[str]
+
     def __init__(self, **kwargs: Any) -> None:
+        # Initialize change tracking (must be first to avoid __setattr__ issues)
+        object.__setattr__(self, "_original", None)
+        object.__setattr__(self, "_changed", set())
         # First pass: set all regular attributes
         for attr_name, attr in self._attributes.items():
             # Skip template keys in first pass - they'll be built later
@@ -168,6 +175,60 @@ class ModelBase(metaclass=ModelMeta):
                     setattr(self, attr_name, None)
                 else:
                     setattr(self, attr_name, tattr.build_key(values))
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Track attribute changes for smart updates."""
+        # Skip tracking for internal attributes
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+            return
+
+        # Track changes if we have an original snapshot
+        original = object.__getattribute__(self, "_original")
+        if original is not None and name in self._attributes:
+            changed = object.__getattribute__(self, "_changed")
+            old_value = original.get(name)
+            if value != old_value:
+                changed.add(name)
+            elif name in changed:
+                changed.discard(name)
+
+        object.__setattr__(self, name, value)
+
+    @property
+    def is_dirty(self) -> bool:
+        """Check if any attributes have changed since loading from DB.
+
+        Returns:
+            True if any attributes were modified, False otherwise.
+
+        Example:
+            >>> user = await User.get(pk="USER#1")
+            >>> print(user.is_dirty)  # False
+            >>> user.name = "New Name"
+            >>> print(user.is_dirty)  # True
+        """
+        return len(self._changed) > 0
+
+    @property
+    def changed_fields(self) -> list[str]:
+        """Get list of attribute names that changed since loading from DB.
+
+        Returns:
+            List of changed attribute names.
+
+        Example:
+            >>> user = await User.get(pk="USER#1")
+            >>> user.name = "New Name"
+            >>> user.email = "new@example.com"
+            >>> print(user.changed_fields)  # ["name", "email"]
+        """
+        return list(self._changed)
+
+    def _reset_change_tracking(self) -> None:
+        """Reset change tracking after save. Stores current state as original."""
+        self._original = self.to_dict()
+        self._changed = set()
 
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
@@ -285,14 +346,22 @@ class ModelBase(metaclass=ModelMeta):
 
     @classmethod
     def from_dict(cls: type[M], data: dict[str, Any]) -> M:
-        """Create a model instance from a dict."""
+        """Create a model instance from a dict.
+
+        Stores the original data for change tracking, enabling smart updates
+        that only send changed fields to DynamoDB.
+        """
         deserialized = {}
         for attr_name, value in data.items():
             if attr_name in cls._attributes:
                 deserialized[attr_name] = cls._attributes[attr_name].deserialize(value)
             else:
                 deserialized[attr_name] = value
-        return cls(**deserialized)
+        instance = cls(**deserialized)
+        # Store original for change tracking (enables smart updates)
+        instance._original = data.copy()
+        instance._changed = set()
+        return instance
 
     def __repr__(self) -> str:
         attrs = ", ".join(f"{k}={v!r}" for k, v in self.to_dict().items())

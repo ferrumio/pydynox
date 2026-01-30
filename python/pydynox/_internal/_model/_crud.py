@@ -12,7 +12,7 @@ from pydynox._internal._model._helpers import (
     prepare_delete,
     prepare_delete_by_key,
     prepare_get,
-    prepare_save,
+    prepare_smart_save,
     prepare_update,
     prepare_update_by_key,
 )
@@ -62,8 +62,13 @@ def get(
     return result
 
 
-def save(self: Model, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
-    """Save model to DynamoDB."""
+def save(
+    self: Model,
+    condition: Condition | None = None,
+    skip_hooks: bool | None = None,
+    full_replace: bool = False,
+) -> None:
+    """Save model to DynamoDB. Uses smart update by default (only changed fields)."""
     # Start S3 metrics collection for uploads
     _start_s3_metrics_collection()
 
@@ -77,27 +82,51 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
     _start_kms_metrics_collection()
 
     # prepare: run BEFORE_SAVE hooks, auto-generate, version condition, size check
-    client, table, item, cond_expr, attr_names, attr_values, skip = prepare_save(
-        self, condition, skip_hooks
-    )
+    (
+        client,
+        table,
+        key_or_item,
+        cond_expr,
+        attr_names,
+        attr_values,
+        skip,
+        use_update,
+        updates,
+    ) = prepare_smart_save(self, condition, skip_hooks, full_replace)
 
     # Collect KMS metrics from serialization
     kms_duration, kms_calls = _stop_kms_metrics_collection()
 
-    if cond_expr is not None:
-        client.sync_put_item(
-            table,
-            item,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
-        )
+    if use_update and updates:
+        # Smart update: UpdateItem with only changed fields
+        if cond_expr is not None:
+            client.sync_update_item(
+                table,
+                key_or_item,
+                updates=updates,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=attr_values,
+            )
+        else:
+            client.sync_update_item(table, key_or_item, updates=updates)
     else:
-        client.sync_put_item(table, item)
+        # Full replace: PutItem with all fields
+        if cond_expr is not None:
+            client.sync_put_item(
+                table,
+                key_or_item,
+                condition_expression=cond_expr,
+                expression_attribute_names=attr_names,
+                expression_attribute_values=attr_values,
+            )
+        else:
+            client.sync_put_item(table, key_or_item)
 
     # Record metrics from client
     if client._last_metrics is not None:
-        self.__class__._record_metrics(client._last_metrics, "put")
+        op_type = "update" if use_update else "put"
+        self.__class__._record_metrics(client._last_metrics, op_type)
 
     # Record KMS metrics
     if kms_calls > 0:
@@ -109,7 +138,7 @@ def save(self: Model, condition: Condition | None = None, skip_hooks: bool | Non
             s3_duration, s3_calls, s3_uploaded, s3_downloaded
         )
 
-    # finalize: run AFTER_SAVE hooks
+    # finalize: run AFTER_SAVE hooks and reset change tracking
     finalize_save(self, skip)
 
 
