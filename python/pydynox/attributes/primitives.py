@@ -68,6 +68,7 @@ class StringAttribute(Attribute[str]):
         default: str | None = None,
         required: bool = False,
         template: str | None = None,
+        discriminator: bool = False,
     ):
         """Create a StringAttribute.
 
@@ -77,9 +78,14 @@ class StringAttribute(Attribute[str]):
             default: Default value when not provided.
             required: Whether this field is required.
             template: Template for building key (e.g., "USER#{email}").
+            discriminator: True if this field is used for model inheritance.
         """
         super().__init__(
-            partition_key=partition_key, sort_key=sort_key, default=default, required=required
+            partition_key=partition_key,
+            sort_key=sort_key,
+            default=default,
+            required=required,
+            discriminator=discriminator,
         )
         self.template = template
         self._template_parts: list[_TemplatePart] | None = None

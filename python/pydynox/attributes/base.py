@@ -50,6 +50,7 @@ class Attribute(Generic[T]):
         sort_key: bool = False,
         default: T | None = None,
         required: bool = False,
+        discriminator: bool = False,
     ):
         """Create an attribute.
 
@@ -58,11 +59,13 @@ class Attribute(Generic[T]):
             sort_key: True if this is the sort key.
             default: Default value when not provided.
             required: Whether this field is required (cannot be None).
+            discriminator: True if this field is used for model inheritance.
         """
         self.partition_key = partition_key
         self.sort_key = sort_key
         self.default = default
         self.required = required
+        self.discriminator = discriminator
         self.attr_name: str | None = None
 
     def __set__(self, instance: Any, value: T | None) -> None:

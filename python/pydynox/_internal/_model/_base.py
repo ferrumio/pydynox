@@ -33,6 +33,8 @@ class ModelMeta(type):
     _attributes: dict[str, Attribute[Any]]
     _partition_key: str | None
     _sort_key: str | None
+    _discriminator_attr: str | None
+    _discriminator_registry: dict[str, type]
     _hooks: dict[HookType, list[Any]]
     _indexes: dict[str, GlobalSecondaryIndex[Any]]
     _local_indexes: dict[str, LocalSecondaryIndex[Any]]
@@ -42,6 +44,8 @@ class ModelMeta(type):
         attributes: dict[str, Attribute[Any]] = {}
         partition_key: str | None = None
         sort_key: str | None = None
+        discriminator_attr: str | None = None
+        discriminator_registry: dict[str, type] = {}
         hooks: dict[HookType, list[Any]] = {hook_type: [] for hook_type in HookType}
         indexes: dict[str, GlobalSecondaryIndex[Any]] = {}
         local_indexes: dict[str, LocalSecondaryIndex[Any]] = {}
@@ -50,12 +54,31 @@ class ModelMeta(type):
             base_attrs = getattr(base, "_attributes", None)
             if base_attrs is not None:
                 attributes.update(base_attrs)
+            else:
+                # Base class without metaclass - collect attributes from __dict__
+                for attr_name, attr_value in base.__dict__.items():
+                    if isinstance(attr_value, Attribute):
+                        attr_value.attr_name = attr_name
+                        attributes[attr_name] = attr_value
+                        if attr_value.partition_key:
+                            partition_key = attr_name
+                        if attr_value.sort_key:
+                            sort_key = attr_name
+                        if getattr(attr_value, "discriminator", False):
+                            discriminator_attr = attr_name
+
             base_partition_key = getattr(base, "_partition_key", None)
             if base_partition_key:
                 partition_key = base_partition_key
             base_sort_key = getattr(base, "_sort_key", None)
             if base_sort_key:
                 sort_key = base_sort_key
+            base_discriminator = getattr(base, "_discriminator_attr", None)
+            if base_discriminator:
+                discriminator_attr = base_discriminator
+            base_registry = getattr(base, "_discriminator_registry", None)
+            if base_registry is not None:
+                discriminator_registry.update(base_registry)
             base_hooks = getattr(base, "_hooks", None)
             if base_hooks is not None:
                 for hook_type, hook_list in base_hooks.items():
@@ -76,6 +99,8 @@ class ModelMeta(type):
                     partition_key = attr_name
                 if attr_value.sort_key:
                     sort_key = attr_name
+                if getattr(attr_value, "discriminator", False):
+                    discriminator_attr = attr_name
 
             if callable(attr_value) and hasattr(attr_value, "_hook_type"):
                 hooks[getattr(attr_value, "_hook_type")].append(attr_value)
@@ -91,9 +116,30 @@ class ModelMeta(type):
         cls._attributes = attributes
         cls._partition_key = partition_key
         cls._sort_key = sort_key
+        cls._discriminator_attr = discriminator_attr
+        cls._discriminator_registry = discriminator_registry
         cls._hooks = hooks
         cls._indexes = indexes
         cls._local_indexes = local_indexes
+
+        # Register this class in ALL parent discriminator registries
+        if discriminator_attr and name != "ModelBase" and name != "Model":
+            # Walk up the inheritance chain and register in all registries
+            for base in bases:
+                current = base
+                while current is not None:
+                    base_registry = getattr(current, "_discriminator_registry", None)
+                    if base_registry is not None:
+                        base_registry[name] = cls
+                    # Move to parent
+                    parent_bases = getattr(current, "__bases__", ())
+                    current = None
+                    for parent in parent_bases:
+                        if hasattr(parent, "_discriminator_registry"):
+                            current = parent
+                            break
+            # Also register in own registry for subclasses
+            discriminator_registry[name] = cls
 
         # Each Model class gets its own metrics storage
         from pydynox._internal._metrics import MetricsStorage
@@ -119,6 +165,8 @@ class ModelBase(metaclass=ModelMeta):
     _attributes: ClassVar[dict[str, Attribute[Any]]]
     _partition_key: ClassVar[str | None]
     _sort_key: ClassVar[str | None]
+    _discriminator_attr: ClassVar[str | None]
+    _discriminator_registry: ClassVar[dict[str, type]]
     _hooks: ClassVar[dict[HookType, list[Any]]]
     _indexes: ClassVar[dict[str, GlobalSecondaryIndex[Any]]]
     _local_indexes: ClassVar[dict[str, LocalSecondaryIndex[Any]]]
@@ -337,6 +385,9 @@ class ModelBase(metaclass=ModelMeta):
             value = getattr(self, attr_name, None)
             if value is not None:
                 result[attr_name] = attr.serialize(value)
+            # Auto-set discriminator to class name
+            elif getattr(attr, "discriminator", False):
+                result[attr_name] = self.__class__.__name__
         return result
 
     def calculate_size(self, detailed: bool = False) -> ItemSize:
@@ -350,14 +401,23 @@ class ModelBase(metaclass=ModelMeta):
 
         Stores the original data for change tracking, enabling smart updates
         that only send changed fields to DynamoDB.
+
+        If the model has a discriminator field, returns the correct subclass.
         """
+        # Check if we should return a subclass based on discriminator
+        target_cls: type[M] = cls
+        if cls._discriminator_attr and cls._discriminator_registry:
+            type_value = data.get(cls._discriminator_attr)
+            if type_value and type_value in cls._discriminator_registry:
+                target_cls = cls._discriminator_registry[type_value]
+
         deserialized = {}
         for attr_name, value in data.items():
-            if attr_name in cls._attributes:
-                deserialized[attr_name] = cls._attributes[attr_name].deserialize(value)
+            if attr_name in target_cls._attributes:
+                deserialized[attr_name] = target_cls._attributes[attr_name].deserialize(value)
             else:
                 deserialized[attr_name] = value
-        instance = cls(**deserialized)
+        instance = target_cls(**deserialized)
         # Store original for change tracking (enables smart updates)
         instance._original = data.copy()
         instance._changed = set()
