@@ -1,6 +1,6 @@
 # pydynox 🐍⚙️
 
-[![CI](https://github.com/ferrumio/pydynox/actions/workflows/ci.yml/badge.svg)](https://github.com/ferrumio/pydynox/actions/workflows/ci.yml)
+[![Main](https://github.com/ferrumio/pydynox/actions/workflows/main.yml/badge.svg)](https://github.com/ferrumio/pydynox/actions/workflows/main.yml)
 [![PyPI version](https://img.shields.io/pypi/v/pydynox.svg)](https://pypi.org/project/pydynox/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pydynox.svg)](https://pypi.org/project/pydynox/)
 [![License](https://img.shields.io/pypi/l/pydynox.svg)](https://github.com/ferrumio/pydynox/blob/main/LICENSE)
