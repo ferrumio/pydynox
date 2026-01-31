@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.24.0] - 2026-01-31
+
+
+### Documentation
+
+- update changelog for v0.23.0 (#229)
+
+
+### Features
+
+- smart save - only send changed fields to DynamoDB (#232)
+- adding model inheritance (#234)
+
+
+### Refactoring
+
+- rename hash e range key names
 ## [0.23.0] - 2026-01-30
 
 
