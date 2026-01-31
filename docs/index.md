@@ -65,12 +65,11 @@ This means your FastAPI or aiohttp app can handle other requests while waiting f
 
 ## Built on AWS SDK for Rust
 
-pydynox uses the official [AWS SDK for Rust](https://aws.amazon.com/sdk-for-rust/) under the hood. This is the same SDK that AWS uses internally and recommends for production workloads.
+pydynox uses the official [AWS SDK for Rust](https://aws.amazon.com/sdk-for-rust/) under the hood.
 
 What this means for you:
 
 - **Official support** - The SDK is maintained by AWS, not a third-party library
-- **Battle-tested** - Used in production across AWS services
 - **Correct behavior** - Retry logic, error handling, and edge cases follow AWS best practices
 - **Future-proof** - As DynamoDB evolves, the SDK evolves with it
 
