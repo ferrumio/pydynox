@@ -405,7 +405,7 @@ class ModelBase(metaclass=ModelMeta):
         If the model has a discriminator field, returns the correct subclass.
         """
         # Check if we should return a subclass based on discriminator
-        target_cls = cls
+        target_cls: type[M] = cls
         if cls._discriminator_attr and cls._discriminator_registry:
             type_value = data.get(cls._discriminator_attr)
             if type_value and type_value in cls._discriminator_registry:
