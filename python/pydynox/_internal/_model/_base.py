@@ -409,7 +409,7 @@ class ModelBase(metaclass=ModelMeta):
         if cls._discriminator_attr and cls._discriminator_registry:
             type_value = data.get(cls._discriminator_attr)
             if type_value and type_value in cls._discriminator_registry:
-                target_cls = cls._discriminator_registry[type_value]  # type: ignore[assignment]
+                target_cls = cls._discriminator_registry[type_value]
 
         deserialized = {}
         for attr_name, value in data.items():

@@ -115,6 +115,90 @@ Multiple models can share the same table. This is the core of single-table desig
 
 The `begins_with("ORDER#")` filter is important. Without it, the query would also return the user's profile (which has the same pk but sk="PROFILE").
 
+## Collection - multi-entity query
+
+When you have multiple entity types under the same partition key, you often want to fetch them all in one query. `Collection` does this for you.
+
+Instead of:
+
+```python
+user = await User.get(pk="USER#123", sk="PROFILE")
+orders = [o async for o in Order.query(pk="USER#123")]
+# = 2 DynamoDB calls
+```
+
+Use Collection:
+
+```python
+from pydynox import Collection
+
+collection = Collection([User, Order, Address])
+result = await collection.query(pk="USER#123")
+# = 1 DynamoDB call
+
+result.users      # [User(...)]
+result.orders     # [Order(...), Order(...)]
+result.addresses  # [Address(...)]
+```
+
+### Requirements
+
+All models in a Collection must:
+
+1. Share the same table
+2. Have a discriminator field (`_type = StringAttribute(discriminator=True)`)
+
+The discriminator tells pydynox which model class to use when deserializing each item.
+
+### Basic usage
+
+=== "basic.py"
+    ```python
+    --8<-- "docs/examples/collection/basic.py"
+    ```
+
+### Filter by sort key
+
+Use `sk_begins_with` to filter results:
+
+=== "sk_filter.py"
+    ```python
+    --8<-- "docs/examples/collection/sk_filter.py"
+    ```
+
+### With inheritance
+
+Collection works well with model inheritance:
+
+=== "with_inheritance.py"
+    ```python
+    --8<-- "docs/examples/collection/with_inheritance.py"
+    ```
+
+### Typed results
+
+Results are fully typed. IDE autocomplete works:
+
+```python
+result = await collection.query(pk="USER#123")
+
+# IDE knows these are User and Order instances
+user: User = result.users[0]
+order: Order = result.orders[0]
+
+# Autocomplete works
+print(user.name)    # User.name
+print(order.total)  # Order.total
+```
+
+### Sync version
+
+Use `sync_query` for synchronous code:
+
+```python
+result = collection.sync_query(pk="USER#123")
+```
+
 ## Best practices
 
 | Practice | Why |
@@ -123,6 +207,7 @@ The `begins_with("ORDER#")` filter is important. Without it, the query would als
 | Match placeholder names to attributes | `template="USER#{user_id}"` with `user_id = StringAttribute()` |
 | Filter by sk prefix | When querying mixed entities with same pk |
 | Create GSI at table creation | Adding GSIs later requires a migration |
+| Use discriminator for Collection | Required for multi-entity queries |
 
 ## Testing your code
 

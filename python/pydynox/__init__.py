@@ -22,6 +22,7 @@ from pydynox._internal._logging import set_correlation_id, set_logger
 from pydynox._internal._tracing import disable_tracing, enable_tracing
 from pydynox.batch_operations import BatchWriter, SyncBatchWriter
 from pydynox.client import DynamoDBClient
+from pydynox.collection import Collection, CollectionResult
 from pydynox.conditions import Condition
 from pydynox.config import (
     ModelConfig,
@@ -46,6 +47,8 @@ __all__ = [
     # Operations
     "BatchWriter",
     "SyncBatchWriter",
+    "Collection",
+    "CollectionResult",
     "Condition",
     "SyncTransaction",
     "Transaction",
