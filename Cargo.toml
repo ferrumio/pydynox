@@ -22,7 +22,7 @@ pyo3 = { version = "0.27", features = ["extension-module"] }
 pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }
 aws-sdk-dynamodb = "1.103"
 aws-sdk-kms = "1.98"
-aws-sdk-s3 = "1.120"
+aws-sdk-s3 = "1.121"
 aws-sdk-sts = "1.96"
 aws-config = { version = "1.5", features = ["behavior-version-latest"] }
 tokio = { version = "1", features = [
