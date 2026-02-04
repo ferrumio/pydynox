@@ -10,7 +10,7 @@ We support the latest minor version. When 1.0 is released, we will support the l
 
 ## Reporting a vulnerability
 
-Open a GitHub issue with the label `security`. We will prioritize it.
+[Open a GitHub issue](https://github.com/ferrumio/pydynox/issues/new?labels=security) with the label `security`. We will prioritize it.
 
 Include:
 - Description of the issue
