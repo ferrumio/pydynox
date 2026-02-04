@@ -132,22 +132,18 @@ pub fn transact_get<'py>(
         let result = execute_transact_get(client, transact_items).await;
 
         match result {
-            Ok(raw) =>
-            {
-                #[allow(deprecated)]
-                Python::with_gil(|py| {
-                    let py_list = PyList::empty(py);
-                    for response in raw.responses {
-                        if let Some(item) = response {
-                            let py_dict = attribute_values_to_py_dict(py, item)?;
-                            py_list.append(py_dict)?;
-                        } else {
-                            py_list.append(py.None())?;
-                        }
+            Ok(raw) => Python::attach(|py| {
+                let py_list = PyList::empty(py);
+                for response in raw.responses {
+                    if let Some(item) = response {
+                        let py_dict = attribute_values_to_py_dict(py, item)?;
+                        py_list.append(py_dict)?;
+                    } else {
+                        py_list.append(py.None())?;
                     }
-                    Ok(py_list.into_any().unbind())
-                })
-            }
+                }
+                Ok(py_list.into_any().unbind())
+            }),
             Err(e) => Err(map_sdk_error(e, None)),
         }
     })

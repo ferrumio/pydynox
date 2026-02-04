@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::py_dict_to_attribute_values;
+use crate::conversions::{extract_string_map, py_dict_to_attribute_values};
 use crate::errors::map_sdk_error_with_item;
 use crate::metrics::OperationMetrics;
 
@@ -37,17 +37,7 @@ pub fn prepare_put_item(
     return_values_on_condition_check_failure: bool,
 ) -> PyResult<PreparedPutItem> {
     let dynamo_item = py_dict_to_attribute_values(py, item)?;
-
-    let names = match expression_attribute_names {
-        Some(dict) => {
-            let mut map = HashMap::new();
-            for (k, v) in dict.iter() {
-                map.insert(k.extract::<String>()?, v.extract::<String>()?);
-            }
-            Some(map)
-        }
-        None => None,
-    };
+    let names = extract_string_map(expression_attribute_names)?;
 
     let values = match expression_attribute_values {
         Some(dict) => Some(py_dict_to_attribute_values(py, dict)?),

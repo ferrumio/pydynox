@@ -141,8 +141,7 @@ pub fn execute_statement<'py>(
         let result =
             execute_statement_core(client, statement, params, consistent_read, next_token).await;
 
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
+        Python::attach(|py| match result {
             Ok(raw) => {
                 let py_result = PyDict::new(py);
 

@@ -9,7 +9,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{attribute_values_to_py_dict, py_dict_to_attribute_values};
+use crate::conversions::{
+    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+};
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
 
@@ -38,17 +40,7 @@ pub fn prepare_get_item(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<PreparedGetItem> {
     let dynamo_key = py_dict_to_attribute_values(py, key)?;
-
-    let names = match expression_attribute_names {
-        Some(dict) => {
-            let mut map = HashMap::new();
-            for (k, v) in dict.iter() {
-                map.insert(k.extract::<String>()?, v.extract::<String>()?);
-            }
-            Some(map)
-        }
-        None => None,
-    };
+    let names = extract_string_map(expression_attribute_names)?;
 
     Ok(PreparedGetItem {
         table: table.to_string(),
@@ -171,8 +163,7 @@ pub fn get_item<'py>(
         let result = execute_get_item(client, prepared).await;
 
         // Convert result back to Python (needs GIL)
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
+        Python::attach(|py| match result {
             Ok(raw) => {
                 let py_result = PyDict::new(py);
                 if let Some(item) = raw.item {
