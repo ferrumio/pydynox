@@ -316,7 +316,6 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-
                 raise ConditionalCheckFailedException("Condition check failed")
 
         tbl[key_str] = copy.deepcopy(item)
@@ -360,7 +359,6 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-
                 raise ConditionalCheckFailedException("Condition check failed")
 
         tbl.pop(key_str, None)
@@ -393,7 +391,6 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-
                 raise ConditionalCheckFailedException("Condition check failed")
 
         # Create item if not exists
