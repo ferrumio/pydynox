@@ -9,7 +9,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{attribute_values_to_py_dict, py_dict_to_attribute_values};
+use crate::conversions::{
+    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+};
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
 
@@ -58,16 +60,7 @@ pub fn prepare_query(
     index_name: Option<String>,
     consistent_read: bool,
 ) -> PyResult<PreparedQuery> {
-    let names = match expression_attribute_names {
-        Some(dict) => {
-            let mut map = HashMap::new();
-            for (k, v) in dict.iter() {
-                map.insert(k.extract::<String>()?, v.extract::<String>()?);
-            }
-            Some(map)
-        }
-        None => None,
-    };
+    let names = extract_string_map(expression_attribute_names)?;
 
     let values = match expression_attribute_values {
         Some(dict) => Some(py_dict_to_attribute_values(py, dict)?),
@@ -276,8 +269,7 @@ pub fn query<'py>(
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_query(client, prepared).await;
 
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
+        Python::attach(|py| match result {
             Ok(raw) => {
                 let py_result = PyDict::new(py);
 

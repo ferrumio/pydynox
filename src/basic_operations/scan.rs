@@ -9,7 +9,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{attribute_values_to_py_dict, py_dict_to_attribute_values};
+use crate::conversions::{
+    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+};
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
 
@@ -58,16 +60,7 @@ pub fn prepare_scan(
     segment: Option<i32>,
     total_segments: Option<i32>,
 ) -> PyResult<PreparedScan> {
-    let names = match expression_attribute_names {
-        Some(dict) => {
-            let mut map = HashMap::new();
-            for (k, v) in dict.iter() {
-                map.insert(k.extract::<String>()?, v.extract::<String>()?);
-            }
-            Some(map)
-        }
-        None => None,
-    };
+    let names = extract_string_map(expression_attribute_names)?;
 
     let values = match expression_attribute_values {
         Some(dict) => Some(py_dict_to_attribute_values(py, dict)?),
@@ -276,8 +269,7 @@ pub fn scan<'py>(
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_scan(client, prepared).await;
 
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
+        Python::attach(|py| match result {
             Ok(raw) => {
                 let py_result = PyDict::new(py);
 
@@ -323,16 +315,7 @@ pub fn prepare_count(
     index_name: Option<String>,
     consistent_read: bool,
 ) -> PyResult<PreparedCount> {
-    let names = match expression_attribute_names {
-        Some(dict) => {
-            let mut map = HashMap::new();
-            for (k, v) in dict.iter() {
-                map.insert(k.extract::<String>()?, v.extract::<String>()?);
-            }
-            Some(map)
-        }
-        None => None,
-    };
+    let names = extract_string_map(expression_attribute_names)?;
 
     let values = match expression_attribute_values {
         Some(dict) => Some(py_dict_to_attribute_values(py, dict)?),
@@ -494,8 +477,7 @@ pub fn count<'py>(
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_count(client, prepared).await;
 
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
+        Python::attach(|py| match result {
             Ok(r) => {
                 let py_result = PyDict::new(py);
                 py_result.set_item("count", r.count)?;
@@ -536,16 +518,7 @@ pub fn prepare_parallel_scan(
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     consistent_read: bool,
 ) -> PyResult<PreparedParallelScan> {
-    let names = match expression_attribute_names {
-        Some(dict) => {
-            let mut map = HashMap::new();
-            for (k, v) in dict.iter() {
-                map.insert(k.extract::<String>()?, v.extract::<String>()?);
-            }
-            Some(map)
-        }
-        None => None,
-    };
+    let names = extract_string_map(expression_attribute_names)?;
 
     let values = match expression_attribute_values {
         Some(dict) => Some(py_dict_to_attribute_values(py, dict)?),
@@ -740,8 +713,7 @@ pub fn parallel_scan<'py>(
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_parallel_scan(client, prepared).await;
 
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
+        Python::attach(|py| match result {
             Ok(raw) => {
                 let py_result = PyDict::new(py);
 

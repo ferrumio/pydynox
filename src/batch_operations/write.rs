@@ -210,10 +210,9 @@ pub fn batch_write<'py>(
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_batch_write(&client, &prepared).await;
 
-        #[allow(deprecated)]
-        Python::with_gil(|_py| match result {
+        match result {
             Ok(()) => Ok(()),
             Err((e, tbl)) => Err(map_sdk_error(e, Some(&tbl))),
-        })
+        }
     })
 }

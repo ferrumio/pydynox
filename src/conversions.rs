@@ -7,6 +7,24 @@ use std::collections::HashMap;
 
 use crate::serialization::py_to_dynamo;
 
+/// Extract a HashMap<String, String> from an optional Python dict.
+///
+/// Used for expression_attribute_names conversion.
+pub fn extract_string_map(
+    dict: Option<&Bound<'_, PyDict>>,
+) -> PyResult<Option<HashMap<String, String>>> {
+    match dict {
+        Some(d) => {
+            let mut map = HashMap::new();
+            for (k, v) in d.iter() {
+                map.insert(k.extract::<String>()?, v.extract::<String>()?);
+            }
+            Ok(Some(map))
+        }
+        None => Ok(None),
+    }
+}
+
 /// Convert a Python value to a DynamoDB AttributeValue.
 ///
 /// This handles simple Python types (str, int, float, bool, None, list, dict).

@@ -210,8 +210,7 @@ pub fn batch_get<'py>(
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_batch_get(&client, &prepared).await;
 
-        #[allow(deprecated)]
-        Python::with_gil(|py| match result {
+        Python::attach(|py| match result {
             Ok(raw) => {
                 let py_list = PyList::empty(py);
                 for item in raw.items {

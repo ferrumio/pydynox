@@ -22,10 +22,9 @@
 //! | set[int/float] | NS | `{"NS": ["1", "2"]}` |
 //! | set[bytes] | BS | `{"BS": ["base64..."]}` |
 
+use base64::Engine;
 use pyo3::prelude::*;
-use pyo3::types::{
-    PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PyModule, PySet, PyString,
-};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
 use std::collections::HashMap;
 
 /// Convert a Python object to a DynamoDB AttributeValue representation.
@@ -95,10 +94,8 @@ pub fn py_to_dynamo<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<P
         result.set_item("N", obj.str()?.to_str()?)?;
     } else if let Ok(bytes) = obj.cast::<PyBytes>() {
         // Binary data - encode as base64
-        let base64 = PyModule::import(py, "base64")?;
-        let encoded = base64.call_method1("b64encode", (bytes,))?;
-        let encoded_str = encoded.call_method0("decode")?;
-        result.set_item("B", encoded_str)?;
+        let encoded = base64::engine::general_purpose::STANDARD.encode(bytes.as_bytes());
+        result.set_item("B", encoded)?;
     } else if let Ok(set) = obj.cast::<PySet>() {
         convert_set_to_dynamo(py, set.iter(), &result)?;
     } else if let Ok(frozen_set) = obj.cast::<PyFrozenSet>() {
@@ -134,7 +131,7 @@ pub fn py_to_dynamo<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<P
 /// DynamoDB sets must be homogeneous (all same type).
 /// Empty sets are not allowed in DynamoDB.
 fn convert_set_to_dynamo<'py, I>(
-    py: Python<'py>,
+    _py: Python<'py>,
     iter: I,
     result: &Bound<'py, PyDict>,
 ) -> PyResult<()>
@@ -184,7 +181,6 @@ where
         result.set_item("NS", numbers)?;
     } else if first.cast::<PyBytes>().is_ok() {
         // Binary Set (BS) - encode each as base64
-        let base64 = PyModule::import(py, "base64")?;
         let binaries: Vec<String> = items
             .iter()
             .map(|item| {
@@ -193,9 +189,7 @@ where
                         "Binary set must contain only bytes",
                     )
                 })?;
-                let encoded = base64.call_method1("b64encode", (bytes,))?;
-                let encoded_str: String = encoded.call_method0("decode")?.extract()?;
-                Ok(encoded_str)
+                Ok(base64::engine::general_purpose::STANDARD.encode(bytes.as_bytes()))
             })
             .collect::<PyResult<Vec<_>>>()?;
         result.set_item("BS", binaries)?;
@@ -292,9 +286,17 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<Py<PyA
 
     // Binary (base64 encoded)
     if let Some(b) = attr.get_item("B")? {
-        let base64 = PyModule::import(py, "base64")?;
-        let decoded = base64.call_method1("b64decode", (b,))?;
-        return Ok(decoded.unbind());
+        let b_str: String = b.extract()?;
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(&b_str)
+            .map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Invalid base64 encoding: {}",
+                    e
+                ))
+            })?;
+        let py_bytes = pyo3::types::PyBytes::new(py, &decoded);
+        return Ok(py_bytes.into_any().unbind());
     }
 
     // List
@@ -354,11 +356,19 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<Py<PyA
 
     // Binary Set
     if let Some(bs) = attr.get_item("BS")? {
-        let base64 = PyModule::import(py, "base64")?;
         let py_set = PySet::empty(py)?;
         for item in bs.cast::<PyList>()?.iter() {
-            let decoded = base64.call_method1("b64decode", (item,))?;
-            py_set.add(decoded)?;
+            let b_str: String = item.extract()?;
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(&b_str)
+                .map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                        "Invalid base64 encoding: {}",
+                        e
+                    ))
+                })?;
+            let py_bytes = pyo3::types::PyBytes::new(py, &decoded);
+            py_set.add(py_bytes)?;
         }
         return Ok(py_set.unbind().into_any());
     }
