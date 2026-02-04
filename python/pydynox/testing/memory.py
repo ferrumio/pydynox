@@ -11,6 +11,8 @@ from functools import wraps
 from typing import Any, Callable, Iterator, TypeVar
 
 from pydynox.config import clear_default_client, get_default_client, set_default_client
+from pydynox.exceptions import ConditionalCheckFailedException
+from pydynox.model import Model
 
 
 @dataclass
@@ -139,8 +141,6 @@ class MemoryBackend:
 
     def _clear_model_caches(self) -> None:
         """Clear _client_instance cache from all Model subclasses."""
-        from pydynox.model import Model
-
         for subclass in Model.__subclasses__():
             if hasattr(subclass, "_client_instance"):
                 subclass._client_instance = None
@@ -316,7 +316,6 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-                from pydynox.exceptions import ConditionalCheckFailedException
 
                 raise ConditionalCheckFailedException("Condition check failed")
 
@@ -361,7 +360,6 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-                from pydynox.exceptions import ConditionalCheckFailedException
 
                 raise ConditionalCheckFailedException("Condition check failed")
 
@@ -395,7 +393,6 @@ class MemoryClient:
                 expression_attribute_names,
                 expression_attribute_values,
             ):
-                from pydynox.exceptions import ConditionalCheckFailedException
 
                 raise ConditionalCheckFailedException("Condition check failed")
 

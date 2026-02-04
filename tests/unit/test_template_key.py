@@ -1,5 +1,7 @@
 """Tests for StringAttribute template feature."""
 
+import sys
+
 import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute
@@ -355,3 +357,39 @@ def test_gsi_template_resolution_error():
     # Should fail - neither sk nor order_id provided
     with pytest.raises(ValueError, match="GSI query requires 'sk' or its template placeholders"):
         list(UserOrder.inverted_index.sync_query(wrong_key="value"))
+
+
+# ========== T-STRING TESTS (Python 3.14+) ==========
+
+
+@pytest.mark.skipif(sys.version_info < (3, 14), reason="t-strings require Python 3.14+")
+def test_tstring_template_parsing():
+    """Test that t-strings work as templates (Python 3.14+)."""
+    # This test only runs on Python 3.14+
+    # The t-string syntax t"USER#{email}" creates a Template object
+    # that _parse_template should handle
+
+    # We can't write actual t-string syntax here because it would
+    # fail to parse on older Python versions. Instead, we test
+    # the Template handling by creating a mock Template object.
+    from string.templatelib import Interpolation, Template
+
+    # Simulate t"USER#{email}"
+    template = Template("USER#", Interpolation("email", "email", None, ""), "")
+
+    attr = StringAttribute(partition_key=True, template=template)
+    assert attr.has_template
+    assert attr.placeholders == ["email"]
+
+
+@pytest.mark.skipif(sys.version_info < (3, 14), reason="t-strings require Python 3.14+")
+def test_tstring_build_key():
+    """Test building key from t-string template."""
+    from string.templatelib import Interpolation, Template
+
+    # Simulate t"USER#{email}"
+    template = Template("USER#", Interpolation("email", "email", None, ""), "")
+
+    attr = StringAttribute(partition_key=True, template=template)
+    key = attr.build_key({"email": "john@example.com"})
+    assert key == "USER#john@example.com"

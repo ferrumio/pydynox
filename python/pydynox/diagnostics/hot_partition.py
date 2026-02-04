@@ -18,6 +18,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from pydynox import pydynox_core
+
 logger = logging.getLogger("pydynox.diagnostics")
 
 
@@ -53,8 +55,6 @@ class HotPartitionDetector:
         reads_threshold: int,
         window_seconds: int,
     ) -> None:
-        from pydynox import pydynox_core
-
         self._tracker = pydynox_core.HotPartitionTracker(
             writes_threshold=writes_threshold,
             reads_threshold=reads_threshold,
