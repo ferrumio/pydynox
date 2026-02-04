@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,11 +18,35 @@ class _TemplatePart:
     value: str  # literal text or attribute name
 
 
-def _parse_template(template: str) -> list[_TemplatePart]:
-    """Parse template like 'USER#{email}' into parts."""
-    parts: list[_TemplatePart] = []
+def _parse_template(template: Any) -> list[_TemplatePart]:
+    """Parse template like 'USER#{email}' into parts.
+
+    Supports both regular strings and t-strings (Python 3.14+, PEP 750).
+
+    Args:
+        template: String template or Template object (t-string).
+
+    Returns:
+        List of template parts.
+    """
+    # Python 3.14+ t-string support
+    if sys.version_info >= (3, 14):
+        from string.templatelib import Interpolation, Template
+
+        if isinstance(template, Template):
+            parts: list[_TemplatePart] = []
+            for item in template:
+                if isinstance(item, str):
+                    if item:  # skip empty strings
+                        parts.append(_TemplatePart(is_placeholder=False, value=item))
+                elif isinstance(item, Interpolation):
+                    parts.append(_TemplatePart(is_placeholder=True, value=item.expression))
+            return parts
+
+    # Regular string template (all Python versions)
+    parts = []
     pattern = r"\{(\w+)\}|([^{]+)"
-    for match in re.finditer(pattern, template):
+    for match in re.finditer(pattern, str(template)):
         if match.group(1):  # placeholder
             parts.append(_TemplatePart(is_placeholder=True, value=match.group(1)))
         else:  # literal
@@ -46,6 +71,7 @@ class StringAttribute(Attribute[str]):
     """String attribute (DynamoDB type S).
 
     Supports optional template for single-table design patterns.
+    On Python 3.14+, t-strings (PEP 750) are also supported.
 
     Example:
         >>> class User(Model):
@@ -57,6 +83,9 @@ class StringAttribute(Attribute[str]):
         >>>
         >>> user = User(email="john@example.com", name="John")
         >>> # pk is auto-built as "USER#john@example.com"
+
+    Python 3.14+ t-string example:
+        >>> pk = StringAttribute(partition_key=True, template=t"USER#{email}")
     """
 
     attr_type = "S"
@@ -67,7 +96,7 @@ class StringAttribute(Attribute[str]):
         sort_key: bool = False,
         default: str | None = None,
         required: bool = False,
-        template: str | None = None,
+        template: Any | None = None,
         discriminator: bool = False,
     ):
         """Create a StringAttribute.
@@ -77,7 +106,8 @@ class StringAttribute(Attribute[str]):
             sort_key: True if this is the sort key.
             default: Default value when not provided.
             required: Whether this field is required.
-            template: Template for building key (e.g., "USER#{email}").
+            template: Template for building key. Supports strings ("USER#{email}")
+                and t-strings (t"USER#{email}") on Python 3.14+.
             discriminator: True if this field is used for model inheritance.
         """
         super().__init__(
