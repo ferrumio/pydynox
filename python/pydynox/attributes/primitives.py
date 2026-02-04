@@ -71,6 +71,7 @@ class StringAttribute(Attribute[str]):
     """String attribute (DynamoDB type S).
 
     Supports optional template for single-table design patterns.
+    On Python 3.14+, t-strings (PEP 750) are also supported.
 
     Example:
         >>> class User(Model):
@@ -82,6 +83,9 @@ class StringAttribute(Attribute[str]):
         >>>
         >>> user = User(email="john@example.com", name="John")
         >>> # pk is auto-built as "USER#john@example.com"
+
+    Python 3.14+ t-string example:
+        >>> pk = StringAttribute(partition_key=True, template=t"USER#{email}")
     """
 
     attr_type = "S"

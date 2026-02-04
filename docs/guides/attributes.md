@@ -54,6 +54,35 @@ class User(Model):
     email = StringAttribute(required=True)  # Required
 ```
 
+#### Key templates
+
+Use templates to build composite keys for single-table design:
+
+```python
+class User(Model):
+    model_config = ModelConfig(table="app")
+    
+    pk = StringAttribute(partition_key=True, template="USER#{user_id}")
+    sk = StringAttribute(sort_key=True, template="PROFILE")
+    user_id = StringAttribute()
+
+user = User(user_id="123")
+# pk is auto-built as "USER#123"
+```
+
+On Python 3.14+, you can use t-strings ([PEP 750](https://peps.python.org/pep-0750/)) for templates:
+
+```python
+class User(Model):
+    model_config = ModelConfig(table="app")
+    
+    pk = StringAttribute(partition_key=True, template=t"USER#{user_id}")
+    sk = StringAttribute(sort_key=True, template=t"PROFILE")
+    user_id = StringAttribute()
+```
+
+T-strings work the same as regular string templates. The syntax is cleaner and gets IDE support for the placeholders.
+
 ### NumberAttribute
 
 Store integers and floats. DynamoDB stores all numbers as strings internally.
