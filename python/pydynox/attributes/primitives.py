@@ -40,7 +40,7 @@ def _parse_template(template: Any) -> list[_TemplatePart]:
                     if item:  # skip empty strings
                         parts.append(_TemplatePart(is_placeholder=False, value=item))
                 elif isinstance(item, Interpolation):
-                    parts.append(_TemplatePart(is_placeholder=True, value=item.expr))
+                    parts.append(_TemplatePart(is_placeholder=True, value=item.expression))
             return parts
 
     # Regular string template (all Python versions)
