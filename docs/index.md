@@ -2,8 +2,8 @@
 
 An async-first DynamoDB ORM for Python with a Rust core.
 
-!!! info "📢 Stable Release: March 2-6, 2026"
-    We're in the final stretch! The API is stabilizing, performance is being polished, and we're building the remaining features. We might release earlier if everything goes well. Stay tuned!
+!!! info "📢 1.0 Release: March 2-6, 2026"
+    The API is stable and fully async. We're collecting feedback before the official release. Try it out and let us know what you think!
 
 ## The problem
 
