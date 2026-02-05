@@ -4,11 +4,37 @@ All notable changes to this project will be documented in this file.
 ## [0.25.0] - 2026-02-05
 
 
+### CI/CD
+
+- bump actions/cache from 5.0.2 to 5.0.3 (#241)
+- bump CodSpeedHQ/action from 4.8.2 to 4.10.4 (#240)
+- bump github/codeql-action from 4.32.0 to 4.32.1 (#239)
+- bump astral-sh/setup-uv from 7.2.0 to 7.2.1 (#238)
+
+
+### Documentation
+
+- update changelog for v0.24.0 (#235)
+- add security docs
+- add security docs
+- launch
+
+
 ### Features
 
-- add debug-level logging for observability (#246)
+- add Collection for multi-entity queries (#237)
+- add tstring support (#243)
+- adding debug logs (#247)
 
 
+### Refactoring
+
+- clean up rust code (#245)
+
+
+### Deps
+
+- bump aws-sdk-s3 in the rust-dependencies group (#242)
 ## [0.24.0] - 2026-01-31
 
 
