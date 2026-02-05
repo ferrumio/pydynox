@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydynox._internal._logging import _log_operation, _log_warning
+from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import ListWithMetrics
 
 _SLOW_QUERY_THRESHOLD_MS = 100.0
@@ -21,6 +21,7 @@ class PartiqlOperations:
         next_token: str | None = None,
     ) -> ListWithMetrics:
         """Execute a PartiQL statement (sync)."""
+        _log_debug("sync_execute_statement", f"Executing: {statement[:50]}...")
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
         items, next_token_out, metrics = self._client.sync_execute_statement(  # type: ignore[attr-defined]
             statement,
@@ -46,6 +47,7 @@ class PartiqlOperations:
         next_token: str | None = None,
     ) -> ListWithMetrics:
         """Execute a PartiQL statement (async)."""
+        _log_debug("execute_statement", f"Executing: {statement[:50]}...")
         self._acquire_rcu(1.0)  # type: ignore[attr-defined]
         result = await self._client.execute_statement(  # type: ignore[attr-defined]
             statement,
