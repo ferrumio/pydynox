@@ -1,6 +1,14 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.25.0] - 2026-02-05
+
+
+### Features
+
+- add debug-level logging for observability (#246)
+
+
 ## [0.24.0] - 2026-01-31
 
 
