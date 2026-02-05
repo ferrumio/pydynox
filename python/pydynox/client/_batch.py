@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydynox._internal._logging import _log_debug
+
 
 class BatchOperations:
     """Batch and transaction operations."""
@@ -24,6 +26,9 @@ class BatchOperations:
         """
         put_count = len(put_items) if put_items else 0
         delete_count = len(delete_keys) if delete_keys else 0
+        _log_debug(
+            "batch_write", f'Batch writing to "{table}" ({put_count} puts, {delete_count} deletes)'
+        )
         self._acquire_wcu(float(put_count + delete_count))  # type: ignore[attr-defined]
         await self._client.batch_write(  # type: ignore[attr-defined]
             table,
@@ -45,6 +50,7 @@ class BatchOperations:
         - Retrying unprocessed keys with exponential backoff
         - Combining results from multiple requests
         """
+        _log_debug("batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
         return await self._client.batch_get(table, keys)  # type: ignore[attr-defined, no-any-return]
 
@@ -64,6 +70,10 @@ class BatchOperations:
         """
         put_count = len(put_items) if put_items else 0
         delete_count = len(delete_keys) if delete_keys else 0
+        _log_debug(
+            "sync_batch_write",
+            f'Batch writing to "{table}" ({put_count} puts, {delete_count} deletes)',
+        )
         self._acquire_wcu(float(put_count + delete_count))  # type: ignore[attr-defined]
         self._client.sync_batch_write(  # type: ignore[attr-defined]
             table,
@@ -85,6 +95,7 @@ class BatchOperations:
         - Retrying unprocessed keys with exponential backoff
         - Combining results from multiple requests
         """
+        _log_debug("sync_batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
         return self._client.sync_batch_get(table, keys)  # type: ignore[attr-defined, no-any-return]
 
@@ -95,6 +106,7 @@ class BatchOperations:
 
         All operations run atomically. Either all succeed or all fail.
         """
+        _log_debug("sync_transact_write", f"Running transaction ({len(operations)} operations)")
         self._client.sync_transact_write(operations)  # type: ignore[attr-defined]
 
     # ========== TRANSACT GET (SYNC) ==========
@@ -121,6 +133,7 @@ class BatchOperations:
                 {"table": "orders", "key": {"pk": "ORDER#1", "sk": "ITEM#1"}},
             ])
         """
+        _log_debug("sync_transact_get", f"Transact getting ({len(gets)} keys)")
         return self._client.sync_transact_get(gets)  # type: ignore[attr-defined, no-any-return]
 
     # ========== TRANSACT WRITE (ASYNC - default) ==========
@@ -130,6 +143,7 @@ class BatchOperations:
 
         All operations run atomically. Either all succeed or all fail.
         """
+        _log_debug("transact_write", f"Running transaction ({len(operations)} operations)")
         await self._client.transact_write(operations)  # type: ignore[attr-defined]
 
     # ========== TRANSACT GET (ASYNC - default) ==========
@@ -145,4 +159,5 @@ class BatchOperations:
         Returns:
             List of items (or None for items that don't exist).
         """
+        _log_debug("transact_get", f"Transact getting ({len(gets)} keys)")
         return await self._client.transact_get(gets)  # type: ignore[attr-defined, no-any-return]

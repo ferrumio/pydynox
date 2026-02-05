@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydynox._internal._logging import _log_operation
+from pydynox._internal._logging import _log_debug, _log_operation
 from pydynox._internal._metrics import OperationMetrics
 from pydynox.query import AsyncScanResult, ScanResult
 
@@ -128,6 +128,7 @@ class ScanOperations:
         consistent_read: bool = False,
     ) -> tuple[int, OperationMetrics]:
         """Count items in a DynamoDB table (sync)."""
+        _log_debug("sync_count", f'Counting items in "{table}"')
         count, metrics = self._client.sync_count(  # type: ignore[attr-defined]
             table,
             filter_expression=filter_expression,
@@ -149,6 +150,7 @@ class ScanOperations:
         consistent_read: bool = False,
     ) -> tuple[int, OperationMetrics]:
         """Count items in a DynamoDB table (async)."""
+        _log_debug("count", f'Counting items in "{table}"')
         result = await self._client.count(  # type: ignore[attr-defined]
             table,
             filter_expression=filter_expression,
@@ -195,6 +197,7 @@ class ScanOperations:
             >>> items, metrics = client.sync_parallel_scan("users", total_segments=4)
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
+        _log_debug("sync_parallel_scan", f'Parallel scanning "{table}" ({total_segments} segments)')
         items, metrics = self._client.sync_parallel_scan(  # type: ignore[attr-defined]
             table,
             total_segments,
@@ -240,6 +243,7 @@ class ScanOperations:
             >>> items, metrics = await client.parallel_scan("users", total_segments=4)
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
+        _log_debug("parallel_scan", f'Parallel scanning "{table}" ({total_segments} segments)')
         result = await self._client.parallel_scan(  # type: ignore[attr-defined]
             table,
             total_segments,

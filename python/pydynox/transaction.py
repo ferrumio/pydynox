@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pydynox._internal._logging import _log_debug
+
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
 
@@ -201,6 +203,7 @@ class Transaction:
         if not self._operations:
             return
 
+        _log_debug("transaction", f"Committing transaction ({len(self._operations)} operations)")
         await self._client.transact_write(self._operations)
 
         # Clear operations after successful commit
@@ -339,6 +342,7 @@ class SyncTransaction:
         if not self._operations:
             return
 
+        _log_debug("transaction", f"Committing transaction ({len(self._operations)} operations)")
         self._client.sync_transact_write(self._operations)
 
         # Clear operations after successful commit

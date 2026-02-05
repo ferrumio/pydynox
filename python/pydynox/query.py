@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from pydynox._internal._logging import _log_operation, _log_warning
+from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core
@@ -132,6 +132,9 @@ class QueryResult:
 
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
+
+        index_info = f" (index={self._index_name})" if self._index_name else ""
+        _log_debug("query", f'Running query on "{self._table}"{index_info}')
 
         items, self._last_evaluated_key, self._metrics = self._client.sync_query_page(
             self._table,
@@ -274,6 +277,9 @@ class AsyncQueryResult:
 
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
+
+        index_info = f" (index={self._index_name})" if self._index_name else ""
+        _log_debug("query", f'Running query on "{self._table}"{index_info}')
 
         result = await self._client.query_page(
             self._table,
@@ -428,6 +434,9 @@ class ScanResult:
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
 
+        index_info = f" (index={self._index_name})" if self._index_name else ""
+        _log_debug("scan", f'Running scan on "{self._table}"{index_info}')
+
         items, self._last_evaluated_key, self._metrics = self._client.sync_scan_page(
             self._table,
             filter_expression=self._filter_expression,
@@ -565,6 +574,9 @@ class AsyncScanResult:
 
         # Use page_size if set, otherwise use limit for DynamoDB Limit parameter
         dynamo_limit = self._page_size if self._page_size is not None else self._limit
+
+        index_info = f" (index={self._index_name})" if self._index_name else ""
+        _log_debug("scan", f'Running scan on "{self._table}"{index_info}')
 
         result = await self._client.scan_page(
             self._table,

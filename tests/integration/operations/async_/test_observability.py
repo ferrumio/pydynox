@@ -138,8 +138,10 @@ async def test_custom_logger_receives_operation_logs(dynamo):
     await dynamo.put_item("test_table", {"pk": "USER#1", "sk": "PROFILE"})
 
     assert len(mock.messages) >= 1
-    level, msg = mock.messages[0]
-    assert level == "info"
+    # Find the INFO level message (debug logs come first)
+    info_msgs = [(level, msg) for level, msg in mock.messages if level == "info"]
+    assert len(info_msgs) >= 1
+    level, msg = info_msgs[0]
     assert "put_item" in msg
 
     # Restore

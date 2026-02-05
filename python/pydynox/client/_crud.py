@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydynox._internal._logging import _log_operation, _log_warning
+from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import OperationMetrics
 from pydynox._internal._tracing import add_response_attributes, trace_operation
 
@@ -101,6 +101,8 @@ class CrudOperations:
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
+        _log_debug("put_item", f'Saving item to "{table}" pk={pk}')
+
         with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             metrics = await self._client.put_item(  # type: ignore[attr-defined]
                 table,
@@ -154,6 +156,8 @@ class CrudOperations:
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
+        _log_debug("sync_put_item", f'Saving item to "{table}" pk={pk}')
+
         with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             metrics = self._client.sync_put_item(  # type: ignore[attr-defined]
                 table,
@@ -197,6 +201,8 @@ class CrudOperations:
         pk = _extract_pk(key)
         if pk:
             self._record_read(table, pk)  # type: ignore[attr-defined]
+
+        _log_debug("get_item", f'Getting item from "{table}" key={key}')
 
         # Build projection expression
         projection_expr, attr_names = _build_projection(projection)
@@ -246,6 +252,8 @@ class CrudOperations:
         pk = _extract_pk(key)
         if pk:
             self._record_read(table, pk)  # type: ignore[attr-defined]
+
+        _log_debug("sync_get_item", f'Getting item from "{table}" key={key}')
 
         # Build projection expression
         projection_expr, attr_names = _build_projection(projection)
@@ -298,6 +306,8 @@ class CrudOperations:
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
+        _log_debug("delete_item", f'Deleting item from "{table}" key={key}')
+
         with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             metrics = await self._client.delete_item(  # type: ignore[attr-defined]
                 table,
@@ -344,6 +354,8 @@ class CrudOperations:
         pk = _extract_pk(key)
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
+
+        _log_debug("sync_delete_item", f'Deleting item from "{table}" key={key}')
 
         with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             metrics = self._client.sync_delete_item(  # type: ignore[attr-defined]
@@ -398,6 +410,8 @@ class CrudOperations:
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
 
+        _log_debug("update_item", f'Updating item in "{table}" key={key}')
+
         with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             metrics = await self._client.update_item(  # type: ignore[attr-defined]
                 table,
@@ -450,6 +464,8 @@ class CrudOperations:
         pk = _extract_pk(key)
         if pk:
             self._record_write(table, pk)  # type: ignore[attr-defined]
+
+        _log_debug("sync_update_item", f'Updating item in "{table}" key={key}')
 
         with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
             metrics = self._client.sync_update_item(  # type: ignore[attr-defined]

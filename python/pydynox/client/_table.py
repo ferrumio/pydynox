@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pydynox._internal._logging import _log_debug
+
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Coroutine
 
@@ -69,6 +71,7 @@ class TableOperations:  # pragma: no cover
         Example:
             await client.create_table("users", partition_key=("pk", "S"))
         """
+        _log_debug("create_table", f'Creating table "{table_name}"')
         return self._client.create_table(  # type: ignore[attr-defined, no-any-return]
             table_name,
             partition_key,
@@ -96,6 +99,7 @@ class TableOperations:  # pragma: no cover
         Example:
             exists = await client.table_exists("users")
         """
+        _log_debug("table_exists", f'Checking if table "{table_name}" exists')
         return self._client.table_exists(table_name)  # type: ignore[attr-defined, no-any-return]
 
     def delete_table(self, table_name: str) -> Coroutine[Any, Any, None]:
@@ -110,6 +114,7 @@ class TableOperations:  # pragma: no cover
         Example:
             await client.delete_table("users")
         """
+        _log_debug("delete_table", f'Deleting table "{table_name}"')
         return self._client.delete_table(table_name)  # type: ignore[attr-defined, no-any-return]
 
     def wait_for_table_active(
@@ -129,6 +134,7 @@ class TableOperations:  # pragma: no cover
         Example:
             await client.wait_for_table_active("users")
         """
+        _log_debug("wait_for_table_active", f'Waiting for table "{table_name}" to become active')
         return self._client.wait_for_table_active(  # type: ignore[attr-defined, no-any-return]
             table_name, timeout_seconds=timeout_seconds
         )
@@ -169,6 +175,7 @@ class TableOperations:  # pragma: no cover
         Example:
             client.sync_create_table("users", partition_key=("pk", "S"))
         """
+        _log_debug("sync_create_table", f'Creating table "{table_name}"')
         self._client.sync_create_table(  # type: ignore[attr-defined]
             table_name,
             partition_key,
@@ -197,6 +204,7 @@ class TableOperations:  # pragma: no cover
             if client.sync_table_exists("users"):
                 print("Table exists")
         """
+        _log_debug("sync_table_exists", f'Checking if table "{table_name}" exists')
         return self._client.sync_table_exists(table_name)  # type: ignore[attr-defined, no-any-return]
 
     def sync_delete_table(self, table_name: str) -> None:
@@ -208,6 +216,7 @@ class TableOperations:  # pragma: no cover
         Example:
             client.sync_delete_table("users")
         """
+        _log_debug("sync_delete_table", f'Deleting table "{table_name}"')
         self._client.sync_delete_table(table_name)  # type: ignore[attr-defined]
 
     def sync_wait_for_table_active(
@@ -224,6 +233,9 @@ class TableOperations:  # pragma: no cover
         Example:
             client.sync_wait_for_table_active("users")
         """
+        _log_debug(
+            "sync_wait_for_table_active", f'Waiting for table "{table_name}" to become active'
+        )
         self._client.sync_wait_for_table_active(  # type: ignore[attr-defined]
             table_name, timeout_seconds=timeout_seconds
         )
