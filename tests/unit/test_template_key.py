@@ -355,7 +355,7 @@ def test_gsi_template_resolution_error():
         )
 
     # Should fail - neither sk nor order_id provided
-    with pytest.raises(ValueError, match="GSI query requires 'sk' or its template placeholders"):
+    with pytest.raises(ValueError, match="requires a partition key value"):
         list(UserOrder.inverted_index.sync_query(wrong_key="value"))
 
 

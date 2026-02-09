@@ -49,7 +49,7 @@ async def main():
         ).save()
 
     # First page
-    result = User.status_index.query(status="active", limit=10, page_size=10)
+    result = User.status_index.query(partition_key="active", limit=10, page_size=10)
 
     print("First page:")
     async for user in result:
@@ -61,7 +61,7 @@ async def main():
 
         # Next page using last_evaluated_key
         next_result = User.status_index.query(
-            status="active",
+            partition_key="active",
             limit=10,
             page_size=10,
             last_evaluated_key=result.last_evaluated_key,

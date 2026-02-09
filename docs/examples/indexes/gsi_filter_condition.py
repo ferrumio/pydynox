@@ -42,7 +42,7 @@ async def main():
     # Query active users over 30
     print("Active users age >= 30:")
     async for user in User.status_index.query(
-        status="active",
+        partition_key="active",
         filter_condition=User.age >= 30,
     ):
         print(f"  {user.name} (age={user.age})")

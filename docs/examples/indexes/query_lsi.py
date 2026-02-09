@@ -71,10 +71,10 @@ async def main():
     async for order in Order.query(partition_key="CUST#1"):
         print(f"  {order.order_id}: {order.status} - ${order.total}")
 
-    # Query orders by status using LSI
+    # Query orders by status using LSI (partition_key= is the recommended way)
     print("\nPending orders for CUST#1 (via LSI):")
     async for order in Order.status_index.query(
-        customer_id="CUST#1", sort_key_condition=Order.status == "pending"
+        partition_key="CUST#1", sort_key_condition=Order.status == "pending"
     ):
         print(f"  {order.order_id}: ${order.total}")
 

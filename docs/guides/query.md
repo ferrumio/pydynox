@@ -286,14 +286,14 @@ async for order in Order.query(partition_key="CUSTOMER#123"):
     print(order.sk)
 
 # GSI query - by status (async)
-async for order in Order.status_index.query(status="shipped"):
+async for order in Order.status_index.query(partition_key="shipped"):
     print(order.pk)
 
 # Sync versions
 for order in Order.sync_query(partition_key="CUSTOMER#123"):
     print(order.sk)
 
-for order in Order.status_index.sync_query(status="shipped"):
+for order in Order.status_index.sync_query(partition_key="shipped"):
     print(order.pk)
 ```
 

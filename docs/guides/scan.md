@@ -355,7 +355,7 @@ Create a GSI on email and use query:
 
 ```python
 # Good: query on GSI
-user = User.email_index.query(email="john@example.com").first()
+user = User.email_index.query(partition_key="john@example.com").first()
 ```
 
 ### Expecting filters to reduce cost

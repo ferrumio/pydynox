@@ -7,6 +7,7 @@ on:
             - "docs/examples/**"
             - "tests/examples/**"
             - ".github/workflows/examples.yml"
+            - "python/**"
     workflow_dispatch:
 
 jobs:

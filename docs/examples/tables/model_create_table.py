@@ -42,7 +42,7 @@ async def main():
     await user.save()
 
     # Query by GSI
-    results = [u async for u in User.email_index.query(email="test@example.com")]
+    results = [u async for u in User.email_index.query(partition_key="test@example.com")]
     assert len(results) == 1
     assert results[0].pk == "USER#1"
 

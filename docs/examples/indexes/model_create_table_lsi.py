@@ -44,7 +44,7 @@ async def main():
     ).save()
 
     # Query using LSI
-    async for order in Order.status_index.query(customer_id="CUST#1"):
+    async for order in Order.status_index.query(partition_key="CUST#1"):
         print(f"Order: {order.order_id} - {order.status}")
 
 
