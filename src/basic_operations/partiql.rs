@@ -101,13 +101,15 @@ pub fn sync_execute_statement(
         None => None,
     };
 
-    let result = runtime.block_on(execute_statement_core(
-        client.clone(),
-        statement.to_string(),
-        params,
-        consistent_read,
-        next_token,
-    ));
+    let result = py.detach(|| {
+        runtime.block_on(execute_statement_core(
+            client.clone(),
+            statement.to_string(),
+            params,
+            consistent_read,
+            next_token,
+        ))
+    });
 
     match result {
         Ok(raw) => {

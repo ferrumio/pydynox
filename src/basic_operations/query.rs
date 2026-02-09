@@ -226,7 +226,7 @@ pub fn sync_query(
         consistent_read,
     )?;
 
-    let result = runtime.block_on(execute_query(client.clone(), prepared));
+    let result = py.detach(|| runtime.block_on(execute_query(client.clone(), prepared)));
 
     match result {
         Ok(raw) => raw_to_py_result(py, raw),

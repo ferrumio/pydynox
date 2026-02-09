@@ -157,7 +157,7 @@ pub fn sync_delete_item(
         return_values_on_condition_check_failure,
     )?;
 
-    let result = runtime.block_on(execute_delete_item(client.clone(), prepared));
+    let result = py.detach(|| runtime.block_on(execute_delete_item(client.clone(), prepared)));
 
     match result {
         Ok(metrics) => Ok(metrics),

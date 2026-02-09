@@ -165,7 +165,7 @@ pub fn sync_batch_get(
 ) -> PyResult<Vec<Py<PyAny>>> {
     let prepared = prepare_batch_get(py, table, keys)?;
 
-    let result = runtime.block_on(execute_batch_get(client, &prepared));
+    let result = py.detach(|| runtime.block_on(execute_batch_get(client, &prepared)));
 
     match result {
         Ok(raw) => {
