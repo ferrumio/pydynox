@@ -60,12 +60,12 @@ async def main():
     # page_size = items per DynamoDB request (controls pagination)
 
     # Example 1: Get exactly 10 active users
-    users = [u async for u in User.status_index.query(status="active", limit=10)]
+    users = [u async for u in User.status_index.query(partition_key="active", limit=10)]
     print(f"limit=10: Got {len(users)} users")
 
     # Example 2: Get all active users, fetching 5 per page
     count = 0
-    async for user in User.status_index.query(status="active", page_size=5):
+    async for _ in User.status_index.query(partition_key="active", page_size=5):
         count += 1
     print(f"page_size=5 (no limit): Got {count} users")
 
@@ -73,7 +73,7 @@ async def main():
     users = [
         u
         async for u in User.status_index.query(
-            status="active",
+            partition_key="active",
             limit=15,
             page_size=5,
         )
@@ -81,13 +81,13 @@ async def main():
     print(f"limit=15, page_size=5: Got {len(users)} users")
 
     # Example 4: Manual pagination for "load more" UI
-    result = User.status_index.query(status="active", limit=10, page_size=10)
+    result = User.status_index.query(partition_key="active", limit=10, page_size=10)
     first_page = [u async for u in result]
     print(f"First page: {len(first_page)} items")
 
     if result.last_evaluated_key:
         result = User.status_index.query(
-            status="active",
+            partition_key="active",
             limit=10,
             page_size=10,
             last_evaluated_key=result.last_evaluated_key,

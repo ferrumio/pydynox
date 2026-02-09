@@ -125,7 +125,7 @@ def test_lsi_query_requires_partition_key() -> None:
 
     # WHEN we query without the hash key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="requires the table's hash key 'pk'"):
+    with pytest.raises(ValueError, match="requires a partition key value"):
         User.status_index.query(status="active")
 
 
@@ -187,3 +187,46 @@ def test_gsi_and_lsi_coexist() -> None:
     # AND LSIs should be in _local_indexes
     assert "status_index" in User._local_indexes
     assert "status_index" not in User._indexes
+
+
+# ============ partition_key= unified API tests ============
+
+
+def test_lsi_query_with_partition_key_kwarg() -> None:
+    """LSI query accepts partition_key= (consistent with Model.query)."""
+    result = User.status_index.query(partition_key="USER#1")
+    assert result._partition_key_value == "USER#1"
+
+
+def test_lsi_sync_query_with_partition_key_kwarg() -> None:
+    """LSI sync_query accepts partition_key= (consistent with Model.sync_query)."""
+    result = User.status_index.sync_query(partition_key="USER#1")
+    assert result._partition_key_value == "USER#1"
+
+
+def test_lsi_query_with_attribute_name_still_works() -> None:
+    """LSI query still accepts attribute name as kwarg (backward compat)."""
+    result = User.status_index.query(pk="USER#1")
+    assert result._partition_key_value == "USER#1"
+
+
+def test_lsi_sync_query_with_attribute_name_still_works() -> None:
+    """LSI sync_query still accepts attribute name as kwarg (backward compat)."""
+    result = User.status_index.sync_query(pk="USER#1")
+    assert result._partition_key_value == "USER#1"
+
+
+def test_lsi_query_partition_key_takes_priority() -> None:
+    """partition_key= takes priority over attribute name kwarg."""
+    # If both are passed, partition_key= wins
+    result = User.status_index.query(partition_key="FROM_PK", pk="FROM_KWARG")
+    assert result._partition_key_value == "FROM_PK"
+
+
+def test_lsi_query_no_partition_key_raises_clear_error() -> None:
+    """LSI query without any partition key gives a clear error."""
+    with pytest.raises(ValueError, match="requires a partition key value"):
+        User.status_index.query()
+
+    with pytest.raises(ValueError, match="requires a partition key value"):
+        User.status_index.sync_query()

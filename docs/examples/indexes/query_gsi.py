@@ -44,12 +44,12 @@ async def main():
         pk="USER#2", sk="PROFILE", email="jane@example.com", status="active", name="Jane"
     ).save()
 
-    # Query by email
-    async for user in User.email_index.query(email="john@example.com"):
+    # Query by email (using partition_key=)
+    async for user in User.email_index.query(partition_key="john@example.com"):
         print(f"By email: {user.name}")
 
-    # Query by status
-    async for user in User.status_index.query(status="active"):
+    # Query by status (using partition_key=)
+    async for user in User.status_index.query(partition_key="active"):
         print(f"Active: {user.name}")
 
 

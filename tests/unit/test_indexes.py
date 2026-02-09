@@ -156,7 +156,7 @@ def test_gsi_query_requires_partition_key() -> None:
 
     # WHEN we query without the hash key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="GSI query requires 'email'"):
+    with pytest.raises(ValueError, match="requires a partition key value"):
         User.email_index.query(status="active")  # type: ignore[call-arg]
 
 
@@ -226,12 +226,12 @@ def test_multi_attr_gsi_query_requires_all_partition_keys() -> None:
 
     # WHEN we query with missing region
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="GSI query requires 'region'"):
+    with pytest.raises(ValueError, match="requires 'region'"):
         User.location_index.query(tenant_id="ACME")
 
     # WHEN we query with missing tenant_id
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="GSI query requires 'tenant_id'"):
+    with pytest.raises(ValueError, match="requires 'tenant_id'"):
         User.location_index.query(region="us-east-1")
 
 
@@ -285,3 +285,57 @@ def test_single_attr_gsi_backward_compat() -> None:
     # AND still accessible via old properties
     assert gsi.partition_key == "email"
     assert gsi.sort_key == "created_at"
+
+
+# ============ partition_key= unified API tests ============
+
+
+def test_gsi_query_with_partition_key_kwarg() -> None:
+    """GSI query accepts partition_key= for single-attribute GSI."""
+    # GIVEN a single-attribute GSI (email_index)
+
+    # WHEN we query using partition_key=
+    result = User.email_index.query(partition_key="john@example.com")
+
+    # THEN it should resolve correctly
+    assert result._partition_key_values == {"email": "john@example.com"}
+
+
+def test_gsi_sync_query_with_partition_key_kwarg() -> None:
+    """GSI sync_query accepts partition_key= for single-attribute GSI."""
+    result = User.email_index.sync_query(partition_key="john@example.com")
+    assert result._partition_key_values == {"email": "john@example.com"}
+
+
+def test_gsi_query_with_attribute_name_still_works() -> None:
+    """GSI query still accepts attribute name as kwarg (backward compat)."""
+    result = User.email_index.query(email="john@example.com")
+    assert result._partition_key_values == {"email": "john@example.com"}
+
+
+def test_gsi_sync_query_with_attribute_name_still_works() -> None:
+    """GSI sync_query still accepts attribute name as kwarg (backward compat)."""
+    result = User.email_index.sync_query(email="john@example.com")
+    assert result._partition_key_values == {"email": "john@example.com"}
+
+
+def test_gsi_partition_key_rejects_multi_attr() -> None:
+    """partition_key= raises error for multi-attribute GSI."""
+    # GIVEN a multi-attribute GSI (location_index with tenant_id + region)
+
+    # WHEN we try to use partition_key= on it
+    # THEN ValueError should be raised with helpful message
+    with pytest.raises(ValueError, match="composite partition key"):
+        User.location_index.query(partition_key="ACME")
+
+
+def test_gsi_partition_key_rejects_multi_attr_sync() -> None:
+    """partition_key= raises error for multi-attribute GSI (sync)."""
+    with pytest.raises(ValueError, match="composite partition key"):
+        User.location_index.sync_query(partition_key="ACME")
+
+
+def test_multi_attr_gsi_query_with_kwargs_still_works() -> None:
+    """Multi-attribute GSI still works with kwargs."""
+    result = User.location_index.query(tenant_id="ACME", region="us-east-1")
+    assert result._partition_key_values == {"tenant_id": "ACME", "region": "us-east-1"}

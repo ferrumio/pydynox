@@ -46,7 +46,7 @@ async def main():
     # Query active users with pk starting with "USER#"
     print("Active users (pk starts with USER#):")
     async for user in User.status_index.query(
-        status="active",
+        partition_key="active",
         sort_key_condition=User.pk.begins_with("USER#"),
     ):
         print(f"  {user.name} ({user.pk})")
@@ -54,7 +54,7 @@ async def main():
     # Query with comparison
     print("\nActive users (pk >= USER#050):")
     async for user in User.status_index.query(
-        status="active",
+        partition_key="active",
         sort_key_condition=User.pk >= "USER#050",
     ):
         print(f"  {user.name} ({user.pk})")

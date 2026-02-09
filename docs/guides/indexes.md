@@ -25,29 +25,32 @@ GSIs let you query by attributes other than the table's primary key. Define them
 
 ## Query a GSI
 
-Use the index attribute to query:
+Use the index attribute to query. Pass the partition key value using `partition_key=`:
 
 === "query_gsi.py"
     ```python
     --8<-- "docs/examples/indexes/query_gsi.py"
     ```
 
+!!! tip
+    All index queries use `partition_key=` as the first argument. This is the same pattern as `Model.query(partition_key=...)`, so the API is consistent everywhere. You can also pass the attribute name as a keyword argument (e.g., `email="john@example.com"`), but `partition_key=` is the recommended way.
+
 ## Range key conditions
 
 When your GSI has a range key, you can add conditions:
 
-=== "sort_key_condition.py"
+=== "gsi_range_key_condition.py"
     ```python
-    --8<-- "docs/examples/indexes/sort_key_condition.py"
+    --8<-- "docs/examples/indexes/gsi_range_key_condition.py"
     ```
 
 ## Filter conditions
 
 Filter non-key attributes after the query:
 
-=== "filter_condition.py"
+=== "gsi_filter_condition.py"
     ```python
-    --8<-- "docs/examples/indexes/filter_condition.py"
+    --8<-- "docs/examples/indexes/gsi_filter_condition.py"
     ```
 
 !!! warning
@@ -59,11 +62,11 @@ Control the sort order with `scan_index_forward`:
 
 ```python
 # Ascending (default)
-async for user in User.status_index.query(status="active", scan_index_forward=True):
+async for user in User.status_index.query(partition_key="active", scan_index_forward=True):
     print(user.name)
 
 # Descending
-async for user in User.status_index.query(status="active", scan_index_forward=False):
+async for user in User.status_index.query(partition_key="active", scan_index_forward=False):
     print(user.name)
 ```
 
@@ -106,24 +109,24 @@ For "load more" buttons:
 GSI queries are async by default. Use `async for` to iterate:
 
 ```python
-async for user in User.email_index.query(email="john@example.com"):
+async for user in User.email_index.query(partition_key="john@example.com"):
     print(user.name)
 
 # With filter
 async for user in User.status_index.query(
-    status="active",
+    partition_key="active",
     filter_condition=User.age >= 18,
 ):
     print(user.email)
 
 # Get first result
-user = await User.email_index.query(email="john@example.com").first()
+user = await User.email_index.query(partition_key="john@example.com").first()
 ```
 
 For sync code, use `sync_query`:
 
 ```python
-for user in User.email_index.sync_query(email="john@example.com"):
+for user in User.email_index.sync_query(partition_key="john@example.com"):
     print(user.name)
 ```
 
@@ -132,7 +135,7 @@ for user in User.email_index.sync_query(email="john@example.com"):
 Access query metrics using class methods:
 
 ```python
-async for user in User.email_index.query(email="john@example.com"):
+async for user in User.email_index.query(partition_key="john@example.com"):
     print(user.name)
 
 # Get last operation metrics
@@ -264,7 +267,7 @@ Use LSI when:
 
 ### Query an LSI
 
-LSI queries require the hash key (same as the table's hash key):
+LSI queries use `partition_key=` for the hash key (same as the table's hash key):
 
 === "query_lsi.py"
     ```python

@@ -365,8 +365,8 @@ async def test_multi_attr_gsi_query_requires_all_partition_keys(multi_attr_clien
     """Test that query fails if not all hash keys provided."""
     # WHEN querying with missing hash key
     # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="Missing"):
+    with pytest.raises(ValueError, match="requires 'region'"):
         [x async for x in Product.location_index.query(tenant_id="ACME")]
 
-    with pytest.raises(ValueError, match="Missing"):
+    with pytest.raises(ValueError, match="requires 'subcategory'"):
         [x async for x in Product.category_index.query(category="electronics")]

@@ -54,7 +54,7 @@ async def main():
     results = [
         o
         async for o in Order.status_index.query(
-            customer_id="CUST#1",
+            partition_key="CUST#1",
             consistent_read=True,  # Strongly consistent read
         )
     ]

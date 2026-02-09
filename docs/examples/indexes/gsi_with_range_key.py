@@ -82,20 +82,20 @@ async def main():
 
     # Query all active users
     print("All active users:")
-    async for user in User.status_index.query(status="active"):
+    async for user in User.status_index.query(partition_key="active"):
         print(f"  {user.name} (pk={user.pk})")
 
     # Query active users with pk starting with "USER#"
     print("\nActive users (not admins):")
     async for user in User.status_index.query(
-        status="active",
+        partition_key="active",
         sort_key_condition=User.pk.begins_with("USER#"),
     ):
         print(f"  {user.name} (pk={user.pk})")
 
     # Query in descending order
     print("\nActive users (descending by pk):")
-    async for user in User.status_index.query(status="active", scan_index_forward=False):
+    async for user in User.status_index.query(partition_key="active", scan_index_forward=False):
         print(f"  {user.name} (pk={user.pk})")
 
 

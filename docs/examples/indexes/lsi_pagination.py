@@ -59,7 +59,7 @@ async def main():
     orders = [
         o
         async for o in Order.created_at_index.query(
-            pk="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             limit=10,
         )
     ]
@@ -67,8 +67,8 @@ async def main():
 
     # Example 2: Get all orders, fetching 5 per page
     count = 0
-    async for order in Order.created_at_index.query(
-        pk="CUSTOMER#1",
+    async for _ in Order.created_at_index.query(
+        partition_key="CUSTOMER#1",
         page_size=5,
     ):
         count += 1
@@ -78,7 +78,7 @@ async def main():
     orders = [
         o
         async for o in Order.created_at_index.query(
-            pk="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             limit=15,
             page_size=5,
         )
@@ -87,7 +87,7 @@ async def main():
 
     # Example 4: Manual pagination with consistent reads (LSI supports this!)
     result = Order.created_at_index.query(
-        pk="CUSTOMER#1",
+        partition_key="CUSTOMER#1",
         limit=10,
         page_size=10,
         consistent_read=True,
@@ -97,7 +97,7 @@ async def main():
 
     if result.last_evaluated_key:
         result = Order.created_at_index.query(
-            pk="CUSTOMER#1",
+            partition_key="CUSTOMER#1",
             limit=10,
             page_size=10,
             consistent_read=True,

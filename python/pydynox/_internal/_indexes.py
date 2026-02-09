@@ -54,7 +54,7 @@ class GlobalSecondaryIndex(Generic[M]):
         ...         partition_key="email",
         ...     )
         >>>
-        >>> users = User.email_index.query(email="john@example.com")
+        >>> users = User.email_index.sync_query(partition_key="john@example.com")
     """
 
     def __init__(
@@ -113,9 +113,14 @@ class GlobalSecondaryIndex(Generic[M]):
         return self._model_class
 
     def _resolve_partition_key_values(
-        self, model_class: type[M], key_values: dict[str, Any]
+        self, model_class: type[M], partition_key: Any | None, key_values: dict[str, Any]
     ) -> dict[str, Any]:
         """Resolve hash key values, building from templates if needed.
+
+        Supports three ways to pass the partition key:
+        1. partition_key="value" (single-attribute GSI only, recommended)
+        2. attribute_name="value" via kwargs (always works)
+        3. Template placeholders via kwargs (if attribute has a template)
 
         For inverted indexes where partition_key="sk", this detects that the user
         passed template placeholders (e.g., order_id="456") and builds the
@@ -124,8 +129,20 @@ class GlobalSecondaryIndex(Generic[M]):
         resolved: dict[str, Any] = {}
         attributes = model_class._attributes
 
+        # If partition_key= was passed directly, map it to the GSI's partition key attribute(s)
+        if partition_key is not None:
+            if len(self.partition_keys) > 1:
+                raise ValueError(
+                    f"GSI '{self.index_name}' has a composite partition key "
+                    f"({', '.join(self.partition_keys)}). "
+                    f"Pass each attribute as a keyword argument instead of using partition_key=. "
+                    f"Example: .query({', '.join(f'{k}=...' for k in self.partition_keys)})"
+                )
+            resolved[self.partition_keys[0]] = partition_key
+            return resolved
+
         for attr_name in self.partition_keys:
-            # Direct value provided
+            # Direct value provided via kwargs
             if attr_name in key_values:
                 resolved[attr_name] = key_values[attr_name]
                 continue
@@ -148,8 +165,15 @@ class GlobalSecondaryIndex(Generic[M]):
                     continue
 
             # Neither direct value nor template placeholders provided
+            if len(self.partition_keys) == 1:
+                raise ValueError(
+                    f"GSI '{self.index_name}' query requires a partition key value. "
+                    f"Use partition_key='value' or {attr_name}='value'. "
+                    f"Got: {list(key_values.keys())}"
+                )
             raise ValueError(
-                f"GSI query requires '{attr_name}' or its template placeholders. "
+                f"GSI '{self.index_name}' query requires '{attr_name}'. "
+                f"Pass it as a keyword argument: .query({attr_name}=...). "
                 f"Got: {list(key_values.keys())}"
             )
 
@@ -157,6 +181,7 @@ class GlobalSecondaryIndex(Generic[M]):
 
     def sync_query(
         self,
+        partition_key: Any = None,
         sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
@@ -167,13 +192,21 @@ class GlobalSecondaryIndex(Generic[M]):
     ) -> GSIQueryResult[M]:
         """Sync query the GSI.
 
-        For inverted indexes with templates, you can pass template placeholders:
-            # If sk has template="ORDER#{order_id}" and GSI has partition_key="sk"
+        The partition key can be passed in three ways:
+            # 1. Using partition_key= (recommended for single-attribute GSI)
+            email_index.sync_query(partition_key="john@example.com")
+
+            # 2. Using the attribute name as kwarg
+            email_index.sync_query(email="john@example.com")
+
+            # 3. Using template placeholders (if attribute has a template)
             inverted_index.sync_query(order_id="456")
-            # Internally builds: sk="ORDER#456"
+
+        For multi-attribute GSIs, use keyword arguments:
+            location_index.sync_query(tenant_id="ACME", region="us-east-1")
         """
         model_class = self._get_model_class()
-        resolved_values = self._resolve_partition_key_values(model_class, key_values)
+        resolved_values = self._resolve_partition_key_values(model_class, partition_key, key_values)
 
         return GSIQueryResult(
             model_class=model_class,
@@ -191,6 +224,7 @@ class GlobalSecondaryIndex(Generic[M]):
 
     def query(
         self,
+        partition_key: Any = None,
         sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
@@ -201,14 +235,25 @@ class GlobalSecondaryIndex(Generic[M]):
     ) -> AsyncGSIQueryResult[M]:
         """Query the GSI (async).
 
-        For inverted indexes with templates, you can pass template placeholders:
-            # If sk has template="ORDER#{order_id}" and GSI has partition_key="sk"
+        The partition key can be passed in three ways:
+            # 1. Using partition_key= (recommended for single-attribute GSI)
+            async for item in email_index.query(partition_key="john@example.com"):
+                print(item)
+
+            # 2. Using the attribute name as kwarg
+            async for item in email_index.query(email="john@example.com"):
+                print(item)
+
+            # 3. Using template placeholders (if attribute has a template)
             async for item in inverted_index.query(order_id="456"):
                 print(item)
-            # Internally builds: sk="ORDER#456"
+
+        For multi-attribute GSIs, use keyword arguments:
+            async for item in location_index.query(tenant_id="ACME", region="us-east-1"):
+                print(item)
         """
         model_class = self._get_model_class()
-        resolved_values = self._resolve_partition_key_values(model_class, key_values)
+        resolved_values = self._resolve_partition_key_values(model_class, partition_key, key_values)
 
         return AsyncGSIQueryResult(
             model_class=model_class,
@@ -570,7 +615,7 @@ class LocalSecondaryIndex(Generic[M]):
         ...         sort_key="status",
         ...     )
         >>>
-        >>> for user in User.status_index.query(pk="USER#1"):
+        >>> for user in User.status_index.sync_query(partition_key="USER#1"):
         ...     print(user.status)
     """
 
@@ -603,6 +648,7 @@ class LocalSecondaryIndex(Generic[M]):
 
     def sync_query(
         self,
+        partition_key: Any = None,
         sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
@@ -612,24 +658,38 @@ class LocalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> LSIQueryResult[M]:
-        """Sync query the LSI."""
+        """Sync query the LSI.
+
+        The partition key can be passed in two ways:
+            # 1. Using partition_key= (recommended, consistent with Model.sync_query)
+            status_index.sync_query(partition_key="USER#1")
+
+            # 2. Using the attribute name as kwarg
+            status_index.sync_query(pk="USER#1")
+        """
         model_class = self._get_model_class()
 
         partition_key_name = model_class._partition_key
         if partition_key_name is None:
             raise ValueError(f"Model {model_class.__name__} has no partition_key defined")
 
-        if partition_key_name not in key_values:
+        # Resolve: partition_key= takes priority, then check kwargs by attribute name
+        resolved_pk = partition_key
+        if resolved_pk is None:
+            if partition_key_name in key_values:
+                resolved_pk = key_values[partition_key_name]
+
+        if resolved_pk is None:
             raise ValueError(
-                f"LSI sync_query requires the table's hash key '{partition_key_name}'. "
-                f"Got: {list(key_values.keys())}"
+                f"LSI '{self.index_name}' query requires a partition key value. "
+                f"Use partition_key='value' or {partition_key_name}='value'."
             )
 
         return LSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
             partition_key_name=partition_key_name,
-            partition_key_value=key_values[partition_key_name],
+            partition_key_value=resolved_pk,
             sort_key_name=self.sort_key,
             sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
@@ -642,6 +702,7 @@ class LocalSecondaryIndex(Generic[M]):
 
     def query(
         self,
+        partition_key: Any = None,
         sort_key_condition: Condition | None = None,
         filter_condition: Condition | None = None,
         limit: int | None = None,
@@ -651,24 +712,40 @@ class LocalSecondaryIndex(Generic[M]):
         last_evaluated_key: dict[str, Any] | None = None,
         **key_values: Any,
     ) -> AsyncLSIQueryResult[M]:
-        """Query the LSI (async)."""
+        """Query the LSI (async).
+
+        The partition key can be passed in two ways:
+            # 1. Using partition_key= (recommended, consistent with Model.query)
+            async for item in status_index.query(partition_key="USER#1"):
+                print(item)
+
+            # 2. Using the attribute name as kwarg
+            async for item in status_index.query(pk="USER#1"):
+                print(item)
+        """
         model_class = self._get_model_class()
 
         partition_key_name = model_class._partition_key
         if partition_key_name is None:
             raise ValueError(f"Model {model_class.__name__} has no partition_key defined")
 
-        if partition_key_name not in key_values:
+        # Resolve: partition_key= takes priority, then check kwargs by attribute name
+        resolved_pk = partition_key
+        if resolved_pk is None:
+            if partition_key_name in key_values:
+                resolved_pk = key_values[partition_key_name]
+
+        if resolved_pk is None:
             raise ValueError(
-                f"LSI query requires the table's hash key '{partition_key_name}'. "
-                f"Got: {list(key_values.keys())}"
+                f"LSI '{self.index_name}' query requires a partition key value. "
+                f"Use partition_key='value' or {partition_key_name}='value'."
             )
 
         return AsyncLSIQueryResult(
             model_class=model_class,
             index_name=self.index_name,
             partition_key_name=partition_key_name,
-            partition_key_value=key_values[partition_key_name],
+            partition_key_value=resolved_pk,
             sort_key_name=self.sort_key,
             sort_key_condition=sort_key_condition,
             filter_condition=filter_condition,
