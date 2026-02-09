@@ -27,6 +27,8 @@ An ADR is a short document that describes a decision, why it was made, and what 
 | 015 | [Metrics API redesign](015-metrics-api-redesign.md) | Accepted |
 | 016 | [Unified AWS client config](016-unified-aws-client-config.md) | Accepted |
 | 017 | [Direct AttributeValue conversion](017-direct-attribute-conversion.md) | Accepted |
+| 018 | [Async-first design](018-async-first-design.md) | Accepted |
+| 019 | [Release GIL during sync block_on](019-gil-release-sync-operations.md) | Accepted |
 
 ## Adding a new ADR
 
