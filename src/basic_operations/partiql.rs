@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{attribute_values_to_py_dict, py_to_attribute_value};
+use crate::conversions::{attribute_values_to_py_dict, py_to_attribute_value_direct};
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
 
@@ -80,7 +80,7 @@ pub async fn execute_statement_core(
 fn convert_parameters(py: Python<'_>, params: &Bound<'_, PyList>) -> PyResult<Vec<AttributeValue>> {
     let mut result = Vec::with_capacity(params.len());
     for item in params.iter() {
-        result.push(py_to_attribute_value(py, &item)?);
+        result.push(py_to_attribute_value_direct(py, &item)?);
     }
     Ok(result)
 }

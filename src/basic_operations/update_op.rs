@@ -11,10 +11,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{py_dict_to_attribute_value, py_dict_to_attribute_values};
+use crate::conversions::{py_dict_to_attribute_values, py_to_attribute_value_direct};
 use crate::errors::map_sdk_error_with_item;
 use crate::metrics::OperationMetrics;
-use crate::serialization::py_to_dynamo;
 
 /// Prepared update_item data (converted from Python).
 pub struct PreparedUpdateItem {
@@ -254,8 +253,7 @@ pub fn build_set_expression(
         set_parts.push(format!("{} = {}", name_placeholder, value_placeholder));
         names.insert(name_placeholder, field);
 
-        let dynamo_value = py_to_dynamo(py, &v)?;
-        let attr_value = py_dict_to_attribute_value(py, dynamo_value.bind(py))?;
+        let attr_value = py_to_attribute_value_direct(py, &v)?;
         values.insert(value_placeholder, attr_value);
     }
 
