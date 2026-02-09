@@ -1,7 +1,7 @@
 //! Error types for pydynox.
 //!
 //! This module maps AWS SDK errors to Python exceptions.
-//! Uses unified error mapping for DynamoDB, S3, and KMS.
+//! Uses typed `SdkError` variant matching — no string parsing of debug output.
 
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::types::AttributeValue;
@@ -108,114 +108,130 @@ impl AwsService {
     }
 }
 
-// ========== UNIFIED ERROR MAPPING ==========
+// ========== TYPED ERROR MAPPING ==========
 
-/// Map common AWS errors (connection, credentials, access).
+/// Map non-service `SdkError` variants (dispatch failures, timeouts, etc.).
 ///
-/// Returns Some(PyErr) if it's a common error, None otherwise.
-fn map_common_error(err_debug: &str, service: AwsService) -> Option<PyErr> {
-    // Connection errors
-    if err_debug.contains("dispatch failure")
-        || err_debug.contains("DispatchFailure")
-        || err_debug.contains("connection refused")
-        || err_debug.contains("Connection refused")
-        || err_debug.contains("ConnectError")
-    {
-        return Some(ConnectionException::new_err(format!(
-            "Connection failed to {}. Check if the endpoint is reachable.",
-            service.name()
-        )));
-    }
-
-    if err_debug.contains("timeout") || err_debug.contains("Timeout") {
-        return Some(ConnectionException::new_err(format!(
-            "Connection timed out to {}. Check your network or endpoint.",
-            service.name()
-        )));
-    }
-
-    // Credential errors
-    if err_debug.contains("NoCredentialsError")
-        || err_debug.contains("no credentials")
-        || err_debug.contains("No credentials")
-        || err_debug.contains("CredentialsError")
-        || err_debug.contains("failed to load credentials")
-    {
-        return Some(CredentialsException::new_err(
-            "No AWS credentials found. Configure credentials via environment variables \
-            (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY), AWS profile, or IAM role.",
-        ));
-    }
-
-    if err_debug.contains("InvalidAccessKeyId") || err_debug.contains("invalid access key") {
-        return Some(CredentialsException::new_err(
-            "Invalid AWS access key ID. Check your credentials.",
-        ));
-    }
-
-    if err_debug.contains("SignatureDoesNotMatch") {
-        return Some(CredentialsException::new_err(
-            "AWS signature mismatch. Check your secret access key.",
-        ));
-    }
-
-    if err_debug.contains("ExpiredToken") || err_debug.contains("expired") {
-        return Some(CredentialsException::new_err(
-            "AWS credentials have expired. Refresh your session token.",
-        ));
-    }
-
-    if err_debug.contains("UnrecognizedClientException") {
-        return Some(CredentialsException::new_err(
-            "Invalid AWS credentials. Check your access key and secret.",
-        ));
-    }
-
-    // Access denied
-    if err_debug.contains("AccessDeniedException") || err_debug.contains("Access Denied") {
-        let msg = extract_message(err_debug).unwrap_or_else(|| {
-            format!(
-                "Access denied to {}. Check your IAM permissions.",
-                service.name()
-            )
-        });
-        return Some(AccessDeniedException::new_err(msg));
-    }
-
-    // Rate limiting
-    if err_debug.contains("ProvisionedThroughputExceededException")
-        || err_debug.contains("LimitExceededException")
-        || err_debug.contains("RequestLimitExceeded")
-        || err_debug.contains("SlowDown")
-        || err_debug.contains("Throttling")
-    {
-        return Some(ProvisionedThroughputExceededException::new_err(format!(
-            "{} request rate too high. Try again with exponential backoff.",
-            service.name()
-        )));
-    }
-
-    None
-}
-
-/// Map DynamoDB-specific errors.
-pub fn map_sdk_error<E, R>(err: SdkError<E, R>, table: Option<&str>) -> PyErr
+/// Returns `Some(PyErr)` for non-service errors, `None` for `ServiceError`.
+fn map_outer_sdk_error<E, R>(err: &SdkError<E, R>, service: AwsService) -> Option<PyErr>
 where
-    E: std::fmt::Debug + std::fmt::Display,
+    E: std::fmt::Debug,
     R: std::fmt::Debug,
 {
-    let err_display = err.to_string();
-    let err_debug = format!("{:?}", err);
+    match err {
+        SdkError::DispatchFailure(dispatch) => {
+            if dispatch.is_timeout() {
+                Some(ConnectionException::new_err(format!(
+                    "Connection timed out to {}. Check your network or endpoint.",
+                    service.name()
+                )))
+            } else if dispatch.is_io() {
+                Some(ConnectionException::new_err(format!(
+                    "Connection failed to {} (I/O error). Check if the endpoint is reachable.",
+                    service.name()
+                )))
+            } else {
+                Some(ConnectionException::new_err(format!(
+                    "Connection failed to {}. Check if the endpoint is reachable.",
+                    service.name()
+                )))
+            }
+        }
+        SdkError::TimeoutError(_) => Some(ConnectionException::new_err(format!(
+            "Connection timed out to {}. Check your network or endpoint.",
+            service.name()
+        ))),
+        SdkError::ConstructionFailure(err) => {
+            let msg = format!("{:?}", err);
+            if msg.contains("credentials")
+                || msg.contains("Credentials")
+                || msg.contains("NoCredentialsError")
+            {
+                Some(CredentialsException::new_err(
+                    "No AWS credentials found. Configure credentials via environment variables \
+                    (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY), AWS profile, or IAM role.",
+                ))
+            } else {
+                Some(PydynoxException::new_err(format!(
+                    "Failed to build request: {}",
+                    msg
+                )))
+            }
+        }
+        SdkError::ResponseError(err) => Some(PydynoxException::new_err(format!(
+            "Invalid response from {}: {:?}",
+            service.name(),
+            err
+        ))),
+        SdkError::ServiceError(_) => None,
+        _ => Some(PydynoxException::new_err(format!(
+            "Unknown error from {}: {:?}",
+            service.name(),
+            err
+        ))),
+    }
+}
 
-    // Check common errors first
-    if let Some(py_err) = map_common_error(&err_debug, AwsService::DynamoDB) {
+/// Map common service error codes shared across DynamoDB, S3, and KMS.
+///
+/// Returns `Some(PyErr)` if matched, `None` if the code needs service-specific handling.
+fn map_common_service_code(
+    code: Option<&str>,
+    message: Option<&str>,
+    service: AwsService,
+) -> Option<PyErr> {
+    let code = code?;
+
+    match code {
+        "UnrecognizedClientException" => Some(CredentialsException::new_err(
+            "Invalid AWS credentials. Check your access key and secret.",
+        )),
+        "InvalidAccessKeyId" => Some(CredentialsException::new_err(
+            "Invalid AWS access key ID. Check your credentials.",
+        )),
+        "SignatureDoesNotMatch" => Some(CredentialsException::new_err(
+            "AWS signature mismatch. Check your secret access key.",
+        )),
+        "ExpiredTokenException" | "ExpiredToken" => Some(CredentialsException::new_err(
+            "AWS credentials have expired. Refresh your session token.",
+        )),
+        "AccessDeniedException" | "AccessDenied" => {
+            let msg = message.unwrap_or("Check your IAM permissions.");
+            Some(AccessDeniedException::new_err(format!(
+                "Access denied to {}: {}",
+                service.name(),
+                msg
+            )))
+        }
+        "ProvisionedThroughputExceededException"
+        | "LimitExceededException"
+        | "RequestLimitExceeded"
+        | "Throttling"
+        | "ThrottlingException"
+        | "SlowDown"
+        | "TooManyRequestsException" => {
+            Some(ProvisionedThroughputExceededException::new_err(format!(
+                "{} request rate too high. Try again with exponential backoff.",
+                service.name()
+            )))
+        }
+        _ => None,
+    }
+}
+
+/// Map a DynamoDB service error code + message to a Python exception.
+fn map_dynamodb_code(
+    code: Option<&str>,
+    message: Option<&str>,
+    display: &str,
+    table: Option<&str>,
+) -> PyErr {
+    // Check common cross-service errors first
+    if let Some(py_err) = map_common_service_code(code, message, AwsService::DynamoDB) {
         return py_err;
     }
 
-    // DynamoDB-specific errors
-    let error_code = extract_error_code(&err_debug);
-
-    match error_code.as_deref() {
+    match code {
         Some("ResourceNotFoundException") => {
             let msg = if let Some(t) = table {
                 format!("Table '{}' not found", t)
@@ -233,40 +249,51 @@ where
             ResourceInUseException::new_err(msg)
         }
         Some("ValidationException") => {
-            let msg = extract_message(&err_debug).unwrap_or(err_display);
-            ValidationException::new_err(msg)
+            let msg = message.unwrap_or(display);
+            ValidationException::new_err(msg.to_string())
         }
         Some("ConditionalCheckFailedException") => {
             ConditionalCheckFailedException::new_err("The condition expression evaluated to false")
         }
         Some("TransactionCanceledException") => {
-            let reasons = extract_cancellation_reasons(&err_debug);
-            let msg = if reasons.is_empty() {
-                "Transaction was canceled".to_string()
-            } else {
-                format!("Transaction was canceled: {}", reasons.join("; "))
-            };
-            TransactionCanceledException::new_err(msg)
+            let msg = message.unwrap_or("Transaction was canceled");
+            TransactionCanceledException::new_err(msg.to_string())
         }
         Some("ItemCollectionSizeLimitExceededException") => {
             ValidationException::new_err("Item collection size limit exceeded")
         }
         _ => {
-            let msg = extract_message(&err_debug).unwrap_or_else(|| {
-                if err_display == "service error" {
-                    let clean = err_debug.replace('\n', " ").replace("  ", " ");
-                    if clean.len() > 500 {
-                        format!("{}...", &clean[..500])
-                    } else {
-                        clean
-                    }
-                } else {
-                    err_display
-                }
-            });
-            PydynoxException::new_err(msg)
+            let msg = message.unwrap_or(display);
+            PydynoxException::new_err(msg.to_string())
         }
     }
+}
+
+/// Map DynamoDB-specific errors using typed `SdkError` variants.
+///
+/// For `ServiceError`, uses `ProvideErrorMetadata` to get the error code and message
+/// instead of parsing debug strings.
+pub fn map_sdk_error<E, R>(err: SdkError<E, R>, table: Option<&str>) -> PyErr
+where
+    E: aws_sdk_dynamodb::error::ProvideErrorMetadata + std::fmt::Debug + std::fmt::Display,
+    R: std::fmt::Debug,
+{
+    // Check outer SdkError variants first (dispatch, timeout, etc.)
+    if let Some(py_err) = map_outer_sdk_error(&err, AwsService::DynamoDB) {
+        return py_err;
+    }
+
+    // It's a ServiceError — use typed metadata
+    if let Some(service_err) = err.as_service_error() {
+        let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(service_err);
+        let code = meta.code();
+        let message = meta.message();
+        let display = service_err.to_string();
+        return map_dynamodb_code(code, message, &display, table);
+    }
+
+    // Should not reach here (map_outer_sdk_error handles all non-service variants)
+    PydynoxException::new_err(format!("Unexpected DynamoDB error: {:?}", err))
 }
 
 /// Map DynamoDB errors with optional item data for ConditionalCheckFailedException.
@@ -280,27 +307,31 @@ pub fn map_sdk_error_with_item<E, R>(
     item: Option<HashMap<String, AttributeValue>>,
 ) -> PyErr
 where
-    E: std::fmt::Debug + std::fmt::Display,
+    E: aws_sdk_dynamodb::error::ProvideErrorMetadata + std::fmt::Debug + std::fmt::Display,
     R: std::fmt::Debug,
 {
-    let err_debug = format!("{:?}", err);
-    let error_code = extract_error_code(&err_debug);
+    // Check outer SdkError variants first
+    if let Some(py_err) = map_outer_sdk_error(&err, AwsService::DynamoDB) {
+        return py_err;
+    }
 
-    // Only handle ConditionalCheckFailedException with item specially
-    if error_code.as_deref() == Some("ConditionalCheckFailedException") {
-        if let Some(item_data) = item {
-            // Convert item to Python dict
-            if let Ok(py_item) = attribute_values_to_py_dict(py, item_data) {
-                // Create exception with item attribute
-                let exc = ConditionalCheckFailedException::new_err(
-                    "The condition expression evaluated to false",
-                );
-                // Set the item attribute on the exception
-                if let Ok(exc_val) = exc.value(py).getattr("__class__") {
-                    let _ = exc.value(py).setattr("item", py_item);
-                    let _ = exc_val; // suppress unused warning
+    // Check for ConditionalCheckFailedException with item
+    if let Some(service_err) = err.as_service_error() {
+        let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(service_err);
+        let code = meta.code();
+
+        if code == Some("ConditionalCheckFailedException") {
+            if let Some(item_data) = item {
+                if let Ok(py_item) = attribute_values_to_py_dict(py, item_data) {
+                    let exc = ConditionalCheckFailedException::new_err(
+                        "The condition expression evaluated to false",
+                    );
+                    if let Ok(exc_val) = exc.value(py).getattr("__class__") {
+                        let _ = exc.value(py).setattr("item", py_item);
+                        let _ = exc_val; // suppress unused warning
+                    }
+                    return exc;
                 }
-                return exc;
             }
         }
     }
@@ -309,178 +340,126 @@ where
     map_sdk_error(err, table)
 }
 
-/// Map S3 SDK errors to Python exceptions.
+/// Map S3 SDK errors to Python exceptions using typed `SdkError` variants.
 pub fn map_s3_error<E, R>(err: SdkError<E, R>, bucket: Option<&str>, key: Option<&str>) -> PyErr
 where
-    E: std::fmt::Debug + std::fmt::Display,
+    E: aws_sdk_s3::error::ProvideErrorMetadata + std::fmt::Debug + std::fmt::Display,
     R: std::fmt::Debug,
 {
-    let err_display = err.to_string();
-    let err_debug = format!("{:?}", err);
-
-    // Check common errors first
-    if let Some(py_err) = map_common_error(&err_debug, AwsService::S3) {
+    // Check outer SdkError variants first
+    if let Some(py_err) = map_outer_sdk_error(&err, AwsService::S3) {
         return py_err;
     }
 
-    // S3-specific errors
-    if err_debug.contains("NoSuchBucket") {
-        let msg = if let Some(b) = bucket {
-            format!("S3 bucket '{}' not found", b)
-        } else {
-            "S3 bucket not found".to_string()
+    // It's a ServiceError — use typed metadata
+    if let Some(service_err) = err.as_service_error() {
+        let meta = aws_sdk_s3::error::ProvideErrorMetadata::meta(service_err);
+        let code = meta.code();
+        let message = meta.message();
+
+        // Check common cross-service errors
+        if let Some(py_err) = map_common_service_code(code, message, AwsService::S3) {
+            return py_err;
+        }
+
+        // S3-specific error codes
+        return match code {
+            Some("NoSuchBucket") => {
+                let msg = if let Some(b) = bucket {
+                    format!("S3 bucket '{}' not found", b)
+                } else {
+                    "S3 bucket not found".to_string()
+                };
+                ResourceNotFoundException::new_err(msg)
+            }
+            Some("NoSuchKey") | Some("NotFound") => {
+                let msg = if let (Some(b), Some(k)) = (bucket, key) {
+                    format!("S3 object '{}/{}' not found", b, k)
+                } else if let Some(k) = key {
+                    format!("S3 object '{}' not found", k)
+                } else {
+                    "S3 object not found".to_string()
+                };
+                ResourceNotFoundException::new_err(msg)
+            }
+            Some("BucketAlreadyExists") | Some("BucketAlreadyOwnedByYou") => {
+                let msg = if let Some(b) = bucket {
+                    format!("S3 bucket '{}' already exists", b)
+                } else {
+                    "S3 bucket already exists".to_string()
+                };
+                ResourceInUseException::new_err(msg)
+            }
+            Some("InvalidBucketName") => ValidationException::new_err("Invalid S3 bucket name"),
+            Some("EntityTooLarge") | Some("MaxSizeExceeded") => {
+                ValidationException::new_err("S3 object too large")
+            }
+            Some("InvalidRange") => {
+                ValidationException::new_err("Invalid byte range for S3 object")
+            }
+            _ => {
+                let msg = message
+                    .map(|m| m.to_string())
+                    .unwrap_or_else(|| service_err.to_string());
+                S3Exception::new_err(format!("S3 operation failed: {}", msg))
+            }
         };
-        return ResourceNotFoundException::new_err(msg);
     }
 
-    if err_debug.contains("NoSuchKey") || err_debug.contains("NotFound") {
-        let msg = if let (Some(b), Some(k)) = (bucket, key) {
-            format!("S3 object '{}/{}' not found", b, k)
-        } else if let Some(k) = key {
-            format!("S3 object '{}' not found", k)
-        } else {
-            "S3 object not found".to_string()
-        };
-        return ResourceNotFoundException::new_err(msg);
-    }
-
-    if err_debug.contains("BucketAlreadyExists") || err_debug.contains("BucketAlreadyOwnedByYou") {
-        let msg = if let Some(b) = bucket {
-            format!("S3 bucket '{}' already exists", b)
-        } else {
-            "S3 bucket already exists".to_string()
-        };
-        return ResourceInUseException::new_err(msg);
-    }
-
-    if err_debug.contains("InvalidBucketName") {
-        return ValidationException::new_err("Invalid S3 bucket name");
-    }
-
-    if err_debug.contains("EntityTooLarge") || err_debug.contains("MaxSizeExceeded") {
-        return ValidationException::new_err("S3 object too large");
-    }
-
-    if err_debug.contains("InvalidRange") {
-        return ValidationException::new_err("Invalid byte range for S3 object");
-    }
-
-    // Generic S3 error
-    let msg = extract_message(&err_debug).unwrap_or(err_display);
-    S3Exception::new_err(format!("S3 operation failed: {}", msg))
+    PydynoxException::new_err(format!("Unexpected S3 error: {:?}", err))
 }
 
-/// Map KMS SDK errors to Python exceptions.
+/// Map KMS SDK errors to Python exceptions using typed `SdkError` variants.
 pub fn map_kms_error<E, R>(err: SdkError<E, R>) -> PyErr
 where
-    E: std::fmt::Debug + std::fmt::Display,
+    E: aws_sdk_kms::error::ProvideErrorMetadata + std::fmt::Debug + std::fmt::Display,
     R: std::fmt::Debug,
 {
-    let err_display = err.to_string();
-    let err_debug = format!("{:?}", err);
-
-    // Check common errors first
-    if let Some(py_err) = map_common_error(&err_debug, AwsService::Kms) {
+    // Check outer SdkError variants first
+    if let Some(py_err) = map_outer_sdk_error(&err, AwsService::Kms) {
         return py_err;
     }
 
-    // KMS-specific errors
-    if err_debug.contains("NotFoundException") || err_debug.contains("not found") {
-        return EncryptionException::new_err("KMS key not found. Check the key ID or alias.");
-    }
+    // It's a ServiceError — use typed metadata
+    if let Some(service_err) = err.as_service_error() {
+        let meta = aws_sdk_kms::error::ProvideErrorMetadata::meta(service_err);
+        let code = meta.code();
+        let message = meta.message();
 
-    if err_debug.contains("DisabledException") {
-        return EncryptionException::new_err("KMS key is disabled.");
-    }
-
-    if err_debug.contains("InvalidKeyUsageException") {
-        return EncryptionException::new_err("KMS key cannot be used for this operation.");
-    }
-
-    if err_debug.contains("KeyUnavailableException") {
-        return EncryptionException::new_err("KMS key is not available. Try again later.");
-    }
-
-    if err_debug.contains("InvalidCiphertextException") {
-        return EncryptionException::new_err("Invalid ciphertext. Data may be corrupted.");
-    }
-
-    if err_debug.contains("IncorrectKeyException") {
-        return EncryptionException::new_err("Wrong KMS key used for decryption.");
-    }
-
-    if err_debug.contains("InvalidGrantTokenException") {
-        return EncryptionException::new_err("Invalid grant token.");
-    }
-
-    // Generic KMS error
-    let msg = extract_message(&err_debug).unwrap_or(err_display);
-    EncryptionException::new_err(format!("KMS operation failed: {}", msg))
-}
-
-// ========== HELPER FUNCTIONS ==========
-
-/// Extract error code from AWS SDK error debug string.
-fn extract_error_code(err_str: &str) -> Option<String> {
-    // Look for patterns like: code: Some("ResourceNotFoundException")
-    if let Some(start) = err_str.find("code: Some(\"") {
-        let rest = &err_str[start + 12..];
-        if let Some(end) = rest.find('"') {
-            return Some(rest[..end].to_string());
+        // Check common cross-service errors
+        if let Some(py_err) = map_common_service_code(code, message, AwsService::Kms) {
+            return py_err;
         }
+
+        // KMS-specific error codes
+        return match code {
+            Some("NotFoundException") => {
+                EncryptionException::new_err("KMS key not found. Check the key ID or alias.")
+            }
+            Some("DisabledException") => EncryptionException::new_err("KMS key is disabled."),
+            Some("InvalidKeyUsageException") => {
+                EncryptionException::new_err("KMS key cannot be used for this operation.")
+            }
+            Some("KeyUnavailableException") => {
+                EncryptionException::new_err("KMS key is not available. Try again later.")
+            }
+            Some("InvalidCiphertextException") => {
+                EncryptionException::new_err("Invalid ciphertext. Data may be corrupted.")
+            }
+            Some("IncorrectKeyException") => {
+                EncryptionException::new_err("Wrong KMS key used for decryption.")
+            }
+            Some("InvalidGrantTokenException") => {
+                EncryptionException::new_err("Invalid grant token.")
+            }
+            _ => {
+                let msg = message
+                    .map(|m| m.to_string())
+                    .unwrap_or_else(|| service_err.to_string());
+                EncryptionException::new_err(format!("KMS operation failed: {}", msg))
+            }
+        };
     }
 
-    // Also check for error type names in the string
-    let known_errors = [
-        "ResourceNotFoundException",
-        "ResourceInUseException",
-        "ValidationException",
-        "ConditionalCheckFailedException",
-        "TransactionCanceledException",
-        "ProvisionedThroughputExceededException",
-        "AccessDeniedException",
-        "UnrecognizedClientException",
-        "ItemCollectionSizeLimitExceededException",
-        "RequestLimitExceeded",
-    ];
-
-    for error in known_errors {
-        if err_str.contains(error) {
-            return Some(error.to_string());
-        }
-    }
-
-    None
-}
-
-/// Extract the error message from AWS SDK error debug string.
-fn extract_message(err_str: &str) -> Option<String> {
-    // Look for patterns like: message: Some("The actual error message")
-    if let Some(start) = err_str.find("message: Some(\"") {
-        let rest = &err_str[start + 15..];
-        if let Some(end) = rest.find('"') {
-            return Some(rest[..end].to_string());
-        }
-    }
-    None
-}
-
-/// Extract cancellation reasons from transaction error.
-fn extract_cancellation_reasons(err_str: &str) -> Vec<String> {
-    let mut reasons = Vec::new();
-
-    if err_str.contains("ConditionalCheckFailed") {
-        reasons.push("Condition check failed".to_string());
-    }
-    if err_str.contains("ItemCollectionSizeLimitExceeded") {
-        reasons.push("Item collection size limit exceeded".to_string());
-    }
-    if err_str.contains("TransactionConflict") {
-        reasons.push("Transaction conflict".to_string());
-    }
-    if err_str.contains("ProvisionedThroughputExceeded") {
-        reasons.push("Throughput exceeded".to_string());
-    }
-
-    reasons
+    PydynoxException::new_err(format!("Unexpected KMS error: {:?}", err))
 }
