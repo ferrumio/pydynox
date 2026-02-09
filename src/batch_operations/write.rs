@@ -171,7 +171,7 @@ pub fn sync_batch_write(
 ) -> PyResult<()> {
     let prepared = prepare_batch_write(py, table, put_items, delete_keys)?;
 
-    let result = runtime.block_on(execute_batch_write(client, &prepared));
+    let result = py.detach(|| runtime.block_on(execute_batch_write(client, &prepared)));
 
     match result {
         Ok(()) => Ok(()),

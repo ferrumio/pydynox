@@ -86,7 +86,7 @@ pub fn sync_transact_write(
     }
 
     let client = client.clone();
-    let result = runtime.block_on(execute_transact_write(client, transact_items));
+    let result = py.detach(|| runtime.block_on(execute_transact_write(client, transact_items)));
 
     match result {
         Ok(()) => Ok(()),

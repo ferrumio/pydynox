@@ -226,7 +226,7 @@ pub fn sync_scan(
         total_segments,
     )?;
 
-    let result = runtime.block_on(execute_scan(client.clone(), prepared));
+    let result = py.detach(|| runtime.block_on(execute_scan(client.clone(), prepared)));
 
     match result {
         Ok(raw) => raw_to_py_result(py, raw),
@@ -444,7 +444,7 @@ pub fn sync_count(
         consistent_read,
     )?;
 
-    let result = runtime.block_on(execute_count(client.clone(), prepared));
+    let result = py.detach(|| runtime.block_on(execute_count(client.clone(), prepared)));
 
     match result {
         Ok(r) => Ok((r.count, r.metrics)),
@@ -671,7 +671,7 @@ pub fn sync_parallel_scan(
         consistent_read,
     )?;
 
-    let result = runtime.block_on(execute_parallel_scan(client.clone(), prepared));
+    let result = py.detach(|| runtime.block_on(execute_parallel_scan(client.clone(), prepared)));
 
     match result {
         Ok(raw) => {

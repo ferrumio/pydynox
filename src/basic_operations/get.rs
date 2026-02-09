@@ -121,7 +121,7 @@ pub fn sync_get_item(
     )?;
 
     // Execute async operation (releases GIL during I/O)
-    let result = runtime.block_on(execute_get_item(client.clone(), prepared));
+    let result = py.detach(|| runtime.block_on(execute_get_item(client.clone(), prepared)));
 
     // Convert result back to Python (needs GIL)
     match result {
