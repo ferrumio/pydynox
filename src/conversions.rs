@@ -1,11 +1,10 @@
 //! Type conversions between Python and DynamoDB AttributeValue.
 
+use aws_sdk_dynamodb::primitives::Blob;
 use aws_sdk_dynamodb::types::AttributeValue;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
 use std::collections::HashMap;
-
-use crate::serialization::py_to_dynamo;
 
 /// Extract a HashMap<String, String> from an optional Python dict.
 ///
@@ -25,15 +24,121 @@ pub fn extract_string_map(
     }
 }
 
-/// Convert a Python value to a DynamoDB AttributeValue.
+/// Convert a Python value directly to a DynamoDB AttributeValue.
 ///
-/// This handles simple Python types (str, int, float, bool, None, list, dict).
-pub fn py_to_attribute_value(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<AttributeValue> {
-    let dynamo_dict = py_to_dynamo(py, value)?;
-    py_dict_to_attribute_value(py, dynamo_dict.bind(py))
+/// This is the fast path — goes straight from PyAny to AttributeValue
+/// without creating an intermediate Python dict.
+///
+/// Handles: str, bool, int, float, None, bytes, set, frozenset, list, dict.
+#[allow(clippy::only_used_in_recursion)]
+pub fn py_to_attribute_value_direct(
+    py: Python<'_>,
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<AttributeValue> {
+    if obj.is_none() {
+        Ok(AttributeValue::Null(true))
+    } else if let Ok(s) = obj.cast::<PyString>() {
+        Ok(AttributeValue::S(s.to_str()?.to_string()))
+    } else if let Ok(b) = obj.cast::<PyBool>() {
+        // Bool check must come before Int because bool is a subclass of int
+        Ok(AttributeValue::Bool(b.is_true()))
+    } else if obj.cast::<PyInt>().is_ok() || obj.cast::<PyFloat>().is_ok() {
+        Ok(AttributeValue::N(obj.str()?.to_str()?.to_string()))
+    } else if let Ok(bytes) = obj.cast::<PyBytes>() {
+        Ok(AttributeValue::B(Blob::new(bytes.as_bytes().to_vec())))
+    } else if let Ok(set) = obj.cast::<PySet>() {
+        convert_set_direct(set.iter())
+    } else if let Ok(frozen_set) = obj.cast::<PyFrozenSet>() {
+        convert_set_direct(frozen_set.iter())
+    } else if let Ok(list) = obj.cast::<PyList>() {
+        let items: Vec<AttributeValue> = list
+            .iter()
+            .map(|item| py_to_attribute_value_direct(py, &item))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(AttributeValue::L(items))
+    } else if let Ok(dict) = obj.cast::<PyDict>() {
+        let mut map = HashMap::new();
+        for (k, v) in dict.iter() {
+            let key: String = k.extract()?;
+            let value = py_to_attribute_value_direct(py, &v)?;
+            map.insert(key, value);
+        }
+        Ok(AttributeValue::M(map))
+    } else {
+        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+            "Unsupported type for DynamoDB: {}. Supported types: str, int, float, bool, None, list, dict, bytes, set",
+            obj.get_type().name()?
+        )))
+    }
+}
+
+/// Convert a Python set/frozenset directly to a DynamoDB set AttributeValue (SS, NS, or BS).
+fn convert_set_direct<'py, I>(iter: I) -> PyResult<AttributeValue>
+where
+    I: Iterator<Item = Bound<'py, PyAny>>,
+{
+    let items: Vec<Bound<'py, PyAny>> = iter.collect();
+
+    if items.is_empty() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "DynamoDB does not support empty sets",
+        ));
+    }
+
+    let first = &items[0];
+
+    if first.cast::<PyString>().is_ok() {
+        let strings: Vec<String> = items
+            .iter()
+            .map(|item| {
+                item.cast::<PyString>()
+                    .map_err(|_| {
+                        PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                            "String set must contain only strings",
+                        )
+                    })?
+                    .extract::<String>()
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(AttributeValue::Ss(strings))
+    } else if first.cast::<PyInt>().is_ok() || first.cast::<PyFloat>().is_ok() {
+        let numbers: Vec<String> = items
+            .iter()
+            .map(|item| {
+                if item.cast::<PyInt>().is_ok() || item.cast::<PyFloat>().is_ok() {
+                    Ok(item.str()?.to_str()?.to_string())
+                } else {
+                    Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Number set must contain only numbers",
+                    ))
+                }
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(AttributeValue::Ns(numbers))
+    } else if first.cast::<PyBytes>().is_ok() {
+        let blobs: Vec<Blob> = items
+            .iter()
+            .map(|item| {
+                let bytes = item.cast::<PyBytes>().map_err(|_| {
+                    PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Binary set must contain only bytes",
+                    )
+                })?;
+                Ok(Blob::new(bytes.as_bytes().to_vec()))
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(AttributeValue::Bs(blobs))
+    } else {
+        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
+            "Unsupported set element type: {}. Sets can only contain strings, numbers, or bytes",
+            first.get_type().name()?
+        )))
+    }
 }
 
 /// Convert a Python dict to a HashMap of DynamoDB AttributeValues.
+///
+/// Uses the direct path (no intermediate Python dict).
 pub fn py_dict_to_attribute_values(
     py: Python<'_>,
     dict: &Bound<'_, PyDict>,
@@ -42,127 +147,11 @@ pub fn py_dict_to_attribute_values(
 
     for (k, v) in dict.iter() {
         let key: String = k.extract()?;
-        let dynamo_value = py_to_dynamo(py, &v)?;
-        let attr_value = py_dict_to_attribute_value(py, dynamo_value.bind(py))?;
+        let attr_value = py_to_attribute_value_direct(py, &v)?;
         result.insert(key, attr_value);
     }
 
     Ok(result)
-}
-
-/// Convert a single Python dict (in DynamoDB format) to an AttributeValue.
-///
-/// The dict should be in the format {"S": "value"}, {"N": "42"}, etc.
-pub fn py_dict_to_attribute_value(
-    _py: Python<'_>,
-    dict: &Bound<'_, PyDict>,
-) -> PyResult<AttributeValue> {
-    // String
-    if let Some(s) = dict.get_item("S")? {
-        let s_str: String = s.extract()?;
-        return Ok(AttributeValue::S(s_str));
-    }
-
-    // Number
-    if let Some(n) = dict.get_item("N")? {
-        let n_str: String = n.extract()?;
-        return Ok(AttributeValue::N(n_str));
-    }
-
-    // Boolean
-    if let Some(b) = dict.get_item("BOOL")? {
-        let b_val: bool = b.extract()?;
-        return Ok(AttributeValue::Bool(b_val));
-    }
-
-    // Null
-    if dict.get_item("NULL")?.is_some() {
-        return Ok(AttributeValue::Null(true));
-    }
-
-    // Binary
-    if let Some(b) = dict.get_item("B")? {
-        let b_str: String = b.extract()?;
-        use aws_sdk_dynamodb::primitives::Blob;
-        use base64::Engine;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(&b_str)
-            .map_err(|e| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid base64 encoding: {}",
-                    e
-                ))
-            })?;
-        return Ok(AttributeValue::B(Blob::new(bytes)));
-    }
-
-    // List
-    if let Some(list) = dict.get_item("L")? {
-        let py_list = list.cast::<pyo3::types::PyList>()?;
-        let mut items = Vec::new();
-        for item in py_list.iter() {
-            let item_dict = item.cast::<PyDict>()?;
-            items.push(py_dict_to_attribute_value(_py, item_dict)?);
-        }
-        return Ok(AttributeValue::L(items));
-    }
-
-    // Map
-    if let Some(map) = dict.get_item("M")? {
-        let py_map = map.cast::<PyDict>()?;
-        let mut items = HashMap::new();
-        for (k, v) in py_map.iter() {
-            let key: String = k.extract()?;
-            let value_dict = v.cast::<PyDict>()?;
-            items.insert(key, py_dict_to_attribute_value(_py, value_dict)?);
-        }
-        return Ok(AttributeValue::M(items));
-    }
-
-    // String Set
-    if let Some(ss) = dict.get_item("SS")? {
-        let py_list = ss.cast::<pyo3::types::PyList>()?;
-        let strings: Vec<String> = py_list
-            .iter()
-            .map(|item| item.extract::<String>())
-            .collect::<PyResult<Vec<_>>>()?;
-        return Ok(AttributeValue::Ss(strings));
-    }
-
-    // Number Set
-    if let Some(ns) = dict.get_item("NS")? {
-        let py_list = ns.cast::<pyo3::types::PyList>()?;
-        let numbers: Vec<String> = py_list
-            .iter()
-            .map(|item| item.extract::<String>())
-            .collect::<PyResult<Vec<_>>>()?;
-        return Ok(AttributeValue::Ns(numbers));
-    }
-
-    // Binary Set
-    if let Some(bs) = dict.get_item("BS")? {
-        use aws_sdk_dynamodb::primitives::Blob;
-        use base64::Engine;
-        let py_list = bs.cast::<pyo3::types::PyList>()?;
-        let mut blobs = Vec::new();
-        for item in py_list.iter() {
-            let b_str: String = item.extract()?;
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(&b_str)
-                .map_err(|e| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid base64 encoding: {}",
-                        e
-                    ))
-                })?;
-            blobs.push(Blob::new(bytes));
-        }
-        return Ok(AttributeValue::Bs(blobs));
-    }
-
-    Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-        "Unknown DynamoDB AttributeValue type",
-    ))
 }
 
 /// Convert a HashMap of DynamoDB AttributeValues to a Python dict.
