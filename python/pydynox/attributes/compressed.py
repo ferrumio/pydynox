@@ -60,6 +60,7 @@ class CompressedAttribute(Attribute[str]):
         sort_key: bool = False,
         default: str | None = None,
         required: bool = False,
+        alias: str | None = None,
     ):
         """Create a compressed attribute.
 
@@ -72,12 +73,14 @@ class CompressedAttribute(Attribute[str]):
             sort_key: True if this is the sort key.
             default: Default value when not provided.
             required: Whether this field is required.
+            alias: DynamoDB attribute name override.
         """
         super().__init__(
             partition_key=partition_key,
             sort_key=sort_key,
             default=default,
             required=required,
+            alias=alias,
         )
         self.algorithm = algorithm
         self.level = level

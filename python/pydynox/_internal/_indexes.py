@@ -273,11 +273,18 @@ class GlobalSecondaryIndex(Generic[M]):
         """Convert to DynamoDB GSI definition format."""
         key_schema: list[dict[str, str]] = []
 
+        model_class = self._model_class
         for attr_name in self.partition_keys:
-            key_schema.append({"AttributeName": attr_name, "KeyType": "HASH"})
+            dynamo_name = attr_name
+            if model_class is not None:
+                dynamo_name = model_class._py_to_dynamo.get(attr_name, attr_name)
+            key_schema.append({"AttributeName": dynamo_name, "KeyType": "HASH"})
 
         for attr_name in self.sort_keys:
-            key_schema.append({"AttributeName": attr_name, "KeyType": "RANGE"})
+            dynamo_name = attr_name
+            if model_class is not None:
+                dynamo_name = model_class._py_to_dynamo.get(attr_name, attr_name)
+            key_schema.append({"AttributeName": dynamo_name, "KeyType": "RANGE"})
 
         projection: dict[str, Any]
         match self.projection:
@@ -311,7 +318,8 @@ class GlobalSecondaryIndex(Generic[M]):
                     f"which is not defined on {model_class.__name__}"
                 )
             attr_type = attributes[attr_name].attr_type
-            partition_keys.append((attr_name, attr_type))
+            dynamo_name = model_class._py_to_dynamo.get(attr_name, attr_name)
+            partition_keys.append((dynamo_name, attr_type))
 
         sort_keys: list[tuple[str, str]] = []
         for attr_name in self.sort_keys:
@@ -321,7 +329,8 @@ class GlobalSecondaryIndex(Generic[M]):
                     f"which is not defined on {model_class.__name__}"
                 )
             attr_type = attributes[attr_name].attr_type
-            sort_keys.append((attr_name, attr_type))
+            dynamo_name = model_class._py_to_dynamo.get(attr_name, attr_name)
+            sort_keys.append((dynamo_name, attr_type))
 
         projection_type: str
         non_key_attributes: list[str] | None = None
@@ -410,9 +419,11 @@ class GSIQueryResult(Generic[M]):
 
         key_conditions: list[str] = []
         for i, attr_name in enumerate(self._partition_keys):
+            # Use alias for DynamoDB attribute name
+            dynamo_name = self._model_class._py_to_dynamo.get(attr_name, attr_name)
             name_placeholder = f"#gsi_hk{i}"
             value_placeholder = f":gsi_hkv{i}"
-            names[attr_name] = name_placeholder
+            names[dynamo_name] = name_placeholder
             values[value_placeholder] = self._partition_key_values[attr_name]
             key_conditions.append(f"{name_placeholder} = {value_placeholder}")
 
@@ -519,9 +530,11 @@ class AsyncGSIQueryResult(Generic[M]):
 
         key_conditions: list[str] = []
         for i, attr_name in enumerate(self._partition_keys):
+            # Use alias for DynamoDB attribute name
+            dynamo_name = self._model_class._py_to_dynamo.get(attr_name, attr_name)
             name_placeholder = f"#gsi_hk{i}"
             value_placeholder = f":gsi_hkv{i}"
-            names[attr_name] = name_placeholder
+            names[dynamo_name] = name_placeholder
             values[value_placeholder] = self._partition_key_values[attr_name]
             key_conditions.append(f"{name_placeholder} = {value_placeholder}")
 
@@ -767,6 +780,7 @@ class LocalSecondaryIndex(Generic[M]):
             )
 
         attr_type = attributes[self.sort_key].attr_type
+        dynamo_sk = model_class._py_to_dynamo.get(self.sort_key, self.sort_key)
 
         projection_type: str
         non_key_attributes: list[str] | None = None
@@ -784,7 +798,7 @@ class LocalSecondaryIndex(Generic[M]):
         result: dict[str, Any] = {
             "index_name": self.index_name,
             # Rust expects range_key for LSI
-            "range_key": (self.sort_key, attr_type),
+            "range_key": (dynamo_sk, attr_type),
             "projection": projection_type,
         }
 
@@ -845,9 +859,13 @@ class LSIQueryResult(Generic[M]):
         names: dict[str, str] = {}
         values: dict[str, Any] = {}
 
+        # Use alias for DynamoDB attribute name
+        dynamo_pk = self._model_class._py_to_dynamo.get(
+            self._partition_key_name, self._partition_key_name
+        )
         name_placeholder = "#lsi_hk"
         value_placeholder = ":lsi_hkv"
-        names[self._partition_key_name] = name_placeholder
+        names[dynamo_pk] = name_placeholder
         values[value_placeholder] = self._partition_key_value
         key_condition = f"{name_placeholder} = {value_placeholder}"
 
@@ -953,9 +971,13 @@ class AsyncLSIQueryResult(Generic[M]):
         names: dict[str, str] = {}
         values: dict[str, Any] = {}
 
+        # Use alias for DynamoDB attribute name
+        dynamo_pk = self._model_class._py_to_dynamo.get(
+            self._partition_key_name, self._partition_key_name
+        )
         name_placeholder = "#lsi_hk"
         value_placeholder = ":lsi_hkv"
-        names[self._partition_key_name] = name_placeholder
+        names[dynamo_pk] = name_placeholder
         values[value_placeholder] = self._partition_key_value
         key_condition = f"{name_placeholder} = {value_placeholder}"
 

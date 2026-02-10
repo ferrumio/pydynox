@@ -39,7 +39,14 @@ class ConditionPath:
         attr_type: str | None = None,
     ):
         self.attribute = attribute
-        self.path = path or ([attribute.attr_name] if attribute and attribute.attr_name else [])
+        if path is not None:
+            self.path = path
+        elif attribute and attribute.attr_name:
+            # Use alias for DynamoDB expression if set, otherwise python name
+            dynamo_name = getattr(attribute, "alias", None) or attribute.attr_name
+            self.path = [dynamo_name]
+        else:
+            self.path = []
         self.attr_type = attr_type or (attribute.attr_type if attribute else None)
 
     def __getitem__(self, key: str | int) -> ConditionPath:

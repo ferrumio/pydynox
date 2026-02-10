@@ -32,9 +32,13 @@ All attributes share these parameters:
 | `sort_key` | bool | False | Is this the sort key |
 | `default` | Any | None | Default value or `AutoGenerate` strategy |
 | `required` | bool | False | Field must have a value (not None) |
+| `alias` | str \| None | None | DynamoDB attribute name (saves storage) |
 
 !!! tip
     Use `AutoGenerate` strategies for automatic ID and timestamp generation. See [Auto-generate strategies](auto-generate.md).
+
+!!! tip
+    Use `alias` to store short names in DynamoDB while keeping readable names in Python. See [Field aliases](aliases.md).
 
 ## Basic types
 
@@ -404,6 +408,7 @@ Download methods:
 
 ## Next steps
 
+- [Field aliases](aliases.md) - Short DynamoDB names, readable Python names
 - [Indexes](indexes.md) - Query by non-key attributes with GSIs
 - [Auto-generate](auto-generate.md) - Generate IDs and timestamps
 - [Encryption](encryption.md) - Field-level encryption with KMS

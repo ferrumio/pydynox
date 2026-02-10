@@ -909,15 +909,17 @@ class Model(ModelBase, metaclass=ModelMeta):
         client = cls._get_client()
         table = cls._get_table()
 
-        # Get hash key type
+        # Get hash key type — use alias for DynamoDB attribute name
         partition_key_attr = cls._attributes[cls._partition_key]
-        partition_key = (cls._partition_key, partition_key_attr.attr_type)
+        pk_dynamo = cls._py_to_dynamo.get(cls._partition_key, cls._partition_key)
+        partition_key = (pk_dynamo, partition_key_attr.attr_type)
 
         # Get range key type if defined
         sort_key = None
         if cls._sort_key:
             sort_key_attr = cls._attributes[cls._sort_key]
-            sort_key = (cls._sort_key, sort_key_attr.attr_type)
+            sk_dynamo = cls._py_to_dynamo.get(cls._sort_key, cls._sort_key)
+            sort_key = (sk_dynamo, sort_key_attr.attr_type)
 
         # Build GSI definitions
         gsis = None
@@ -1013,15 +1015,17 @@ class Model(ModelBase, metaclass=ModelMeta):
         client = cls._get_client()
         table = cls._get_table()
 
-        # Get hash key type
+        # Get hash key type — use alias for DynamoDB attribute name
         partition_key_attr = cls._attributes[cls._partition_key]
-        partition_key = (cls._partition_key, partition_key_attr.attr_type)
+        pk_dynamo = cls._py_to_dynamo.get(cls._partition_key, cls._partition_key)
+        partition_key = (pk_dynamo, partition_key_attr.attr_type)
 
         # Get range key type if defined
         sort_key = None
         if cls._sort_key:
             sort_key_attr = cls._attributes[cls._sort_key]
-            sort_key = (cls._sort_key, sort_key_attr.attr_type)
+            sk_dynamo = cls._py_to_dynamo.get(cls._sort_key, cls._sort_key)
+            sort_key = (sk_dynamo, sort_key_attr.attr_type)
 
         # Build GSI definitions
         gsis = None

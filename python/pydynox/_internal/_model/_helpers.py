@@ -69,11 +69,17 @@ def prepare_get(
     client = cls._get_client()
     table = cls._get_table()
 
+    # Translate python key names to DynamoDB aliases
+    aliased_keys = {}
+    for k, v in keys.items():
+        dynamo_name = cls._py_to_dynamo.get(k, k)
+        aliased_keys[dynamo_name] = v
+
     use_consistent = consistent_read
     if use_consistent is None:
         use_consistent = getattr(cls.model_config, "consistent_read", False)
 
-    return client, table, keys, use_consistent
+    return client, table, aliased_keys, use_consistent
 
 
 def finalize_get(cls: type[M], item: dict[str, Any] | None) -> M | None:
@@ -200,11 +206,14 @@ def prepare_smart_save(
                 value = getattr(self, field_name, None)
                 # Serialize the value - handles special types like S3Value
                 attr = self._attributes[field_name]
-                updates[field_name] = attr.serialize(value)
+                # Use alias for DynamoDB attribute name
+                dynamo_name = self._py_to_dynamo.get(field_name, field_name)
+                updates[dynamo_name] = attr.serialize(value)
 
         # Also include version field if it changed
         if version_attr is not None and version_attr not in updates:
-            updates[version_attr] = new_version
+            dynamo_version = self._py_to_dynamo.get(version_attr, version_attr)
+            updates[dynamo_version] = new_version
 
         if final_condition is not None:
             names: dict[str, str] = {}
@@ -248,7 +257,9 @@ def prepare_delete(self: Model, condition: Condition | None, skip_hooks: bool | 
     if version_attr is not None:
         current_version: int | None = getattr(self, version_attr, None)
         if current_version is not None:
-            path = ConditionPath(path=[version_attr])
+            # Use alias for DynamoDB attribute name in condition
+            dynamo_name = self._py_to_dynamo.get(version_attr, version_attr)
+            path = ConditionPath(path=[dynamo_name])
             version_condition = path == current_version
 
     final_condition = condition
@@ -323,14 +334,30 @@ def prepare_update(
                 raise ValueError(f"Unknown attribute: {attr_name}")
             setattr(self, attr_name, value)
 
+        # Translate update keys to DynamoDB alias names
+        aliased_kwargs = {}
+        for attr_name, value in kwargs.items():
+            dynamo_name = self._py_to_dynamo.get(attr_name, attr_name)
+            aliased_kwargs[dynamo_name] = value
+
         if condition is not None:
             cond_names: dict[str, str] = {}
             cond_values: dict[str, Any] = {}
             cond_expr = condition.serialize(cond_names, cond_values)
             attr_names = {v: k for k, v in cond_names.items()}
-            return client, table, key, None, cond_expr, attr_names, cond_values, kwargs, skip
+            return (
+                client,
+                table,
+                key,
+                None,
+                cond_expr,
+                attr_names,
+                cond_values,
+                aliased_kwargs,
+                skip,
+            )
 
-        return client, table, key, None, None, None, None, kwargs, skip
+        return client, table, key, None, None, None, None, aliased_kwargs, skip
 
     return client, table, key, None, None, None, None, None, skip
 
@@ -354,6 +381,12 @@ def prepare_update_by_key(
         if attr_name not in cls._attributes:
             raise ValueError(f"Unknown attribute: {attr_name}")
 
+    # Translate update keys to DynamoDB alias names
+    aliased_updates = {}
+    for attr_name, value in updates.items():
+        dynamo_name = cls._py_to_dynamo.get(attr_name, attr_name)
+        aliased_updates[dynamo_name] = value
+
     client = cls._get_client()
     table = cls._get_table()
 
@@ -373,13 +406,13 @@ def prepare_update_by_key(
             client,
             table,
             key,
-            updates,
+            aliased_updates,
             renamed_expr,
             attr_names if attr_names else None,
             renamed_values if renamed_values else None,
         )
 
-    return client, table, key, updates, None, None, None
+    return client, table, key, aliased_updates, None, None, None
 
 
 def prepare_delete_by_key(

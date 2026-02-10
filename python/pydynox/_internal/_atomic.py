@@ -29,7 +29,14 @@ class AtomicPath:
         path: list[str] | None = None,
     ):
         self.attribute = attribute
-        self.path = path or ([attribute.attr_name] if attribute and attribute.attr_name else [])
+        if path is not None:
+            self.path = path
+        elif attribute and attribute.attr_name:
+            # Use alias for DynamoDB expression if set, otherwise python name
+            dynamo_name = getattr(attribute, "alias", None) or attribute.attr_name
+            self.path = [dynamo_name]
+        else:
+            self.path = []
 
     def _serialize_path(self, names: dict[str, str]) -> str:
         parts = []
