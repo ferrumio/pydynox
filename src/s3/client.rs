@@ -3,12 +3,12 @@
 //! This module provides S3 operations that can be used standalone or
 //! through the DynamoDBClient's lazy S3 client.
 
-use crate::client_internal::{build_s3_client, AwsConfig};
+use crate::client_internal::{AwsConfig, build_s3_client};
 use crate::errors::S3Exception;
 use crate::s3::operations::{
-    delete_object, download_bytes, head_object, presigned_url, save_to_file, sync_delete_object,
-    sync_download_bytes, sync_head_object, sync_presigned_url, sync_save_to_file,
-    sync_upload_bytes, upload_bytes, S3Metadata, S3Metrics,
+    S3Metadata, S3Metrics, delete_object, download_bytes, head_object, presigned_url, save_to_file,
+    sync_delete_object, sync_download_bytes, sync_head_object, sync_presigned_url,
+    sync_save_to_file, sync_upload_bytes, upload_bytes,
 };
 use aws_sdk_s3::Client;
 use once_cell::sync::Lazy;
@@ -68,7 +68,8 @@ impl S3Client {
     ) -> PyResult<Self> {
         // Set proxy env var if provided
         if let Some(ref proxy) = proxy_url {
-            std::env::set_var("HTTPS_PROXY", proxy);
+            // SAFETY: called during client construction, before any async work starts
+            unsafe { std::env::set_var("HTTPS_PROXY", proxy) };
         }
 
         let config = AwsConfig {

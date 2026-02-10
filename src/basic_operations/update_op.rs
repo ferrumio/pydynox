@@ -1,9 +1,9 @@
 //! Update item operation.
 
+use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::types::{
     AttributeValue, ReturnConsumedCapacity, ReturnValuesOnConditionCheckFailure,
 };
-use aws_sdk_dynamodb::Client;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;
@@ -151,10 +151,10 @@ fn extract_item_from_update_error(
 ) -> Option<HashMap<String, AttributeValue>> {
     use aws_sdk_dynamodb::operation::update_item::UpdateItemError;
 
-    if let aws_sdk_dynamodb::error::SdkError::ServiceError(service_err) = err {
-        if let UpdateItemError::ConditionalCheckFailedException(ccf) = service_err.err() {
-            return ccf.item().cloned();
-        }
+    if let aws_sdk_dynamodb::error::SdkError::ServiceError(service_err) = err
+        && let UpdateItemError::ConditionalCheckFailedException(ccf) = service_err.err()
+    {
+        return ccf.item().cloned();
     }
     None
 }

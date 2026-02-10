@@ -1,9 +1,9 @@
 //! S3 operations - upload, download, presigned URLs, delete.
 
-use crate::errors::{map_s3_error, S3Exception};
+use crate::errors::{S3Exception, map_s3_error};
+use aws_sdk_s3::Client;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
-use aws_sdk_s3::Client;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict};
 use std::collections::HashMap;

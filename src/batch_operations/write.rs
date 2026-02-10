@@ -1,7 +1,7 @@
 //! Batch write operations for DynamoDB.
 
-use aws_sdk_dynamodb::types::{DeleteRequest, PutRequest, WriteRequest};
 use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::types::{DeleteRequest, PutRequest, WriteRequest};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
@@ -107,16 +107,15 @@ async fn execute_batch_write(
 
             match result {
                 Ok(output) => {
-                    if let Some(unprocessed) = output.unprocessed_items {
-                        if let Some(items) = unprocessed.get(&prepared.table) {
-                            if !items.is_empty() {
-                                pending = items.clone();
-                                retries += 1;
-                                let delay = std::time::Duration::from_millis(50 * (1 << retries));
-                                tokio::time::sleep(delay).await;
-                                continue;
-                            }
-                        }
+                    if let Some(unprocessed) = output.unprocessed_items
+                        && let Some(items) = unprocessed.get(&prepared.table)
+                        && !items.is_empty()
+                    {
+                        pending = items.clone();
+                        retries += 1;
+                        let delay = std::time::Duration::from_millis(50 * (1 << retries));
+                        tokio::time::sleep(delay).await;
+                        continue;
                     }
                     pending.clear();
                 }
