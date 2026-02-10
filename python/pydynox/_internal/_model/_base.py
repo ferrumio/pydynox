@@ -39,6 +39,8 @@ class ModelMeta(type):
     _indexes: dict[str, GlobalSecondaryIndex[Any]]
     _local_indexes: dict[str, LocalSecondaryIndex[Any]]
     _metrics_storage: "MetricsStorage"
+    _py_to_dynamo: dict[str, str]
+    _dynamo_to_py: dict[str, str]
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> ModelMeta:
         attributes: dict[str, Attribute[Any]] = {}
@@ -122,6 +124,17 @@ class ModelMeta(type):
         cls._indexes = indexes
         cls._local_indexes = local_indexes
 
+        # Build alias lookup dicts
+        py_to_dynamo: dict[str, str] = {}
+        dynamo_to_py: dict[str, str] = {}
+        for attr_name, attr in attributes.items():
+            alias = getattr(attr, "alias", None)
+            if alias is not None:
+                py_to_dynamo[attr_name] = alias
+                dynamo_to_py[alias] = attr_name
+        cls._py_to_dynamo = py_to_dynamo
+        cls._dynamo_to_py = dynamo_to_py
+
         # Register this class in ALL parent discriminator registries
         if discriminator_attr and name != "ModelBase" and name != "Model":
             # Walk up the inheritance chain and register in all registries
@@ -172,6 +185,8 @@ class ModelBase(metaclass=ModelMeta):
     _local_indexes: ClassVar[dict[str, LocalSecondaryIndex[Any]]]
     _client_instance: ClassVar[DynamoDBClient | None] = None
     _metrics_storage: ClassVar["MetricsStorage"]
+    _py_to_dynamo: ClassVar[dict[str, str]]
+    _dynamo_to_py: ClassVar[dict[str, str]]
 
     model_config: ClassVar[ModelConfig]
 
@@ -373,21 +388,27 @@ class ModelBase(metaclass=ModelMeta):
     def _get_key(self) -> dict[str, Any]:
         key = {}
         if self._partition_key:
-            key[self._partition_key] = getattr(self, self._partition_key)
+            dynamo_name = self._py_to_dynamo.get(self._partition_key, self._partition_key)
+            key[dynamo_name] = getattr(self, self._partition_key)
         if self._sort_key:
-            key[self._sort_key] = getattr(self, self._sort_key)
+            dynamo_name = self._py_to_dynamo.get(self._sort_key, self._sort_key)
+            key[dynamo_name] = getattr(self, self._sort_key)
         return key
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert the model to a dict."""
+        """Convert the model to a dict.
+
+        Uses alias names for DynamoDB keys when defined.
+        """
         result = {}
         for attr_name, attr in self._attributes.items():
+            dynamo_name = self._py_to_dynamo.get(attr_name, attr_name)
             value = getattr(self, attr_name, None)
             if value is not None:
-                result[attr_name] = attr.serialize(value)
+                result[dynamo_name] = attr.serialize(value)
             # Auto-set discriminator to class name
             elif getattr(attr, "discriminator", False):
-                result[attr_name] = self.__class__.__name__
+                result[dynamo_name] = self.__class__.__name__
         return result
 
     def calculate_size(self, detailed: bool = False) -> ItemSize:
@@ -399,6 +420,7 @@ class ModelBase(metaclass=ModelMeta):
     def from_dict(cls: type[M], data: dict[str, Any]) -> M:
         """Create a model instance from a dict.
 
+        Translates DynamoDB alias names back to Python attribute names.
         Stores the original data for change tracking, enabling smart updates
         that only send changed fields to DynamoDB.
 
@@ -406,19 +428,28 @@ class ModelBase(metaclass=ModelMeta):
         """
         # Check if we should return a subclass based on discriminator
         target_cls: type[M] = cls
+
         if cls._discriminator_attr and cls._discriminator_registry:
-            type_value = data.get(cls._discriminator_attr)
+            # Discriminator value might be under alias or python name
+            disc_dynamo = cls._py_to_dynamo.get(cls._discriminator_attr, cls._discriminator_attr)
+            type_value = data.get(cls._discriminator_attr) or data.get(disc_dynamo)
             if type_value and type_value in cls._discriminator_registry:
                 target_cls = cls._discriminator_registry[type_value]  # type: ignore[assignment]
 
+        # Translate alias keys to python names
+        translated: dict[str, Any] = {}
+        for key, value in data.items():
+            py_name = target_cls._dynamo_to_py.get(key, key)
+            translated[py_name] = value
+
         deserialized = {}
-        for attr_name, value in data.items():
+        for attr_name, value in translated.items():
             if attr_name in target_cls._attributes:
                 deserialized[attr_name] = target_cls._attributes[attr_name].deserialize(value)
             else:
                 deserialized[attr_name] = value
         instance = target_cls(**deserialized)
-        # Store original for change tracking (enables smart updates)
+        # Store original for change tracking (uses aliased dict from DynamoDB)
         instance._original = data.copy()
         instance._changed = set()
         return instance
@@ -436,7 +467,10 @@ class ModelBase(metaclass=ModelMeta):
     def _extract_key_from_kwargs(
         cls, kwargs: dict[str, Any]
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Split kwargs into key attributes and updates."""
+        """Split kwargs into key attributes and updates.
+
+        Keys use alias names for DynamoDB. Updates use Python names.
+        """
         if cls._partition_key is None:
             raise ValueError(f"Model {cls.__name__} has no partition_key defined")
 
@@ -445,16 +479,18 @@ class ModelBase(metaclass=ModelMeta):
 
         for attr_name, value in kwargs.items():
             if attr_name == cls._partition_key:
-                key[attr_name] = value
+                dynamo_name = cls._py_to_dynamo.get(attr_name, attr_name)
+                key[dynamo_name] = value
             elif attr_name == cls._sort_key:
-                key[attr_name] = value
+                dynamo_name = cls._py_to_dynamo.get(attr_name, attr_name)
+                key[dynamo_name] = value
             else:
                 updates[attr_name] = value
 
-        if cls._partition_key not in key:
+        if cls._partition_key not in kwargs:
             raise ValueError(f"Missing required partition_key: {cls._partition_key}")
 
-        if cls._sort_key is not None and cls._sort_key not in key:
+        if cls._sort_key is not None and cls._sort_key not in kwargs:
             raise ValueError(f"Missing required sort_key: {cls._sort_key}")
 
         return key, updates

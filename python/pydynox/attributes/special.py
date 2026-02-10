@@ -107,6 +107,7 @@ class EnumAttribute(Attribute[E], Generic[E]):
         sort_key: bool = False,
         default: E | None = None,
         required: bool = False,
+        alias: str | None = None,
     ):
         """Create an enum attribute.
 
@@ -116,12 +117,14 @@ class EnumAttribute(Attribute[E], Generic[E]):
             sort_key: True if this is the sort key.
             default: Default enum value.
             required: Whether this field is required.
+            alias: DynamoDB attribute name override.
         """
         super().__init__(
             partition_key=partition_key,
             sort_key=sort_key,
             default=default,
             required=required,
+            alias=alias,
         )
         self.enum_class = enum_class
 

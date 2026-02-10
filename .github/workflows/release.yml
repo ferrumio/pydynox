@@ -158,30 +158,30 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
 
-  github-release:
-    name: Create GitHub Release
-    needs: [prepare, publish]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
-        with:
-          name: "pydynox v${{ needs.prepare.outputs.version }}"
-          body: |
-            Release v${{ needs.prepare.outputs.version }}
-
-            See [CHANGELOG.md](CHANGELOG.md) for details.
-
-            ## Installation
-
-            ```bash
-            pip install pydynox==${{ needs.prepare.outputs.version }}
-            ```
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # github-release:
+  #   name: Create GitHub Release
+  #   needs: [prepare, publish]
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'push'
+  #   steps:
+  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #
+  #     - name: Create GitHub Release
+  #       uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+  #       with:
+  #         name: "pydynox v${{ needs.prepare.outputs.version }}"
+  #         body: |
+  #           Release v${{ needs.prepare.outputs.version }}
+  #
+  #           See [CHANGELOG.md](CHANGELOG.md) for details.
+  #
+  #           ## Installation
+  #
+  #           ```bash
+  #           pip install pydynox==${{ needs.prepare.outputs.version }}
+  #           ```
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docs:
     name: Deploy Documentation

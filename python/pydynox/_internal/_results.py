@@ -53,10 +53,11 @@ def _build_query_params(
     names: dict[str, str] = {}
     values: dict[str, Any] = {}
 
-    # Build key condition
+    # Build key condition — use alias for DynamoDB attribute name
+    dynamo_pk_name = model_class._py_to_dynamo.get(partition_key_name, partition_key_name)
     hk_placeholder = "#pk"
     hk_val_placeholder = ":pkv"
-    names[partition_key_name] = hk_placeholder
+    names[dynamo_pk_name] = hk_placeholder
     values[hk_val_placeholder] = partition_key_value
     key_condition = f"{hk_placeholder} = {hk_val_placeholder}"
 
@@ -74,7 +75,10 @@ def _build_query_params(
         for i, field in enumerate(fields):
             parts = field.split(".")
             part_placeholders = []
-            for part in parts:
+            for j, part in enumerate(parts):
+                # Translate top-level python name to alias if exists
+                if j == 0:
+                    part = model_class._py_to_dynamo.get(part, part)
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
                 proj_names[placeholder] = part
                 part_placeholders.append(placeholder)
@@ -121,7 +125,10 @@ def _build_scan_params(
         for i, field in enumerate(fields):
             parts = field.split(".")
             part_placeholders = []
-            for part in parts:
+            for j, part in enumerate(parts):
+                # Translate top-level python name to alias if exists
+                if j == 0:
+                    part = model_class._py_to_dynamo.get(part, part)
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
                 proj_names[placeholder] = part
                 part_placeholders.append(placeholder)

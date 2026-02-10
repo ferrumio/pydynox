@@ -31,6 +31,7 @@ nav = [
         "guides/operations-metrics.md",
     ] },
     { "Features" = [
+        "guides/aliases.md",
         "guides/ttl.md",
         "guides/hooks.md",
         "guides/auto-generate.md",

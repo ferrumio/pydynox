@@ -51,6 +51,7 @@ class Attribute(Generic[T]):
         default: T | None = None,
         required: bool = False,
         discriminator: bool = False,
+        alias: str | None = None,
     ):
         """Create an attribute.
 
@@ -60,12 +61,16 @@ class Attribute(Generic[T]):
             default: Default value when not provided.
             required: Whether this field is required (cannot be None).
             discriminator: True if this field is used for model inheritance.
+            alias: DynamoDB attribute name. If set, this name is used in DynamoDB
+                instead of the Python attribute name. Useful for shorter names
+                to save storage costs.
         """
         self.partition_key = partition_key
         self.sort_key = sort_key
         self.default = default
         self.required = required
         self.discriminator = discriminator
+        self.alias: str | None = alias
         self.attr_name: str | None = None
 
     def __set__(self, instance: Any, value: T | None) -> None:

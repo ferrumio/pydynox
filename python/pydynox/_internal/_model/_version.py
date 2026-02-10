@@ -32,7 +32,9 @@ def _build_version_condition(self: Model) -> tuple[Condition | None, int]:
         return None, 0
 
     current_version: int | None = getattr(self, version_attr, None)
-    path = ConditionPath(path=[version_attr])
+    # Use alias for DynamoDB attribute name in condition
+    dynamo_name = self._py_to_dynamo.get(version_attr, version_attr)
+    path = ConditionPath(path=[dynamo_name])
 
     if current_version is None:
         return path.not_exists(), 1

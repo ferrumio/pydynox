@@ -98,6 +98,7 @@ class StringAttribute(Attribute[str]):
         required: bool = False,
         template: Any | None = None,
         discriminator: bool = False,
+        alias: str | None = None,
     ):
         """Create a StringAttribute.
 
@@ -109,6 +110,7 @@ class StringAttribute(Attribute[str]):
             template: Template for building key. Supports strings ("USER#{email}")
                 and t-strings (t"USER#{email}") on Python 3.14+.
             discriminator: True if this field is used for model inheritance.
+            alias: DynamoDB attribute name override.
         """
         super().__init__(
             partition_key=partition_key,
@@ -116,6 +118,7 @@ class StringAttribute(Attribute[str]):
             default=default,
             required=required,
             discriminator=discriminator,
+            alias=alias,
         )
         self.template = template
         self._template_parts: list[_TemplatePart] | None = None
