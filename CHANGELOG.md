@@ -1,6 +1,38 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.26.0] - 2026-02-10
+
+
+### CI/CD
+
+- bump PyO3/maturin-action from 1.49.4 to 1.50.0 (#266)
+- bump github/codeql-action from 4.32.1 to 4.32.2 (#265)
+- bump astral-sh/setup-uv from 7.2.1 to 7.3.0 (#264)
+- bump CodSpeedHQ/action from 4.10.4 to 4.10.6 (#263)
+
+
+### Documentation
+
+- update changelog for v0.25.0 (#248)
+
+
+### Features
+
+- adding field alias support (#267)
+
+
+### Refactoring
+
+- improve error message mechanism (#254)
+- improve thread mechanism (#255)
+- remove 2step serialization (#256)
+- unify query API (#260)
+
+
+### Deps
+
+- bump the rust-dependencies group with 7 updates (#261)
 ## [0.25.0] - 2026-02-05
 
 
