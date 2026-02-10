@@ -20,7 +20,7 @@ use aws_sdk_kms::types::DataKeySpec;
 use aws_sdk_kms::Client;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use pyo3::prelude::*;
-use rand::RngCore;
+use rand::Rng;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -33,7 +33,7 @@ const FORMAT_VERSION: u8 = 1;
 const NONCE_SIZE: usize = 12;
 
 /// Metrics from a KMS operation.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Default)]
 pub struct KmsMetrics {
     /// Total duration in milliseconds.
@@ -65,7 +65,7 @@ impl KmsMetrics {
 }
 
 /// Result of an encrypt operation with metrics.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct EncryptResult {
     /// The encrypted ciphertext.
@@ -78,7 +78,7 @@ pub struct EncryptResult {
 }
 
 /// Result of a decrypt operation with metrics.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug)]
 pub struct DecryptResult {
     /// The decrypted plaintext.

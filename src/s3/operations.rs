@@ -21,7 +21,7 @@ const MIN_PART_SIZE: usize = 5 * 1024 * 1024;
 const DEFAULT_PART_SIZE: usize = 10 * 1024 * 1024;
 
 /// Metrics from an S3 operation.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Default)]
 pub struct S3Metrics {
     #[pyo3(get)]
@@ -56,7 +56,7 @@ impl S3Metrics {
 }
 
 /// S3 file metadata returned after upload.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone)]
 pub struct S3Metadata {
     #[pyo3(get)]

@@ -12,7 +12,7 @@ use pyo3::types::PyBytes;
 use std::io::{Read, Write};
 
 /// Compression algorithm options.
-#[pyclass(eq, eq_int)]
+#[pyclass(eq, eq_int, from_py_object)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CompressionAlgorithm {
     /// Zstandard - best compression ratio

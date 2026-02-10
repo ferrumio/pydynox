@@ -18,8 +18,8 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-pyo3 = { version = "0.27", features = ["extension-module"] }
-pyo3-async-runtimes = { version = "0.27", features = ["tokio-runtime"] }
+pyo3 = { version = "0.28", features = ["extension-module"] }
+pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
 aws-sdk-dynamodb = "1.104"
 aws-sdk-kms = "1.99"
 aws-sdk-s3 = "1.122"
@@ -53,7 +53,7 @@ aes-gcm = "0.10"
 rand = "0.10"
 
 [dev-dependencies]
-pyo3 = { version = "0.27", features = ["auto-initialize"] }
+pyo3 = { version = "0.28", features = ["auto-initialize"] }
 
 [profile.release]
 lto = true
