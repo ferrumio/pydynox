@@ -21,9 +21,9 @@
 //! the env vars are set (injected automatically by EKS/GitHub).
 //! Just use `DynamoDBClient()` without any parameters.
 
+use aws_config::BehaviorVersion;
 use aws_config::profile::ProfileFileCredentialsProvider;
 use aws_config::sts::AssumeRoleProvider;
-use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::config::Credentials;
 
 use super::config::AwsConfig;

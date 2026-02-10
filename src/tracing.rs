@@ -49,10 +49,13 @@ pub fn enable_sdk_debug() {
     // Set default if RUST_LOG not set
     // Use trace level for maximum detail (HTTP bodies, retries, etc)
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var(
-            "RUST_LOG",
-            "aws_sdk_dynamodb=trace,aws_smithy_runtime=trace,aws_smithy_http_client=trace,aws_config=debug",
-        );
+        // SAFETY: called once during tracing setup, before async runtime is active
+        unsafe {
+            std::env::set_var(
+                "RUST_LOG",
+                "aws_sdk_dynamodb=trace,aws_smithy_runtime=trace,aws_smithy_http_client=trace,aws_config=debug",
+            );
+        }
     }
     init_tracing();
 }

@@ -13,10 +13,10 @@ pub async fn execute_table_exists(client: Client, table_name: String) -> PyResul
         Ok(_) => Ok(true),
         Err(e) => {
             // Check if it's ResourceNotFoundException
-            if let Some(service_error) = e.as_service_error() {
-                if service_error.is_resource_not_found_exception() {
-                    return Ok(false);
-                }
+            if let Some(service_error) = e.as_service_error()
+                && service_error.is_resource_not_found_exception()
+            {
+                return Ok(false);
             }
             // For any other error, use map_sdk_error
             Err(map_sdk_error(e, Some(&table_name)))

@@ -1,7 +1,7 @@
 //! Scan operation.
 
-use aws_sdk_dynamodb::types::{AttributeValue, ReturnConsumedCapacity, Select};
 use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::types::{AttributeValue, ReturnConsumedCapacity, Select};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use std::collections::HashMap;

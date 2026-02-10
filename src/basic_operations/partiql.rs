@@ -1,7 +1,7 @@
 //! PartiQL operations.
 
-use aws_sdk_dynamodb::types::{AttributeValue, ReturnConsumedCapacity};
 use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::types::{AttributeValue, ReturnConsumedCapacity};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;

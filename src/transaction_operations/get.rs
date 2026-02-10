@@ -1,7 +1,7 @@
 //! Transactional get operations for DynamoDB.
 
-use aws_sdk_dynamodb::types::{AttributeValue, Get, ItemResponse, TransactGetItem};
 use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::types::{AttributeValue, Get, ItemResponse, TransactGetItem};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;

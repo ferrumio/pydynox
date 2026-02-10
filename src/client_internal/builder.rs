@@ -4,15 +4,15 @@
 
 use std::time::Duration;
 
+use aws_config::BehaviorVersion;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::retry::RetryConfig;
 use aws_config::timeout::TimeoutConfig;
-use aws_config::BehaviorVersion;
 use aws_sdk_dynamodb::Client as DynamoDbClient;
 use aws_sdk_kms::Client as KmsClient;
 use aws_sdk_s3::Client as S3Client;
 
-use super::auth::{build_credential_provider, CredentialProvider};
+use super::auth::{CredentialProvider, build_credential_provider};
 use super::config::AwsConfig;
 
 /// Build the base AWS SDK config from AwsConfig.

@@ -1,7 +1,7 @@
 //! Batch get operations for DynamoDB.
 
-use aws_sdk_dynamodb::types::{AttributeValue, KeysAndAttributes};
 use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::types::{AttributeValue, KeysAndAttributes};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
@@ -95,22 +95,22 @@ async fn execute_batch_get(
 
             match result {
                 Ok(output) => {
-                    if let Some(responses) = output.responses {
-                        if let Some(items) = responses.get(&prepared.table) {
-                            all_results.extend(items.clone());
-                        }
+                    if let Some(responses) = output.responses
+                        && let Some(items) = responses.get(&prepared.table)
+                    {
+                        all_results.extend(items.clone());
                     }
 
-                    if let Some(unprocessed) = output.unprocessed_keys {
-                        if let Some(keys_and_attrs) = unprocessed.get(&prepared.table) {
-                            let keys = keys_and_attrs.keys();
-                            if !keys.is_empty() {
-                                pending = keys.to_vec();
-                                retries += 1;
-                                let delay = std::time::Duration::from_millis(50 * (1 << retries));
-                                tokio::time::sleep(delay).await;
-                                continue;
-                            }
+                    if let Some(unprocessed) = output.unprocessed_keys
+                        && let Some(keys_and_attrs) = unprocessed.get(&prepared.table)
+                    {
+                        let keys = keys_and_attrs.keys();
+                        if !keys.is_empty() {
+                            pending = keys.to_vec();
+                            retries += 1;
+                            let delay = std::time::Duration::from_millis(50 * (1 << retries));
+                            tokio::time::sleep(delay).await;
+                            continue;
                         }
                     }
                     pending.clear();
