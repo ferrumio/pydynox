@@ -1,11 +1,11 @@
 //! Table creation operation.
 
+use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::types::{
     AttributeDefinition, BillingMode, GlobalSecondaryIndex, KeySchemaElement, KeyType,
     LocalSecondaryIndex, Projection, ProjectionType, ScalarAttributeType, SseSpecification,
     SseType, TableClass,
 };
-use aws_sdk_dynamodb::Client;
 use pyo3::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use tokio::runtime::Runtime;
 use super::gsi::GsiDefinition;
 use super::lsi::LsiDefinition;
 use super::wait::{execute_wait_for_table_active, sync_wait_for_table_active};
-use crate::errors::{map_sdk_error, ValidationException};
+use crate::errors::{ValidationException, map_sdk_error};
 
 /// Prepared create table request (converted before async).
 pub struct PreparedCreateTable {
@@ -55,21 +55,25 @@ pub fn prepare_create_table(
     let mut defined_attrs: HashSet<String> = HashSet::new();
 
     // Build attribute definitions
-    let mut attribute_definitions = vec![AttributeDefinition::builder()
-        .attribute_name(hash_key_name)
-        .attribute_type(hash_attr_type)
-        .build()
-        .map_err(|e| {
-            ValidationException::new_err(format!("Invalid attribute definition: {}", e))
-        })?];
+    let mut attribute_definitions = vec![
+        AttributeDefinition::builder()
+            .attribute_name(hash_key_name)
+            .attribute_type(hash_attr_type)
+            .build()
+            .map_err(|e| {
+                ValidationException::new_err(format!("Invalid attribute definition: {}", e))
+            })?,
+    ];
     defined_attrs.insert(hash_key_name.to_string());
 
     // Build key schema
-    let mut key_schema = vec![KeySchemaElement::builder()
-        .attribute_name(hash_key_name)
-        .key_type(KeyType::Hash)
-        .build()
-        .map_err(|e| ValidationException::new_err(format!("Invalid key schema: {}", e)))?];
+    let mut key_schema = vec![
+        KeySchemaElement::builder()
+            .attribute_name(hash_key_name)
+            .key_type(KeyType::Hash)
+            .build()
+            .map_err(|e| ValidationException::new_err(format!("Invalid key schema: {}", e)))?,
+    ];
 
     // Add range key if provided
     if let (Some(rk_name), Some(rk_type)) = (range_key_name, range_key_type) {

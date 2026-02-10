@@ -1,7 +1,7 @@
 //! Transactional write operations for DynamoDB.
 
-use aws_sdk_dynamodb::types::{ConditionCheck, Delete, Put, TransactWriteItem, Update};
 use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::types::{ConditionCheck, Delete, Put, TransactWriteItem, Update};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::sync::Arc;

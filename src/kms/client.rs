@@ -5,12 +5,12 @@
 //! 2. Plaintext key encrypts data locally with AES-256-GCM
 //! 3. Encrypted key is stored alongside the encrypted data
 
-use crate::client_internal::{build_kms_client, AwsConfig};
+use crate::client_internal::{AwsConfig, build_kms_client};
 use crate::errors::EncryptionException;
-use crate::kms::operations::{
-    decrypt_impl, encrypt_impl, sync_decrypt_impl, sync_encrypt_impl, DecryptResult, EncryptResult,
-};
 use crate::kms::ENCRYPTED_PREFIX;
+use crate::kms::operations::{
+    DecryptResult, EncryptResult, decrypt_impl, encrypt_impl, sync_decrypt_impl, sync_encrypt_impl,
+};
 use aws_sdk_kms::Client;
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
@@ -75,7 +75,8 @@ impl KmsEncryptor {
     ) -> PyResult<Self> {
         // Set proxy env var if provided
         if let Some(ref proxy) = proxy_url {
-            std::env::set_var("HTTPS_PROXY", proxy);
+            // SAFETY: called during client construction, before any async work starts
+            unsafe { std::env::set_var("HTTPS_PROXY", proxy) };
         }
 
         let config = AwsConfig {

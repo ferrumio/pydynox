@@ -9,16 +9,16 @@
 //! - KMS Encrypt has 4KB limit, but DynamoDB fields can be 400KB
 //! - Reduces KMS calls (one per operation instead of one per field)
 
-use crate::errors::{map_kms_error, EncryptionException};
+use crate::errors::{EncryptionException, map_kms_error};
 use crate::kms::ENCRYPTED_PREFIX;
 use aes_gcm::{
-    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
 };
+use aws_sdk_kms::Client;
 use aws_sdk_kms::primitives::Blob;
 use aws_sdk_kms::types::DataKeySpec;
-use aws_sdk_kms::Client;
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use pyo3::prelude::*;
 use rand::Rng;
 use std::collections::HashMap;

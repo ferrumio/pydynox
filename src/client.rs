@@ -26,7 +26,7 @@ use tokio::runtime::Runtime;
 
 use crate::basic_operations;
 use crate::batch_operations;
-use crate::client_internal::{build_client, build_kms_client, build_s3_client, AwsConfig};
+use crate::client_internal::{AwsConfig, build_client, build_kms_client, build_s3_client};
 use crate::metrics::OperationMetrics;
 use crate::table_operations;
 use crate::transaction_operations;
@@ -172,7 +172,8 @@ impl DynamoDBClient {
     ) -> PyResult<Self> {
         // Set proxy env var if provided (AWS SDK reads from env)
         if let Some(ref proxy) = proxy_url {
-            std::env::set_var("HTTPS_PROXY", proxy);
+            // SAFETY: called during client construction, before any async work starts
+            unsafe { std::env::set_var("HTTPS_PROXY", proxy) };
         }
 
         let config = AwsConfig {

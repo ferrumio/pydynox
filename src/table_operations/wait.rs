@@ -1,7 +1,7 @@
 //! Wait for table to become active.
 
-use aws_sdk_dynamodb::types::TableStatus;
 use aws_sdk_dynamodb::Client;
+use aws_sdk_dynamodb::types::TableStatus;
 use pyo3::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
@@ -31,10 +31,10 @@ pub async fn execute_wait_for_table_active(
 
         match result {
             Ok(response) => {
-                if let Some(table) = response.table() {
-                    if table.table_status() == Some(&TableStatus::Active) {
-                        return Ok(());
-                    }
+                if let Some(table) = response.table()
+                    && table.table_status() == Some(&TableStatus::Active)
+                {
+                    return Ok(());
                 }
             }
             Err(e) => {

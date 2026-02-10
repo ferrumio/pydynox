@@ -6,7 +6,7 @@
 //! - [`lz4`]: Fastest compression/decompression
 //! - [`gzip`]: Good balance, widely compatible
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::io::{Read, Write};

@@ -320,19 +320,18 @@ where
         let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(service_err);
         let code = meta.code();
 
-        if code == Some("ConditionalCheckFailedException") {
-            if let Some(item_data) = item {
-                if let Ok(py_item) = attribute_values_to_py_dict(py, item_data) {
-                    let exc = ConditionalCheckFailedException::new_err(
-                        "The condition expression evaluated to false",
-                    );
-                    if let Ok(exc_val) = exc.value(py).getattr("__class__") {
-                        let _ = exc.value(py).setattr("item", py_item);
-                        let _ = exc_val; // suppress unused warning
-                    }
-                    return exc;
-                }
+        if code == Some("ConditionalCheckFailedException")
+            && let Some(item_data) = item
+            && let Ok(py_item) = attribute_values_to_py_dict(py, item_data)
+        {
+            let exc = ConditionalCheckFailedException::new_err(
+                "The condition expression evaluated to false",
+            );
+            if let Ok(exc_val) = exc.value(py).getattr("__class__") {
+                let _ = exc.value(py).setattr("item", py_item);
+                let _ = exc_val; // suppress unused warning
             }
+            return exc;
         }
     }
 
