@@ -10,7 +10,7 @@ use pyo3::prelude::*;
 /// Contains timing, capacity consumption, and request tracking info.
 /// All fields except duration_ms are optional since DynamoDB may not
 /// return them depending on the operation and settings.
-#[pyclass]
+#[pyclass(from_py_object)]
 #[derive(Clone, Debug, Default)]
 pub struct OperationMetrics {
     /// Operation duration in milliseconds.
