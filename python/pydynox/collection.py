@@ -122,7 +122,27 @@ class Collection:
 
         if len(tables) > 1:
             raise ValueError(f"All models must share the same table. Found: {tables}")
-
+ 
+        # Check clients consistency
+        first_model , first_client = None, None
+        for model in self._models:
+            try:
+                client = model._get_client()
+            except ValueError as exc:
+                # keeping old behavior for models without client
+                if "No client configured for" in str(exc):
+                    continue
+                raise
+            
+            if first_client is None:
+                first_client = client
+                first_model = model
+            elif client is not first_client and first_model is not None:
+                raise ValueError(
+                    f"All models must use the same client. "
+                    f"Model {model.__name__} uses a different client than {first_model.__name__}."
+                )
+            
     def _get_table(self) -> str:
         """Get the shared table name."""
         return self._models[0].model_config.table
