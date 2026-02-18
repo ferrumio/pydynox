@@ -20,10 +20,10 @@ path = "src/lib.rs"
 [dependencies]
 pyo3 = { version = "0.28", features = ["extension-module"] }
 pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
-aws-sdk-dynamodb = "1.104"
-aws-sdk-kms = "1.99"
-aws-sdk-s3 = "1.122"
-aws-sdk-sts = "1.97"
+aws-sdk-dynamodb = "1.105"
+aws-sdk-kms = "1.101"
+aws-sdk-s3 = "1.123"
+aws-sdk-sts = "1.98"
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 tokio = { version = "1", features = [
     "rt-multi-thread",
@@ -42,7 +42,7 @@ lz4_flex = "0.12"
 flate2 = "1.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.20", features = ["v4"] }
+uuid = { version = "1.21", features = ["v4"] }
 ulid = "1.1"
 svix-ksuid = "0.8"
 chrono = { version = "0.4", default-features = false, features = [
