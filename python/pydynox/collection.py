@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydynox.hooks import HookType
 
@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from pydynox.model import Model
 
 M = TypeVar("M", bound="Model")
+
 
 class _QueryParams(NamedTuple):
     key_condition: str

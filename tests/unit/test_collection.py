@@ -205,11 +205,13 @@ def test_build_collection_query_params_template_with_sk():
     assert params.attr_names == {"#pk": "pk", "#sk": "sk"}
     assert params.attr_values == {":pkv": "USER#789", ":skprefix": "PROFILE#"}
 
+
 @pytest.mark.parametrize("model", (User, TemplateModel), ids=["pk", "template"])
 def test_build_collection_query_params_missing_pk_raises(model):
     collection = Collection([model])
     with pytest.raises(ValueError, match="pk is required"):
         collection._build_collection_query_params()
+
 
 def test_build_collection_query_params_pk_override_template():
     collection = Collection([TemplateModel])
