@@ -130,7 +130,7 @@ class Collection:
             raise ValueError(f"All models must share the same table. Found: {tables}")
 
         # Check clients consistency
-        first_model , first_client = None, None
+        first_model, first_client = None, None
         for model in self._models:
             try:
                 client = model._get_client()

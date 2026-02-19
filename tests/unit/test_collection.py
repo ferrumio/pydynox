@@ -59,26 +59,33 @@ def test_collection_no_discriminator_raises():
 
 def test_collection_with_different_client_raises():
     client1, client2 = MagicMock(), MagicMock()
+
     class UserWithClient1(User):
         model_config = ModelConfig(table="test_table", client=client1)
+
     class OrderWithClient2(Order):
         model_config = ModelConfig(table="test_table", client=client2)
 
     with pytest.raises(ValueError, match="must use the same client"):
         Collection([UserWithClient1, OrderWithClient2])
 
+
 def test_collection_with_same_client():
     client = MagicMock()
+
     class UserWithClient(User):
         model_config = ModelConfig(table="test_table", client=client)
+
     class OrderWithClient(Order):
         model_config = ModelConfig(table="test_table", client=client)
 
     # same client should not raise
     Collection([UserWithClient, OrderWithClient])
 
+
 def test_collection_for_default_client():
     from pydynox import clear_default_client, set_default_client
+
     default_config = MagicMock()
     set_default_client(default_config)
     try:
@@ -87,6 +94,7 @@ def test_collection_for_default_client():
         assert collection._get_client() == default_config
     finally:
         clear_default_client()
+
 
 def test_collection_different_tables_raises():
     with pytest.raises(ValueError, match="must share the same table"):
