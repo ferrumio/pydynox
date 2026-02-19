@@ -167,3 +167,55 @@ def test_collection_resolve_pk_no_template():
     collection = Collection([User])
     pk = collection._resolve_pk_from_template({"user_id": "123"})
     assert pk is None
+
+
+# _build_collection_query_params tests
+def test_build_collection_query_params_basic():
+    collection = Collection([User, Order])
+    params = collection._build_collection_query_params(pk="USER#123")
+
+    assert params.key_condition == "#pk = :pkv"
+    assert params.attr_names == {"#pk": "pk"}
+    assert params.attr_values == {":pkv": "USER#123"}
+
+
+def test_build_collection_query_params_with_sk_begins_with():
+    collection = Collection([User, Order])
+    params = collection._build_collection_query_params(pk="USER#123", sk_begins_with="ORDER#")
+
+    assert params.key_condition == "#pk = :pkv AND begins_with(#sk, :skprefix)"
+    assert params.attr_names == {"#pk": "pk", "#sk": "sk"}
+    assert params.attr_values == {":pkv": "USER#123", ":skprefix": "ORDER#"}
+
+
+def test_build_collection_query_params_from_template():
+    collection = Collection([TemplateModel])
+    params = collection._build_collection_query_params(user_id="456")
+
+    assert params.key_condition == "#pk = :pkv"
+    assert params.attr_names == {"#pk": "pk"}
+    assert params.attr_values == {":pkv": "USER#456"}
+
+
+def test_build_collection_query_params_template_with_sk():
+    collection = Collection([TemplateModel])
+    params = collection._build_collection_query_params(user_id="789", sk_begins_with="PROFILE#")
+
+    assert params.key_condition == "#pk = :pkv AND begins_with(#sk, :skprefix)"
+    assert params.attr_names == {"#pk": "pk", "#sk": "sk"}
+    assert params.attr_values == {":pkv": "USER#789", ":skprefix": "PROFILE#"}
+
+
+@pytest.mark.parametrize("model", (User, TemplateModel), ids=["pk", "template"])
+def test_build_collection_query_params_missing_pk_raises(model):
+    collection = Collection([model])
+    with pytest.raises(ValueError, match="pk is required"):
+        collection._build_collection_query_params()
+
+
+def test_build_collection_query_params_pk_override_template():
+    collection = Collection([TemplateModel])
+    params = collection._build_collection_query_params(pk="EXPLICIT#123", user_id="456")
+
+    # Should use explicit pk, not template
+    assert params.attr_values == {":pkv": "EXPLICIT#123"}

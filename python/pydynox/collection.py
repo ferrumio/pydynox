@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydynox.hooks import HookType
 
@@ -10,6 +10,12 @@ if TYPE_CHECKING:
     from pydynox.model import Model
 
 M = TypeVar("M", bound="Model")
+
+
+class _QueryParams(NamedTuple):
+    key_condition: str
+    attr_names: dict[str, str]
+    attr_values: dict[str, Any]
 
 
 class CollectionResult:
@@ -131,6 +137,45 @@ class Collection:
         """Get the DynamoDB client from the first model."""
         return self._models[0]._get_client()
 
+    def _build_collection_query_params(
+        self,
+        pk: str | None = None,
+        sk_begins_with: str | None = None,
+        **kwargs: Any,
+    ) -> _QueryParams:
+        """Build query parameters for collection query."""
+        # Resolve partition key from template if needed
+        partition_key = pk
+        if partition_key is None and kwargs:
+            partition_key = self._resolve_pk_from_template(kwargs)
+
+        if partition_key is None:
+            raise ValueError("pk is required")
+
+        # Build key condition
+        pk_attr = self._models[0]._partition_key
+        if pk_attr is None:
+            raise ValueError("Model has no partition key")
+
+        names: dict[str, str] = {"#pk": pk_attr}
+        values: dict[str, Any] = {":pkv": partition_key}
+
+        key_condition = "#pk = :pkv"
+
+        # Add sk_begins_with if provided
+        if sk_begins_with:
+            sk_attr = self._models[0]._sort_key
+            if sk_attr:
+                names["#sk"] = sk_attr
+                values[":skprefix"] = sk_begins_with
+                key_condition += " AND begins_with(#sk, :skprefix)"
+
+        return _QueryParams(
+            key_condition=key_condition,
+            attr_names=names,
+            attr_values=values,
+        )
+
     async def query(
         self,
         pk: str | None = None,
@@ -161,42 +206,15 @@ class Collection:
         client = self._get_client()
         table = self._get_table()
 
-        # Resolve partition key from template if needed
-        partition_key = pk
-        if partition_key is None and kwargs:
-            partition_key = self._resolve_pk_from_template(kwargs)
-
-        if partition_key is None:
-            raise ValueError("pk is required")
-
-        # Build key condition
-        pk_attr = self._models[0]._partition_key
-        if pk_attr is None:
-            raise ValueError("Model has no partition key")
-
-        names: dict[str, str] = {}
-        values: dict[str, Any] = {}
-
-        names[pk_attr] = "#pk"
-        values[":pkv"] = partition_key
-        key_condition = "#pk = :pkv"
-
-        # Add sk_begins_with if provided
-        if sk_begins_with:
-            sk_attr = self._models[0]._sort_key
-            if sk_attr:
-                names[sk_attr] = "#sk"
-                values[":skprefix"] = sk_begins_with
-                key_condition += " AND begins_with(#sk, :skprefix)"
-
-        attr_names = {v: k for k, v in names.items()}
+        # Build query parameters
+        params = self._build_collection_query_params(pk=pk, sk_begins_with=sk_begins_with, **kwargs)
 
         # Execute query and collect all items
         query_result = client.query(
             table,
-            key_condition_expression=key_condition,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=values,
+            key_condition_expression=params.key_condition,
+            expression_attribute_names=params.attr_names,
+            expression_attribute_values=params.attr_values,
             index_name=index,
             limit=limit,
             consistent_read=consistent_read,
@@ -236,42 +254,15 @@ class Collection:
         client = self._get_client()
         table = self._get_table()
 
-        # Resolve partition key from template if needed
-        partition_key = pk
-        if partition_key is None and kwargs:
-            partition_key = self._resolve_pk_from_template(kwargs)
-
-        if partition_key is None:
-            raise ValueError("pk is required")
-
-        # Build key condition
-        pk_attr = self._models[0]._partition_key
-        if pk_attr is None:
-            raise ValueError("Model has no partition key")
-
-        names: dict[str, str] = {}
-        values: dict[str, Any] = {}
-
-        names[pk_attr] = "#pk"
-        values[":pkv"] = partition_key
-        key_condition = "#pk = :pkv"
-
-        # Add sk_begins_with if provided
-        if sk_begins_with:
-            sk_attr = self._models[0]._sort_key
-            if sk_attr:
-                names[sk_attr] = "#sk"
-                values[":skprefix"] = sk_begins_with
-                key_condition += " AND begins_with(#sk, :skprefix)"
-
-        attr_names = {v: k for k, v in names.items()}
+        # Build query parameters
+        params = self._build_collection_query_params(pk=pk, sk_begins_with=sk_begins_with, **kwargs)
 
         # Execute query and collect all items
         query_result = client.sync_query(
             table,
-            key_condition_expression=key_condition,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=values,
+            key_condition_expression=params.key_condition,
+            expression_attribute_names=params.attr_names,
+            expression_attribute_values=params.attr_values,
             index_name=index,
             limit=limit,
             consistent_read=consistent_read,
@@ -295,14 +286,17 @@ class Collection:
         if not (hasattr(pk_attr, "has_template") and pk_attr.has_template):
             return None
 
+        # Cast to template-aware attribute for type checker
+        template_attr = pk_attr
+
         # Build from template
         values = {}
-        for placeholder in pk_attr.placeholders:  # type: ignore[union-attr]
+        for placeholder in template_attr.placeholders:  # type: ignore[union-attr]
             if placeholder not in kwargs:
                 return None
             values[placeholder] = kwargs[placeholder]
 
-        return pk_attr.build_key(values)  # type: ignore[union-attr]
+        return template_attr.build_key(values)  # type: ignore[union-attr]
 
     def __repr__(self) -> str:
         names = ", ".join(m.__name__ for m in self._models)
