@@ -78,16 +78,16 @@ def test_collection_with_same_client():
     Collection([UserWithClient, OrderWithClient])
 
 def test_collection_for_default_client():
-    from pydynox import set_default_client, clear_default_client
+    from pydynox import clear_default_client, set_default_client
     default_config = MagicMock()
     set_default_client(default_config)
     try:
         collection = Collection([User, Order])
-        # using set_default_client should not raise 
+        # using set_default_client should not raise
         assert collection._get_client() == default_config
     finally:
         clear_default_client()
-    
+
 def test_collection_different_tables_raises():
     with pytest.raises(ValueError, match="must share the same table"):
         Collection([User, DifferentTable])
