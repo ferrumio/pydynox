@@ -315,34 +315,36 @@ pub async fn execute_decrypt(
 ///
 /// Returns: (ciphertext, metrics)
 pub fn sync_encrypt_impl(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     key_id: &str,
     context: &HashMap<String, String>,
     plaintext: &str,
 ) -> PyResult<(String, KmsMetrics)> {
-    runtime.block_on(execute_encrypt(
-        client.clone(),
-        key_id.to_string(),
-        context.clone(),
-        plaintext.to_string(),
-    ))
+    let client = client.clone();
+    let key_id = key_id.to_string();
+    let context = context.clone();
+    let plaintext = plaintext.to_string();
+
+    py.detach(|| runtime.block_on(execute_encrypt(client, key_id, context, plaintext)))
 }
 
 /// Sync decrypt - blocks until complete.
 ///
 /// Returns: (plaintext, metrics)
 pub fn sync_decrypt_impl(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     context: &HashMap<String, String>,
     ciphertext: &str,
 ) -> PyResult<(String, KmsMetrics)> {
-    runtime.block_on(execute_decrypt(
-        client.clone(),
-        context.clone(),
-        ciphertext.to_string(),
-    ))
+    let client = client.clone();
+    let context = context.clone();
+    let ciphertext = ciphertext.to_string();
+
+    py.detach(|| runtime.block_on(execute_decrypt(client, context, ciphertext)))
 }
 
 // ========== ASYNC WRAPPERS (default) ==========

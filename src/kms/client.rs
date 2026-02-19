@@ -173,8 +173,9 @@ impl KmsEncryptor {
     // ========== SYNC METHODS ==========
 
     /// Encrypt a plaintext string (sync).
-    pub fn sync_encrypt(&self, plaintext: &str) -> PyResult<String> {
+    pub fn sync_encrypt(&self, py: Python<'_>, plaintext: &str) -> PyResult<String> {
         let (ciphertext, _metrics) = sync_encrypt_impl(
+            py,
             &self.client,
             &self.runtime,
             &self.key_id,
@@ -185,8 +186,13 @@ impl KmsEncryptor {
     }
 
     /// Encrypt with metrics (sync).
-    pub fn sync_encrypt_with_metrics(&self, plaintext: &str) -> PyResult<EncryptResult> {
+    pub fn sync_encrypt_with_metrics(
+        &self,
+        py: Python<'_>,
+        plaintext: &str,
+    ) -> PyResult<EncryptResult> {
         let (ciphertext, metrics) = sync_encrypt_impl(
+            py,
             &self.client,
             &self.runtime,
             &self.key_id,
@@ -200,16 +206,20 @@ impl KmsEncryptor {
     }
 
     /// Decrypt a ciphertext string (sync).
-    pub fn sync_decrypt(&self, ciphertext: &str) -> PyResult<String> {
+    pub fn sync_decrypt(&self, py: Python<'_>, ciphertext: &str) -> PyResult<String> {
         let (plaintext, _metrics) =
-            sync_decrypt_impl(&self.client, &self.runtime, &self.context, ciphertext)?;
+            sync_decrypt_impl(py, &self.client, &self.runtime, &self.context, ciphertext)?;
         Ok(plaintext)
     }
 
     /// Decrypt with metrics (sync).
-    pub fn sync_decrypt_with_metrics(&self, ciphertext: &str) -> PyResult<DecryptResult> {
+    pub fn sync_decrypt_with_metrics(
+        &self,
+        py: Python<'_>,
+        ciphertext: &str,
+    ) -> PyResult<DecryptResult> {
         let (plaintext, metrics) =
-            sync_decrypt_impl(&self.client, &self.runtime, &self.context, ciphertext)?;
+            sync_decrypt_impl(py, &self.client, &self.runtime, &self.context, ciphertext)?;
         Ok(DecryptResult { plaintext, metrics })
     }
 

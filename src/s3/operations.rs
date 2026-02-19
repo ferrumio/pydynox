@@ -728,6 +728,7 @@ pub fn sync_download_bytes<'py>(
 
 /// Sync presigned URL - blocks until complete.
 pub fn sync_presigned_url(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
@@ -738,16 +739,19 @@ pub fn sync_presigned_url(
     let bucket = bucket.to_string();
     let key = key.to_string();
 
-    runtime.block_on(async {
-        let result = execute_presigned_url(client, bucket, key, expires_secs)
-            .await
-            .map_err(S3Exception::new_err)?;
-        Ok((result.url, result.metrics))
+    py.detach(|| {
+        runtime.block_on(async {
+            let result = execute_presigned_url(client, bucket, key, expires_secs)
+                .await
+                .map_err(S3Exception::new_err)?;
+            Ok((result.url, result.metrics))
+        })
     })
 }
 
 /// Sync delete object - blocks until complete.
 pub fn sync_delete_object(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
@@ -757,16 +761,19 @@ pub fn sync_delete_object(
     let bucket = bucket.to_string();
     let key = key.to_string();
 
-    runtime.block_on(async {
-        let result = execute_delete(client, bucket, key)
-            .await
-            .map_err(S3Exception::new_err)?;
-        Ok(result.metrics)
+    py.detach(|| {
+        runtime.block_on(async {
+            let result = execute_delete(client, bucket, key)
+                .await
+                .map_err(S3Exception::new_err)?;
+            Ok(result.metrics)
+        })
     })
 }
 
 /// Sync head object - blocks until complete.
 pub fn sync_head_object(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
@@ -776,16 +783,19 @@ pub fn sync_head_object(
     let bucket = bucket.to_string();
     let key = key.to_string();
 
-    runtime.block_on(async {
-        let result = execute_head(client, bucket, key)
-            .await
-            .map_err(S3Exception::new_err)?;
-        Ok((result.metadata, result.metrics))
+    py.detach(|| {
+        runtime.block_on(async {
+            let result = execute_head(client, bucket, key)
+                .await
+                .map_err(S3Exception::new_err)?;
+            Ok((result.metadata, result.metrics))
+        })
     })
 }
 
 /// Sync save to file - blocks until complete.
 pub fn sync_save_to_file(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     bucket: &str,
@@ -797,10 +807,12 @@ pub fn sync_save_to_file(
     let key = key.to_string();
     let path = path.to_string();
 
-    runtime.block_on(async {
-        let result = execute_save_to_file(client, bucket, key, path)
-            .await
-            .map_err(S3Exception::new_err)?;
-        Ok((result.bytes_written, result.metrics))
+    py.detach(|| {
+        runtime.block_on(async {
+            let result = execute_save_to_file(client, bucket, key, path)
+                .await
+                .map_err(S3Exception::new_err)?;
+            Ok((result.bytes_written, result.metrics))
+        })
     })
 }
