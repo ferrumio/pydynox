@@ -288,12 +288,12 @@ class Collection:
 
         # Build from template
         values = {}
-        for placeholder in pk_attr.placeholders:  # type: ignore[union-attr]
+        for placeholder in pk_attr.placeholders:
             if placeholder not in kwargs:
                 return None
             values[placeholder] = kwargs[placeholder]
 
-        return pk_attr.build_key(values)  # type: ignore[union-attr]
+        return pk_attr.build_key(values)
 
     def __repr__(self) -> str:
         names = ", ".join(m.__name__ for m in self._models)
