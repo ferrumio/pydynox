@@ -286,14 +286,17 @@ class Collection:
         if not (hasattr(pk_attr, "has_template") and pk_attr.has_template):
             return None
 
+        # Cast to template-aware attribute for type checker
+        template_attr = pk_attr
+
         # Build from template
         values = {}
-        for placeholder in pk_attr.placeholders:
+        for placeholder in template_attr.placeholders:  # type: ignore[union-attr]
             if placeholder not in kwargs:
                 return None
             values[placeholder] = kwargs[placeholder]
 
-        return pk_attr.build_key(values)
+        return template_attr.build_key(values)  # type: ignore[union-attr]
 
     def __repr__(self) -> str:
         names = ", ".join(m.__name__ for m in self._models)
