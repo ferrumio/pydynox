@@ -434,7 +434,7 @@ class ModelBase(metaclass=ModelMeta):
             disc_dynamo = cls._py_to_dynamo.get(cls._discriminator_attr, cls._discriminator_attr)
             type_value = data.get(cls._discriminator_attr) or data.get(disc_dynamo)
             if type_value and type_value in cls._discriminator_registry:
-                target_cls = cls._discriminator_registry[type_value]  # type: ignore[assignment]
+                target_cls = cls._discriminator_registry[type_value]  # type: ignore[invalid-assignment]
 
         # Translate alias keys to python names
         translated: dict[str, Any] = {}
