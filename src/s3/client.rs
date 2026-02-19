@@ -224,31 +224,43 @@ impl S3Client {
     #[pyo3(signature = (bucket, key, expires_secs=3600))]
     pub fn sync_presigned_url(
         &self,
+        py: Python<'_>,
         bucket: &str,
         key: &str,
         expires_secs: u64,
     ) -> PyResult<(String, S3Metrics)> {
-        sync_presigned_url(&self.client, &self.runtime, bucket, key, expires_secs)
+        sync_presigned_url(py, &self.client, &self.runtime, bucket, key, expires_secs)
     }
 
     /// Sync delete an object from S3. Returns S3Metrics.
-    pub fn sync_delete_object(&self, bucket: &str, key: &str) -> PyResult<S3Metrics> {
-        sync_delete_object(&self.client, &self.runtime, bucket, key)
+    pub fn sync_delete_object(
+        &self,
+        py: Python<'_>,
+        bucket: &str,
+        key: &str,
+    ) -> PyResult<S3Metrics> {
+        sync_delete_object(py, &self.client, &self.runtime, bucket, key)
     }
 
     /// Sync get object metadata without downloading. Returns (S3Metadata, S3Metrics).
-    pub fn sync_head_object(&self, bucket: &str, key: &str) -> PyResult<(S3Metadata, S3Metrics)> {
-        sync_head_object(&self.client, &self.runtime, bucket, key)
+    pub fn sync_head_object(
+        &self,
+        py: Python<'_>,
+        bucket: &str,
+        key: &str,
+    ) -> PyResult<(S3Metadata, S3Metrics)> {
+        sync_head_object(py, &self.client, &self.runtime, bucket, key)
     }
 
     /// Sync save S3 object directly to file (streaming, memory efficient).
     /// Returns (bytes_written, S3Metrics).
     pub fn sync_save_to_file(
         &self,
+        py: Python<'_>,
         bucket: &str,
         key: &str,
         path: &str,
     ) -> PyResult<(u64, S3Metrics)> {
-        sync_save_to_file(&self.client, &self.runtime, bucket, key, path)
+        sync_save_to_file(py, &self.client, &self.runtime, bucket, key, path)
     }
 }
