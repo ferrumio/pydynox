@@ -6,6 +6,29 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
 use std::collections::HashMap;
 
+/// Parse a DynamoDB number string to a Python int or float.
+///
+/// DynamoDB numbers can have up to 38 digits of precision.
+/// Rust `i64` only handles 19 digits, so for integers that overflow
+/// we fall back to Python's arbitrary-precision `int`.
+/// Floats are parsed as `f64` which covers DynamoDB's range.
+pub(crate) fn parse_number_to_py(py: Python<'_>, n: &str) -> PyResult<Py<PyAny>> {
+    if n.contains('.') || n.contains('e') || n.contains('E') {
+        let f: f64 = n.parse().map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid number: {}", n))
+        })?;
+        Ok(f.into_pyobject(py)?.unbind().into_any())
+    } else if let Ok(i) = n.parse::<i64>() {
+        Ok(i.into_pyobject(py)?.unbind().into_any())
+    } else {
+        let int_type = py.get_type::<PyInt>();
+        let py_int = int_type.call1((n,)).map_err(|_| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid number: {}", n))
+        })?;
+        Ok(py_int.unbind().into_any())
+    }
+}
+
 /// Extract a HashMap<String, String> from an optional Python dict.
 ///
 /// Used for expression_attribute_names conversion.
@@ -178,26 +201,7 @@ pub fn attribute_values_to_py_dict(
 fn attribute_value_to_py_direct(py: Python<'_>, value: AttributeValue) -> PyResult<Py<PyAny>> {
     match value {
         AttributeValue::S(s) => Ok(s.into_pyobject(py)?.unbind().into_any()),
-        AttributeValue::N(n) => {
-            // Parse number - int or float
-            if n.contains('.') || n.contains('e') || n.contains('E') {
-                let f: f64 = n.parse().map_err(|_| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid number: {}",
-                        n
-                    ))
-                })?;
-                Ok(f.into_pyobject(py)?.unbind().into_any())
-            } else {
-                let i: i64 = n.parse().map_err(|_| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid number: {}",
-                        n
-                    ))
-                })?;
-                Ok(i.into_pyobject(py)?.unbind().into_any())
-            }
-        }
+        AttributeValue::N(n) => parse_number_to_py(py, &n),
         AttributeValue::Bool(b) => Ok(b.into_pyobject(py)?.to_owned().unbind().into_any()),
         AttributeValue::Null(_) => Ok(py.None()),
         AttributeValue::B(b) => {
@@ -231,23 +235,8 @@ fn attribute_value_to_py_direct(py: Python<'_>, value: AttributeValue) -> PyResu
         AttributeValue::Ns(ns) => {
             let py_set = pyo3::types::PySet::empty(py)?;
             for n in ns {
-                if n.contains('.') || n.contains('e') || n.contains('E') {
-                    let f: f64 = n.parse().map_err(|_| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Invalid number: {}",
-                            n
-                        ))
-                    })?;
-                    py_set.add(f)?;
-                } else {
-                    let i: i64 = n.parse().map_err(|_| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                            "Invalid number: {}",
-                            n
-                        ))
-                    })?;
-                    py_set.add(i)?;
-                }
+                let py_num = parse_number_to_py(py, &n)?;
+                py_set.add(py_num.bind(py))?;
             }
             Ok(py_set.into_any().unbind())
         }

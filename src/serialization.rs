@@ -22,6 +22,7 @@
 //! | set[int/float] | NS | `{"NS": ["1", "2"]}` |
 //! | set[bytes] | BS | `{"BS": ["base64..."]}` |
 
+use crate::conversions::parse_number_to_py;
 use base64::Engine;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
@@ -255,23 +256,7 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<Py<PyA
     // Number (stored as string, convert to int or float)
     if let Some(n) = attr.get_item("N")? {
         let n_str: String = n.extract()?;
-        if n_str.contains('.') || n_str.contains('e') || n_str.contains('E') {
-            let f: f64 = n_str.parse().map_err(|_| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid number format: {}",
-                    n_str
-                ))
-            })?;
-            return Ok(f.into_pyobject(py)?.unbind().into_any());
-        } else {
-            let i: i64 = n_str.parse().map_err(|_| {
-                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                    "Invalid number format: {}",
-                    n_str
-                ))
-            })?;
-            return Ok(i.into_pyobject(py)?.unbind().into_any());
-        }
+        return parse_number_to_py(py, &n_str);
     }
 
     // Boolean
@@ -333,23 +318,8 @@ pub fn dynamo_to_py(py: Python<'_>, attr: &Bound<'_, PyDict>) -> PyResult<Py<PyA
         let py_set = PySet::empty(py)?;
         for item in ns.cast::<PyList>()?.iter() {
             let n_str: String = item.extract()?;
-            if n_str.contains('.') || n_str.contains('e') || n_str.contains('E') {
-                let f: f64 = n_str.parse().map_err(|_| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid number in set: {}",
-                        n_str
-                    ))
-                })?;
-                py_set.add(f)?;
-            } else {
-                let i: i64 = n_str.parse().map_err(|_| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
-                        "Invalid number in set: {}",
-                        n_str
-                    ))
-                })?;
-                py_set.add(i)?;
-            }
+            let py_num = parse_number_to_py(py, &n_str)?;
+            py_set.add(py_num.bind(py))?;
         }
         return Ok(py_set.unbind().into_any());
     }
