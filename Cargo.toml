@@ -1,6 +1,6 @@
 [package]
 name = "pydynox"
-version = "0.26.0"
+version = "0.27.0"
 edition = "2024"
 authors = ["Leandro Cavalcante Damascena <leandro.damascena@gmail.com>"]
 description = "A fast DynamoDB ORM for Python with a Rust core"
@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
-pyo3 = { version = "0.28", features = ["extension-module"] }
+pyo3 = { version = ">=0.28.2", features = ["extension-module"] }
 pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
 aws-sdk-dynamodb = "1.105"
 aws-sdk-kms = "1.101"
@@ -53,7 +53,7 @@ aes-gcm = "0.10"
 rand = "0.10"
 
 [dev-dependencies]
-pyo3 = { version = "0.28", features = ["auto-initialize"] }
+pyo3 = { version = ">=0.28.2", features = ["auto-initialize"] }
 
 [profile.release]
 lto = true
