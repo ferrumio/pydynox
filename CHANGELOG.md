@@ -1,6 +1,36 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [0.27.0] - 2026-02-20
+
+
+### Bug Fixes
+
+- release GIL on sync ops (#284)
+- allow dynamodb big numbers (#285)
+
+
+### CI/CD
+
+- bump github/codeql-action from 4.32.2 to 4.32.3 (#274)
+
+
+### Documentation
+
+- update changelog for v0.26.0 (#268)
+
+
+### Refactoring
+
+- collection query and sync_query (#276)
+- adding additional client consistency in model validation (#277)
+
+
+### Deps
+
+- bump time from 0.3.45 to 0.3.47 (#270)
+- bump bytes from 1.11.0 to 1.11.1 (#269)
+- bump the rust-dependencies group with 7 updates (#275)
 ## [0.26.0] - 2026-02-10
 
 
