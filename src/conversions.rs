@@ -124,10 +124,21 @@ where
             })
             .collect::<PyResult<Vec<_>>>()?;
         Ok(AttributeValue::Ss(strings))
+    } else if first.cast::<PyBool>().is_ok() {
+        // Bool check MUST come before Int check because bool is a subclass of int
+        return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "DynamoDB sets do not support booleans. Use a list instead.",
+        ));
     } else if first.cast::<PyInt>().is_ok() || first.cast::<PyFloat>().is_ok() {
         let numbers: Vec<String> = items
             .iter()
             .map(|item| {
+                // Check for booleans hiding in a number set (e.g. {1, True, 2})
+                if item.cast::<PyBool>().is_ok() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                        "Number set contains a boolean. DynamoDB sets do not support booleans.",
+                    ));
+                }
                 if item.cast::<PyInt>().is_ok() || item.cast::<PyFloat>().is_ok() {
                     Ok(item.str()?.to_str()?.to_string())
                 } else {
