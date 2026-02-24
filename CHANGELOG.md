@@ -1,6 +1,34 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.0.0] - 2026-02-24
+
+
+### Bug Fixes
+
+- resolve boolean check (#291)
+
+
+### CI/CD
+
+- bump CodSpeedHQ/action from 4.10.6 to 4.11.0 (#289)
+- bump github/codeql-action from 4.32.3 to 4.32.4 (#287)
+- bump orhun/git-cliff-action from 4.7.0 to 4.7.1 (#288)
+
+
+### Documentation
+
+- update changelog for v0.27.0 (#286)
+
+
+### Features
+
+- v1 (#292)
+
+
+### Deps
+
+- bump the rust-dependencies group with 4 updates (#290)
 ## [0.27.0] - 2026-02-20
 
 
