@@ -81,7 +81,8 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-    ) -> OperationMetrics:
+        return_values: str | None = None,
+    ) -> OperationMetrics | dict[str, Any] | None:
         """Put an item into a DynamoDB table (async).
 
         Args:
@@ -92,9 +93,13 @@ class CrudOperations:
             expression_attribute_values: Attribute value placeholders.
             return_values_on_condition_check_failure: If True and condition fails,
                 the ConditionalCheckFailedException will have an 'item' attribute.
+            return_values: "NONE" or "ALL_OLD". When "ALL_OLD", returns the
+                item as it was before the put (if it existed).
 
         Returns:
-            Operation metrics.
+            OperationMetrics when return_values is None/NONE.
+            dict or None when return_values is set (the old item attributes).
+            Metrics are always available via get_last_metrics().
         """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(item)
@@ -104,14 +109,16 @@ class CrudOperations:
         _log_debug("put_item", f'Saving item to "{table}" pk={pk}')
 
         with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = await self._client.put_item(  # type: ignore[attr-defined]
+            result = await self._client.put_item(  # type: ignore[attr-defined]
                 table,
                 item,
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 return_values_on_condition_check_failure=return_values_on_condition_check_failure,
+                return_values=return_values,
             )
+            attributes, metrics = result
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
             )
@@ -120,6 +127,9 @@ class CrudOperations:
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
         self._record_metrics(metrics, "put")
+
+        if return_values and return_values != "NONE":
+            return attributes
         return metrics
 
     def sync_put_item(
@@ -130,7 +140,8 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-    ) -> OperationMetrics:
+        return_values: str | None = None,
+    ) -> OperationMetrics | dict[str, Any] | None:
         """Put an item into a DynamoDB table (sync).
 
         Args:
@@ -142,14 +153,13 @@ class CrudOperations:
             return_values_on_condition_check_failure: If True and condition fails,
                 the ConditionalCheckFailedException will have an 'item' attribute
                 with the existing item. Saves an extra GET call.
+            return_values: "NONE" or "ALL_OLD". When "ALL_OLD", returns the
+                item as it was before the put (if it existed).
 
         Returns:
-            Operation metrics.
-
-        Raises:
-            ConditionalCheckFailedException: If condition fails. When
-                return_values_on_condition_check_failure=True, the exception
-                has an 'item' attribute with the existing item.
+            OperationMetrics when return_values is None/NONE.
+            dict or None when return_values is set (the old item attributes).
+            Metrics are always available via get_last_metrics().
         """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(item)
@@ -159,13 +169,14 @@ class CrudOperations:
         _log_debug("sync_put_item", f'Saving item to "{table}" pk={pk}')
 
         with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = self._client.sync_put_item(  # type: ignore[attr-defined]
+            attributes, metrics = self._client.sync_put_item(  # type: ignore[attr-defined]
                 table,
                 item,
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 return_values_on_condition_check_failure=return_values_on_condition_check_failure,
+                return_values=return_values,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -175,6 +186,9 @@ class CrudOperations:
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("put_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
         self._record_metrics(metrics, "put")
+
+        if return_values and return_values != "NONE":
+            return attributes
         return metrics
 
     # ========== GET ==========
@@ -286,7 +300,8 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-    ) -> OperationMetrics:
+        return_values: str | None = None,
+    ) -> OperationMetrics | dict[str, Any] | None:
         """Delete an item from a DynamoDB table (async).
 
         Args:
@@ -297,9 +312,13 @@ class CrudOperations:
             expression_attribute_values: Attribute value placeholders.
             return_values_on_condition_check_failure: If True and condition fails,
                 the ConditionalCheckFailedException will have an 'item' attribute.
+            return_values: "NONE" or "ALL_OLD". When "ALL_OLD", returns the
+                deleted item's attributes.
 
         Returns:
-            Operation metrics.
+            OperationMetrics when return_values is None/NONE.
+            dict or None when return_values is set (the deleted item attributes).
+            Metrics are always available via get_last_metrics().
         """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
@@ -309,14 +328,16 @@ class CrudOperations:
         _log_debug("delete_item", f'Deleting item from "{table}" key={key}')
 
         with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = await self._client.delete_item(  # type: ignore[attr-defined]
+            result = await self._client.delete_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 return_values_on_condition_check_failure=return_values_on_condition_check_failure,
+                return_values=return_values,
             )
+            attributes, metrics = result
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
             )
@@ -325,6 +346,9 @@ class CrudOperations:
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("delete_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
         self._record_metrics(metrics, "delete")
+
+        if return_values and return_values != "NONE":
+            return attributes
         return metrics
 
     def sync_delete_item(
@@ -335,7 +359,8 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-    ) -> OperationMetrics:
+        return_values: str | None = None,
+    ) -> OperationMetrics | dict[str, Any] | None:
         """Delete an item from a DynamoDB table (sync).
 
         Args:
@@ -346,9 +371,13 @@ class CrudOperations:
             expression_attribute_values: Attribute value placeholders.
             return_values_on_condition_check_failure: If True and condition fails,
                 the ConditionalCheckFailedException will have an 'item' attribute.
+            return_values: "NONE" or "ALL_OLD". When "ALL_OLD", returns the
+                deleted item's attributes.
 
         Returns:
-            Operation metrics.
+            OperationMetrics when return_values is None/NONE.
+            dict or None when return_values is set (the deleted item attributes).
+            Metrics are always available via get_last_metrics().
         """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
@@ -358,13 +387,14 @@ class CrudOperations:
         _log_debug("sync_delete_item", f'Deleting item from "{table}" key={key}')
 
         with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = self._client.sync_delete_item(  # type: ignore[attr-defined]
+            attributes, metrics = self._client.sync_delete_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 condition_expression=condition_expression,
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 return_values_on_condition_check_failure=return_values_on_condition_check_failure,
+                return_values=return_values,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -374,6 +404,9 @@ class CrudOperations:
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("delete_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
         self._record_metrics(metrics, "delete")
+
+        if return_values and return_values != "NONE":
+            return attributes
         return metrics
 
     # ========== UPDATE ==========
@@ -388,7 +421,8 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-    ) -> OperationMetrics:
+        return_values: str | None = None,
+    ) -> OperationMetrics | dict[str, Any] | None:
         """Update an item in a DynamoDB table (async).
 
         Args:
@@ -401,9 +435,13 @@ class CrudOperations:
             expression_attribute_values: Attribute value placeholders.
             return_values_on_condition_check_failure: If True and condition fails,
                 the ConditionalCheckFailedException will have an 'item' attribute.
+            return_values: One of NONE, ALL_OLD, UPDATED_OLD, ALL_NEW, UPDATED_NEW.
+                Controls what DynamoDB returns after the update.
 
         Returns:
-            Operation metrics.
+            OperationMetrics when return_values is None/NONE.
+            dict or None when return_values is set (the item attributes).
+            Metrics are always available via get_last_metrics().
         """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
@@ -413,7 +451,7 @@ class CrudOperations:
         _log_debug("update_item", f'Updating item in "{table}" key={key}')
 
         with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = await self._client.update_item(  # type: ignore[attr-defined]
+            result = await self._client.update_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 updates=updates,
@@ -422,7 +460,9 @@ class CrudOperations:
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 return_values_on_condition_check_failure=return_values_on_condition_check_failure,
+                return_values=return_values,
             )
+            attributes, metrics = result
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
             )
@@ -431,6 +471,9 @@ class CrudOperations:
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("update_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
         self._record_metrics(metrics, "update")
+
+        if return_values and return_values != "NONE":
+            return attributes
         return metrics
 
     def sync_update_item(
@@ -443,7 +486,8 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-    ) -> OperationMetrics:
+        return_values: str | None = None,
+    ) -> OperationMetrics | dict[str, Any] | None:
         """Update an item in a DynamoDB table (sync).
 
         Args:
@@ -456,9 +500,13 @@ class CrudOperations:
             expression_attribute_values: Attribute value placeholders.
             return_values_on_condition_check_failure: If True and condition fails,
                 the ConditionalCheckFailedException will have an 'item' attribute.
+            return_values: One of NONE, ALL_OLD, UPDATED_OLD, ALL_NEW, UPDATED_NEW.
+                Controls what DynamoDB returns after the update.
 
         Returns:
-            Operation metrics.
+            OperationMetrics when return_values is None/NONE.
+            dict or None when return_values is set (the item attributes).
+            Metrics are always available via get_last_metrics().
         """
         self._acquire_wcu(1.0)  # type: ignore[attr-defined]
         pk = _extract_pk(key)
@@ -468,7 +516,7 @@ class CrudOperations:
         _log_debug("sync_update_item", f'Updating item in "{table}" key={key}')
 
         with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            metrics = self._client.sync_update_item(  # type: ignore[attr-defined]
+            attributes, metrics = self._client.sync_update_item(  # type: ignore[attr-defined]
                 table,
                 key,
                 updates=updates,
@@ -477,6 +525,7 @@ class CrudOperations:
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 return_values_on_condition_check_failure=return_values_on_condition_check_failure,
+                return_values=return_values,
             )
             add_response_attributes(
                 span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
@@ -486,4 +535,7 @@ class CrudOperations:
         if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
             _log_warning("update_item", f"slow operation ({metrics.duration_ms:.1f}ms)")
         self._record_metrics(metrics, "update")
+
+        if return_values and return_values != "NONE":
+            return attributes
         return metrics
