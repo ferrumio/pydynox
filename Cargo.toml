@@ -20,7 +20,7 @@ path = "src/lib.rs"
 [dependencies]
 pyo3 = { version = ">=0.28.2", features = ["extension-module"] }
 pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
-aws-sdk-dynamodb = "1.105"
+aws-sdk-dynamodb = "1.107"
 aws-sdk-kms = "1.102"
 aws-sdk-s3 = "1.124"
 aws-sdk-sts = "1.99"
