@@ -2,7 +2,7 @@
 
 use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::types::{
-    AttributeValue, ReturnConsumedCapacity, ReturnValuesOnConditionCheckFailure,
+    AttributeValue, ReturnConsumedCapacity, ReturnValue, ReturnValuesOnConditionCheckFailure,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -11,7 +11,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{extract_string_map, py_dict_to_attribute_values};
+use crate::conversions::{
+    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+};
 use crate::errors::map_sdk_error_with_item;
 use crate::metrics::OperationMetrics;
 
@@ -23,6 +25,13 @@ pub struct PreparedPutItem {
     pub expression_attribute_names: Option<HashMap<String, String>>,
     pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
     pub return_values_on_condition_check_failure: Option<ReturnValuesOnConditionCheckFailure>,
+    pub return_values: Option<ReturnValue>,
+}
+
+/// Result of a put_item operation.
+pub struct PutItemResult {
+    pub metrics: OperationMetrics,
+    pub attributes: Option<HashMap<String, AttributeValue>>,
 }
 
 /// Prepare put_item by converting Python data to Rust.
@@ -35,6 +44,7 @@ pub fn prepare_put_item(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     return_values_on_condition_check_failure: bool,
+    return_values: Option<String>,
 ) -> PyResult<PreparedPutItem> {
     let dynamo_item = py_dict_to_attribute_values(py, item)?;
     let names = extract_string_map(expression_attribute_names)?;
@@ -50,6 +60,19 @@ pub fn prepare_put_item(
         None
     };
 
+    // PutItem only supports NONE and ALL_OLD
+    let rv = match return_values {
+        Some(ref s) if s == "ALL_OLD" => Some(ReturnValue::AllOld),
+        Some(ref s) if s == "NONE" => None,
+        Some(ref s) => {
+            return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Invalid return_values for put_item: '{}'. Must be NONE or ALL_OLD",
+                s
+            )));
+        }
+        None => None,
+    };
+
     Ok(PreparedPutItem {
         table: table.to_string(),
         item: dynamo_item,
@@ -57,6 +80,7 @@ pub fn prepare_put_item(
         expression_attribute_names: names,
         expression_attribute_values: values,
         return_values_on_condition_check_failure: return_on_failure,
+        return_values: rv,
     })
 }
 
@@ -65,13 +89,15 @@ pub async fn execute_put_item(
     client: Client,
     prepared: PreparedPutItem,
 ) -> Result<
-    OperationMetrics,
+    PutItemResult,
     (
         aws_sdk_dynamodb::error::SdkError<aws_sdk_dynamodb::operation::put_item::PutItemError>,
         String,
         Option<HashMap<String, AttributeValue>>,
     ),
 > {
+    let has_return_values = prepared.return_values.is_some();
+
     let mut request = client
         .put_item()
         .table_name(&prepared.table)
@@ -94,6 +120,9 @@ pub async fn execute_put_item(
     if let Some(return_on_failure) = prepared.return_values_on_condition_check_failure {
         request = request.return_values_on_condition_check_failure(return_on_failure);
     }
+    if let Some(rv) = prepared.return_values {
+        request = request.return_values(rv);
+    }
 
     let start = Instant::now();
     let result = request.send().await;
@@ -102,15 +131,19 @@ pub async fn execute_put_item(
     match result {
         Ok(output) => {
             let consumed_wcu = output.consumed_capacity().and_then(|c| c.capacity_units());
-            Ok(OperationMetrics::with_capacity(
-                duration_ms,
-                None,
-                consumed_wcu,
-                None,
-            ))
+
+            let attributes = if has_return_values {
+                output.attributes().cloned()
+            } else {
+                None
+            };
+
+            Ok(PutItemResult {
+                metrics: OperationMetrics::with_capacity(duration_ms, None, consumed_wcu, None),
+                attributes,
+            })
         }
         Err(e) => {
-            // Extract item from ConditionalCheckFailedException if present
             let item = extract_item_from_put_error(&e);
             Err((e, prepared.table, item))
         }
@@ -143,7 +176,8 @@ pub fn sync_put_item(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     return_values_on_condition_check_failure: bool,
-) -> PyResult<OperationMetrics> {
+    return_values: Option<String>,
+) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
     let prepared = prepare_put_item(
         py,
         table,
@@ -152,12 +186,19 @@ pub fn sync_put_item(
         expression_attribute_names,
         expression_attribute_values,
         return_values_on_condition_check_failure,
+        return_values,
     )?;
 
     let result = py.detach(|| runtime.block_on(execute_put_item(client.clone(), prepared)));
 
     match result {
-        Ok(metrics) => Ok(metrics),
+        Ok(put_result) => {
+            let py_attrs = match put_result.attributes {
+                Some(attrs) => Some(attribute_values_to_py_dict(py, attrs)?.into()),
+                None => None,
+            };
+            Ok((py_attrs, put_result.metrics))
+        }
         Err((e, tbl, item)) => Err(map_sdk_error_with_item(py, e, Some(&tbl), item)),
     }
 }
@@ -173,6 +214,7 @@ pub fn put_item<'py>(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     return_values_on_condition_check_failure: bool,
+    return_values: Option<String>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_put_item(
         py,
@@ -182,12 +224,21 @@ pub fn put_item<'py>(
         expression_attribute_names,
         expression_attribute_values,
         return_values_on_condition_check_failure,
+        return_values,
     )?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_put_item(client, prepared).await;
         match result {
-            Ok(metrics) => Ok(metrics),
+            Ok(put_result) => Python::attach(|py| {
+                let py_attrs = match put_result.attributes {
+                    Some(attrs) => {
+                        Some(attribute_values_to_py_dict(py, attrs)?.unbind().into_any())
+                    }
+                    None => None,
+                };
+                Ok((py_attrs, put_result.metrics))
+            }),
             Err((e, tbl, item)) => {
                 Python::attach(|py| Err(map_sdk_error_with_item(py, e, Some(&tbl), item)))
             }

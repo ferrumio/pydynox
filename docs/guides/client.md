@@ -212,6 +212,51 @@ Write methods (`put_item`, `update_item`, `delete_item`) support these optional 
 | `expression_attribute_names` | Placeholders for reserved words |
 | `expression_attribute_values` | Placeholders for values |
 | `return_values_on_condition_check_failure` | If `True`, get the existing item on `ConditionalCheckFailedException` |
+| `return_values` | Get item data back from the write. Saves an extra GET call. |
+
+### Returning values
+
+Use `return_values` to get item data back from a write operation without making a separate GET call.
+
+Each operation supports different values:
+
+| Operation | Allowed values |
+|-----------|---------------|
+| `put_item` | `NONE`, `ALL_OLD` |
+| `delete_item` | `NONE`, `ALL_OLD` |
+| `update_item` | `NONE`, `ALL_OLD`, `UPDATED_OLD`, `ALL_NEW`, `UPDATED_NEW` |
+
+When `return_values` is set (and not `NONE`), the method returns `dict | None` with the item attributes. Without it, you get `OperationMetrics` as before. Metrics are always available via `get_last_metrics()`.
+
+#### put_item
+
+Get the old item when overwriting an existing key. Returns `None` if the key didn't exist.
+
+=== "return_values_put.py"
+    ```python
+    --8<-- "docs/examples/client/return_values_put.py"
+    ```
+
+#### update_item
+
+Get item data back after an update. `ALL_NEW` is the most common — gives you the full item in one round trip.
+
+=== "return_values_update.py"
+    ```python
+    --8<-- "docs/examples/client/return_values_update.py"
+    ```
+
+#### delete_item
+
+Get the deleted item back. Useful when you need to archive or log what was removed.
+
+=== "return_values_delete.py"
+    ```python
+    --8<-- "docs/examples/client/return_values_delete.py"
+    ```
+
+!!! tip
+    `return_values="ALL_NEW"` on `update_item` is the most useful one. You get the full item after the update in one call instead of doing update + get.
 
 ### Utility methods
 
