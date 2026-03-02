@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, overload
 
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import OperationMetrics
 from pydynox._internal._tracing import add_response_attributes, trace_operation
 
 _SLOW_QUERY_THRESHOLD_MS = 100.0
+
+# Valid DynamoDB ReturnValues per operation
+PutReturnValues = Literal["NONE", "ALL_OLD"]
+DeleteReturnValues = Literal["NONE", "ALL_OLD"]
+UpdateReturnValues = Literal["NONE", "ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDATED_NEW"]
 
 
 def _build_projection(
@@ -73,6 +78,7 @@ class CrudOperations:
 
     # ========== PUT ==========
 
+    @overload
     async def put_item(
         self,
         table: str,
@@ -81,7 +87,31 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-        return_values: str | None = None,
+        return_values: None = None,
+    ) -> OperationMetrics: ...
+
+    @overload
+    async def put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        *,
+        return_values: Literal["ALL_OLD"],
+    ) -> dict[str, Any] | None: ...
+
+    async def put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: PutReturnValues | None = None,
     ) -> OperationMetrics | dict[str, Any] | None:
         """Put an item into a DynamoDB table (async).
 
@@ -132,6 +162,7 @@ class CrudOperations:
             return attributes
         return metrics
 
+    @overload
     def sync_put_item(
         self,
         table: str,
@@ -140,7 +171,31 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-        return_values: str | None = None,
+        return_values: None = None,
+    ) -> OperationMetrics: ...
+
+    @overload
+    def sync_put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        *,
+        return_values: Literal["ALL_OLD"],
+    ) -> dict[str, Any] | None: ...
+
+    def sync_put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: PutReturnValues | None = None,
     ) -> OperationMetrics | dict[str, Any] | None:
         """Put an item into a DynamoDB table (sync).
 
@@ -292,6 +347,7 @@ class CrudOperations:
 
     # ========== DELETE ==========
 
+    @overload
     async def delete_item(
         self,
         table: str,
@@ -300,7 +356,31 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-        return_values: str | None = None,
+        return_values: None = None,
+    ) -> OperationMetrics: ...
+
+    @overload
+    async def delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        *,
+        return_values: Literal["ALL_OLD"],
+    ) -> dict[str, Any] | None: ...
+
+    async def delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: DeleteReturnValues | None = None,
     ) -> OperationMetrics | dict[str, Any] | None:
         """Delete an item from a DynamoDB table (async).
 
@@ -351,6 +431,7 @@ class CrudOperations:
             return attributes
         return metrics
 
+    @overload
     def sync_delete_item(
         self,
         table: str,
@@ -359,7 +440,31 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-        return_values: str | None = None,
+        return_values: None = None,
+    ) -> OperationMetrics: ...
+
+    @overload
+    def sync_delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        *,
+        return_values: Literal["ALL_OLD"],
+    ) -> dict[str, Any] | None: ...
+
+    def sync_delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: DeleteReturnValues | None = None,
     ) -> OperationMetrics | dict[str, Any] | None:
         """Delete an item from a DynamoDB table (sync).
 
@@ -411,6 +516,7 @@ class CrudOperations:
 
     # ========== UPDATE ==========
 
+    @overload
     async def update_item(
         self,
         table: str,
@@ -421,7 +527,35 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-        return_values: str | None = None,
+        return_values: None = None,
+    ) -> OperationMetrics: ...
+
+    @overload
+    async def update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        *,
+        return_values: Literal["ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDATED_NEW"],
+    ) -> dict[str, Any] | None: ...
+
+    async def update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: UpdateReturnValues | None = None,
     ) -> OperationMetrics | dict[str, Any] | None:
         """Update an item in a DynamoDB table (async).
 
@@ -476,6 +610,7 @@ class CrudOperations:
             return attributes
         return metrics
 
+    @overload
     def sync_update_item(
         self,
         table: str,
@@ -486,7 +621,35 @@ class CrudOperations:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         return_values_on_condition_check_failure: bool = False,
-        return_values: str | None = None,
+        return_values: None = None,
+    ) -> OperationMetrics: ...
+
+    @overload
+    def sync_update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        *,
+        return_values: Literal["ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDATED_NEW"],
+    ) -> dict[str, Any] | None: ...
+
+    def sync_update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: UpdateReturnValues | None = None,
     ) -> OperationMetrics | dict[str, Any] | None:
         """Update an item in a DynamoDB table (sync).
 
