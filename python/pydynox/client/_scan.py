@@ -6,6 +6,7 @@ from typing import Any
 
 from pydynox._internal._logging import _log_debug, _log_operation
 from pydynox._internal._metrics import OperationMetrics
+from pydynox._internal._tracing import add_response_attributes, trace_operation
 from pydynox.query import AsyncScanResult, ScanResult
 
 
@@ -129,14 +130,18 @@ class ScanOperations:
     ) -> tuple[int, OperationMetrics]:
         """Count items in a DynamoDB table (sync)."""
         _log_debug("sync_count", f'Counting items in "{table}"')
-        count, metrics = self._client.sync_count(  # type: ignore[attr-defined]
-            table,
-            filter_expression=filter_expression,
-            expression_attribute_names=expression_attribute_names,
-            expression_attribute_values=expression_attribute_values,
-            index_name=index_name,
-            consistent_read=consistent_read,
-        )
+        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            count, metrics = self._client.sync_count(  # type: ignore[attr-defined]
+                table,
+                filter_expression=filter_expression,
+                expression_attribute_names=expression_attribute_names,
+                expression_attribute_values=expression_attribute_values,
+                index_name=index_name,
+                consistent_read=consistent_read,
+            )
+            add_response_attributes(
+                span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
+            )
         _log_operation("count", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         return count, metrics
 
@@ -151,16 +156,20 @@ class ScanOperations:
     ) -> tuple[int, OperationMetrics]:
         """Count items in a DynamoDB table (async)."""
         _log_debug("count", f'Counting items in "{table}"')
-        result = await self._client.count(  # type: ignore[attr-defined]
-            table,
-            filter_expression=filter_expression,
-            expression_attribute_names=expression_attribute_names,
-            expression_attribute_values=expression_attribute_values,
-            index_name=index_name,
-            consistent_read=consistent_read,
-        )
-        count: int = result["count"]
-        metrics: OperationMetrics = result["metrics"]
+        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            result = await self._client.count(  # type: ignore[attr-defined]
+                table,
+                filter_expression=filter_expression,
+                expression_attribute_names=expression_attribute_names,
+                expression_attribute_values=expression_attribute_values,
+                index_name=index_name,
+                consistent_read=consistent_read,
+            )
+            count: int = result["count"]
+            metrics: OperationMetrics = result["metrics"]
+            add_response_attributes(
+                span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
+            )
         _log_operation("count", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu)
         return count, metrics
 
@@ -198,15 +207,19 @@ class ScanOperations:
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
         _log_debug("sync_parallel_scan", f'Parallel scanning "{table}" ({total_segments} segments)')
-        items, metrics = self._client.sync_parallel_scan(  # type: ignore[attr-defined]
-            table,
-            total_segments,
-            filter_expression=filter_expression,
-            projection_expression=projection_expression,
-            expression_attribute_names=expression_attribute_names,
-            expression_attribute_values=expression_attribute_values,
-            consistent_read=consistent_read,
-        )
+        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            items, metrics = self._client.sync_parallel_scan(  # type: ignore[attr-defined]
+                table,
+                total_segments,
+                filter_expression=filter_expression,
+                projection_expression=projection_expression,
+                expression_attribute_names=expression_attribute_names,
+                expression_attribute_values=expression_attribute_values,
+                consistent_read=consistent_read,
+            )
+            add_response_attributes(
+                span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
+            )
         _log_operation(
             "parallel_scan", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu
         )
@@ -244,17 +257,21 @@ class ScanOperations:
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
         _log_debug("parallel_scan", f'Parallel scanning "{table}" ({total_segments} segments)')
-        result = await self._client.parallel_scan(  # type: ignore[attr-defined]
-            table,
-            total_segments,
-            filter_expression=filter_expression,
-            projection_expression=projection_expression,
-            expression_attribute_names=expression_attribute_names,
-            expression_attribute_values=expression_attribute_values,
-            consistent_read=consistent_read,
-        )
-        items: list[dict[str, Any]] = result["items"]
-        metrics: OperationMetrics = result["metrics"]
+        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
+            result = await self._client.parallel_scan(  # type: ignore[attr-defined]
+                table,
+                total_segments,
+                filter_expression=filter_expression,
+                projection_expression=projection_expression,
+                expression_attribute_names=expression_attribute_names,
+                expression_attribute_values=expression_attribute_values,
+                consistent_read=consistent_read,
+            )
+            items: list[dict[str, Any]] = result["items"]
+            metrics: OperationMetrics = result["metrics"]
+            add_response_attributes(
+                span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
+            )
         _log_operation(
             "parallel_scan", table, metrics.duration_ms, consumed_rcu=metrics.consumed_rcu
         )
