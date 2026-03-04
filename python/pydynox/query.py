@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
+from pydynox._internal._tracing import add_response_attributes, trace_operation
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core
@@ -136,19 +137,26 @@ class QueryResult:
         index_info = f" (index={self._index_name})" if self._index_name else ""
         _log_debug("query", f'Running query on "{self._table}"{index_info}')
 
-        items, self._last_evaluated_key, self._metrics = self._client.sync_query_page(
-            self._table,
-            self._key_condition_expression,
-            filter_expression=self._filter_expression,
-            projection_expression=self._projection_expression,
-            expression_attribute_names=self._expression_attribute_names,
-            expression_attribute_values=self._expression_attribute_values,
-            limit=dynamo_limit,
-            exclusive_start_key=start_key,
-            scan_index_forward=self._scan_index_forward,
-            index_name=self._index_name,
-            consistent_read=self._consistent_read,
-        )
+        region = self._client.get_region()
+        with trace_operation("query", self._table, region) as span:
+            items, self._last_evaluated_key, self._metrics = self._client.sync_query_page(
+                self._table,
+                self._key_condition_expression,
+                filter_expression=self._filter_expression,
+                projection_expression=self._projection_expression,
+                expression_attribute_names=self._expression_attribute_names,
+                expression_attribute_values=self._expression_attribute_values,
+                limit=dynamo_limit,
+                exclusive_start_key=start_key,
+                scan_index_forward=self._scan_index_forward,
+                index_name=self._index_name,
+                consistent_read=self._consistent_read,
+            )
+            add_response_attributes(
+                span,
+                consumed_rcu=self._metrics.consumed_rcu,
+                request_id=self._metrics.request_id,
+            )
 
         self._current_page = items
         self._page_index = 0
@@ -281,24 +289,31 @@ class AsyncQueryResult:
         index_info = f" (index={self._index_name})" if self._index_name else ""
         _log_debug("query", f'Running query on "{self._table}"{index_info}')
 
-        result = await self._client.query_page(
-            self._table,
-            self._key_condition_expression,
-            filter_expression=self._filter_expression,
-            projection_expression=self._projection_expression,
-            expression_attribute_names=self._expression_attribute_names,
-            expression_attribute_values=self._expression_attribute_values,
-            limit=dynamo_limit,
-            exclusive_start_key=start_key,
-            scan_index_forward=self._scan_index_forward,
-            index_name=self._index_name,
-            consistent_read=self._consistent_read,
-        )
+        region = self._client.get_region()
+        with trace_operation("query", self._table, region) as span:
+            result = await self._client.query_page(
+                self._table,
+                self._key_condition_expression,
+                filter_expression=self._filter_expression,
+                projection_expression=self._projection_expression,
+                expression_attribute_names=self._expression_attribute_names,
+                expression_attribute_values=self._expression_attribute_values,
+                limit=dynamo_limit,
+                exclusive_start_key=start_key,
+                scan_index_forward=self._scan_index_forward,
+                index_name=self._index_name,
+                consistent_read=self._consistent_read,
+            )
 
-        self._current_page = result["items"]
-        self._last_evaluated_key = result["last_evaluated_key"]
-        self._metrics = result["metrics"]
-        self._page_index = 0
+            self._current_page = result["items"]
+            self._last_evaluated_key = result["last_evaluated_key"]
+            self._metrics = result["metrics"]
+            self._page_index = 0
+            add_response_attributes(
+                span,
+                consumed_rcu=self._metrics.consumed_rcu,
+                request_id=self._metrics.request_id,
+            )
 
         # Log the query
         _log_operation(
@@ -437,19 +452,26 @@ class ScanResult:
         index_info = f" (index={self._index_name})" if self._index_name else ""
         _log_debug("scan", f'Running scan on "{self._table}"{index_info}')
 
-        items, self._last_evaluated_key, self._metrics = self._client.sync_scan_page(
-            self._table,
-            filter_expression=self._filter_expression,
-            projection_expression=self._projection_expression,
-            expression_attribute_names=self._expression_attribute_names,
-            expression_attribute_values=self._expression_attribute_values,
-            limit=dynamo_limit,
-            exclusive_start_key=start_key,
-            index_name=self._index_name,
-            consistent_read=self._consistent_read,
-            segment=self._segment,
-            total_segments=self._total_segments,
-        )
+        region = self._client.get_region()
+        with trace_operation("scan", self._table, region) as span:
+            items, self._last_evaluated_key, self._metrics = self._client.sync_scan_page(
+                self._table,
+                filter_expression=self._filter_expression,
+                projection_expression=self._projection_expression,
+                expression_attribute_names=self._expression_attribute_names,
+                expression_attribute_values=self._expression_attribute_values,
+                limit=dynamo_limit,
+                exclusive_start_key=start_key,
+                index_name=self._index_name,
+                consistent_read=self._consistent_read,
+                segment=self._segment,
+                total_segments=self._total_segments,
+            )
+            add_response_attributes(
+                span,
+                consumed_rcu=self._metrics.consumed_rcu,
+                request_id=self._metrics.request_id,
+            )
 
         self._current_page = items
         self._page_index = 0
@@ -578,24 +600,31 @@ class AsyncScanResult:
         index_info = f" (index={self._index_name})" if self._index_name else ""
         _log_debug("scan", f'Running scan on "{self._table}"{index_info}')
 
-        result = await self._client.scan_page(
-            self._table,
-            filter_expression=self._filter_expression,
-            projection_expression=self._projection_expression,
-            expression_attribute_names=self._expression_attribute_names,
-            expression_attribute_values=self._expression_attribute_values,
-            limit=dynamo_limit,
-            exclusive_start_key=start_key,
-            index_name=self._index_name,
-            consistent_read=self._consistent_read,
-            segment=self._segment,
-            total_segments=self._total_segments,
-        )
+        region = self._client.get_region()
+        with trace_operation("scan", self._table, region) as span:
+            result = await self._client.scan_page(
+                self._table,
+                filter_expression=self._filter_expression,
+                projection_expression=self._projection_expression,
+                expression_attribute_names=self._expression_attribute_names,
+                expression_attribute_values=self._expression_attribute_values,
+                limit=dynamo_limit,
+                exclusive_start_key=start_key,
+                index_name=self._index_name,
+                consistent_read=self._consistent_read,
+                segment=self._segment,
+                total_segments=self._total_segments,
+            )
 
-        self._current_page = result["items"]
-        self._last_evaluated_key = result["last_evaluated_key"]
-        self._metrics = result["metrics"]
-        self._page_index = 0
+            self._current_page = result["items"]
+            self._last_evaluated_key = result["last_evaluated_key"]
+            self._metrics = result["metrics"]
+            self._page_index = 0
+            add_response_attributes(
+                span,
+                consumed_rcu=self._metrics.consumed_rcu,
+                request_id=self._metrics.request_id,
+            )
 
         _log_operation(
             "scan",
