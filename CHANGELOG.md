@@ -1,6 +1,36 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.1.0] - 2026-03-04
+
+
+### Bug Fixes
+
+- add tracer in scan/query methods (#303)
+
+
+### CI/CD
+
+- bump PyO3/maturin-action from 1.50.0 to 1.50.1 (#300)
+- bump actions/download-artifact from 7.0.0 to 8.0.0 (#299)
+- bump github/codeql-action from 4.32.4 to 4.32.5 (#301)
+- bump actions/upload-artifact from 6.0.0 to 7.0.0 (#302)
+- bump astral-sh/setup-uv from 7.3.0 to 7.3.1 (#298)
+
+
+### Documentation
+
+- update changelog for v1.0.0 (#293)
+
+
+### Features
+
+- add support for return values (#297)
+
+
+### Deps
+
+- bump aws-sdk-dynamodb in the rust-dependencies group (#296)
 ## [1.0.0] - 2026-02-24
 
 
