@@ -42,7 +42,7 @@ lz4_flex = "0.12"
 flate2 = "1.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.21", features = ["v4"] }
+uuid = { version = "1.22", features = ["v4"] }
 ulid = "1.1"
 svix-ksuid = "0.8"
 chrono = { version = "0.4", default-features = false, features = [
