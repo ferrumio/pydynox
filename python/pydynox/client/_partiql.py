@@ -6,11 +6,12 @@ from typing import Any
 
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import ListWithMetrics
+from pydynox.client._typing import _MixinBase
 
 _SLOW_QUERY_THRESHOLD_MS = 100.0
 
 
-class PartiqlOperations:
+class PartiqlOperations(_MixinBase):
     """PartiQL statement execution."""
 
     def sync_execute_statement(

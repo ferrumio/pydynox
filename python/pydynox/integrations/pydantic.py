@@ -19,7 +19,7 @@ Example:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydynox.integrations._base import add_dynamodb_methods
 
@@ -105,6 +105,16 @@ def from_pydantic(
         validated = instance.__class__.model_validate(current)  # type: ignore
         return {k: getattr(validated, k) for k in updates}
 
-    return add_dynamodb_methods(
-        cls, table, partition_key, sort_key, client, to_dict, from_dict, validate_update
+    return cast(
+        type[T],
+        add_dynamodb_methods(
+            cls,
+            table,
+            partition_key,
+            sort_key,
+            client,
+            cast(Any, to_dict),
+            cast(Any, from_dict),
+            cast(Any, validate_update),
+        ),
     )

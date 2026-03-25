@@ -13,7 +13,7 @@ from testcontainers.localstack import LocalStackContainer
 @pytest.fixture(scope="session")
 def localstack_container():
     """Start LocalStack container for the test session."""
-    container = LocalStackContainer(image="localstack/localstack:latest")
+    container = LocalStackContainer(image="localstack/localstack:4.4.0")
     container.with_services("dynamodb")
 
     container.start()

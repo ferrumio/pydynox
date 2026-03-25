@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast
 
 from pydynox.hooks import HookType
 
@@ -306,17 +306,18 @@ class Collection:
         if not (hasattr(pk_attr, "has_template") and pk_attr.has_template):
             return None
 
-        # Cast to template-aware attribute for type checker
-        template_attr = pk_attr
+        from pydynox._internal._indexes import _TemplateAttr
+
+        template_attr = cast(_TemplateAttr, pk_attr)
 
         # Build from template
         values = {}
-        for placeholder in template_attr.placeholders:  # type: ignore[union-attr]
+        for placeholder in template_attr.placeholders:
             if placeholder not in kwargs:
                 return None
             values[placeholder] = kwargs[placeholder]
 
-        return template_attr.build_key(values)  # type: ignore[union-attr]
+        return template_attr.build_key(values)
 
     def __repr__(self) -> str:
         names = ", ".join(m.__name__ for m in self._models)

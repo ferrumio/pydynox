@@ -62,4 +62,4 @@ def extend_ttl(self: Model, new_expiration: datetime) -> None:
     key = self._get_key()
     # Serialize datetime to epoch timestamp for DynamoDB
     ttl_timestamp = int(new_expiration.timestamp())
-    client.update_item(table, key, updates={ttl_attr: ttl_timestamp})
+    client.sync_update_item(table, key, updates={ttl_attr: ttl_timestamp})

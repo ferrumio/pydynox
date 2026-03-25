@@ -223,6 +223,61 @@ def test_sync_model_batch_get_empty_keys(user_model):
     assert users == []
 
 
+def test_sync_batch_get_consistent_read(dynamo):
+    """Test sync batch get with consistent_read=True."""
+    # GIVEN existing items
+    items = [
+        {"pk": "SYNC_BGET_CR#1", "sk": "ITEM#1", "name": "Alice"},
+        {"pk": "SYNC_BGET_CR#1", "sk": "ITEM#2", "name": "Bob"},
+    ]
+    for item in items:
+        dynamo.sync_put_item("test_table", item)
+
+    # WHEN batch getting with consistent_read=True
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    results = dynamo.sync_batch_get("test_table", keys, consistent_read=True)
+
+    # THEN all items are returned
+    assert len(results) == 2
+    names = {r["name"] for r in results}
+    assert names == {"Alice", "Bob"}
+
+
+def test_sync_batch_get_consistent_read_false(dynamo):
+    """Test sync batch get with consistent_read=False (default behavior)."""
+    # GIVEN an existing item
+    dynamo.sync_put_item("test_table", {"pk": "SYNC_BGET_CRF#1", "sk": "ITEM#1", "name": "Alice"})
+
+    # WHEN batch getting with consistent_read=False
+    keys = [{"pk": "SYNC_BGET_CRF#1", "sk": "ITEM#1"}]
+    results = dynamo.sync_batch_get("test_table", keys, consistent_read=False)
+
+    # THEN the item is returned
+    assert len(results) == 1
+    assert results[0]["name"] == "Alice"
+
+
+def test_sync_model_batch_get_consistent_read(dynamo, user_model):
+    """Model.sync_batch_get with consistent_read=True returns correct items."""
+    # GIVEN existing items
+    uid = str(uuid.uuid4())
+    items = [
+        {"pk": f"SYNC_MBGET_CR#{uid}", "sk": "USER#1", "name": "Alice", "age": 25},
+        {"pk": f"SYNC_MBGET_CR#{uid}", "sk": "USER#2", "name": "Bob", "age": 30},
+    ]
+    for item in items:
+        dynamo.sync_put_item("test_table", item)
+
+    # WHEN batch getting with consistent_read=True
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    users = user_model.sync_batch_get(keys, consistent_read=True)
+
+    # THEN Model instances are returned with correct data
+    assert len(users) == 2
+    names = {u.name for u in users}
+    assert names == {"Alice", "Bob"}
+
+
 def test_sync_model_batch_get_missing_items(dynamo, user_model):
     """Model.sync_batch_get only returns existing items."""
     # GIVEN only one existing item

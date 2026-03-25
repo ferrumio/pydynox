@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox.attributes import Attribute
-from pydynox.client import DynamoDBClient
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
@@ -14,6 +13,7 @@ from pydynox.size import ItemSize, calculate_item_size
 
 if TYPE_CHECKING:
     from pydynox._internal._metrics import MetricsStorage
+    from pydynox.client import DynamoDBClient
 
 M = TypeVar("M", bound="ModelBase")
 
@@ -221,8 +221,7 @@ class ModelBase(metaclass=ModelMeta):
             if not (hasattr(attr, "has_template") and attr.has_template):
                 continue
 
-            # Cast to template protocol for type checker
-            tattr: _TemplateAttr = attr  # type: ignore[assignment]
+            tattr = cast(_TemplateAttr, attr)
 
             # If user explicitly passed the key value, validate it matches template
             if attr_name in kwargs:
@@ -311,8 +310,7 @@ class ModelBase(metaclass=ModelMeta):
             if not (hasattr(attr, "has_template") and attr.has_template):
                 continue
 
-            # Cast to template protocol for type checker
-            tattr: _TemplateAttr = attr  # type: ignore[assignment]
+            tattr = cast(_TemplateAttr, attr)
 
             # Collect values for all placeholders
             values = {}
@@ -434,7 +432,7 @@ class ModelBase(metaclass=ModelMeta):
             disc_dynamo = cls._py_to_dynamo.get(cls._discriminator_attr, cls._discriminator_attr)
             type_value = data.get(cls._discriminator_attr) or data.get(disc_dynamo)
             if type_value and type_value in cls._discriminator_registry:
-                target_cls = cls._discriminator_registry[type_value]  # type: ignore[invalid-assignment]
+                target_cls = cast(type[M], cls._discriminator_registry[type_value])
 
         # Translate alias keys to python names
         translated: dict[str, Any] = {}

@@ -7,10 +7,11 @@ from typing import Any
 from pydynox._internal._logging import _log_debug, _log_operation
 from pydynox._internal._metrics import OperationMetrics
 from pydynox._internal._tracing import add_response_attributes, trace_operation
+from pydynox.client._typing import _MixinBase
 from pydynox.query import AsyncScanResult, ScanResult
 
 
-class ScanOperations:
+class ScanOperations(_MixinBase):
     """Scan and count operations."""
 
     # ========== SCAN ==========

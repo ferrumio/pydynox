@@ -111,10 +111,10 @@ class Attribute(Generic[T]):
         """Get ConditionPath for this attribute."""
         return ConditionPath(attribute=self)
 
-    def __eq__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
+    def __eq__(self, other: Any) -> ConditionComparison:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         return ConditionComparison("=", self._get_path(), other)
 
-    def __ne__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
+    def __ne__(self, other: Any) -> ConditionComparison:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         return ConditionComparison("<>", self._get_path(), other)
 
     def __lt__(self, other: Any) -> ConditionComparison:

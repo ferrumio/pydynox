@@ -7,6 +7,7 @@ from typing import Any, Literal, overload
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import OperationMetrics
 from pydynox._internal._tracing import add_response_attributes, trace_operation
+from pydynox.client._typing import _MixinBase
 
 _SLOW_QUERY_THRESHOLD_MS = 100.0
 
@@ -68,7 +69,7 @@ def _extract_pk(item_or_key: dict[str, Any]) -> str | None:
     return str(value) if value is not None else None
 
 
-class CrudOperations:
+class CrudOperations(_MixinBase):
     """CRUD operations: get, put, delete, update."""
 
     def _record_metrics(self, metrics: OperationMetrics, operation: str) -> None:
