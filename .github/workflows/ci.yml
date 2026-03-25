@@ -123,7 +123,7 @@ jobs:
           allow-prereleases: true
 
       - name: Download wheel
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: wheel-${{ matrix.os }}-py${{ matrix.python }}
           path: dist
@@ -167,7 +167,7 @@ jobs:
   #         python-version: "3.12"
 
   #     - name: Download wheel
-  #       uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+  #       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
   #       with:
   #         name: wheel-ubuntu-latest-py3.12
   #         path: dist
@@ -199,7 +199,7 @@ jobs:
           python-version: "3.14"
 
       - name: Download wheel
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: wheel-ubuntu-latest-py3.14
           path: dist
@@ -219,7 +219,7 @@ jobs:
           pytest tests/ -v --cov=pydynox --cov-report=xml --ignore=tests/benchmark --ignore=tests/memory
 
       - name: Upload coverage
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5.5.3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
