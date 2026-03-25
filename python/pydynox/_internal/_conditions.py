@@ -63,11 +63,11 @@ class ConditionPath:
             new_path.append(key)
         return ConditionPath(path=new_path, attr_type=None)
 
-    # Comparison operators
-    def __eq__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
+    # Comparison operators (DSL: intentionally return ConditionComparison, not bool)
+    def __eq__(self, other: object) -> ConditionComparison:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         return ConditionComparison("=", self, other)
 
-    def __ne__(self, other: Any) -> ConditionComparison:  # type: ignore[override]
+    def __ne__(self, other: object) -> ConditionComparison:  # type: ignore[override]  # ty: ignore[invalid-method-override]
         return ConditionComparison("<>", self, other)
 
     def __lt__(self, other: Any) -> ConditionComparison:

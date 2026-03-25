@@ -561,13 +561,7 @@ pub fn calculate_part_size(total_size: usize) -> usize {
     let target_parts = 100;
     let calculated = total_size / target_parts;
 
-    if calculated < MIN_PART_SIZE {
-        MIN_PART_SIZE
-    } else if calculated > DEFAULT_PART_SIZE * 10 {
-        DEFAULT_PART_SIZE * 10
-    } else {
-        calculated
-    }
+    calculated.clamp(MIN_PART_SIZE, DEFAULT_PART_SIZE * 10)
 }
 
 // ========== ASYNC WRAPPERS (no prefix) - return Python awaitable ==========

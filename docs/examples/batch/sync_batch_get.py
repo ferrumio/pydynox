@@ -40,5 +40,9 @@ def main():
     for user in users_dict:
         print(user["name"])
 
+    # Strongly consistent reads
+    items = client.sync_batch_get("users", keys, consistent_read=True)
+    users = User.sync_batch_get(keys, consistent_read=True)
+
 
 main()

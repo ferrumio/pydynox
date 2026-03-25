@@ -42,5 +42,9 @@ async def main():
     for user in users_dict:
         print(user["name"])
 
+    # Strongly consistent reads
+    items = await client.batch_get("users", keys, consistent_read=True)
+    users = await User.batch_get(keys, consistent_read=True)
+
 
 asyncio.run(main())

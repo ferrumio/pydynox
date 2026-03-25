@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 from pydynox._internal._results import (
     AsyncModelQueryResult,
@@ -52,8 +52,7 @@ def _resolve_partition_key(cls: type[M], partition_key: Any | None, kwargs: dict
             f"partition_key is required. Model {cls.__name__} hash key has no template."
         )
 
-    # Cast to template protocol for type checker
-    tattr: _TemplateAttr = hash_attr  # type: ignore[assignment]
+    tattr = cast(_TemplateAttr, hash_attr)
 
     # Build from template using kwargs
     values = {}

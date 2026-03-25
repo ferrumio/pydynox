@@ -16,7 +16,7 @@ def localstack_container():
     """Start LocalStack container for the test session."""
     print("\n🐳 Starting LocalStack container...")
 
-    container = LocalStackContainer(image="localstack/localstack:latest")
+    container = LocalStackContainer(image="localstack/localstack:4.4.0")
     container.with_services("dynamodb", "s3", "kms")
 
     container.start()

@@ -9,6 +9,8 @@
 //!
 //! The Python bindings are exposed via PyO3.
 
+#![allow(clippy::result_large_err)]
+
 use pyo3::prelude::*;
 
 mod basic_operations;

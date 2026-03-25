@@ -181,7 +181,7 @@ def main() -> None:
 
     # Start LocalStack
     print("🐳 Starting LocalStack...")
-    container = LocalStackContainer(image="localstack/localstack:latest")
+    container = LocalStackContainer(image="localstack/localstack:4.4.0")
     container.with_services("dynamodb", "s3", "kms")
     container.start()
     time.sleep(2)

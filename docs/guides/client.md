@@ -200,7 +200,7 @@ Item operations also follow async-first. Async methods have no prefix, sync meth
 | `update_item(table, key, updates, ...)` | `sync_update_item(...)` | Update specific attributes. |
 | `query(table, key_condition, ...)` | `sync_query(...)` | Find items by partition key. |
 | `batch_write(table, put_items, delete_keys)` | `sync_batch_write(...)` | Write up to 25 items at once. |
-| `batch_get(table, keys)` | `sync_batch_get(...)` | Get up to 100 items at once. |
+| `batch_get(table, keys, consistent_read)` | `sync_batch_get(...)` | Get up to 100 items at once. |
 | `transact_write(operations)` | `sync_transact_write(...)` | Atomic multi-item write. |
 | `transact_get(gets)` | `sync_transact_get(...)` | Atomic multi-item read. |
 

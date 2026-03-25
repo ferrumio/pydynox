@@ -21,6 +21,7 @@ const BATCH_MAX_RETRIES: usize = 5;
 struct PreparedBatchGet {
     table: String,
     keys: Vec<HashMap<String, AttributeValue>>,
+    consistent_read: bool,
 }
 
 /// Prepare batch get - convert Python dicts to Rust types (needs GIL).
@@ -28,6 +29,7 @@ fn prepare_batch_get(
     py: Python<'_>,
     table: &str,
     keys: &Bound<'_, PyList>,
+    consistent_read: bool,
 ) -> PyResult<PreparedBatchGet> {
     let mut all_keys: Vec<HashMap<String, AttributeValue>> = Vec::new();
     for key in keys.iter() {
@@ -39,6 +41,7 @@ fn prepare_batch_get(
     Ok(PreparedBatchGet {
         table: table.to_string(),
         keys: all_keys,
+        consistent_read,
     })
 }
 
@@ -71,18 +74,19 @@ async fn execute_batch_get(
         let mut retries = 0;
 
         while !pending.is_empty() && retries < BATCH_MAX_RETRIES {
-            let keys_and_attrs = KeysAndAttributes::builder()
-                .set_keys(Some(pending.clone()))
-                .build()
-                .map_err(|e| {
-                    (
-                        aws_sdk_dynamodb::error::SdkError::construction_failure(format!(
-                            "Failed to build keys and attributes: {}",
-                            e
-                        )),
-                        prepared.table.clone(),
-                    )
-                })?;
+            let mut builder = KeysAndAttributes::builder().set_keys(Some(pending.clone()));
+            if prepared.consistent_read {
+                builder = builder.consistent_read(true);
+            }
+            let keys_and_attrs = builder.build().map_err(|e| {
+                (
+                    aws_sdk_dynamodb::error::SdkError::construction_failure(format!(
+                        "Failed to build keys and attributes: {}",
+                        e
+                    )),
+                    prepared.table.clone(),
+                )
+            })?;
 
             let mut request_items = HashMap::new();
             request_items.insert(prepared.table.clone(), keys_and_attrs);
@@ -162,8 +166,9 @@ pub fn sync_batch_get(
     runtime: &Arc<Runtime>,
     table: &str,
     keys: &Bound<'_, PyList>,
+    consistent_read: bool,
 ) -> PyResult<Vec<Py<PyAny>>> {
-    let prepared = prepare_batch_get(py, table, keys)?;
+    let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
 
     let result = py.detach(|| runtime.block_on(execute_batch_get(client, &prepared)));
 
@@ -204,8 +209,9 @@ pub fn batch_get<'py>(
     client: Client,
     table: &str,
     keys: &Bound<'_, PyList>,
+    consistent_read: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let prepared = prepare_batch_get(py, table, keys)?;
+    let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_batch_get(&client, &prepared).await;
