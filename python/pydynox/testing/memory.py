@@ -8,7 +8,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Iterator, TypeVar
+from typing import Any, Callable, Iterator, TypeVar, cast
 
 from pydynox.config import clear_default_client, get_default_client, set_default_client
 from pydynox.exceptions import ConditionalCheckFailedException
@@ -125,7 +125,7 @@ class MemoryBackend:
         self._client = MemoryClient(seed=self._seed)
         # Clear cached clients so models use the new MemoryClient
         self._clear_model_caches()
-        set_default_client(self._client)  # type: ignore[arg-type]
+        set_default_client(self._client)
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -157,7 +157,7 @@ class MemoryBackend:
             with self:
                 return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return cast(F, wrapper)
 
     @property
     def tables(self) -> dict[str, dict[str, dict[str, Any]]]:

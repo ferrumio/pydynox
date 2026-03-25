@@ -519,6 +519,34 @@ def test_sync_batch_get_as_dict_true_returns_dicts(user_model, mock_client):
     assert users[1]["name"] == "Bob"
 
 
+def test_sync_batch_get_consistent_read_passed_to_client(user_model, mock_client):
+    """sync_batch_get passes consistent_read=True to the client."""
+    mock_client.sync_batch_get.return_value = [
+        {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
+    ]
+
+    keys = [{"pk": "USER#1", "sk": "PROFILE"}]
+    user_model.sync_batch_get(keys, consistent_read=True)
+
+    mock_client.sync_batch_get.assert_called_once()
+    call_kwargs = mock_client.sync_batch_get.call_args
+    assert call_kwargs[1].get("consistent_read") is True or call_kwargs[0][2] is True
+
+
+def test_sync_batch_get_consistent_read_defaults_to_false(user_model, mock_client):
+    """sync_batch_get passes consistent_read=False by default."""
+    mock_client.sync_batch_get.return_value = [
+        {"pk": "USER#1", "sk": "PROFILE", "name": "Alice", "age": 30},
+    ]
+
+    keys = [{"pk": "USER#1", "sk": "PROFILE"}]
+    user_model.sync_batch_get(keys)
+
+    mock_client.sync_batch_get.assert_called_once()
+    call_kwargs = mock_client.sync_batch_get.call_args
+    assert call_kwargs[1].get("consistent_read") is False or call_kwargs[0][2] is False
+
+
 def test_sync_batch_get_empty_keys_returns_empty_list(user_model, mock_client):
     """sync_batch_get with empty keys returns empty list."""
     users = user_model.sync_batch_get([])
