@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 _default_client: DynamoDBClient | None = None
 
 
-def set_default_client(client: "DynamoDBClient") -> None:
+def set_default_client(client: Any) -> None:
     """Set the default client for all models.
 
     Call this once at app startup. All models without an explicit client

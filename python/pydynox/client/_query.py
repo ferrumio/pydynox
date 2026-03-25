@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydynox.client._typing import _MixinBase
 from pydynox.query import AsyncQueryResult, QueryResult
 
 
-class QueryOperations:
+class QueryOperations(_MixinBase):
     """Query operations."""
 
     def sync_query(

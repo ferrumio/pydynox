@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from pydynox._internal._logging import _log_debug
+from pydynox.client._typing import _MixinBase
 
 
-class BatchOperations:
+class BatchOperations(_MixinBase):
     """Batch and transaction operations."""
 
     # ========== BATCH WRITE (ASYNC - default, no prefix) ==========
@@ -42,6 +43,7 @@ class BatchOperations:
         self,
         table: str,
         keys: list[dict[str, Any]],
+        consistent_read: bool = False,
     ) -> list[dict[str, Any]]:
         """Async batch get items from a DynamoDB table.
 
@@ -52,7 +54,7 @@ class BatchOperations:
         """
         _log_debug("batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        return await self._client.batch_get(table, keys)  # type: ignore[attr-defined, no-any-return]
+        return await self._client.batch_get(table, keys, consistent_read)  # type: ignore[attr-defined, no-any-return]
 
     # ========== BATCH WRITE (SYNC - with sync_ prefix) ==========
 
@@ -87,6 +89,7 @@ class BatchOperations:
         self,
         table: str,
         keys: list[dict[str, Any]],
+        consistent_read: bool = False,
     ) -> list[dict[str, Any]]:
         """Sync batch get items from a DynamoDB table.
 
@@ -97,7 +100,7 @@ class BatchOperations:
         """
         _log_debug("sync_batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        return self._client.sync_batch_get(table, keys)  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_batch_get(table, keys, consistent_read)  # type: ignore[attr-defined, no-any-return]
 
     # ========== TRANSACT WRITE (SYNC) ==========
 

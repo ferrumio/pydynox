@@ -169,13 +169,15 @@ class S3Attribute(Attribute[S3Value | None]):
 
         # Create S3Value from metadata
         # Note: s3_ops will be set when accessed via model
+        if self._s3_ops is None:
+            raise RuntimeError("S3 operations not initialized. Set up S3 on the model first.")
         return S3Value(
             bucket=value["bucket"],
             key=value["key"],
             size=value["size"],
             etag=value["etag"],
             content_type=value.get("content_type"),
-            s3_ops=self._s3_ops,  # type: ignore[arg-type]
+            s3_ops=self._s3_ops,
             last_modified=value.get("last_modified"),
             version_id=value.get("version_id"),
             metadata=value.get("metadata"),

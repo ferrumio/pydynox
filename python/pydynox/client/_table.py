@@ -15,12 +15,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pydynox._internal._logging import _log_debug
+from pydynox.client._typing import _MixinBase
 
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Coroutine
 
 
-class TableOperations:  # pragma: no cover
+class TableOperations(_MixinBase):  # pragma: no cover
     """Table management operations: create, delete, exists, wait.
 
     Async-first API:

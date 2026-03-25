@@ -71,6 +71,14 @@ For sync code (scripts, CLI tools, or frameworks that don't support async), use 
 |-----------------|------|
 | `await Model.batch_get(keys)` | `Model.sync_batch_get(keys)` |
 
+### batch_get parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `keys` | list[dict] | required | List of key dicts (partition key + optional sort key) |
+| `consistent_read` | bool | False | Use strongly consistent reads |
+| `as_dict` | bool | False | Return dicts instead of Model instances |
+
 ### Context managers
 
 | Async (default) | Sync |
