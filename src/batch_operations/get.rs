@@ -74,22 +74,19 @@ async fn execute_batch_get(
         let mut retries = 0;
 
         while !pending.is_empty() && retries < BATCH_MAX_RETRIES {
-            let mut builder = KeysAndAttributes::builder()
-                .set_keys(Some(pending.clone()));
+            let mut builder = KeysAndAttributes::builder().set_keys(Some(pending.clone()));
             if prepared.consistent_read {
                 builder = builder.consistent_read(true);
             }
-            let keys_and_attrs = builder
-                .build()
-                .map_err(|e| {
-                    (
-                        aws_sdk_dynamodb::error::SdkError::construction_failure(format!(
-                            "Failed to build keys and attributes: {}",
-                            e
-                        )),
-                        prepared.table.clone(),
-                    )
-                })?;
+            let keys_and_attrs = builder.build().map_err(|e| {
+                (
+                    aws_sdk_dynamodb::error::SdkError::construction_failure(format!(
+                        "Failed to build keys and attributes: {}",
+                        e
+                    )),
+                    prepared.table.clone(),
+                )
+            })?;
 
             let mut request_items = HashMap::new();
             request_items.insert(prepared.table.clone(), keys_and_attrs);

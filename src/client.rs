@@ -717,7 +717,14 @@ impl DynamoDBClient {
         keys: &Bound<'_, pyo3::types::PyList>,
         consistent_read: bool,
     ) -> PyResult<Vec<Py<PyAny>>> {
-        batch_operations::sync_batch_get(py, &self.client, &self.runtime, table, keys, consistent_read)
+        batch_operations::sync_batch_get(
+            py,
+            &self.client,
+            &self.runtime,
+            table,
+            keys,
+            consistent_read,
+        )
     }
 
     // ========== TRANSACTION OPERATIONS (SYNC - with sync_ prefix) ==========
