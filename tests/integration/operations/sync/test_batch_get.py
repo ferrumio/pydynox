@@ -246,9 +246,7 @@ def test_sync_batch_get_consistent_read(dynamo):
 def test_sync_batch_get_consistent_read_false(dynamo):
     """Test sync batch get with consistent_read=False (default behavior)."""
     # GIVEN an existing item
-    dynamo.sync_put_item(
-        "test_table", {"pk": "SYNC_BGET_CRF#1", "sk": "ITEM#1", "name": "Alice"}
-    )
+    dynamo.sync_put_item("test_table", {"pk": "SYNC_BGET_CRF#1", "sk": "ITEM#1", "name": "Alice"})
 
     # WHEN batch getting with consistent_read=False
     keys = [{"pk": "SYNC_BGET_CRF#1", "sk": "ITEM#1"}]
