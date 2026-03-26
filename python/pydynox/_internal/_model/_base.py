@@ -289,9 +289,7 @@ class ModelBase(metaclass=ModelMeta):
 
     def _reset_change_tracking(self) -> None:
         """Reset change tracking after save. Stores current state as original."""
-        self._original = {
-            name: getattr(self, name) for name in self._attributes
-        }
+        self._original = {name: getattr(self, name) for name in self._attributes}
         self._changed = set()
 
     def _apply_auto_generate(self) -> None:

@@ -94,8 +94,11 @@ def test_save_and_reload_not_dirty(table):
     """
     uid = str(uuid.uuid4())[:8]
     user = UserAlias(
-        user_id=f"USER#{uid}", sort_key="PROFILE",
-        first_name="John", email="john@test.com", age=30,
+        user_id=f"USER#{uid}",
+        sort_key="PROFILE",
+        first_name="John",
+        email="john@test.com",
+        age=30,
     )
     user.sync_save()
 
@@ -112,8 +115,11 @@ def test_save_and_reload_set_same_not_dirty(table):
     """
     uid = str(uuid.uuid4())[:8]
     user = UserAlias(
-        user_id=f"USER#{uid}", sort_key="PROFILE",
-        first_name="John", email="john@test.com", age=30,
+        user_id=f"USER#{uid}",
+        sort_key="PROFILE",
+        first_name="John",
+        email="john@test.com",
+        age=30,
     )
     user.sync_save()
 
@@ -135,8 +141,11 @@ def test_smart_save_only_sends_changed_fields(table):
     """
     uid = str(uuid.uuid4())[:8]
     user = UserAlias(
-        user_id=f"USER#{uid}", sort_key="PROFILE",
-        first_name="John", email="john@test.com", age=30,
+        user_id=f"USER#{uid}",
+        sort_key="PROFILE",
+        first_name="John",
+        email="john@test.com",
+        age=30,
     )
     user.sync_save()
 
@@ -162,8 +171,11 @@ def test_reset_change_tracking_after_save(table):
     """
     uid = str(uuid.uuid4())[:8]
     user = UserAlias(
-        user_id=f"USER#{uid}", sort_key="PROFILE",
-        first_name="John", email="john@test.com", age=30,
+        user_id=f"USER#{uid}",
+        sort_key="PROFILE",
+        first_name="John",
+        email="john@test.com",
+        age=30,
     )
     user.sync_save()
 
