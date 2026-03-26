@@ -345,14 +345,22 @@ def prepare_update(
             cond_values: dict[str, Any] = {}
             cond_expr = condition.serialize(cond_names, cond_values)
             attr_names = {v: k for k, v in cond_names.items()}
+            # Rename condition value placeholders to avoid collision with update placeholders
+            # Rust build_set_expression uses :v0, :v1, etc. for updates
+            renamed_values: dict[str, Any] = {}
+            renamed_expr = cond_expr
+            for old_key, val in cond_values.items():
+                new_key = old_key.replace(":v", ":cond")
+                renamed_values[new_key] = val
+                renamed_expr = renamed_expr.replace(old_key, new_key)
             return (
                 client,
                 table,
                 key,
                 None,
-                cond_expr,
+                renamed_expr,
                 attr_names,
-                cond_values,
+                renamed_values,
                 aliased_kwargs,
                 skip,
             )
