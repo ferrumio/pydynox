@@ -315,6 +315,68 @@ async def test_delete_with_condition_in_variable(user_model):
 
 
 @pytest.mark.asyncio
+async def test_update_with_condition_success(user_model):
+    """Update with matching condition should persist the new value."""
+    User = user_model
+
+    user = User(pk="COND#20", sk="PROFILE", name="Tina", age=25, status="pending")
+    await user.save()
+
+    await user.update(status="starting", condition=User.status == "pending")
+
+    loaded = await User.get(pk="COND#20", sk="PROFILE")
+    assert loaded.status == "starting"
+
+
+@pytest.mark.asyncio
+async def test_update_with_condition_fails_on_mismatch(user_model):
+    """Update with non-matching condition should raise and leave item unchanged."""
+    User = user_model
+
+    user = User(pk="COND#21", sk="PROFILE", name="Uma", age=30, status="active")
+    await user.save()
+
+    with pytest.raises(Exception):
+        await user.update(status="inactive", condition=User.status == "pending")
+
+    loaded = await User.get(pk="COND#21", sk="PROFILE")
+    assert loaded.status == "active"
+
+
+@pytest.mark.asyncio
+async def test_update_with_condition_multiple_fields(user_model):
+    """Update multiple fields with a condition should persist all values correctly."""
+    User = user_model
+
+    user = User(pk="COND#22", sk="PROFILE", name="Vera", age=25, status="pending")
+    await user.save()
+
+    await user.update(name="Vera Updated", status="active", condition=User.status == "pending")
+
+    loaded = await User.get(pk="COND#22", sk="PROFILE")
+    assert loaded.name == "Vera Updated"
+    assert loaded.status == "active"
+    assert loaded.age == 25  # unchanged field preserved
+
+
+@pytest.mark.asyncio
+async def test_update_with_compound_condition(user_model):
+    """Update with a compound AND condition should work when both clauses match."""
+    User = user_model
+
+    user = User(pk="COND#23", sk="PROFILE", name="Will", age=30, status="active")
+    await user.save()
+
+    await user.update(
+        name="Will Updated",
+        condition=(User.status == "active") & (User.age == 30),
+    )
+
+    loaded = await User.get(pk="COND#23", sk="PROFILE")
+    assert loaded.name == "Will Updated"
+
+
+@pytest.mark.asyncio
 async def test_reuse_condition_multiple_times(user_model):
     """Same condition can be reused for multiple operations."""
     User = user_model
