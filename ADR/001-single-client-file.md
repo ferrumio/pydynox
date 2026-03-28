@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR 020](020-split-client-into-modules.md)
 
 ## Context
 

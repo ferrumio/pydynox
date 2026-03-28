@@ -10,7 +10,7 @@ An ADR is a short document that describes a decision, why it was made, and what 
 
 | # | Title | Status |
 |---|-------|--------|
-| 001 | [Single client.rs file](001-single-client-file.md) | Accepted |
+| 001 | [Single client.rs file](001-single-client-file.md) | Superseded by 020 |
 | 002 | [Why Rust](002-why-rust.md) | Accepted |
 | 003 | [Rust vs Python](003-rust-vs-python.md) | Accepted |
 | 004 | [Model and Client API](004-model-and-client-api.md) | Accepted |
@@ -29,6 +29,7 @@ An ADR is a short document that describes a decision, why it was made, and what 
 | 017 | [Direct AttributeValue conversion](017-direct-attribute-conversion.md) | Accepted |
 | 018 | [Async-first design](018-async-first-design.md) | Accepted |
 | 019 | [Release GIL during sync block_on](019-gil-release-sync-operations.md) | Accepted |
+| 020 | [Split client.rs into domain modules](020-split-client-into-modules.md) | Accepted |
 
 ## Adding a new ADR
 
