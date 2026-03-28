@@ -6,6 +6,7 @@
 [![License](https://img.shields.io/pypi/l/pydynox.svg)](https://github.com/ferrumio/pydynox/blob/main/LICENSE)
 [![Downloads](https://static.pepy.tech/badge/pydynox/month)](https://pepy.tech/project/pydynox)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/ferrumio/pydynox/badge)](https://securityscorecards.dev/viewer/?uri=github.com/ferrumio/pydynox)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12285/badge)](https://www.bestpractices.dev/projects/12285)
 
 A fast, async-first DynamoDB ORM for Python with a Rust core.
 
