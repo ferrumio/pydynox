@@ -1,6 +1,53 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.1.1] - 2026-03-28
+
+
+### Bug Fixes
+
+- bump deps (#305)
+- add consistent_read parameter to batch operations (#324)
+- Specify correct return types for Get/Query/Scan/BatchGet depending on the value of as_dict (#323)
+- correct fields marked as dirty (#329)
+- resolve naming collision when performing conditional updates (#330)
+
+
+### CI/CD
+
+- bump CodSpeedHQ/action from 4.11.0 to 4.11.1 (#306)
+- bump github/codeql-action from 4.32.5 to 4.32.6 (#307)
+- bump astral-sh/setup-uv from 7.3.1 to 7.6.0 (#314)
+- bump github/codeql-action from 4.32.6 to 4.33.0 (#315)
+- bump actions/cache from 5.0.3 to 5.0.4 (#319)
+- bump actions/download-artifact from 8.0.0 to 8.0.1 (#313)
+- bump CodSpeedHQ/action from 4.11.1 to 4.12.1 (#318)
+- bump codecov/codecov-action from 5.5.2 to 5.5.3 (#317)
+- resolve security issues (#326)
+- bump release-drafter/release-drafter from 6 to 7 (#312)
+
+
+### Documentation
+
+- update changelog for v1.1.0 (#304)
+
+
+### Refactoring
+
+- split client.rs file (#332)
+
+
+### Build
+
+- bump requests from 2.32.5 to 2.33.0 (#327)
+- bump memray from 1.19.1 to 1.19.2 (#328)
+
+
+### Deps
+
+- bump uuid from 1.21.0 to 1.22.0 in the rust-dependencies group (#308)
+- bump lz4_flex from 0.12.0 to 0.12.1 (#321)
+- bump the rust-dependencies group across 1 directory with 6 updates (#320)
 ## [1.1.0] - 2026-03-04
 
 
