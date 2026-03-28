@@ -76,5 +76,4 @@ impl AwsConfig {
                 .ok()
         })
     }
-
 }
