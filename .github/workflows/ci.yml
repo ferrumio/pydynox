@@ -14,6 +14,8 @@ on:
       - "uv.lock"
       - ".github/workflows/ci.yml"
 
+permissions: read-all
+
 env:
   CARGO_TERM_COLOR: always
 

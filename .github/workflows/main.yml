@@ -12,6 +12,8 @@ on:
             - "pyproject.toml"
             - "uv.lock"
 
+permissions: read-all
+
 env:
     CARGO_TERM_COLOR: always
 
