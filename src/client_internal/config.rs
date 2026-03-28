@@ -3,8 +3,6 @@
 //! This module provides a single configuration struct that all AWS clients use.
 //! This avoids code duplication and ensures consistent behavior across services.
 
-use std::sync::Arc;
-
 /// Shared configuration for all AWS clients.
 ///
 /// Created once by DynamoDBClient, then shared with S3 and KMS clients
@@ -77,10 +75,5 @@ impl AwsConfig {
                 .or_else(|_| std::env::var("AWS_ENDPOINT_URL"))
                 .ok()
         })
-    }
-
-    /// Create a shareable Arc wrapper.
-    pub fn into_arc(self) -> Arc<AwsConfig> {
-        Arc::new(self)
     }
 }
