@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from pydynox.hooks import HookType
 from pydynox.query import AsyncQueryResult, AsyncScanResult, QueryResult, ScanResult
@@ -13,9 +13,7 @@ if TYPE_CHECKING:
     from pydynox.model import Model
 
 M = TypeVar("M", bound="Model")
-
-# Type alias for results that can be either Model or dict
-ResultItem = Union[M, dict[str, Any]]
+T = TypeVar("T")  # Result item type (Model or dict)
 
 
 def _serialize_filter(
@@ -151,10 +149,10 @@ def _build_scan_params(
     )
 
 
-class BaseModelResult(ABC, Generic[M]):
+class BaseModelResult(ABC, Generic[T]):
     """Base class for model result iterators (sync and async)."""
 
-    _model_class: type[M]
+    _model_class: type[Model]
     _result: Any
     _initialized: bool
     _as_dict: bool
@@ -166,7 +164,7 @@ class BaseModelResult(ABC, Generic[M]):
             return None
         return self._result.last_evaluated_key
 
-    def _to_instance(self, item: dict[str, Any]) -> M:
+    def _to_instance(self, item: dict[str, Any]) -> Any:
         """Convert dict to model instance and run hooks."""
         instance = self._model_class.from_dict(item)
         skip = getattr(self._model_class.model_config, "skip_hooks", False)
@@ -174,10 +172,11 @@ class BaseModelResult(ABC, Generic[M]):
             instance._run_hooks(HookType.AFTER_LOAD)
         return instance
 
-    def _to_result(self, item: dict[str, Any]) -> M | dict[str, Any]:
+    def _to_result(self, item: dict[str, Any]) -> T:
         """Convert item based on as_dict flag."""
         if self._as_dict:
-            return item
+            # If as_dict is True, T will always be a dict, so casting is safe
+            return cast(T, item)
         return self._to_instance(item)
 
     @abstractmethod
@@ -186,7 +185,7 @@ class BaseModelResult(ABC, Generic[M]):
         ...
 
 
-class ModelQueryResult(BaseModelResult[M]):
+class ModelQueryResult(BaseModelResult[T]):
     """Result of a Model.query() with automatic pagination."""
 
     def __init__(
@@ -249,17 +248,17 @@ class ModelQueryResult(BaseModelResult[M]):
             consistent_read=use_consistent,
         )
 
-    def __iter__(self) -> ModelQueryResult[M]:
+    def __iter__(self) -> ModelQueryResult[T]:
         return self
 
-    def __next__(self) -> M | dict[str, Any]:
+    def __next__(self) -> T:
         if not self._initialized:
             self._result = self._build_result()
             self._items_iter = iter(self._result)
             self._initialized = True
         return self._to_result(next(self._items_iter))
 
-    def first(self) -> M | dict[str, Any] | None:
+    def first(self) -> T | None:
         """Get the first result or None."""
         try:
             return next(iter(self))
@@ -267,7 +266,7 @@ class ModelQueryResult(BaseModelResult[M]):
             return None
 
 
-class AsyncModelQueryResult(BaseModelResult[M]):
+class AsyncModelQueryResult(BaseModelResult[T]):
     """Async result of a Model.query() with automatic pagination."""
 
     def __init__(
@@ -329,17 +328,17 @@ class AsyncModelQueryResult(BaseModelResult[M]):
             consistent_read=use_consistent,
         )
 
-    def __aiter__(self) -> AsyncModelQueryResult[M]:
+    def __aiter__(self) -> AsyncModelQueryResult[T]:
         return self
 
-    async def __anext__(self) -> M | dict[str, Any]:
+    async def __anext__(self) -> T:
         if not self._initialized:
             self._result = self._build_result()
             self._initialized = True
         item = await self._result.__anext__()
         return self._to_result(item)
 
-    async def first(self) -> M | dict[str, Any] | None:
+    async def first(self) -> T | None:
         """Get the first result or None."""
         try:
             return await self.__anext__()
@@ -347,7 +346,7 @@ class AsyncModelQueryResult(BaseModelResult[M]):
             return None
 
 
-class ModelScanResult(BaseModelResult[M]):
+class ModelScanResult(BaseModelResult[T]):
     """Result of a Model.scan() with automatic pagination."""
 
     def __init__(
@@ -401,17 +400,17 @@ class ModelScanResult(BaseModelResult[M]):
             total_segments=self._total_segments,
         )
 
-    def __iter__(self) -> ModelScanResult[M]:
+    def __iter__(self) -> ModelScanResult[T]:
         return self
 
-    def __next__(self) -> M | dict[str, Any]:
+    def __next__(self) -> T:
         if not self._initialized:
             self._result = self._build_result()
             self._items_iter = iter(self._result)
             self._initialized = True
         return self._to_result(next(self._items_iter))
 
-    def first(self) -> M | dict[str, Any] | None:
+    def first(self) -> T | None:
         """Get the first result or None."""
         try:
             return next(iter(self))
@@ -419,7 +418,7 @@ class ModelScanResult(BaseModelResult[M]):
             return None
 
 
-class AsyncModelScanResult(BaseModelResult[M]):
+class AsyncModelScanResult(BaseModelResult[T]):
     """Async result of a Model.scan() with automatic pagination."""
 
     def __init__(
@@ -472,17 +471,17 @@ class AsyncModelScanResult(BaseModelResult[M]):
             total_segments=self._total_segments,
         )
 
-    def __aiter__(self) -> AsyncModelScanResult[M]:
+    def __aiter__(self) -> AsyncModelScanResult[T]:
         return self
 
-    async def __anext__(self) -> M | dict[str, Any]:
+    async def __anext__(self) -> T:
         if not self._initialized:
             self._result = self._build_result()
             self._initialized = True
         item = await self._result.__anext__()
         return self._to_result(item)
 
-    async def first(self) -> M | dict[str, Any] | None:
+    async def first(self) -> T | None:
         """Get the first result or None."""
         try:
             return await self.__anext__()

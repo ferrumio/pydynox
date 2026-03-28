@@ -289,7 +289,7 @@ class ModelBase(metaclass=ModelMeta):
 
     def _reset_change_tracking(self) -> None:
         """Reset change tracking after save. Stores current state as original."""
-        self._original = self.to_dict()
+        self._original = {name: getattr(self, name) for name in self._attributes}
         self._changed = set()
 
     def _apply_auto_generate(self) -> None:
@@ -447,8 +447,9 @@ class ModelBase(metaclass=ModelMeta):
             else:
                 deserialized[attr_name] = value
         instance = target_cls(**deserialized)
-        # Store original for change tracking (uses aliased dict from DynamoDB)
-        instance._original = data.copy()
+        # Store original for change tracking with Python names and deserialized values
+        # so __setattr__ can compare correctly (it looks up by Python attr name)
+        instance._original = deserialized.copy()
         instance._changed = set()
         return instance
 
