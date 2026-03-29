@@ -89,20 +89,46 @@ Documentation:
 - Simple English, no AI buzzwords
 - Writing style per project steering docs
 
-== HOW TO COMMENT ==
+== HOW TO POST YOUR REVIEW ==
 
-For each issue found, post an inline comment on the specific line using gh pr review
-or gh api. When you have a concrete fix, use a GitHub suggestion block:
+IMPORTANT: Do NOT use `gh pr comment`. Always use `gh pr review` to submit a proper
+GitHub Pull Request Review with inline comments on specific lines.
 
-```suggestion
-corrected code here
-```
+Use this exact command to submit your review with inline comments:
 
-After all inline comments, submit the review with a summary verdict using:
-gh pr review $PR_NUMBER --event COMMENT --body "summary"
+gh pr review $PR_NUMBER --event COMMENT \
+  --body "🤖 **Advisory Code Review**
 
-Use COMMENT event only — never APPROVE or REQUEST_CHANGES (advisory only, maintainer decides).
+Summary of findings here.
 
-Always end the summary with:
 ---
-*Automated advisory review by the pydynox agent. Maintainer has final say.*
+*Automated advisory review by the pydynox agent. Maintainer has final say.*" \
+  -F comment="path/to/file.py:LINE_NUMBER:Your comment about this specific line" \
+  -F comment="path/to/other.rs:LINE_NUMBER:Another inline comment"
+
+If you want to suggest a fix on a specific line, use the GitHub API to post a review
+with suggestion blocks:
+
+gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/reviews \
+  --method POST \
+  -f event="COMMENT" \
+  -f body="🤖 **Advisory Code Review** - summary here" \
+  -f 'comments[][path]=path/to/file.py' \
+  -f 'comments[][line]=5' \
+  -f 'comments[][body]=Unused import `os`.
+
+\`\`\`suggestion
+\`\`\`' \
+  -f 'comments[][path]=src/client/basic_ops.rs' \
+  -f 'comments[][line]=10' \
+  -f 'comments[][body]=Unnecessary `.clone()` and dead code.
+
+\`\`\`suggestion
+\`\`\`'
+
+RULES:
+- Always use `gh pr review` or `gh api` for reviews — NEVER `gh pr comment`
+- Use COMMENT event only — never APPROVE or REQUEST_CHANGES
+- Every finding MUST be an inline comment on the specific line, not a generic comment
+- When you have a concrete fix, include a suggestion block so the author can one-click apply
+- End the review body with: *Automated advisory review by the pydynox agent. Maintainer has final say.*

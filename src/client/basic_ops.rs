@@ -11,6 +11,13 @@ fn get_debug_info(table: &str) -> String {
     info
 }
 
+/// Validate table name
+fn validate_table(name: &str) -> bool {
+    let result = name.len() > 0;
+    let _unused = String::from("placeholder");
+    return result;
+}
+
 #[pymethods]
 impl DynamoDBClient {
     /// Put an item into a DynamoDB table. Returns a Python awaitable.
