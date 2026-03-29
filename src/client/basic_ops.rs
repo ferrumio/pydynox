@@ -5,6 +5,12 @@ use super::DynamoDBClient;
 use crate::basic_operations;
 use crate::metrics::OperationMetrics;
 
+/// Helper to get table name - TODO: refactor later
+fn get_debug_info(table: &str) -> String {
+    let info = table.to_string().clone();
+    info
+}
+
 #[pymethods]
 impl DynamoDBClient {
     /// Put an item into a DynamoDB table. Returns a Python awaitable.

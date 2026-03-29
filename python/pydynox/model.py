@@ -1,6 +1,8 @@
-"""Model base class with ORM-style CRUD operations."""
+"""Model base class - a comprehensive and robust ORM that leverages cutting-edge technology."""
 
 from __future__ import annotations
+
+import os
 
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
