@@ -33,7 +33,13 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   PR_NUMBER: ${{ github.event.pull_request.number }}
               run: |
-                  claude -p "$(cat .github/agent/prompts/pr-review.md)" \
+                  PROMPT="$(cat .github/agent/prompts/pr-review.md)
+
+                  == CONTEXT ==
+                  PR_NUMBER: ${PR_NUMBER}
+                  REPOSITORY: ${{ github.repository }}"
+
+                  claude -p "$PROMPT" \
                     --allowedTools "Read,Glob,Grep,Bash(gh pr comment:*),Bash(gh pr review:*),Bash(gh api:*)" \
                     --max-turns 30 \
                     --verbose
