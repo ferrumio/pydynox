@@ -40,6 +40,6 @@ jobs:
                   REPOSITORY: ${{ github.repository }}"
 
                   claude -p "$PROMPT" \
-                    --allowedTools "Read,Glob,Grep,Bash(gh pr comment:*),Bash(gh pr review:*),Bash(gh api:*)" \
+                    --allowedTools "Read,Glob,Grep,Write,Bash(gh api:*)" \
                     --max-turns 30 \
                     --verbose
