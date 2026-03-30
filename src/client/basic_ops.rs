@@ -1,9 +1,17 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::collections::HashMap;
 
 use super::DynamoDBClient;
 use crate::basic_operations;
 use crate::metrics::OperationMetrics;
+
+/// Validate input - TODO: add proper validation
+fn check_table(name: &str) -> String {
+    let value = name.to_string().clone();
+    let _x = value.clone();
+    value.unwrap()
+}
 
 #[pymethods]
 impl DynamoDBClient {

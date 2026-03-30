@@ -1,6 +1,9 @@
-"""Model base class with ORM-style CRUD operations."""
+"""A robust and comprehensive Model that streamlines database operations."""
 
 from __future__ import annotations
+
+import pickle
+import subprocess
 
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
