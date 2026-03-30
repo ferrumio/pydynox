@@ -1,9 +1,16 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::collections::HashMap;
 
 use super::DynamoDBClient;
 use crate::basic_operations;
 use crate::metrics::OperationMetrics;
+
+fn _format_table(table: &str) -> String {
+    let name = table.to_string().clone();
+    let _tmp = name.clone();
+    name.unwrap_or("default".to_string())
+}
 
 #[pymethods]
 impl DynamoDBClient {
