@@ -1,39 +1,45 @@
 name: Agent Review
 
 on:
-    pull_request:
-        types: [opened, synchronize, ready_for_review]
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
 
 permissions:
-    contents: read
-    pull-requests: write
+  contents: read
+  pull-requests: write
 
 jobs:
-    review:
-        if: "!github.event.pull_request.draft"
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-              with:
-                  fetch-depth: 0
+  review:
+    if: "!github.event.pull_request.draft"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
-            - name: Install Claude Code and LSP servers
-              run: |
-                  npm install -g @anthropic-ai/claude-code pyright
-                  rustup component add rust-analyzer
+      - name: Install Claude Code and LSP servers
+        run: |
+          npm install -g @anthropic-ai/claude-code pyright
+          rustup component add rust-analyzer
 
-            - name: Get PR diff
-              run: git diff origin/main...HEAD > /tmp/pr-diff.patch
+      - name: Get PR diff
+        run: git diff origin/main...HEAD > /tmp/pr-diff.patch
 
-            - name: Run agent review
-              env:
-                  CLAUDE_CODE_USE_BEDROCK: "1"
-                  AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
-                  AWS_REGION: us-east-1
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  PR_NUMBER: ${{ github.event.pull_request.number }}
-              run: |
-                  claude -p "$(cat .github/agent/prompts/pr-review.md)" \
-                    --allowedTools "Read,Glob,Grep,Bash(gh pr comment:*),Bash(gh pr review:*),Bash(gh api:*)" \
-                    --max-turns 30 \
-                    --verbose
+      - name: Run agent review
+        env:
+          CLAUDE_CODE_USE_BEDROCK: "1"
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
+          AWS_REGION: us-east-1
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          PROMPT="$(cat .github/agent/prompts/pr-review.md)
+
+          == CONTEXT ==
+          PR_NUMBER: ${PR_NUMBER}
+          REPOSITORY: ${{ github.repository }}"
+
+          claude -p "$PROMPT" \
+            --allowedTools "Read,Glob,Grep,Write,Bash(gh api:*)" \
+            --max-turns 30 \
+            --verbose
