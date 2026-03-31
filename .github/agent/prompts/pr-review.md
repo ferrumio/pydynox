@@ -39,7 +39,7 @@ For dependabot PRs that pass all checks, you also handle auto-merging.
 READ code: Read, Glob, Grep
 WRITE review JSON: Write (only to /tmp/review.json)
 POST review: Bash(gh api)
-DEPENDABOT only: Bash(gh pr merge), Bash(gh pr edit), Bash(sleep)
+DEPENDABOT only: Bash(gh pr review --approve), Bash(gh pr merge), Bash(gh pr edit), Bash(sleep)
 
 You MUST NOT use: Edit, Bash(git:*), Bash(gh pr close:*),
 Bash(curl:*), Bash(wget:*), Bash(env:*), Bash(printenv:*).
@@ -87,18 +87,21 @@ After ALL checks have status "completed", evaluate:
 
 If any check has conclusion "failure" → go to == DEPENDABOT BLOCK ==.
 
-STEP 4 — AUTO-MERGE:
+STEP 4 — APPROVE AND MERGE:
 If security check passed AND CI is green:
-1. Post a review:
-   Write /tmp/review.json:
-   {
-     "event": "COMMENT",
-     "body": "🤖 **Dependabot Auto-Review**\n\n✅ Security check passed — dependency version bump only\n✅ CI checks are green\n\nAuto-merging this PR.\n\n---\n*Automated review by the pydynox agent.*"
-   }
-   gh api repos/REPOSITORY/pulls/PR_NUMBER/reviews --input /tmp/review.json
+1. Approve the PR (required by branch protection):
+   gh pr review PR_NUMBER --approve --body "🤖 **Dependabot Auto-Review**
+
+   ✅ Security check passed — dependency version bump only
+   ✅ CI checks are green
+
+   Auto-merging this PR.
+
+   ---
+   *Automated review by the pydynox agent.*"
 
 2. Merge the PR:
-   gh pr merge PR_NUMBER --squash --auto
+   gh pr merge PR_NUMBER --squash
 
 == DEPENDABOT BLOCK ==
 
@@ -198,5 +201,5 @@ RULES:
 - Each comment MUST have path, line, and body
 - When you have a fix, include a ```suggestion``` block in the comment body
 - The "line" must be a line number visible in the PR diff
-- For regular PRs: use "COMMENT" if no violations, "REQUEST_CHANGES" if rules are violated — NEVER "APPROVE"
-- For dependabot PRs: follow the == DEPENDABOT FLOW == rules instead
+- For regular PRs: use "COMMENT" if no violations, "REQUEST_CHANGES" if rules are violated — NEVER "APPROVE", NEVER merge
+- For dependabot PRs: follow the == DEPENDABOT FLOW == (approve + merge is allowed ONLY for dependabot)
