@@ -66,16 +66,18 @@ Read the PR diff at /tmp/pr-diff.patch. Verify:
 If ANY of these fail → go to == DEPENDABOT BLOCK == below.
 
 STEP 2 — WAIT FOR CI:
-CI takes time to run. Poll the CI status every 2 minutes until ALL checks complete.
+CI takes time to run. Poll the CI status every 60 seconds, up to 20 attempts max (safety net).
 
 To check CI status, run:
-gh api repos/REPOSITORY/commits/$(gh api repos/REPOSITORY/pulls/PR_NUMBER --jq '.head.sha')/check-runs --jq '.check_runs[] | {name: .name, status: .status, conclusion: .conclusion}'
+gh api repos/REPOSITORY/commits/$(gh api repos/REPOSITORY/pulls/PR_NUMBER --jq '.head.sha')/check-runs --jq '.check_runs[] | select(.name != "review") | {name: .name, status: .status, conclusion: .conclusion}'
 
-If ANY check has status "in_progress" or "queued", run:
-sleep 120
+IMPORTANT: The select(.name != "review") filter excludes this workflow's own check.
+Without it, you will loop forever waiting for yourself to complete.
 
-Then check again. Keep polling until all checks have status "completed".
-There is no retry limit — CI can take 15-20 minutes. Just keep waiting.
+If ANY remaining check has status "in_progress" or "queued", run:
+sleep 60
+
+Then check again. Maximum 20 attempts. If still not done after 20 attempts, go to == DEPENDABOT BLOCK ==.
 
 IMPORTANT: Do NOT read files, analyze code, or do anything else while waiting.
 Just sleep and poll. This saves tokens.
