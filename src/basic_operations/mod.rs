@@ -19,6 +19,24 @@ mod query;
 mod scan;
 mod update_op;
 
+/// Extract the item from a ConditionalCheckFailedException.
+///
+/// All DynamoDB write operations (put, delete, update) can return this error
+/// when a condition expression fails. The error may contain the existing item.
+/// This macro avoids duplicating the extraction logic across operations.
+macro_rules! extract_item_from_error {
+    ($err:expr, $error_type:path) => {{
+        if let aws_sdk_dynamodb::error::SdkError::ServiceError(service_err) = $err
+            && let $error_type(ccf) = service_err.err()
+        {
+            return ccf.item().cloned();
+        }
+        None
+    }};
+}
+
+pub(crate) use extract_item_from_error;
+
 // Re-export async operations (default, no prefix)
 pub use delete::delete_item;
 pub use get::get_item;
