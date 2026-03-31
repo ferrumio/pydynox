@@ -155,13 +155,10 @@ fn extract_item_from_put_error(
     err: &aws_sdk_dynamodb::error::SdkError<aws_sdk_dynamodb::operation::put_item::PutItemError>,
 ) -> Option<HashMap<String, AttributeValue>> {
     use aws_sdk_dynamodb::operation::put_item::PutItemError;
-
-    if let aws_sdk_dynamodb::error::SdkError::ServiceError(service_err) = err
-        && let PutItemError::ConditionalCheckFailedException(ccf) = service_err.err()
-    {
-        return ccf.item().cloned();
-    }
-    None
+    crate::basic_operations::extract_item_from_error!(
+        err,
+        PutItemError::ConditionalCheckFailedException
+    )
 }
 
 /// Sync put_item - blocks until complete.
