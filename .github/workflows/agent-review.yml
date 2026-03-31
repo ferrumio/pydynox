@@ -41,6 +41,6 @@ jobs:
           REPOSITORY: ${{ github.repository }}"
 
           claude -p "$PROMPT" \
-            --allowedTools "Read,Glob,Grep,Write,Bash(gh api:*),Bash(gh pr merge:*),Bash(gh pr edit:*),Bash(sleep:*)" \
+            --allowedTools "Read,Glob,Grep,Write,Bash(gh api:*),Bash(gh pr review:*),Bash(gh pr merge:*),Bash(gh pr edit:*),Bash(sleep:*)" \
             --max-turns 50 \
             --verbose
