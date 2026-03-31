@@ -5,7 +5,7 @@ on:
     types: [opened, synchronize, ready_for_review]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -37,9 +37,10 @@ jobs:
 
           == CONTEXT ==
           PR_NUMBER: ${PR_NUMBER}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           REPOSITORY: ${{ github.repository }}"
 
           claude -p "$PROMPT" \
-            --allowedTools "Read,Glob,Grep,Write,Bash(gh api:*)" \
-            --max-turns 30 \
+            --allowedTools "Read,Glob,Grep,Write,Bash(gh api:*),Bash(gh pr review:*),Bash(gh pr merge:*),Bash(gh pr edit:*),Bash(sleep:*)" \
+            --max-turns 50 \
             --verbose
