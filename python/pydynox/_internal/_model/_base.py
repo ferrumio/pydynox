@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox.attributes import Attribute
+from pydynox.attributes.special import JSONAttribute
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
@@ -193,11 +194,13 @@ class ModelBase(metaclass=ModelMeta):
     # Change tracking
     _original: dict[str, Any] | None
     _changed: set[str]
+    _json_snapshots: dict[str, str | None]
 
     def __init__(self, **kwargs: Any) -> None:
         # Initialize change tracking (must be first to avoid __setattr__ issues)
         object.__setattr__(self, "_original", None)
         object.__setattr__(self, "_changed", set())
+        object.__setattr__(self, "_json_snapshots", {})
         # First pass: set all regular attributes
         for attr_name, attr in self._attributes.items():
             # Skip template keys in first pass - they'll be built later
@@ -291,6 +294,35 @@ class ModelBase(metaclass=ModelMeta):
         """Reset change tracking after save. Stores current state as original."""
         self._original = {name: getattr(self, name) for name in self._attributes}
         self._changed = set()
+        self._build_json_snapshots()
+
+    def _build_json_snapshots(self) -> None:
+        """Build JSON string snapshots for typed JSONAttributes.
+
+        Used to detect in-place mutations on typed JSON objects
+        (e.g., model.payload.score = 0.99) that bypass __setattr__.
+        """
+        snapshots: dict[str, str | None] = {}
+        for attr_name, attr in self._attributes.items():
+            if isinstance(attr, JSONAttribute) and attr.model_class is not None:
+                value = getattr(self, attr_name, None)
+                snapshots[attr_name] = attr.serialize(value)
+        self._json_snapshots = snapshots
+
+    def _detect_json_mutations(self) -> None:
+        """Detect in-place mutations on typed JSONAttributes.
+
+        Compares current serialized JSON against stored snapshots.
+        Adds mutated attributes to _changed set.
+        """
+        if not self._json_snapshots:
+            return
+        for attr_name, old_json in self._json_snapshots.items():
+            attr = self._attributes[attr_name]
+            current_value = getattr(self, attr_name, None)
+            current_json = attr.serialize(current_value)
+            if current_json != old_json:
+                self._changed.add(attr_name)
 
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
@@ -451,6 +483,7 @@ class ModelBase(metaclass=ModelMeta):
         # so __setattr__ can compare correctly (it looks up by Python attr name)
         instance._original = deserialized.copy()
         instance._changed = set()
+        instance._build_json_snapshots()
         return instance
 
     def __repr__(self) -> str:

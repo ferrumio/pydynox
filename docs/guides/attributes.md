@@ -185,6 +185,21 @@ When to use `JSONAttribute` over `MapAttribute`:
 - You need to store the exact JSON structure
 - Compatibility with other systems expecting JSON
 
+#### Typed JSONAttribute
+
+Pass a Pydantic model or dataclass to `JSONAttribute` for automatic serialization and type safety. Works like `EnumAttribute(Status)`:
+
+=== "typed_json_attribute.py"
+    ```python
+    --8<-- "docs/examples/models/typed_json_attribute.py"
+    ```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model_class` | type | None | Pydantic model or dataclass for auto ser/deser |
+
+In-place mutations (e.g., `event.payload.score = 0.99`) are detected automatically on `save()` by comparing JSON snapshots. No extra boilerplate needed.
+
 ### EnumAttribute
 
 Store Python enum as its value. Keeps your code type-safe.
@@ -397,6 +412,7 @@ Download methods:
 | True/false | `BooleanAttribute` |
 | Nested object | `MapAttribute` |
 | Complex JSON | `JSONAttribute` |
+| Typed JSON (Pydantic/dataclass) | `JSONAttribute(MyModel)` |
 | Type-safe status | `EnumAttribute` |
 | Sortable timestamp | `DatetimeAttribute` |
 | Auto-expiring items | `TTLAttribute` |

@@ -2,68 +2,150 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, overload
 
 from pydynox.attributes.base import Attribute
 
 E = TypeVar("E", bound=Enum)
+J = TypeVar("J")
 
 
-class JSONAttribute(Attribute[dict[str, Any] | list[Any]]):
-    """Store dict/list as JSON string.
+class JSONAttribute(Attribute[J], Generic[J]):
+    """Store dict/list or typed model as JSON string.
 
-    Different from MapAttribute which uses DynamoDB's native Map type.
-    JSONAttribute stores data as a string, which can be useful when you
-    need to store complex nested structures or when you want to avoid
-    DynamoDB's map limitations.
+    When used without a model class, stores plain dict/list as JSON.
+    When used with a Pydantic model or dataclass, automatically handles
+    serialization and deserialization to the typed model.
 
     Example:
         >>> from pydynox import Model, ModelConfig
         >>> from pydynox.attributes import StringAttribute, JSONAttribute
         >>>
+        >>> # Plain dict/list (existing behavior)
         >>> class Config(Model):
         ...     model_config = ModelConfig(table="configs")
         ...     pk = StringAttribute(partition_key=True)
         ...     settings = JSONAttribute()
         >>>
-        >>> config = Config(pk="CFG#1", settings={"theme": "dark", "notifications": True})
-        >>> config.save()
-        >>> # Stored as string '{"theme": "dark", "notifications": true}'
+        >>> # Typed with Pydantic model
+        >>> from pydantic import BaseModel
+        >>>
+        >>> class Payload(BaseModel):
+        ...     region: str
+        ...     score: float
+        >>>
+        >>> class MyModel(Model):
+        ...     model_config = ModelConfig(table="my_table")
+        ...     pk = StringAttribute(partition_key=True)
+        ...     payload = JSONAttribute(Payload)
     """
 
     attr_type = "S"
 
-    def serialize(self, value: dict[str, Any] | list[Any] | None) -> str | None:
-        """Convert dict/list to JSON string.
+    @overload
+    def __init__(
+        self: JSONAttribute[dict[str, Any] | list[Any]],
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: Any | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        model_class: type[J],
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: J | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        model_class: type[J] | None = None,
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: Any | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ):
+        super().__init__(
+            partition_key=partition_key,
+            sort_key=sort_key,
+            default=default,
+            required=required,
+            alias=alias,
+        )
+        self.model_class = model_class
+        self._is_pydantic = model_class is not None and hasattr(model_class, "model_validate")
+        self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
+
+    def _to_dict(self, value: Any) -> dict[str, Any] | list[Any]:
+        """Convert a typed model instance to a dict for JSON serialization."""
+        if self._is_pydantic:
+            return value.model_dump()
+        if self._is_dataclass:
+            return dataclasses.asdict(value)
+        return value
+
+    def _from_dict(self, data: dict[str, Any]) -> Any:
+        """Convert a dict to a typed model instance."""
+        model_class = self.model_class
+        if model_class is None:
+            return data
+        if self._is_pydantic:
+            return model_class.model_validate(data)  # ty: ignore[unresolved-attribute]
+        return model_class(**data)
+
+    def serialize(self, value: Any | None) -> str | None:
+        """Convert value to JSON string.
+
+        For typed models, calls model_dump() or dataclasses.asdict() first.
 
         Args:
-            value: Dict or list to serialize.
+            value: Dict, list, or typed model instance to serialize.
 
         Returns:
             JSON string or None.
         """
         if value is None:
             return None
+        if self.model_class is not None:
+            return json.dumps(self._to_dict(value))
         return json.dumps(value)
 
-    def deserialize(self, value: Any) -> dict[str, Any] | list[Any] | None:
-        """Convert JSON string back to dict/list.
+    def deserialize(self, value: Any) -> Any | None:
+        """Convert JSON string back to dict/list or typed model.
+
+        For typed models, calls model_validate() or constructs from dict.
 
         Args:
             value: JSON string from DynamoDB.
 
         Returns:
-            Parsed dict/list or None.
+            Parsed dict/list, typed model instance, or None.
         """
         if value is None:
             return None
-        if isinstance(value, (dict, list)):
-            return value
-        result: dict[str, Any] | list[Any] = json.loads(value)
-        return result
+        if isinstance(value, str):
+            data = json.loads(value)
+        elif isinstance(value, (dict, list)):
+            data = value
+        else:
+            data = value
+        if self.model_class is not None and isinstance(data, dict):
+            return self._from_dict(data)
+        return data
 
 
 class EnumAttribute(Attribute[E], Generic[E]):

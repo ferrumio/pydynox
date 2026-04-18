@@ -35,6 +35,7 @@ Each attribute returns a specific type:
 | `StringSetAttribute` | `set[str]` or `None` |
 | `NumberSetAttribute` | `set[int or float]` or `None` |
 | `JSONAttribute` | `dict[str, Any]` or `list[Any]` or `None` |
+| `JSONAttribute(MyModel)` | `MyModel` or `None` |
 | `DatetimeAttribute` | `datetime` or `None` |
 | `TTLAttribute` | `datetime` or `None` |
 | `CompressedAttribute` | `str` or `None` |

@@ -1,5 +1,6 @@
 """Tests for attribute types."""
 
+import dataclasses
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -147,6 +148,97 @@ def test_json_attribute_deserialize(value, expected):
     # WHEN we deserialize the value
     # THEN it should match expected Python object
     assert attr.deserialize(value) == expected
+
+
+# --- Typed JSONAttribute tests ---
+
+
+@dataclasses.dataclass
+class PayloadDC:
+    region: str
+    score: float
+
+
+def test_typed_json_attribute_stores_model_class():
+    """Typed JSONAttribute stores the model class."""
+    # WHEN we create a typed JSON attribute with a dataclass
+    attr = JSONAttribute(PayloadDC)
+
+    # THEN model_class should be stored
+    assert attr.model_class is PayloadDC
+
+
+def test_typed_json_attribute_serialize_dataclass():
+    """Typed JSONAttribute serializes a dataclass to JSON string."""
+    # GIVEN a typed JSON attribute
+    attr = JSONAttribute(PayloadDC)
+
+    # WHEN we serialize a dataclass instance
+    result = attr.serialize(PayloadDC(region="us-east-1", score=0.95))
+
+    # THEN it should be a JSON string
+    assert result == '{"region": "us-east-1", "score": 0.95}'
+
+
+def test_typed_json_attribute_deserialize_dataclass():
+    """Typed JSONAttribute deserializes JSON string to dataclass."""
+    # GIVEN a typed JSON attribute
+    attr = JSONAttribute(PayloadDC)
+
+    # WHEN we deserialize a JSON string
+    result = attr.deserialize('{"region": "us-east-1", "score": 0.95}')
+
+    # THEN it should be a dataclass instance
+    assert result == PayloadDC(region="us-east-1", score=0.95)
+
+
+def test_typed_json_attribute_serialize_none():
+    """Typed JSONAttribute returns None for None."""
+    # GIVEN a typed JSON attribute
+    attr = JSONAttribute(PayloadDC)
+
+    # THEN serialize/deserialize None returns None
+    assert attr.serialize(None) is None
+    assert attr.deserialize(None) is None
+
+
+def test_typed_json_attribute_roundtrip_dataclass():
+    """Typed JSONAttribute roundtrip preserves dataclass."""
+    # GIVEN a typed JSON attribute and original dataclass
+    attr = JSONAttribute(PayloadDC)
+    original = PayloadDC(region="eu-west-1", score=0.88)
+
+    # WHEN we serialize and deserialize
+    serialized = attr.serialize(original)
+    deserialized = attr.deserialize(serialized)
+
+    # THEN original value should be preserved
+    assert deserialized == original
+
+
+def test_typed_json_attribute_passthrough_dict():
+    """Typed JSONAttribute deserializes dict directly (no JSON parse needed)."""
+    # GIVEN a typed JSON attribute
+    attr = JSONAttribute(PayloadDC)
+
+    # WHEN we deserialize an already-parsed dict
+    result = attr.deserialize({"region": "us-east-1", "score": 0.5})
+
+    # THEN it should construct the dataclass from the dict
+    assert result == PayloadDC(region="us-east-1", score=0.5)
+
+
+def test_untyped_json_attribute_backward_compat():
+    """JSONAttribute without model_class behaves exactly as before."""
+    # GIVEN an untyped JSON attribute
+    attr = JSONAttribute()
+
+    # THEN model_class should be None
+    assert attr.model_class is None
+
+    # AND serialize/deserialize should work as before
+    assert attr.serialize({"key": "value"}) == '{"key": "value"}'
+    assert attr.deserialize('{"key": "value"}') == {"key": "value"}
 
 
 # --- EnumAttribute tests ---
