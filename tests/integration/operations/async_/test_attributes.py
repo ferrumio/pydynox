@@ -1,5 +1,6 @@
 """Integration tests for new attribute types."""
 
+import dataclasses
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -194,3 +195,118 @@ async def test_number_set_attribute_with_floats(setup_client, table):
     assert 4.5 in loaded.ratings
     assert 3.8 in loaded.ratings
     assert 5 in loaded.ratings or 5.0 in loaded.ratings
+
+
+# --- Typed JSONAttribute tests ---
+
+
+@dataclasses.dataclass
+class Payload:
+    region: str
+    score: float
+
+
+@pytest.mark.asyncio
+async def test_typed_json_attribute_roundtrip(setup_client, table):
+    """Typed JSONAttribute saves and loads dataclass correctly."""
+
+    class Event(Model):
+        model_config = ModelConfig(table="test_table")
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        payload = JSONAttribute(Payload)
+
+    # GIVEN a model with a typed JSON attribute
+    event = Event(
+        pk="EVT#1",
+        sk="DATA",
+        payload=Payload(region="us-east-1", score=0.95),
+    )
+
+    # WHEN we save and load it
+    await event.save()
+    loaded = await Event.get(pk="EVT#1", sk="DATA")
+
+    # THEN the typed payload is preserved
+    assert loaded is not None
+    assert loaded.payload == Payload(region="us-east-1", score=0.95)
+    assert loaded.payload.region == "us-east-1"
+    assert loaded.payload.score == 0.95
+
+
+@pytest.mark.asyncio
+async def test_typed_json_attribute_inplace_mutation(setup_client, table):
+    """Typed JSONAttribute detects in-place mutations on save."""
+
+    class Event(Model):
+        model_config = ModelConfig(table="test_table")
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        payload = JSONAttribute(Payload)
+
+    # GIVEN a saved model with typed JSON
+    event = Event(
+        pk="EVT#2",
+        sk="DATA",
+        payload=Payload(region="us-east-1", score=0.95),
+    )
+    await event.save()
+
+    # WHEN we load, mutate in-place, and save again
+    loaded = await Event.get(pk="EVT#2", sk="DATA")
+    loaded.payload.score = 0.99
+    await loaded.save()
+
+    # THEN the mutation is persisted
+    result = await Event.get(pk="EVT#2", sk="DATA")
+    assert result is not None
+    assert result.payload.score == 0.99
+    assert result.payload.region == "us-east-1"
+
+
+@pytest.mark.asyncio
+async def test_typed_json_attribute_none_roundtrip(setup_client, table):
+    """Typed JSONAttribute handles None correctly."""
+
+    class Event(Model):
+        model_config = ModelConfig(table="test_table")
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        payload = JSONAttribute(Payload)
+
+    # GIVEN a model with None payload
+    event = Event(pk="EVT#3", sk="DATA")
+    await event.save()
+
+    # WHEN we load it
+    loaded = await Event.get(pk="EVT#3", sk="DATA")
+
+    # THEN payload is None
+    assert loaded is not None
+    assert loaded.payload is None
+
+
+@pytest.mark.asyncio
+async def test_untyped_json_still_works(setup_client, table):
+    """Untyped JSONAttribute still works as before (backward compat)."""
+
+    class Config(Model):
+        model_config = ModelConfig(table="test_table")
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        settings = JSONAttribute()
+
+    # GIVEN a model with untyped JSON
+    config = Config(
+        pk="CFG#COMPAT",
+        sk="SETTINGS",
+        settings={"theme": "dark", "notifications": True},
+    )
+    await config.save()
+
+    # WHEN we load it
+    loaded = await Config.get(pk="CFG#COMPAT", sk="SETTINGS")
+
+    # THEN plain dict is preserved
+    assert loaded is not None
+    assert loaded.settings == {"theme": "dark", "notifications": True}

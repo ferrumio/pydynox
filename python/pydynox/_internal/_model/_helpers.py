@@ -193,6 +193,9 @@ def prepare_smart_save(
     client = self._get_client()
     table = self._get_table()
 
+    # Detect in-place mutations on typed JSONAttributes before deciding
+    self._detect_json_mutations()
+
     # Decide: UpdateItem (smart) or PutItem (full)
     # Use UpdateItem if: has original (loaded from DB), has changes, not full_replace
     use_update = self._original is not None and len(self._changed) > 0 and not full_replace
