@@ -1,6 +1,44 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.2.0] - 2026-04-18
+
+
+### CI/CD
+
+- bump astral-sh/setup-uv from 7.6.0 to 8.0.0 (#342)
+- bump github/codeql-action from 4.33.0 to 4.35.1 (#338)
+- bump actions/deploy-pages from 4.0.5 to 5.0.0 (#339)
+- bump actions/configure-pages from 5.0.0 to 6.0.0 (#341)
+- bump codecov/codecov-action from 5.5.3 to 6.0.0 (#340)
+- bump CodSpeedHQ/action from 4.12.1 to 4.13.0 (#346)
+- bump actions/upload-artifact from 7.0.0 to 7.0.1 (#350)
+- bump actions/upload-pages-artifact from 4.0.0 to 5.0.0 (#351)
+- bump CodSpeedHQ/action from 4.13.0 to 4.13.1 (#353)
+- bump PyO3/maturin-action from 1.50.1 to 1.51.0 (#352)
+- bump pypa/gh-action-pypi-publish from 1.13.0 to 1.14.0 (#349)
+
+
+### Documentation
+
+- update changelog for v1.1.1 (#333)
+
+
+### Features
+
+- adding json attribute (#355)
+
+
+### Refactoring
+
+- remove code duplication (#344)
+
+
+### Deps
+
+- bump uuid from 1.22.0 to 1.23.0 in the rust-dependencies group across 1 directory (#343)
+- bump the rust-dependencies group with 3 updates (#347)
+- bump the rust-dependencies group with 3 updates (#354)
 ## [1.1.1] - 2026-03-28
 
 
