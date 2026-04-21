@@ -20,10 +20,10 @@ path = "src/lib.rs"
 [dependencies]
 pyo3 = { version = ">=0.28.2", features = ["extension-module", "multiple-pymethods"] }
 pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
-aws-sdk-dynamodb = "1.107"
-aws-sdk-kms = "1.104"
-aws-sdk-s3 = "1.129"
-aws-sdk-sts = "1.101"
+aws-sdk-dynamodb = "1.111"
+aws-sdk-kms = "1.105"
+aws-sdk-s3 = "1.130"
+aws-sdk-sts = "1.103"
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 tokio = { version = "1", features = [
     "rt-multi-thread",
