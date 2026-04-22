@@ -314,6 +314,17 @@ pydynox/python/pydynox/
 └── integrations/        # Pydantic, etc.
 ```
 
+### Duplication (DRY) and code quality
+
+Duplicated code is **harder to keep correct** (fixes must be applied everywhere) and **noisier in review**. Automated checks and team standards often treat high duplication in new changes as a problem—plan for that up front when you add or change Python:
+
+1. **Do not copy-paste** the same control flow, conditionals, or config lookups in multiple modules. If you are about to paste a second time, **extract a helper** (module-level function, or a small method on the relevant base class like `ModelBase`).
+2. **Reuse existing hooks** where they exist — for example config resolution and hook behavior should go through the established paths (`_get_config()`, `_get_consistent_read`, `_run_after_load_hook`, etc.) instead of inlining new variants.
+3. **Similar tests** in one file: prefer **`@pytest.mark.parametrize`** or shared fixtures over many nearly identical test functions.
+4. If a change *must* look similar in two places (e.g. sync vs async), keep the **shared logic in one function** and keep the call sites as thin as possible.
+
+Refactor early when the same block appears more than once; do not wait for a failing check or a large follow-up PR.
+
 ### Type Hints
 
 Always use type hints. mypy MUST pass with zero errors.

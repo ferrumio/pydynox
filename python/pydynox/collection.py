@@ -39,7 +39,8 @@ class CollectionResult:
                 disc_attr = model_cls._discriminator_attr
                 if disc_attr and item.get(disc_attr) == model_name:
                     instance = model_cls.from_dict(item)
-                    skip = getattr(model_cls.model_config, "skip_hooks", False)
+                    config = model_cls._get_config()
+                    skip = config.skip_hooks if config is not None else False
                     if not skip:
                         instance._run_hooks(HookType.AFTER_LOAD)
                     self._items_by_type[model_name].append(instance)
@@ -115,9 +116,10 @@ class Collection:
         tables = set()
         for model in self._models:
             # Check table
-            if not hasattr(model, "model_config"):
-                raise ValueError(f"Model {model.__name__} has no model_config")
-            tables.add(model.model_config.table)
+            config = model._get_config()
+            if config is None:
+                raise ValueError(f"Model {model.__name__} has no dynamodb_config")
+            tables.add(config.table)
 
             # Check discriminator
             if not model._discriminator_attr:
@@ -151,7 +153,7 @@ class Collection:
 
     def _get_table(self) -> str:
         """Get the shared table name."""
-        return self._models[0].model_config.table
+        return self._models[0]._get_table()
 
     def _get_client(self) -> Any:
         """Get the DynamoDB client from the first model."""

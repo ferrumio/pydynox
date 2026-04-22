@@ -108,11 +108,12 @@ class Model(ModelBase, metaclass=ModelMeta):
     """Base class for DynamoDB models with ORM-style CRUD.
 
     Example:
-        >>> from pydynox import Model, ModelConfig
+        >>> from typing import ClassVar
+        >>> from pydynox import Model, DynamoConfig
         >>> from pydynox.attributes import StringAttribute
         >>>
         >>> class User(Model):
-        ...     model_config = ModelConfig(table="users")
+        ...     dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(table="users")
         ...     pk = StringAttribute(partition_key=True)
         ...     sk = StringAttribute(sort_key=True)
         ...     name = StringAttribute()

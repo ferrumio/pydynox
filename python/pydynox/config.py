@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
@@ -56,10 +56,13 @@ def clear_default_client() -> None:
 
 
 @dataclass
-class ModelConfig:
-    """Type-safe model configuration.
+class DynamoConfig:
+    """Type-safe model configuration for DynamoDB behavior.
 
-    Use this instead of class Meta for better IDE support and type checking.
+    Assigned to the ``dynamodb_config`` class attribute on a
+    :class:`pydynox.Model` subclass. The legacy name ``model_config`` still
+    works for back-compat but emits a :class:`DeprecationWarning` the first
+    time pydynox reads it.
 
     Args:
         table: DynamoDB table name (required).
@@ -74,13 +77,14 @@ class ModelConfig:
             If set, overrides the client's detector threshold for this model.
 
     Example:
-        >>> from pydynox import DynamoDBClient, Model, ModelConfig
+        >>> from typing import ClassVar
+        >>> from pydynox import DynamoDBClient, Model, DynamoConfig
         >>> from pydynox.attributes import StringAttribute
         >>>
         >>> client = DynamoDBClient(region="us-east-1")
         >>>
         >>> class User(Model):
-        ...     model_config = ModelConfig(
+        ...     dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(
         ...         table="users",
         ...         client=client,
         ...     )
@@ -89,7 +93,7 @@ class ModelConfig:
         >>>
         >>> # Model with higher hot partition thresholds (high traffic expected)
         >>> class Event(Model):
-        ...     model_config = ModelConfig(
+        ...     dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(
         ...         table="events",
         ...         hot_partition_writes=2000,
         ...         hot_partition_reads=5000,
@@ -104,3 +108,12 @@ class ModelConfig:
     consistent_read: bool = field(default=False)
     hot_partition_writes: int | None = field(default=None)
     hot_partition_reads: int | None = field(default=None)
+
+
+# Back-compat alias. ``ModelConfig`` used to be the canonical name; it now
+# resolves to :class:`DynamoConfig` so existing imports and isinstance
+# checks keep working. The name itself is not deprecated at the class
+# level because dropping the import would break every current user.
+# The deprecation only fires when a Model subclass sets the legacy
+# ``model_config`` class attribute instead of the new ``dynamodb_config``.
+ModelConfig: TypeAlias = DynamoConfig

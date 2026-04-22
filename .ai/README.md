@@ -13,7 +13,7 @@ Welcome! This folder has everything you need to contribute to pydynox.
 | File | What it covers |
 |------|----------------|
 | `project-context.md` | What is pydynox, tech stack, goals |
-| `coding-guidelines.md` | Python vs Rust decisions, code style |
+| `coding-guidelines.md` | Python vs Rust decisions, code style, DRY / avoiding duplication |
 | `testing-guidelines.md` | How to write and run tests |
 | `dependencies.md` | When to add dependencies |
 | `common-mistakes.md` | Things that break the build |

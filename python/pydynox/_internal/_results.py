@@ -5,7 +5,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
-from pydynox.hooks import HookType
 from pydynox.query import AsyncQueryResult, AsyncScanResult, QueryResult, ScanResult
 
 if TYPE_CHECKING:
@@ -29,7 +28,8 @@ def _get_consistent_read(model_class: type[M], explicit: bool | None) -> bool:
     """Get consistent_read value, falling back to model config."""
     if explicit is not None:
         return explicit
-    return getattr(model_class.model_config, "consistent_read", False)
+    config = model_class._get_config()
+    return config.consistent_read if config is not None else False
 
 
 def _build_query_params(
@@ -167,9 +167,7 @@ class BaseModelResult(ABC, Generic[T]):
     def _to_instance(self, item: dict[str, Any]) -> Any:
         """Convert dict to model instance and run hooks."""
         instance = self._model_class.from_dict(item)
-        skip = getattr(self._model_class.model_config, "skip_hooks", False)
-        if not skip:
-            instance._run_hooks(HookType.AFTER_LOAD)
+        self._model_class._run_after_load_hook(instance)
         return instance
 
     def _to_result(self, item: dict[str, Any]) -> T:
