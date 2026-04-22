@@ -9,8 +9,8 @@ from pydynox._internal._results import (
     AsyncModelScanResult,
     ModelQueryResult,
     ModelScanResult,
+    _get_consistent_read,
 )
-from pydynox.hooks import HookType
 
 if TYPE_CHECKING:
     from pydynox._internal._metrics import OperationMetrics
@@ -154,10 +154,7 @@ def sync_count(
 
     attr_names = {v: k for k, v in names.items()}
 
-    use_consistent = consistent_read
-    if use_consistent is None:
-        _cfg = cls._get_config()
-        use_consistent = _cfg.consistent_read if _cfg is not None else False
+    use_consistent = _get_consistent_read(cls, consistent_read)
 
     return client.sync_count(
         table,
@@ -204,10 +201,7 @@ def sync_parallel_scan(
 
     attr_names = {v: k for k, v in names.items()}
 
-    use_consistent = consistent_read
-    if use_consistent is None:
-        _cfg = cls._get_config()
-        use_consistent = _cfg.consistent_read if _cfg is not None else False
+    use_consistent = _get_consistent_read(cls, consistent_read)
 
     items, metrics = client.sync_parallel_scan(
         table,
@@ -223,11 +217,7 @@ def sync_parallel_scan(
 
     instances = [cls.from_dict(item) for item in items]
 
-    _cfg = cls._get_config()
-    skip = _cfg.skip_hooks if _cfg is not None else False
-    if not skip:
-        for instance in instances:
-            instance._run_hooks(HookType.AFTER_LOAD)
+    cls._run_after_load_hooks_batch(instances)
 
     return instances, metrics
 
@@ -324,10 +314,7 @@ async def count(
 
     attr_names = {v: k for k, v in names.items()}
 
-    use_consistent = consistent_read
-    if use_consistent is None:
-        _cfg = cls._get_config()
-        use_consistent = _cfg.consistent_read if _cfg is not None else False
+    use_consistent = _get_consistent_read(cls, consistent_read)
 
     return await client.count(
         table,
@@ -374,10 +361,7 @@ async def parallel_scan(
 
     attr_names = {v: k for k, v in names.items()}
 
-    use_consistent = consistent_read
-    if use_consistent is None:
-        _cfg = cls._get_config()
-        use_consistent = _cfg.consistent_read if _cfg is not None else False
+    use_consistent = _get_consistent_read(cls, consistent_read)
 
     items, metrics = await client.parallel_scan(
         table,
@@ -393,10 +377,6 @@ async def parallel_scan(
 
     instances = [cls.from_dict(item) for item in items]
 
-    _cfg = cls._get_config()
-    skip = _cfg.skip_hooks if _cfg is not None else False
-    if not skip:
-        for instance in instances:
-            instance._run_hooks(HookType.AFTER_LOAD)
+    cls._run_after_load_hooks_batch(instances)
 
     return instances, metrics

@@ -461,13 +461,32 @@ class ModelBase(metaclass=ModelMeta):
             raise ValueError(f"Model {cls.__name__} must define dynamodb_config")
         return config.table
 
-    def _should_skip_hooks(self, skip_hooks: bool | None) -> bool:
-        if skip_hooks is not None:
-            return skip_hooks
-        config = type(self)._get_config()
+    @classmethod
+    def _config_skip_hooks(cls) -> bool:
+        """Return ``skip_hooks`` from DynamoConfig, or False when unconfigured."""
+        config = cls._get_config()
         if config is not None:
             return config.skip_hooks
         return False
+
+    def _should_skip_hooks(self, skip_hooks: bool | None) -> bool:
+        if skip_hooks is not None:
+            return skip_hooks
+        return type(self)._config_skip_hooks()
+
+    @classmethod
+    def _run_after_load_hook(cls, instance: M) -> None:
+        """Run AFTER_LOAD unless DynamoConfig has ``skip_hooks`` set."""
+        if not cls._config_skip_hooks():
+            instance._run_hooks(HookType.AFTER_LOAD)
+
+    @classmethod
+    def _run_after_load_hooks_batch(cls, instances: list[M]) -> None:
+        """Run AFTER_LOAD on instances unless the model config suppresses hooks."""
+        if cls._config_skip_hooks():
+            return
+        for instance in instances:
+            instance._run_hooks(HookType.AFTER_LOAD)
 
     def _run_hooks(self, hook_type: HookType) -> None:
         for hook in self._hooks.get(hook_type, []):

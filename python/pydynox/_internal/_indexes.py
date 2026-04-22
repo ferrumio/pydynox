@@ -465,12 +465,7 @@ class GSIQueryResult(Generic[M]):
         item = next(self._items_iter)
         instance = self._model_class.from_dict(item)
 
-        _cfg = self._model_class._get_config()
-        skip = _cfg.skip_hooks if _cfg is not None else False
-        if not skip:
-            from pydynox.hooks import HookType
-
-            instance._run_hooks(HookType.AFTER_LOAD)
+        self._model_class._run_after_load_hook(instance)
 
         return instance
 
@@ -572,12 +567,7 @@ class AsyncGSIQueryResult(Generic[M]):
         item = await self._query_result.__anext__()
         instance = self._model_class.from_dict(item)
 
-        _cfg = self._model_class._get_config()
-        skip = _cfg.skip_hooks if _cfg is not None else False
-        if not skip:
-            from pydynox.hooks import HookType
-
-            instance._run_hooks(HookType.AFTER_LOAD)
+        self._model_class._run_after_load_hook(instance)
 
         return instance
 
@@ -900,12 +890,7 @@ class LSIQueryResult(Generic[M]):
         item = next(self._items_iter)
         instance = self._model_class.from_dict(item)
 
-        _cfg = self._model_class._get_config()
-        skip = _cfg.skip_hooks if _cfg is not None else False
-        if not skip:
-            from pydynox.hooks import HookType
-
-            instance._run_hooks(HookType.AFTER_LOAD)
+        self._model_class._run_after_load_hook(instance)
 
         return instance
 
@@ -1008,12 +993,7 @@ class AsyncLSIQueryResult(Generic[M]):
         item = await self._query_result.__anext__()
         instance = self._model_class.from_dict(item)
 
-        _cfg = self._model_class._get_config()
-        skip = _cfg.skip_hooks if _cfg is not None else False
-        if not skip:
-            from pydynox.hooks import HookType
-
-            instance._run_hooks(HookType.AFTER_LOAD)
+        self._model_class._run_after_load_hook(instance)
 
         return instance
 
