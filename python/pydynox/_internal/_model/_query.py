@@ -156,7 +156,8 @@ def sync_count(
 
     use_consistent = consistent_read
     if use_consistent is None:
-        use_consistent = getattr(cls.model_config, "consistent_read", False)
+        _cfg = cls._get_config()
+        use_consistent = _cfg.consistent_read if _cfg is not None else False
 
     return client.sync_count(
         table,
@@ -205,7 +206,8 @@ def sync_parallel_scan(
 
     use_consistent = consistent_read
     if use_consistent is None:
-        use_consistent = getattr(cls.model_config, "consistent_read", False)
+        _cfg = cls._get_config()
+        use_consistent = _cfg.consistent_read if _cfg is not None else False
 
     items, metrics = client.sync_parallel_scan(
         table,
@@ -221,7 +223,8 @@ def sync_parallel_scan(
 
     instances = [cls.from_dict(item) for item in items]
 
-    skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+    _cfg = cls._get_config()
+    skip = _cfg.skip_hooks if _cfg is not None else False
     if not skip:
         for instance in instances:
             instance._run_hooks(HookType.AFTER_LOAD)
@@ -323,7 +326,8 @@ async def count(
 
     use_consistent = consistent_read
     if use_consistent is None:
-        use_consistent = getattr(cls.model_config, "consistent_read", False)
+        _cfg = cls._get_config()
+        use_consistent = _cfg.consistent_read if _cfg is not None else False
 
     return await client.count(
         table,
@@ -372,7 +376,8 @@ async def parallel_scan(
 
     use_consistent = consistent_read
     if use_consistent is None:
-        use_consistent = getattr(cls.model_config, "consistent_read", False)
+        _cfg = cls._get_config()
+        use_consistent = _cfg.consistent_read if _cfg is not None else False
 
     items, metrics = await client.parallel_scan(
         table,
@@ -388,7 +393,8 @@ async def parallel_scan(
 
     instances = [cls.from_dict(item) for item in items]
 
-    skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+    _cfg = cls._get_config()
+    skip = _cfg.skip_hooks if _cfg is not None else False
     if not skip:
         for instance in instances:
             instance._run_hooks(HookType.AFTER_LOAD)

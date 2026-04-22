@@ -77,7 +77,8 @@ def prepare_get(
 
     use_consistent = consistent_read
     if use_consistent is None:
-        use_consistent = getattr(cls.model_config, "consistent_read", False)
+        config = cls._get_config()
+        use_consistent = config.consistent_read if config is not None else False
 
     return client, table, aliased_keys, use_consistent
 
@@ -88,7 +89,8 @@ def finalize_get(cls: type[M], item: dict[str, Any] | None) -> M | None:
         return None
 
     instance = cls.from_dict(item)
-    skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+    config = cls._get_config()
+    skip = config.skip_hooks if config is not None else False
     if not skip:
         instance._run_hooks(HookType.AFTER_LOAD)
     return instance
@@ -118,9 +120,8 @@ def prepare_save(self: Model, condition: Condition | None, skip_hooks: bool | No
     if version_attr is not None:
         setattr(self, version_attr, new_version)
 
-    max_size = (
-        getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
-    )
+    config = type(self)._get_config()
+    max_size = config.max_size if config is not None else None
     if max_size is not None:
         size = self.calculate_size()
         if size.bytes > max_size:
@@ -178,9 +179,8 @@ def prepare_smart_save(
     if version_attr is not None:
         setattr(self, version_attr, new_version)
 
-    max_size = (
-        getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
-    )
+    config = type(self)._get_config()
+    max_size = config.max_size if config is not None else None
     if max_size is not None:
         size = self.calculate_size()
         if size.bytes > max_size:

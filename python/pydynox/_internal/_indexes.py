@@ -45,7 +45,7 @@ class GlobalSecondaryIndex(Generic[M]):
 
     Example:
         >>> class User(Model):
-        ...     model_config = ModelConfig(table="users")
+        ...     dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(table="users")
         ...     pk = StringAttribute(partition_key=True)
         ...     email = StringAttribute()
         ...
@@ -465,11 +465,8 @@ class GSIQueryResult(Generic[M]):
         item = next(self._items_iter)
         instance = self._model_class.from_dict(item)
 
-        skip = (
-            self._model_class.model_config.skip_hooks
-            if hasattr(self._model_class, "model_config")
-            else False
-        )
+        _cfg = self._model_class._get_config()
+        skip = _cfg.skip_hooks if _cfg is not None else False
         if not skip:
             from pydynox.hooks import HookType
 
@@ -575,11 +572,8 @@ class AsyncGSIQueryResult(Generic[M]):
         item = await self._query_result.__anext__()
         instance = self._model_class.from_dict(item)
 
-        skip = (
-            self._model_class.model_config.skip_hooks
-            if hasattr(self._model_class, "model_config")
-            else False
-        )
+        _cfg = self._model_class._get_config()
+        skip = _cfg.skip_hooks if _cfg is not None else False
         if not skip:
             from pydynox.hooks import HookType
 
@@ -617,7 +611,7 @@ class LocalSecondaryIndex(Generic[M]):
 
     Example:
         >>> class User(Model):
-        ...     model_config = ModelConfig(table="users")
+        ...     dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(table="users")
         ...     pk = StringAttribute(partition_key=True)
         ...     sk = StringAttribute(sort_key=True)
         ...     status = StringAttribute()
@@ -906,11 +900,8 @@ class LSIQueryResult(Generic[M]):
         item = next(self._items_iter)
         instance = self._model_class.from_dict(item)
 
-        skip = (
-            self._model_class.model_config.skip_hooks
-            if hasattr(self._model_class, "model_config")
-            else False
-        )
+        _cfg = self._model_class._get_config()
+        skip = _cfg.skip_hooks if _cfg is not None else False
         if not skip:
             from pydynox.hooks import HookType
 
@@ -1017,11 +1008,8 @@ class AsyncLSIQueryResult(Generic[M]):
         item = await self._query_result.__anext__()
         instance = self._model_class.from_dict(item)
 
-        skip = (
-            self._model_class.model_config.skip_hooks
-            if hasattr(self._model_class, "model_config")
-            else False
-        )
+        _cfg = self._model_class._get_config()
+        skip = _cfg.skip_hooks if _cfg is not None else False
         if not skip:
             from pydynox.hooks import HookType
 
