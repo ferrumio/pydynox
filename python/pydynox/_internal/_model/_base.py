@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
+from pydynox._internal._dynamo_annotated import apply_annotated_dynamo_fields
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox.attributes import Attribute
 from pydynox.attributes.special import JSONAttribute
@@ -137,6 +138,10 @@ class ModelMeta(type):
                 local_indexes[attr_name] = attr_value
 
         cls = super().__new__(mcs, name, bases, namespace)
+
+        partition_key, sort_key, discriminator_attr = apply_annotated_dynamo_fields(
+            cls, namespace, attributes, partition_key, sort_key, discriminator_attr
+        )
 
         cls._attributes = attributes
         cls._partition_key = partition_key

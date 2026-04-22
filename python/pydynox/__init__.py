@@ -34,6 +34,14 @@ from pydynox.config import (
     get_default_client,
     set_default_client,
 )
+from pydynox.dynamo import (
+    Dynamo,
+    DynamoBinary,
+    DynamoBoolean,
+    DynamoFieldMarker,
+    DynamoNumber,
+    DynamoString,
+)
 from pydynox.generators import AutoGenerate
 from pydynox.integrations.functions import dynamodb_model
 from pydynox.model import Model
@@ -50,6 +58,13 @@ __all__ = [
     "DynamoConfig",
     # Back-compat alias for DynamoConfig
     "ModelConfig",
+    # Annotated field markers
+    "Dynamo",
+    "DynamoString",
+    "DynamoNumber",
+    "DynamoBoolean",
+    "DynamoBinary",
+    "DynamoFieldMarker",
     # Operations
     "BatchWriter",
     "SyncBatchWriter",
