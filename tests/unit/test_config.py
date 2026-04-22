@@ -1,9 +1,12 @@
-"""Tests for ModelConfig and default client."""
+"""Tests for DynamoConfig / ModelConfig and default client."""
 
+import warnings
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 import pytest
 from pydynox import (
+    DynamoConfig,
     Model,
     ModelConfig,
     clear_default_client,
@@ -217,10 +220,10 @@ async def test_model_raises_error_when_no_client():
 
 
 @pytest.mark.asyncio
-async def test_model_raises_error_when_no_model_config():
-    """Model raises error when model_config is not defined."""
+async def test_model_raises_error_when_no_dynamodb_config():
+    """Model raises error when neither dynamodb_config nor model_config is defined."""
 
-    # GIVEN a model without model_config
+    # GIVEN a model without any config
     class User(Model):
         pk = StringAttribute(partition_key=True)
         name = StringAttribute()
@@ -230,8 +233,8 @@ async def test_model_raises_error_when_no_model_config():
     set_default_client(mock_client)
 
     # WHEN we try to call get (async)
-    # THEN ValueError should be raised
-    with pytest.raises(ValueError, match="must define model_config"):
+    # THEN ValueError should be raised pointing at dynamodb_config
+    with pytest.raises(ValueError, match="must define dynamodb_config"):
         await User.get(pk="USER#1")
 
 
@@ -265,4 +268,161 @@ def test_model_get_table_from_config():
         pk = StringAttribute(partition_key=True)
 
     # THEN _get_table should return the configured table name
-    assert User._get_table() == "my_users_table"
+    with warnings.catch_warnings():
+        # Silence the legacy model_config deprecation for this assertion
+        warnings.simplefilter("ignore", DeprecationWarning)
+        assert User._get_table() == "my_users_table"
+
+
+# --------------------------------------------------------------------------
+# PR 1: DynamoConfig / dynamodb_config rename
+# --------------------------------------------------------------------------
+
+
+def test_modelconfig_is_alias_for_dynamoconfig():
+    """ModelConfig is a runtime alias of DynamoConfig."""
+    # Both names point at the same class object.
+    assert ModelConfig is DynamoConfig
+
+
+def test_dynamodb_config_field_names_unchanged():
+    """DynamoConfig keeps the same field names and defaults as the legacy ModelConfig."""
+    # GIVEN a DynamoConfig with defaults
+    config = DynamoConfig(table="users")
+
+    # THEN every documented field is present with the expected default
+    assert config.table == "users"
+    assert config.client is None
+    assert config.skip_hooks is False
+    assert config.max_size is None
+    assert config.consistent_read is False
+    assert config.hot_partition_writes is None
+    assert config.hot_partition_reads is None
+
+
+@pytest.mark.asyncio
+async def test_dynamodb_config_resolves_client():
+    """A class with dynamodb_config only resolves its client without a warning."""
+    # GIVEN a model declared with dynamodb_config
+    mock_client = MagicMock()
+
+    async def mock_get_item(table, key, consistent_read=False):
+        return {"pk": "USER#1", "name": "John"}
+
+    mock_client.get_item = mock_get_item
+
+    class User(Model):
+        dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(
+            table="users", client=mock_client
+        )
+        pk = StringAttribute(partition_key=True)
+        name = StringAttribute()
+
+    User._client_instance = None
+
+    # WHEN we resolve the client and fetch an item
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        result = await User.get(pk="USER#1")
+
+    # THEN the new-style config is used and no deprecation is emitted
+    assert result is not None
+    assert result.pk == "USER#1"
+    assert User._get_table() == "users"
+
+
+def test_legacy_model_config_still_works_with_warning():
+    """A class with legacy model_config still works but triggers a deprecation warning."""
+    # GIVEN a model declared with the legacy model_config attribute
+    mock_client = MagicMock()
+
+    class User(Model):
+        model_config = ModelConfig(table="users", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+
+    # WHEN we read the config for the first time
+    with pytest.warns(DeprecationWarning, match="dynamodb_config"):
+        table = User._get_table()
+
+    # THEN the legacy value is still returned
+    assert table == "users"
+
+
+def test_legacy_model_config_warning_fires_once_per_class():
+    """The deprecation warning for legacy model_config is emitted at most once per class."""
+    # GIVEN a model declared with the legacy attribute
+    class User(Model):
+        model_config = ModelConfig(table="users")
+        pk = StringAttribute(partition_key=True)
+
+    # WHEN we access the config multiple times
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for _ in range(5):
+            User._get_config()
+
+    # THEN only one DeprecationWarning is emitted for this class
+    deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+    assert len(deprecations) == 1
+
+
+def test_dynamodb_config_wins_over_legacy_model_config():
+    """When both are set, dynamodb_config takes precedence and no warning fires."""
+    # GIVEN a model with both attributes set
+    class User(Model):
+        dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(table="new_table")
+        model_config = ModelConfig(table="old_table")
+        pk = StringAttribute(partition_key=True)
+
+    # WHEN we resolve the config
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        resolved = User._get_config()
+
+    # THEN the new attribute wins and no deprecation fires
+    assert resolved is not None
+    assert resolved.table == "new_table"
+
+
+def test_hot_partition_overrides_resolve_under_dynamodb_config():
+    """Hot-partition thresholds configured via dynamodb_config are applied."""
+    # GIVEN a client with diagnostics and a model using dynamodb_config thresholds
+    mock_client = MagicMock()
+    diagnostics = MagicMock()
+    mock_client.diagnostics = diagnostics
+
+    class Event(Model):
+        dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(
+            table="events",
+            client=mock_client,
+            hot_partition_writes=2000,
+            hot_partition_reads=5000,
+        )
+        pk = StringAttribute(partition_key=True)
+
+    Event._client_instance = None
+
+    # WHEN the client is resolved for the first time
+    assert Event._get_client() is mock_client
+
+    # THEN the diagnostics thresholds are wired using the values from the config
+    diagnostics.set_table_thresholds.assert_called_with(
+        "events", writes_threshold=2000, reads_threshold=5000
+    )
+
+
+def test_skip_hooks_resolves_under_dynamodb_config():
+    """skip_hooks set on dynamodb_config is respected by _should_skip_hooks."""
+    # GIVEN a model with skip_hooks=True under the new attribute
+    class User(Model):
+        dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(
+            table="users", skip_hooks=True
+        )
+        pk = StringAttribute(partition_key=True)
+
+    # WHEN the instance is asked whether to skip hooks
+    user = User(pk="USER#1")
+
+    # THEN the stored value is respected and can still be overridden per-call
+    assert user._should_skip_hooks(None) is True
+    assert user._should_skip_hooks(False) is False

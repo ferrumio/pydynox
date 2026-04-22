@@ -45,7 +45,8 @@ async def batch_get(
     # Convert to model instances
     instances = [cls.from_dict(item) for item in items]
 
-    skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+    config = cls._get_config()
+    skip = config.skip_hooks if config is not None else False
     if not skip:
         for instance in instances:
             instance._run_hooks(HookType.AFTER_LOAD)
@@ -86,7 +87,8 @@ def sync_batch_get(
     # Convert to model instances
     instances = [cls.from_dict(item) for item in items]
 
-    skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
+    config = cls._get_config()
+    skip = config.skip_hooks if config is not None else False
     if not skip:
         for instance in instances:
             instance._run_hooks(HookType.AFTER_LOAD)

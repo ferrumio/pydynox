@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
+from pydynox._internal._dynamo_annotated import apply_annotated_dynamo_fields
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox.attributes import Attribute
 from pydynox.attributes.special import JSONAttribute
-from pydynox.config import ModelConfig, get_default_client
+from pydynox.config import DynamoConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
 from pydynox.size import ItemSize, calculate_item_size
@@ -17,6 +19,27 @@ if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
 
 M = TypeVar("M", bound="ModelBase")
+
+
+_LEGACY_CONFIG_WARNED: set[int] = set()
+
+
+def _warn_legacy_model_config(cls: type) -> None:
+    """Emit a DeprecationWarning for a class that uses the legacy
+    ``model_config`` attribute. Fires at most once per class to keep
+    logs quiet on hot paths.
+    """
+    key = id(cls)
+    if key in _LEGACY_CONFIG_WARNED:
+        return
+    _LEGACY_CONFIG_WARNED.add(key)
+    warnings.warn(
+        f"{cls.__name__}: `model_config = ModelConfig(...)` is deprecated; "
+        "rename to `dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(...)`. "
+        "See docs/refactor/pydantic-model/01-dynamoconfig-rename.md.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 class _TemplateAttr(Protocol):
@@ -116,6 +139,10 @@ class ModelMeta(type):
 
         cls = super().__new__(mcs, name, bases, namespace)
 
+        partition_key, sort_key, discriminator_attr = apply_annotated_dynamo_fields(
+            cls, namespace, attributes, partition_key, sort_key, discriminator_attr
+        )
+
         cls._attributes = attributes
         cls._partition_key = partition_key
         cls._sort_key = sort_key
@@ -189,7 +216,10 @@ class ModelBase(metaclass=ModelMeta):
     _py_to_dynamo: ClassVar[dict[str, str]]
     _dynamo_to_py: ClassVar[dict[str, str]]
 
-    model_config: ClassVar[ModelConfig]
+    # New canonical name. Subclasses should set this instead of
+    # ``model_config``. The legacy name keeps working (see
+    # :meth:`_get_config`) with a one-time DeprecationWarning per class.
+    dynamodb_config: ClassVar[DynamoConfig]
 
     # Change tracking
     _original: dict[str, Any] | None
@@ -356,13 +386,42 @@ class ModelBase(metaclass=ModelMeta):
             setattr(self, attr_name, tattr.build_key(values))
 
     @classmethod
+    def _get_config(cls) -> DynamoConfig | None:
+        """Return the resolved DynamoDB config for this model, if any.
+
+        Resolution order:
+
+        1. ``cls.dynamodb_config`` — the canonical attribute.
+        2. ``cls.model_config`` — legacy name, kept for back-compat.
+           Emits a one-time :class:`DeprecationWarning` per class pointing
+           users at ``dynamodb_config``.
+        3. ``None`` — caller is responsible for raising or falling back.
+
+        The legacy branch requires the value to be a :class:`DynamoConfig`
+        instance so that a pydantic ``ConfigDict`` on a subclass cannot be
+        mistaken for pydynox configuration (relevant once
+        ``PydanticModel`` lands in PR 4).
+        """
+        new = getattr(cls, "dynamodb_config", None)
+        if isinstance(new, DynamoConfig):
+            return new
+
+        legacy = getattr(cls, "model_config", None)
+        if isinstance(legacy, DynamoConfig):
+            _warn_legacy_model_config(cls)
+            return legacy
+
+        return None
+
+    @classmethod
     def _get_client(cls) -> DynamoDBClient:
         """Get the DynamoDB client for this model."""
         if cls._client_instance is not None:
             return cls._client_instance
 
-        if hasattr(cls, "model_config") and cls.model_config.client is not None:
-            cls._client_instance = cls.model_config.client
+        config = cls._get_config()
+        if config is not None and config.client is not None:
+            cls._client_instance = config.client
             cls._apply_hot_partition_overrides()
             return cls._client_instance
 
@@ -374,12 +433,12 @@ class ModelBase(metaclass=ModelMeta):
 
         raise ValueError(
             f"No client configured for {cls.__name__}. "
-            "Either pass client to ModelConfig or call pydynox.set_default_client()"
+            "Either pass client to DynamoConfig or call pydynox.set_default_client()"
         )
 
     @classmethod
     def _apply_hot_partition_overrides(cls) -> None:
-        """Apply hot partition threshold overrides from ModelConfig."""
+        """Apply hot partition threshold overrides from the model config."""
         if cls._client_instance is None:
             return
 
@@ -387,29 +446,52 @@ class ModelBase(metaclass=ModelMeta):
         if diagnostics is None:
             return
 
-        if not hasattr(cls, "model_config"):
+        config = cls._get_config()
+        if config is None:
             return
 
-        writes = getattr(cls.model_config, "hot_partition_writes", None)
-        reads = getattr(cls.model_config, "hot_partition_reads", None)
+        writes = config.hot_partition_writes
+        reads = config.hot_partition_reads
 
         if writes is not None or reads is not None:
-            table = cls.model_config.table
-            diagnostics.set_table_thresholds(table, writes_threshold=writes, reads_threshold=reads)
+            diagnostics.set_table_thresholds(
+                config.table, writes_threshold=writes, reads_threshold=reads
+            )
 
     @classmethod
     def _get_table(cls) -> str:
-        """Get the table name from model_config."""
-        if not hasattr(cls, "model_config"):
-            raise ValueError(f"Model {cls.__name__} must define model_config")
-        return cls.model_config.table
+        """Get the table name from the model config."""
+        config = cls._get_config()
+        if config is None:
+            raise ValueError(f"Model {cls.__name__} must define dynamodb_config")
+        return config.table
+
+    @classmethod
+    def _config_skip_hooks(cls) -> bool:
+        """Return ``skip_hooks`` from DynamoConfig, or False when unconfigured."""
+        config = cls._get_config()
+        if config is not None:
+            return config.skip_hooks
+        return False
 
     def _should_skip_hooks(self, skip_hooks: bool | None) -> bool:
         if skip_hooks is not None:
             return skip_hooks
-        if hasattr(self, "model_config"):
-            return self.model_config.skip_hooks
-        return False
+        return type(self)._config_skip_hooks()
+
+    @classmethod
+    def _run_after_load_hook(cls, instance: M) -> None:
+        """Run AFTER_LOAD unless DynamoConfig has ``skip_hooks`` set."""
+        if not cls._config_skip_hooks():
+            instance._run_hooks(HookType.AFTER_LOAD)
+
+    @classmethod
+    def _run_after_load_hooks_batch(cls, instances: list[M]) -> None:
+        """Run AFTER_LOAD on instances unless the model config suppresses hooks."""
+        if cls._config_skip_hooks():
+            return
+        for instance in instances:
+            instance._run_hooks(HookType.AFTER_LOAD)
 
     def _run_hooks(self, hook_type: HookType) -> None:
         for hook in self._hooks.get(hook_type, []):

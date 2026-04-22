@@ -33,6 +33,28 @@ class User(Model):
     pk = StringAttribute(partition_key=True)  # Required
 ```
 
+#### Alternative: `Annotated` + `Dynamo.*` (optional)
+
+You can declare the same field semantics with `typing.Annotated` and the
+`Dynamo` metadata namespace (e.g. `Dynamo.String`). The metaclass still builds
+the usual `StringAttribute` / `NumberAttribute` / … instances; a class-body
+`pk = StringAttribute(...)` still **wins** if both are used for the same name.
+
+```python
+from typing import Annotated, ClassVar
+
+from pydynox import Dynamo, DynamoConfig, Model
+
+
+class User(Model):
+    dynamodb_config: ClassVar[DynamoConfig] = DynamoConfig(table="users")
+
+    pk: Annotated[str, Dynamo.String(partition_key=True)]
+    name: Annotated[str, Dynamo.String()]
+```
+
+See the refactor note [02-annotated-markers](../refactor/pydantic-model/02-annotated-markers.md) for the supported marker set.
+
 Add a range key (sort key) for composite keys:
 
 ```python

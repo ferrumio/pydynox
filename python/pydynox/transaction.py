@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pydynox._internal._async_utils import aidentity
 from pydynox._internal._logging import _log_debug
 
 if TYPE_CHECKING:
@@ -52,7 +53,7 @@ class Transaction:
 
     async def __aenter__(self) -> Transaction:
         """Enter the async context manager."""
-        return self
+        return await aidentity(self)
 
     async def __aexit__(
         self,

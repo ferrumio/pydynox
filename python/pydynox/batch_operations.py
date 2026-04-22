@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pydynox._internal._async_utils import aidentity
+
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
 
@@ -36,7 +38,7 @@ class BatchWriter:
 
     async def __aenter__(self) -> BatchWriter:
         """Enter the async context manager."""
-        return self
+        return await aidentity(self)
 
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any
