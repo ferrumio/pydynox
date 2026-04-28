@@ -21,8 +21,8 @@ path = "src/lib.rs"
 pyo3 = { version = ">=0.28.2", features = ["extension-module", "multiple-pymethods"] }
 pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
 aws-sdk-dynamodb = "1.111"
-aws-sdk-kms = "1.105"
-aws-sdk-s3 = "1.130"
+aws-sdk-kms = "1.106"
+aws-sdk-s3 = "1.131"
 aws-sdk-sts = "1.103"
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 tokio = { version = "1", features = [
@@ -44,7 +44,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.23", features = ["v4"] }
 ulid = "1.1"
-svix-ksuid = "0.8"
+svix-ksuid = "0.9"
 chrono = { version = "0.4", default-features = false, features = [
     "std",
     "clock",
