@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, TypeVar, overload
 
 from pydynox.attributes.base import Attribute
+
+MT = TypeVar("MT")
 
 
 @dataclass
@@ -197,7 +200,126 @@ class ListAttribute(Attribute[list[Any]]):
     attr_type = "L"
 
 
-class MapAttribute(Attribute[dict[str, Any]]):
-    """Map attribute (DynamoDB type M)."""
+class MapAttribute(Attribute[MT], Generic[MT]):
+    """Map attribute (DynamoDB type M).
+
+    When used without a model class, stores plain dict.
+    When used with a Pydantic model or dataclass, automatically handles
+    serialization and deserialization to the typed model.
+
+    Example:
+        >>> import dataclasses
+        >>> from pydynox import Model, ModelConfig
+        >>> from pydynox.attributes import StringAttribute, MapAttribute
+        >>>
+        >>> @dataclasses.dataclass
+        ... class Address:
+        ...     street: str
+        ...     city: str
+        ...     zip: str
+        >>>
+        >>> class User(Model):
+        ...     model_config = ModelConfig(table="users")
+        ...     pk = StringAttribute(partition_key=True)
+        ...     address = MapAttribute(Address)
+        >>>
+        >>> user = User(pk="USER#1", address=Address("123 Main St", "NYC", "10001"))
+        >>> # address is serialized as DynamoDB Map (M type)
+    """
 
     attr_type = "M"
+
+    @overload
+    def __init__(
+        self: "MapAttribute[dict[str, Any]]",
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: dict[str, Any] | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        model_class: type[MT],
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: MT | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        model_class: type[MT] | None = None,
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: Any | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ):
+        super().__init__(
+            partition_key=partition_key,
+            sort_key=sort_key,
+            default=default,
+            required=required,
+            alias=alias,
+        )
+        self.model_class = model_class
+        self._is_pydantic = model_class is not None and hasattr(model_class, "model_validate")
+        self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
+
+    def _to_dict(self, value: Any) -> dict[str, Any]:
+        """Convert a typed model instance to a dict."""
+        if self._is_pydantic:
+            return value.model_dump()
+        if self._is_dataclass:
+            return dataclasses.asdict(value)
+        return value
+
+    def _from_dict(self, data: dict[str, Any]) -> Any:
+        """Convert a dict to a typed model instance."""
+        model_class = self.model_class
+        if model_class is None:
+            return data
+        if self._is_pydantic:
+            return model_class.model_validate(data)  # ty: ignore[unresolved-attribute]
+        return model_class(**data)
+
+    def serialize(self, value: Any | None) -> dict[str, Any] | None:
+        """Convert value to dict for DynamoDB Map storage.
+
+        For typed models, calls model_dump() or dataclasses.asdict() first.
+
+        Args:
+            value: Dict or typed model instance to serialize.
+
+        Returns:
+            Dict or None.
+        """
+        if value is None:
+            return None
+        if self.model_class is not None:
+            return self._to_dict(value)
+        return value
+
+    def deserialize(self, value: Any) -> Any | None:
+        """Convert dict back to typed model or return as-is.
+
+        For typed models, constructs the model from the dict.
+
+        Args:
+            value: Dict from DynamoDB.
+
+        Returns:
+            Typed model instance, dict, or None.
+        """
+        if value is None:
+            return None
+        if self.model_class is not None and isinstance(value, dict):
+            return self._from_dict(value)
+        return value
