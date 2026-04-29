@@ -273,53 +273,22 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         self._is_pydantic = model_class is not None and hasattr(model_class, "model_validate")
         self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
 
-    def _to_dict(self, value: Any) -> dict[str, Any]:
-        """Convert a typed model instance to a dict."""
+    def serialize(self, value: Any | None) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        if self.model_class is None:
+            return value
         if self._is_pydantic:
             return value.model_dump()
         if self._is_dataclass:
             return dataclasses.asdict(value)
         return value
 
-    def _from_dict(self, data: dict[str, Any]) -> Any:
-        """Convert a dict to a typed model instance."""
-        model_class = self.model_class
-        if model_class is None:
-            return data
-        if self._is_pydantic:
-            return model_class.model_validate(data)  # ty: ignore[unresolved-attribute]
-        return model_class(**data)
-
-    def serialize(self, value: Any | None) -> dict[str, Any] | None:
-        """Convert value to dict for DynamoDB Map storage.
-
-        For typed models, calls model_dump() or dataclasses.asdict() first.
-
-        Args:
-            value: Dict or typed model instance to serialize.
-
-        Returns:
-            Dict or None.
-        """
-        if value is None:
-            return None
-        if self.model_class is not None:
-            return self._to_dict(value)
-        return value
-
     def deserialize(self, value: Any) -> Any | None:
-        """Convert dict back to typed model or return as-is.
-
-        For typed models, constructs the model from the dict.
-
-        Args:
-            value: Dict from DynamoDB.
-
-        Returns:
-            Typed model instance, dict, or None.
-        """
         if value is None:
             return None
-        if self.model_class is not None and isinstance(value, dict):
-            return self._from_dict(value)
-        return value
+        if self.model_class is None or not isinstance(value, dict):
+            return value
+        if self._is_pydantic:
+            return self.model_class.model_validate(value)  # ty: ignore[unresolved-attribute]
+        return self.model_class(**value)
