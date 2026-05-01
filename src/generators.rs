@@ -41,7 +41,7 @@ pub fn generate_ulid() -> String {
 /// `"0ujsswThIGTUYm2K8FjOOfXtY1K"`
 #[pyfunction]
 pub fn generate_ksuid() -> String {
-    Ksuid::new(None, None).to_string()
+    Ksuid::now(None).to_string()
 }
 
 /// Generate Unix epoch timestamp in seconds.
