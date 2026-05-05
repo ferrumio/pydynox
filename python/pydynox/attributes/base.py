@@ -106,6 +106,10 @@ class Attribute(Generic[T]):
         """Convert DynamoDB value to Python format."""
         return value
 
+    def _snapshot_key(self, value: Any) -> str | None:
+        """Return a comparable snapshot string for change tracking, or None if not applicable."""
+        return None
+
     # Condition operators
     def _get_path(self) -> ConditionPath:
         """Get ConditionPath for this attribute."""

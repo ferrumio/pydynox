@@ -303,11 +303,10 @@ class ModelBase(metaclass=ModelMeta):
         """
         snapshots: dict[str, str | None] = {}
         for attr_name, attr in self._attributes.items():
-            if hasattr(attr, "_snapshot_key"):
-                value = getattr(self, attr_name, None)
-                snapshot = attr._snapshot_key(value)
-                if snapshot is not None:
-                    snapshots[attr_name] = snapshot
+            value = getattr(self, attr_name, None)
+            snapshot = attr._snapshot_key(value)
+            if snapshot is not None:
+                snapshots[attr_name] = snapshot
         self._json_snapshots = snapshots
 
     def _detect_json_mutations(self) -> None:
