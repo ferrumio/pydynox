@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox.attributes import Attribute
-from pydynox.attributes.primitives import MapAttribute
-from pydynox.attributes.special import JSONAttribute
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
@@ -305,12 +303,11 @@ class ModelBase(metaclass=ModelMeta):
         """
         snapshots: dict[str, str | None] = {}
         for attr_name, attr in self._attributes.items():
-            if isinstance(attr, JSONAttribute) and attr.model_class is not None:
+            if hasattr(attr, "_snapshot_key"):
                 value = getattr(self, attr_name, None)
-                snapshots[attr_name] = attr.serialize(value)
-            elif isinstance(attr, MapAttribute) and attr.model_class is not None:
-                value = getattr(self, attr_name, None)
-                snapshots[attr_name] = attr._snapshot_key(value)
+                snapshot = attr._snapshot_key(value)
+                if snapshot is not None:
+                    snapshots[attr_name] = snapshot
         self._json_snapshots = snapshots
 
     def _detect_json_mutations(self) -> None:
@@ -324,10 +321,7 @@ class ModelBase(metaclass=ModelMeta):
         for attr_name, old_json in self._json_snapshots.items():
             attr = self._attributes[attr_name]
             current_value = getattr(self, attr_name, None)
-            if isinstance(attr, MapAttribute) and attr.model_class is not None:
-                current_json = attr._snapshot_key(current_value)
-            else:
-                current_json = attr.serialize(current_value)
+            current_json = attr._snapshot_key(current_value)
             if current_json != old_json:
                 self._changed.add(attr_name)
 

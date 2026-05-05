@@ -124,6 +124,11 @@ class JSONAttribute(Attribute[J], Generic[J]):
             return json.dumps(self._to_dict(value))
         return json.dumps(value)
 
+    def _snapshot_key(self, value: Any) -> str | None:
+        if self.model_class is None:
+            return None
+        return self.serialize(value)
+
     def deserialize(self, value: Any) -> Any | None:
         """Convert JSON string back to dict/list or typed model.
 

@@ -296,5 +296,7 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         return self.model_class(**{k: v for k, v in value.items() if k in fields})
 
     def _snapshot_key(self, value: Any) -> str | None:
+        if self.model_class is None:
+            return None
         serialized = self.serialize(value)
         return json.dumps(serialized, sort_keys=True) if serialized is not None else None
