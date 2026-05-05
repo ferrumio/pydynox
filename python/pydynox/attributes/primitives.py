@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import re
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic, TypeVar, overload
 
 from pydynox.attributes.base import Attribute
+
+MT = TypeVar("MT")
 
 
 @dataclass
@@ -197,7 +201,102 @@ class ListAttribute(Attribute[list[Any]]):
     attr_type = "L"
 
 
-class MapAttribute(Attribute[dict[str, Any]]):
-    """Map attribute (DynamoDB type M)."""
+class MapAttribute(Attribute[MT], Generic[MT]):
+    """Map attribute (DynamoDB type M).
+
+    When used without a model class, stores plain dict.
+    When used with a Pydantic model or dataclass, automatically handles
+    serialization and deserialization to the typed model.
+
+    Example:
+        >>> import dataclasses
+        >>> from pydynox import Model, ModelConfig
+        >>> from pydynox.attributes import StringAttribute, MapAttribute
+        >>>
+        >>> @dataclasses.dataclass
+        ... class Address:
+        ...     street: str
+        ...     city: str
+        ...     zip: str
+        >>>
+        >>> class User(Model):
+        ...     model_config = ModelConfig(table="users")
+        ...     pk = StringAttribute(partition_key=True)
+        ...     address = MapAttribute(Address)
+        >>>
+        >>> user = User(pk="USER#1", address=Address("123 Main St", "NYC", "10001"))
+        >>> # address is serialized as DynamoDB Map (M type)
+    """
 
     attr_type = "M"
+
+    @overload
+    def __init__(
+        self: "MapAttribute[dict[str, Any]]",
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: dict[str, Any] | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        model_class: type[MT],
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: MT | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        model_class: type[MT] | None = None,
+        *,
+        partition_key: bool = False,
+        sort_key: bool = False,
+        default: Any | None = None,
+        required: bool = False,
+        alias: str | None = None,
+    ):
+        super().__init__(
+            partition_key=partition_key,
+            sort_key=sort_key,
+            default=default,
+            required=required,
+            alias=alias,
+        )
+        self.model_class = model_class
+        self._is_pydantic = model_class is not None and hasattr(model_class, "model_validate")
+        self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
+
+    def serialize(self, value: Any | None) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        if self.model_class is None:
+            return value
+        if self._is_pydantic:
+            return value.model_dump()
+        if self._is_dataclass:
+            return dataclasses.asdict(value)
+        return value
+
+    def deserialize(self, value: Any) -> Any | None:
+        if value is None:
+            return None
+        if self.model_class is None or not isinstance(value, dict):
+            return value
+        if self._is_pydantic:
+            return self.model_class.model_validate(value)  # ty: ignore[unresolved-attribute]
+        fields = {f.name for f in dataclasses.fields(self.model_class)}
+        return self.model_class(**{k: v for k, v in value.items() if k in fields})
+
+    def _snapshot_key(self, value: Any) -> str | None:
+        if self.model_class is None:
+            return None
+        serialized = self.serialize(value)
+        return json.dumps(serialized, sort_keys=True) if serialized is not None else None
