@@ -110,81 +110,56 @@ class AddressDC:
     zip: str
 
 
+SAMPLE_DC = AddressDC(street="123 Main St", city="NYC", zip="10001")
+SAMPLE_DC_DICT = {"street": "123 Main St", "city": "NYC", "zip": "10001"}
+
+
 def test_map_attribute_type():
     """MapAttribute has map type."""
-    # WHEN we create a map attribute
     attr = MapAttribute()
-
-    # THEN attr_type should be M
     assert attr.attr_type == "M"
 
 
 def test_typed_map_attribute_stores_model_class():
     """Typed MapAttribute stores the model class."""
-    # WHEN we create a typed map attribute with a dataclass
     attr = MapAttribute(AddressDC)
-
-    # THEN model_class should be stored
     assert attr.model_class is AddressDC
 
 
 def test_typed_map_attribute_serialize_dataclass():
     """Typed MapAttribute serializes a dataclass to dict."""
-    # GIVEN a typed map attribute
     attr = MapAttribute(AddressDC)
-
-    # WHEN we serialize a dataclass instance
-    result = attr.serialize(AddressDC(street="123 Main St", city="NYC", zip="10001"))
-
-    # THEN it should be a dict (DynamoDB M type)
-    assert result == {"street": "123 Main St", "city": "NYC", "zip": "10001"}
+    assert attr.serialize(SAMPLE_DC) == SAMPLE_DC_DICT
 
 
 def test_typed_map_attribute_deserialize_dataclass():
     """Typed MapAttribute deserializes dict to dataclass."""
-    # GIVEN a typed map attribute
     attr = MapAttribute(AddressDC)
-
-    # WHEN we deserialize a dict
-    result = attr.deserialize({"street": "123 Main St", "city": "NYC", "zip": "10001"})
-
-    # THEN it should be a dataclass instance
-    assert result == AddressDC(street="123 Main St", city="NYC", zip="10001")
+    assert attr.deserialize(SAMPLE_DC_DICT) == SAMPLE_DC
 
 
 def test_typed_map_attribute_serialize_none():
     """Typed MapAttribute returns None for None."""
-    # GIVEN a typed map attribute
     attr = MapAttribute(AddressDC)
-
-    # THEN serialize/deserialize None returns None
     assert attr.serialize(None) is None
     assert attr.deserialize(None) is None
 
 
 def test_typed_map_attribute_roundtrip_dataclass():
     """Typed MapAttribute roundtrip preserves dataclass."""
-    # GIVEN a typed map attribute and original dataclass
     attr = MapAttribute(AddressDC)
     original = AddressDC(street="456 Elm St", city="Chicago", zip="60601")
 
-    # WHEN we serialize and deserialize
-    serialized = attr.serialize(original)
-    deserialized = attr.deserialize(serialized)
+    deserialized = attr.deserialize(attr.serialize(original))
 
-    # THEN original value should be preserved
     assert deserialized == original
 
 
 def test_untyped_map_attribute_passthrough():
     """MapAttribute without model_class passes dicts through unchanged."""
-    # GIVEN an untyped map attribute
     attr = MapAttribute()
-
-    # THEN model_class should be None
     assert attr.model_class is None
 
-    # AND serialize/deserialize should pass through dicts
     data = {"key": "value", "nested": {"a": 1}}
     assert attr.serialize(data) == data
     assert attr.deserialize(data) == data
