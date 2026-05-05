@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
@@ -311,8 +310,7 @@ class ModelBase(metaclass=ModelMeta):
                 snapshots[attr_name] = attr.serialize(value)
             elif isinstance(attr, MapAttribute) and attr.model_class is not None:
                 value = getattr(self, attr_name, None)
-                serialized = attr.serialize(value)
-                snapshots[attr_name] = json.dumps(serialized) if serialized is not None else None
+                snapshots[attr_name] = attr._snapshot_key(value)
         self._json_snapshots = snapshots
 
     def _detect_json_mutations(self) -> None:
@@ -327,8 +325,7 @@ class ModelBase(metaclass=ModelMeta):
             attr = self._attributes[attr_name]
             current_value = getattr(self, attr_name, None)
             if isinstance(attr, MapAttribute) and attr.model_class is not None:
-                serialized = attr.serialize(current_value)
-                current_json = json.dumps(serialized) if serialized is not None else None
+                current_json = attr._snapshot_key(current_value)
             else:
                 current_json = attr.serialize(current_value)
             if current_json != old_json:
