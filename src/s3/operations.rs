@@ -215,7 +215,10 @@ async fn execute_simple_upload(
         }
     }
 
-    let resp = req.send().await.map_err(|e| map_s3_error(e, Some(bucket), Some(key)))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| map_s3_error(e, Some(bucket), Some(key)))?;
 
     Ok(S3Metadata {
         bucket: bucket.to_string(),
@@ -251,7 +254,10 @@ async fn execute_multipart_upload(
         }
     }
 
-    let create_resp = create_req.send().await.map_err(|e| map_s3_error(e, Some(bucket), Some(key)))?;
+    let create_resp = create_req
+        .send()
+        .await
+        .map_err(|e| map_s3_error(e, Some(bucket), Some(key)))?;
 
     let upload_id = create_resp
         .upload_id()
@@ -558,8 +564,7 @@ pub fn upload_bytes<'py>(
     let data_vec = data.as_bytes().to_vec();
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_upload(client, bucket, key, data_vec, content_type, metadata)
-            .await?;
+        let result = execute_upload(client, bucket, key, data_vec, content_type, metadata).await?;
         Ok((result.metadata, result.metrics))
     })
 }
@@ -655,8 +660,8 @@ pub fn sync_upload_bytes(
 
     py.detach(|| {
         runtime.block_on(async {
-            let result = execute_upload(client, bucket, key, data_vec, content_type, metadata)
-                .await?;
+            let result =
+                execute_upload(client, bucket, key, data_vec, content_type, metadata).await?;
             Ok((result.metadata, result.metrics))
         })
     })
@@ -674,9 +679,8 @@ pub fn sync_download_bytes<'py>(
     let bucket = bucket.to_string();
     let key = key.to_string();
 
-    let result = py.detach(|| {
-        runtime.block_on(async { execute_download(client, bucket, key).await })
-    })?;
+    let result =
+        py.detach(|| runtime.block_on(async { execute_download(client, bucket, key).await }))?;
 
     let bytes = PyBytes::new(py, &result.data);
     Ok((bytes, result.metrics))
