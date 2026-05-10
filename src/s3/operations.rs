@@ -149,7 +149,7 @@ pub async fn execute_upload(
     data: Vec<u8>,
     content_type: Option<String>,
     metadata: Option<HashMap<String, String>>,
-) -> Result<UploadResult, String> {
+) -> Result<UploadResult, PyErr> {
     let start = Instant::now();
     let size = data.len();
 
@@ -196,7 +196,7 @@ async fn execute_simple_upload(
     data: Vec<u8>,
     content_type: Option<String>,
     metadata: Option<HashMap<String, String>>,
-) -> Result<S3Metadata, String> {
+) -> Result<S3Metadata, PyErr> {
     let size = data.len() as u64;
 
     let mut req = client
@@ -215,10 +215,7 @@ async fn execute_simple_upload(
         }
     }
 
-    let resp = req.send().await.map_err(|e| {
-        let py_err = map_s3_error(e, Some(bucket), Some(key));
-        format!("{}", py_err)
-    })?;
+    let resp = req.send().await.map_err(|e| map_s3_error(e, Some(bucket), Some(key)))?;
 
     Ok(S3Metadata {
         bucket: bucket.to_string(),
@@ -239,7 +236,7 @@ async fn execute_multipart_upload(
     data: Vec<u8>,
     content_type: Option<String>,
     metadata: Option<HashMap<String, String>>,
-) -> Result<(S3Metadata, u32), String> {
+) -> Result<(S3Metadata, u32), PyErr> {
     let size = data.len() as u64;
 
     let mut create_req = client.create_multipart_upload().bucket(bucket).key(key);
@@ -254,14 +251,11 @@ async fn execute_multipart_upload(
         }
     }
 
-    let create_resp = create_req.send().await.map_err(|e| {
-        let py_err = map_s3_error(e, Some(bucket), Some(key));
-        format!("{}", py_err)
-    })?;
+    let create_resp = create_req.send().await.map_err(|e| map_s3_error(e, Some(bucket), Some(key)))?;
 
     let upload_id = create_resp
         .upload_id()
-        .ok_or("No upload ID returned")?
+        .ok_or_else(|| S3Exception::new_err("No upload ID returned"))?
         .to_string();
 
     let part_size = calculate_part_size(data.len());
@@ -299,8 +293,7 @@ async fn execute_multipart_upload(
                     .upload_id(&upload_id)
                     .send()
                     .await;
-                let py_err = map_s3_error(e, Some(bucket), Some(key));
-                return Err(format!("Failed to upload part {}: {}", part_number, py_err));
+                return Err(map_s3_error(e, Some(bucket), Some(key)));
             }
         }
 
@@ -319,10 +312,7 @@ async fn execute_multipart_upload(
         .multipart_upload(completed)
         .send()
         .await
-        .map_err(|e| {
-            let py_err = map_s3_error(e, Some(bucket), Some(key));
-            format!("{}", py_err)
-        })?;
+        .map_err(|e| map_s3_error(e, Some(bucket), Some(key)))?;
 
     api_calls += 1;
 
@@ -349,7 +339,7 @@ pub async fn execute_download(
     client: Client,
     bucket: String,
     key: String,
-) -> Result<DownloadResult, String> {
+) -> Result<DownloadResult, PyErr> {
     let start = Instant::now();
 
     let resp = client
@@ -358,16 +348,13 @@ pub async fn execute_download(
         .key(&key)
         .send()
         .await
-        .map_err(|e| {
-            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
-            format!("{}", py_err)
-        })?;
+        .map_err(|e| map_s3_error(e, Some(&bucket), Some(&key)))?;
 
     let data = resp
         .body
         .collect()
         .await
-        .map_err(|e| format!("Failed to read S3 body: {}", e))
+        .map_err(|e| S3Exception::new_err(format!("Failed to read S3 body: {}", e)))
         .map(|data| data.into_bytes().to_vec())?;
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
@@ -389,7 +376,7 @@ pub async fn execute_save_to_file(
     bucket: String,
     key: String,
     path: String,
-) -> Result<SaveToFileResult, String> {
+) -> Result<SaveToFileResult, PyErr> {
     use tokio::io::AsyncWriteExt;
 
     let start = Instant::now();
@@ -400,14 +387,11 @@ pub async fn execute_save_to_file(
         .key(&key)
         .send()
         .await
-        .map_err(|e| {
-            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
-            format!("{}", py_err)
-        })?;
+        .map_err(|e| map_s3_error(e, Some(&bucket), Some(&key)))?;
 
     let mut file = tokio::fs::File::create(&path)
         .await
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+        .map_err(|e| S3Exception::new_err(format!("Failed to create file: {}", e)))?;
 
     let mut stream = resp.body;
     let mut total_bytes: u64 = 0;
@@ -415,17 +399,17 @@ pub async fn execute_save_to_file(
     while let Some(chunk) = stream
         .try_next()
         .await
-        .map_err(|e| format!("Failed to read chunk: {}", e))?
+        .map_err(|e| S3Exception::new_err(format!("Failed to read chunk: {}", e)))?
     {
         total_bytes += chunk.len() as u64;
         file.write_all(&chunk)
             .await
-            .map_err(|e| format!("Failed to write to file: {}", e))?;
+            .map_err(|e| S3Exception::new_err(format!("Failed to write to file: {}", e)))?;
     }
 
     file.flush()
         .await
-        .map_err(|e| format!("Failed to flush file: {}", e))?;
+        .map_err(|e| S3Exception::new_err(format!("Failed to flush file: {}", e)))?;
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -445,11 +429,11 @@ pub async fn execute_presigned_url(
     bucket: String,
     key: String,
     expires_secs: u64,
-) -> Result<PresignedUrlResult, String> {
+) -> Result<PresignedUrlResult, PyErr> {
     let start = Instant::now();
 
     let presign_config = PresigningConfig::expires_in(Duration::from_secs(expires_secs))
-        .map_err(|e| format!("Invalid expiration: {}", e))?;
+        .map_err(|e| S3Exception::new_err(format!("Invalid expiration: {}", e)))?;
 
     let presigned = client
         .get_object()
@@ -457,7 +441,7 @@ pub async fn execute_presigned_url(
         .key(&key)
         .presigned(presign_config)
         .await
-        .map_err(|e| format!("Failed to generate presigned URL: {}", e))?;
+        .map_err(|e| S3Exception::new_err(format!("Failed to generate presigned URL: {}", e)))?;
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -476,7 +460,7 @@ pub async fn execute_delete(
     client: Client,
     bucket: String,
     key: String,
-) -> Result<DeleteResult, String> {
+) -> Result<DeleteResult, PyErr> {
     let start = Instant::now();
 
     client
@@ -485,10 +469,7 @@ pub async fn execute_delete(
         .key(&key)
         .send()
         .await
-        .map_err(|e| {
-            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
-            format!("{}", py_err)
-        })?;
+        .map_err(|e| map_s3_error(e, Some(&bucket), Some(&key)))?;
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -506,7 +487,7 @@ pub async fn execute_head(
     client: Client,
     bucket: String,
     key: String,
-) -> Result<HeadResult, String> {
+) -> Result<HeadResult, PyErr> {
     let start = Instant::now();
 
     let resp = client
@@ -515,10 +496,7 @@ pub async fn execute_head(
         .key(&key)
         .send()
         .await
-        .map_err(|e| {
-            let py_err = map_s3_error(e, Some(&bucket), Some(&key));
-            format!("{}", py_err)
-        })?;
+        .map_err(|e| map_s3_error(e, Some(&bucket), Some(&key)))?;
 
     let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -581,8 +559,7 @@ pub fn upload_bytes<'py>(
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_upload(client, bucket, key, data_vec, content_type, metadata)
-            .await
-            .map_err(S3Exception::new_err)?;
+            .await?;
         Ok((result.metadata, result.metrics))
     })
 }
@@ -595,9 +572,7 @@ pub fn download_bytes(
     key: String,
 ) -> PyResult<Bound<'_, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_download(client, bucket, key)
-            .await
-            .map_err(S3Exception::new_err)?;
+        let result = execute_download(client, bucket, key).await?;
         Python::attach(|py| {
             let bytes = PyBytes::new(py, &result.data);
             Ok((bytes.unbind(), result.metrics))
@@ -614,9 +589,7 @@ pub fn presigned_url(
     expires_secs: u64,
 ) -> PyResult<Bound<'_, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_presigned_url(client, bucket, key, expires_secs)
-            .await
-            .map_err(S3Exception::new_err)?;
+        let result = execute_presigned_url(client, bucket, key, expires_secs).await?;
         Ok((result.url, result.metrics))
     })
 }
@@ -629,9 +602,7 @@ pub fn delete_object(
     key: String,
 ) -> PyResult<Bound<'_, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_delete(client, bucket, key)
-            .await
-            .map_err(S3Exception::new_err)?;
+        let result = execute_delete(client, bucket, key).await?;
         Ok(result.metrics)
     })
 }
@@ -644,9 +615,7 @@ pub fn head_object(
     key: String,
 ) -> PyResult<Bound<'_, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_head(client, bucket, key)
-            .await
-            .map_err(S3Exception::new_err)?;
+        let result = execute_head(client, bucket, key).await?;
         Ok((result.metadata, result.metrics))
     })
 }
@@ -660,9 +629,7 @@ pub fn save_to_file(
     path: String,
 ) -> PyResult<Bound<'_, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_save_to_file(client, bucket, key, path)
-            .await
-            .map_err(S3Exception::new_err)?;
+        let result = execute_save_to_file(client, bucket, key, path).await?;
         Ok((result.bytes_written, result.metrics))
     })
 }
@@ -689,8 +656,7 @@ pub fn sync_upload_bytes(
     py.detach(|| {
         runtime.block_on(async {
             let result = execute_upload(client, bucket, key, data_vec, content_type, metadata)
-                .await
-                .map_err(S3Exception::new_err)?;
+                .await?;
             Ok((result.metadata, result.metrics))
         })
     })
@@ -709,11 +675,7 @@ pub fn sync_download_bytes<'py>(
     let key = key.to_string();
 
     let result = py.detach(|| {
-        runtime.block_on(async {
-            execute_download(client, bucket, key)
-                .await
-                .map_err(S3Exception::new_err)
-        })
+        runtime.block_on(async { execute_download(client, bucket, key).await })
     })?;
 
     let bytes = PyBytes::new(py, &result.data);
@@ -735,9 +697,7 @@ pub fn sync_presigned_url(
 
     py.detach(|| {
         runtime.block_on(async {
-            let result = execute_presigned_url(client, bucket, key, expires_secs)
-                .await
-                .map_err(S3Exception::new_err)?;
+            let result = execute_presigned_url(client, bucket, key, expires_secs).await?;
             Ok((result.url, result.metrics))
         })
     })
@@ -757,9 +717,7 @@ pub fn sync_delete_object(
 
     py.detach(|| {
         runtime.block_on(async {
-            let result = execute_delete(client, bucket, key)
-                .await
-                .map_err(S3Exception::new_err)?;
+            let result = execute_delete(client, bucket, key).await?;
             Ok(result.metrics)
         })
     })
@@ -779,9 +737,7 @@ pub fn sync_head_object(
 
     py.detach(|| {
         runtime.block_on(async {
-            let result = execute_head(client, bucket, key)
-                .await
-                .map_err(S3Exception::new_err)?;
+            let result = execute_head(client, bucket, key).await?;
             Ok((result.metadata, result.metrics))
         })
     })
@@ -803,9 +759,7 @@ pub fn sync_save_to_file(
 
     py.detach(|| {
         runtime.block_on(async {
-            let result = execute_save_to_file(client, bucket, key, path)
-                .await
-                .map_err(S3Exception::new_err)?;
+            let result = execute_save_to_file(client, bucket, key, path).await?;
             Ok((result.bytes_written, result.metrics))
         })
     })
