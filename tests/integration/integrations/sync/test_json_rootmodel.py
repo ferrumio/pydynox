@@ -6,7 +6,6 @@ Regression tests for https://github.com/ferrumio/pydynox/issues/367
 import uuid
 
 from pydantic import BaseModel, RootModel
-
 from pydynox import Model, ModelConfig
 from pydynox.attributes import JSONAttribute, StringAttribute
 from pydynox.testing import MemoryBackend
