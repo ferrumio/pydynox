@@ -92,6 +92,7 @@ class JSONAttribute(Attribute[J], Generic[J]):
         if model_class is not None and not self._is_dataclass:
             try:
                 from pydantic import TypeAdapter
+
                 self._type_adapter = TypeAdapter(model_class)
             except ImportError:
                 pass
