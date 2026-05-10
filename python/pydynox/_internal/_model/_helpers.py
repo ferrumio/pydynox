@@ -337,11 +337,12 @@ def prepare_update(
                 raise ValueError(f"Unknown attribute: {attr_name}")
             setattr(self, attr_name, value)
 
-        # Translate update keys to DynamoDB alias names
+        # Translate update keys to DynamoDB alias names and serialize values
         aliased_kwargs = {}
         for attr_name, value in kwargs.items():
+            attr = self._attributes[attr_name]
             dynamo_name = self._py_to_dynamo.get(attr_name, attr_name)
-            aliased_kwargs[dynamo_name] = value
+            aliased_kwargs[dynamo_name] = attr.serialize(value)
 
         if condition is not None:
             cond_names: dict[str, str] = {}
@@ -392,11 +393,12 @@ def prepare_update_by_key(
         if attr_name not in cls._attributes:
             raise ValueError(f"Unknown attribute: {attr_name}")
 
-    # Translate update keys to DynamoDB alias names
+    # Translate update keys to DynamoDB alias names and serialize values
     aliased_updates = {}
     for attr_name, value in updates.items():
+        attr = cls._attributes[attr_name]
         dynamo_name = cls._py_to_dynamo.get(attr_name, attr_name)
-        aliased_updates[dynamo_name] = value
+        aliased_updates[dynamo_name] = attr.serialize(value)
 
     client = cls._get_client()
     table = cls._get_table()

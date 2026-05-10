@@ -87,24 +87,31 @@ class JSONAttribute(Attribute[J], Generic[J]):
             alias=alias,
         )
         self.model_class = model_class
-        self._is_pydantic = model_class is not None and hasattr(model_class, "model_validate")
         self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
+        self._type_adapter = None
+        if model_class is not None and not self._is_dataclass:
+            try:
+                from pydantic import TypeAdapter
+
+                self._type_adapter = TypeAdapter(model_class)
+            except ImportError:
+                pass
 
     def _to_dict(self, value: Any) -> dict[str, Any] | list[Any]:
         """Convert a typed model instance to a dict for JSON serialization."""
-        if self._is_pydantic:
-            return value.model_dump()
+        if self._type_adapter is not None:
+            return self._type_adapter.dump_python(value, mode="python")
         if self._is_dataclass:
             return dataclasses.asdict(value)
         return value
 
-    def _from_dict(self, data: dict[str, Any]) -> Any:
-        """Convert a dict to a typed model instance."""
+    def _from_dict(self, data: Any) -> Any:
+        """Convert raw data to a typed model instance."""
+        if self._type_adapter is not None:
+            return self._type_adapter.validate_python(data)
         model_class = self.model_class
         if model_class is None:
             return data
-        if self._is_pydantic:
-            return model_class.model_validate(data)  # ty: ignore[unresolved-attribute]
         return model_class(**data)
 
     def serialize(self, value: Any | None) -> str | None:
@@ -148,7 +155,7 @@ class JSONAttribute(Attribute[J], Generic[J]):
             data = value
         else:
             data = value
-        if self.model_class is not None and isinstance(data, dict):
+        if self.model_class is not None:
             return self._from_dict(data)
         return data
 

@@ -109,20 +109,26 @@ class MemoryBackend:
         ...     assert user.name == "John"
     """
 
-    def __init__(self, seed: dict[str, list[dict[str, Any]]] | None = None) -> None:
+    def __init__(
+        self,
+        seed: dict[str, list[dict[str, Any]]] | None = None,
+        strict: bool = True,
+    ) -> None:
         """Initialize the memory backend.
 
         Args:
             seed: Optional dict of table_name -> list of items to pre-populate.
+            strict: If True, reject values with types unsupported by DynamoDB.
         """
         self._seed = seed or {}
+        self._strict = strict
         self._previous_client: Any = None
         self._client: MemoryClient | None = None
 
     def __enter__(self) -> "MemoryBackend":
         """Enter context manager."""
         self._previous_client = get_default_client()
-        self._client = MemoryClient(seed=self._seed)
+        self._client = MemoryClient(seed=self._seed, strict=self._strict)
         # Clear cached clients so models use the new MemoryClient
         self._clear_model_caches()
         set_default_client(self._client)
@@ -179,11 +185,13 @@ class MemoryBackend:
 @contextmanager
 def memory_backend(
     seed: dict[str, list[dict[str, Any]]] | None = None,
+    strict: bool = True,
 ) -> Iterator[MemoryBackend]:
     """Context manager for in-memory testing.
 
     Args:
         seed: Optional dict of table_name -> list of items to pre-populate.
+        strict: If True, reject values with types unsupported by DynamoDB.
 
     Yields:
         MemoryBackend instance.
@@ -194,7 +202,7 @@ def memory_backend(
         ...     user.save()
         ...     assert "users" in backend.tables
     """
-    backend = MemoryBackend(seed=seed)
+    backend = MemoryBackend(seed=seed, strict=strict)
     with backend:
         yield backend
 
@@ -202,10 +210,17 @@ def memory_backend(
 class MemoryClient:
     """In-memory client that mimics DynamoDBClient interface."""
 
-    def __init__(self, seed: dict[str, list[dict[str, Any]]] | None = None) -> None:
+    _VALID_DYNAMO_TYPES = (str, int, float, bool, type(None), list, dict, bytes, set)
+
+    def __init__(
+        self,
+        seed: dict[str, list[dict[str, Any]]] | None = None,
+        strict: bool = True,
+    ) -> None:
         # tables[table_name][key_string] = item
         self._tables: dict[str, dict[str, dict[str, Any]]] = {}
         self._table_schemas: dict[str, dict[str, str]] = {}  # table -> {partition_key, sort_key}
+        self._strict = strict
         self._rate_limit = None
         self._diagnostics = None
         self._last_metrics: FakeMetrics | None = None
@@ -221,6 +236,37 @@ class MemoryClient:
                     # Infer key from first item
                     key_str = self._make_key_string(item)
                     self._tables[table_name][key_str] = copy.deepcopy(item)
+
+    def _validate_value(self, value: Any) -> None:
+        """Raise TypeError if value is not a valid DynamoDB type (recursive)."""
+        if not self._strict:
+            return
+        if isinstance(value, self._VALID_DYNAMO_TYPES):
+            if isinstance(value, dict):
+                for v in value.values():
+                    self._validate_value(v)
+            elif isinstance(value, list):
+                for v in value:
+                    self._validate_value(v)
+            elif isinstance(value, set):
+                for v in value:
+                    if not isinstance(v, (str, int, float, bytes)):
+                        raise TypeError(
+                            f"Unsupported type in set for DynamoDB: {type(v).__name__}. "
+                            f"Sets may only contain str, int, float, or bytes."
+                        )
+        else:
+            raise TypeError(
+                f"Unsupported type for DynamoDB: {type(value).__name__}. "
+                f"Supported types: str, int, float, bool, None, list, dict, bytes, set"
+            )
+
+    def _validate_item(self, item: dict[str, Any]) -> None:
+        """Validate all values in an item dict."""
+        if not self._strict:
+            return
+        for key, value in item.items():
+            self._validate_value(value)
 
     @property
     def diagnostics(self) -> None:
@@ -303,6 +349,7 @@ class MemoryClient:
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> FakeMetrics:
         """Internal sync put item implementation."""
+        self._validate_item(item)
         start = time.time()
         tbl = self._get_table(table)
         key_str = self._make_key_string(item)
@@ -400,6 +447,7 @@ class MemoryClient:
 
         # Apply updates
         if updates:
+            self._validate_item(updates)
             for attr, value in updates.items():
                 existing[attr] = value
 
