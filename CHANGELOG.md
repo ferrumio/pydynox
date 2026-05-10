@@ -1,6 +1,54 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.3.0] - 2026-05-10
+
+
+### Bug Fixes
+
+- update serialization (#378)
+- update json attribute (#379)
+
+
+### CI/CD
+
+- bump CodSpeedHQ/action from 4.13.1 to 4.14.0 (#357)
+- bump astral-sh/setup-uv from 8.0.0 to 8.1.0 (#358)
+- bump actions/cache from 5.0.4 to 5.0.5 (#359)
+- bump github/codeql-action from 4.35.1 to 4.35.2 (#360)
+- bump orhun/git-cliff-action from 4.7.1 to 4.8.0 (#368)
+- bump github/codeql-action from 4.35.2 to 4.35.3 (#373)
+- bump CodSpeedHQ/action from 4.14.0 to 4.15.0 (#374)
+
+
+### Documentation
+
+- update changelog for v1.2.0 (#356)
+
+
+### Miscellaneous
+
+- bump v1.3.0 (#381)
+
+
+### Refactoring
+
+- replace string with pyerr (#380)
+
+
+### Build
+
+- bump pytest from 9.0.2 to 9.0.3 (#362)
+- bump mako from 1.3.10 to 1.3.11 (#363)
+
+
+### Deps
+
+- bump the rust-dependencies group with 7 updates (#361)
+- bump the dev-dependencies group with 3 updates (#370)
+- bump the rust-dependencies group with 3 updates (#369)
+- bump the dev-dependencies group with 2 updates (#375)
+- bump tokio from 1.52.1 to 1.52.2 in the rust-dependencies group (#376)
 ## [1.2.0] - 2026-04-18
 
 
