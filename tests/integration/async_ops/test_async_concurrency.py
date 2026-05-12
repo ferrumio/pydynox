@@ -65,6 +65,10 @@ async def test_async_does_not_block_event_loop(async_table: DynamoDBClient):
     assert counter > 0, "Counter should have incremented - async is not working!"
 
 
+@pytest.mark.skip(
+    reason="Flaky on CI — LocalStack connection limits cause concurrent ops to queue up, "
+    "making the concurrent run occasionally slower than sequential."
+)
 @pytest.mark.asyncio
 @pytest.mark.flaky(reruns=3)
 async def test_concurrent_operations_faster_than_sequential(async_table: DynamoDBClient):
