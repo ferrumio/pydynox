@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydynox._internal._atomic import AtomicOp, serialize_atomic
 from pydynox._internal._conditions import ConditionPath
@@ -16,50 +16,58 @@ if TYPE_CHECKING:
 
 M = TypeVar("M", bound="Model")
 
-# Type aliases for return types
-SaveResult = tuple[
-    "DynamoDBClient",
-    str,
-    dict[str, Any],
-    str | None,
-    dict[str, str] | None,
-    dict[str, Any] | None,
-    bool,
-]
-SmartSaveResult = tuple[
-    "DynamoDBClient",
-    str,
-    dict[str, Any],  # key or item
-    str | None,  # condition_expr
-    dict[str, str] | None,  # attr_names
-    dict[str, Any] | None,  # attr_values
-    bool,  # skip_hooks
-    bool,  # use_update (True = UpdateItem, False = PutItem)
-    dict[str, Any] | None,  # updates (for UpdateItem)
-]
-UpdateResult = tuple[
-    "DynamoDBClient",
-    str,
-    dict[str, Any],
-    str | None,
-    str | None,
-    dict[str, str] | None,
-    dict[str, Any] | None,
-    dict[str, Any] | None,
-    bool,
-]
-UpdateByKeyResult = tuple[
-    "DynamoDBClient",
-    str,
-    dict[str, Any],
-    dict[str, Any],
-    str | None,
-    dict[str, str] | None,
-    dict[str, Any] | None,
-]
-DeleteByKeyResult = tuple[
-    "DynamoDBClient", str, dict[str, Any], str | None, dict[str, str] | None, dict[str, Any] | None
-]
+
+class SaveResult(NamedTuple):
+    client: DynamoDBClient
+    table: str
+    item: dict[str, Any]
+    condition_expr: str | None
+    attr_names: dict[str, str] | None
+    attr_values: dict[str, Any] | None
+    skip_hooks: bool
+
+
+class SmartSaveResult(NamedTuple):
+    client: DynamoDBClient
+    table: str
+    key_or_item: dict[str, Any]
+    condition_expr: str | None
+    attr_names: dict[str, str] | None
+    attr_values: dict[str, Any] | None
+    skip_hooks: bool
+    use_update: bool
+    updates: dict[str, Any] | None
+
+
+class UpdateResult(NamedTuple):
+    client: DynamoDBClient
+    table: str
+    key: dict[str, Any]
+    update_expr: str | None
+    condition_expr: str | None
+    attr_names: dict[str, str] | None
+    attr_values: dict[str, Any] | None
+    updates: dict[str, Any] | None
+    skip_hooks: bool
+
+
+class UpdateByKeyResult(NamedTuple):
+    client: DynamoDBClient
+    table: str
+    key: dict[str, Any]
+    updates: dict[str, Any]
+    condition_expr: str | None
+    attr_names: dict[str, str] | None
+    attr_values: dict[str, Any] | None
+
+
+class DeleteByKeyResult(NamedTuple):
+    client: DynamoDBClient
+    table: str
+    key: dict[str, Any]
+    condition_expr: str | None
+    attr_names: dict[str, str] | None
+    attr_values: dict[str, Any] | None
 
 
 def prepare_get(
@@ -139,9 +147,9 @@ def prepare_save(self: Model, condition: Condition | None, skip_hooks: bool | No
         values: dict[str, Any] = {}
         expr = final_condition.serialize(names, values)
         attr_names = {v: k for k, v in names.items()}
-        return client, table, item, expr, attr_names, values, skip
+        return SaveResult(client, table, item, expr, attr_names, values, skip)
 
-    return client, table, item, None, None, None, skip
+    return SaveResult(client, table, item, None, None, None, skip)
 
 
 def finalize_save(self: Model, skip: bool) -> None:
@@ -231,9 +239,9 @@ def prepare_smart_save(
                 new_key = old_key.replace(":v", ":cond")
                 renamed_values[new_key] = val
                 renamed_expr = renamed_expr.replace(old_key, new_key)
-            return client, table, key, renamed_expr, attr_names, renamed_values, skip, True, updates
+            return SmartSaveResult(client, table, key, renamed_expr, attr_names, renamed_values, skip, True, updates)
 
-        return client, table, key, None, None, None, skip, True, updates
+        return SmartSaveResult(client, table, key, None, None, None, skip, True, updates)
 
     # Full replace: PutItem with all fields
     item = self.to_dict()
@@ -243,9 +251,9 @@ def prepare_smart_save(
         values: dict[str, Any] = {}
         expr = final_condition.serialize(names, values)
         attr_names = {v: k for k, v in names.items()}
-        return client, table, item, expr, attr_names, values, skip, False, None
+        return SmartSaveResult(client, table, item, expr, attr_names, values, skip, False, None)
 
-    return client, table, item, None, None, None, skip, False, None
+    return SmartSaveResult(client, table, item, None, None, None, skip, False, None)
 
 
 def prepare_delete(self: Model, condition: Condition | None, skip_hooks: bool | None) -> SaveResult:
@@ -280,9 +288,9 @@ def prepare_delete(self: Model, condition: Condition | None, skip_hooks: bool | 
         values: dict[str, Any] = {}
         expr = final_condition.serialize(names, values)
         attr_names = {v: k for k, v in names.items()}
-        return client, table, key, expr, attr_names, values, skip
+        return SaveResult(client, table, key, expr, attr_names, values, skip)
 
-    return client, table, key, None, None, None, skip
+    return SaveResult(client, table, key, None, None, None, skip)
 
 
 def finalize_delete(self: Model, skip: bool) -> None:
@@ -319,7 +327,7 @@ def prepare_update(
             cond_attr_names = {v: k for k, v in cond_names.items()}
             attr_names = {**attr_names, **cond_attr_names}
 
-        return (
+        return UpdateResult(
             client,
             table,
             key,
@@ -357,7 +365,7 @@ def prepare_update(
                 new_key = old_key.replace(":v", ":cond")
                 renamed_values[new_key] = val
                 renamed_expr = renamed_expr.replace(old_key, new_key)
-            return (
+            return UpdateResult(
                 client,
                 table,
                 key,
@@ -369,9 +377,9 @@ def prepare_update(
                 skip,
             )
 
-        return client, table, key, None, None, None, None, aliased_kwargs, skip
+        return UpdateResult(client, table, key, None, None, None, None, aliased_kwargs, skip)
 
-    return client, table, key, None, None, None, None, None, skip
+    return UpdateResult(client, table, key, None, None, None, None, None, skip)
 
 
 def finalize_update(self: Model, skip: bool) -> None:
@@ -415,7 +423,7 @@ def prepare_update_by_key(
             new_key = old_key.replace(":v", ":cond")
             renamed_values[new_key] = val
             renamed_expr = renamed_expr.replace(old_key, new_key)
-        return (
+        return UpdateByKeyResult(
             client,
             table,
             key,
@@ -425,7 +433,7 @@ def prepare_update_by_key(
             renamed_values if renamed_values else None,
         )
 
-    return client, table, key, aliased_updates, None, None, None
+    return UpdateByKeyResult(client, table, key, aliased_updates, None, None, None)
 
 
 def prepare_delete_by_key(
@@ -442,6 +450,6 @@ def prepare_delete_by_key(
         values: dict[str, Any] = {}
         cond_expr = condition.serialize(names, values)
         attr_names = {v: k for k, v in names.items()}
-        return client, table, key, cond_expr, attr_names, values
+        return DeleteByKeyResult(client, table, key, cond_expr, attr_names, values)
 
-    return client, table, key, None, None, None
+    return DeleteByKeyResult(client, table, key, None, None, None)

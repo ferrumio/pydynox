@@ -57,77 +57,65 @@ async def save(
     await self._upload_s3_files()
     s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
 
-    (
-        client,
-        table,
-        key_or_item,
-        cond_expr,
-        attr_names,
-        attr_values,
-        skip,
-        use_update,
-        updates,
-    ) = prepare_smart_save(self, condition, skip_hooks, full_replace)
+    result = prepare_smart_save(self, condition, skip_hooks, full_replace)
 
-    if use_update and updates:
+    if result.use_update and result.updates:
         # Smart update: UpdateItem with only changed fields
-        if cond_expr is not None:
-            await client.update_item(
-                table,
-                key_or_item,
-                updates=updates,
-                condition_expression=cond_expr,
-                expression_attribute_names=attr_names,
-                expression_attribute_values=attr_values,
+        if result.condition_expr is not None:
+            await result.client.update_item(
+                result.table,
+                result.key_or_item,
+                updates=result.updates,
+                condition_expression=result.condition_expr,
+                expression_attribute_names=result.attr_names,
+                expression_attribute_values=result.attr_values,
             )
         else:
-            await client.update_item(table, key_or_item, updates=updates)
+            await result.client.update_item(result.table, result.key_or_item, updates=result.updates)
     else:
         # Full replace: PutItem with all fields
-        if cond_expr is not None:
-            await client.put_item(
-                table,
-                key_or_item,
-                condition_expression=cond_expr,
-                expression_attribute_names=attr_names,
-                expression_attribute_values=attr_values,
+        if result.condition_expr is not None:
+            await result.client.put_item(
+                result.table,
+                result.key_or_item,
+                condition_expression=result.condition_expr,
+                expression_attribute_names=result.attr_names,
+                expression_attribute_values=result.attr_values,
             )
         else:
-            await client.put_item(table, key_or_item)
+            await result.client.put_item(result.table, result.key_or_item)
 
-    if client._last_metrics is not None:
-        op_type = "update" if use_update else "put"
-        self.__class__._record_metrics(client._last_metrics, op_type)
+    if result.client._last_metrics is not None:
+        op_type = "update" if result.use_update else "put"
+        self.__class__._record_metrics(result.client._last_metrics, op_type)
 
     if s3_calls > 0:
         self.__class__._metrics_storage.total.add_s3(
             s3_duration, s3_calls, s3_uploaded, s3_downloaded
         )
 
-    finalize_save(self, skip)
+    finalize_save(self, result.skip_hooks)
 
 
 async def delete(
     self: Model, condition: Condition | None = None, skip_hooks: bool | None = None
 ) -> None:
     """Async delete model from DynamoDB (default)."""
-    client, table, key, cond_expr, attr_names, attr_values, skip = prepare_delete(
-        self, condition, skip_hooks
-    )
+    result = prepare_delete(self, condition, skip_hooks)
 
-    if cond_expr is not None:
-        await client.delete_item(
-            table,
-            key,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.condition_expr is not None:
+        await result.client.delete_item(
+            result.table,
+            result.item,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
     else:
-        await client.delete_item(table, key)
+        await result.client.delete_item(result.table, result.item)
 
-    if client._last_metrics is not None:
-        self.__class__._record_metrics(client._last_metrics, "delete")
+    if result.client._last_metrics is not None:
+        self.__class__._record_metrics(result.client._last_metrics, "delete")
 
     _start_s3_metrics_collection()
     await self._delete_s3_files()
@@ -138,7 +126,7 @@ async def delete(
             s3_duration, s3_calls, s3_uploaded, s3_downloaded
         )
 
-    finalize_delete(self, skip)
+    finalize_delete(self, result.skip_hooks)
 
 
 async def update(
@@ -149,36 +137,34 @@ async def update(
     **kwargs: Any,
 ) -> None:
     """Async update specific attributes (default)."""
-    client, table, key, update_expr, cond_expr, attr_names, attr_values, updates, skip = (
-        prepare_update(self, atomic, condition, skip_hooks, kwargs)
-    )
+    result = prepare_update(self, atomic, condition, skip_hooks, kwargs)
 
-    if update_expr is not None:
-        await client.update_item(
-            table,
-            key,
-            update_expression=update_expr,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.update_expr is not None:
+        await result.client.update_item(
+            result.table,
+            result.key,
+            update_expression=result.update_expr,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
-    elif updates is not None:
-        if cond_expr is not None:
-            await client.update_item(
-                table,
-                key,
-                updates=updates,
-                condition_expression=cond_expr,
-                expression_attribute_names=attr_names,
-                expression_attribute_values=attr_values,
+    elif result.updates is not None:
+        if result.condition_expr is not None:
+            await result.client.update_item(
+                result.table,
+                result.key,
+                updates=result.updates,
+                condition_expression=result.condition_expr,
+                expression_attribute_names=result.attr_names,
+                expression_attribute_values=result.attr_values,
             )
         else:
-            await client.update_item(table, key, updates=updates)
+            await result.client.update_item(result.table, result.key, updates=result.updates)
 
-    if client._last_metrics is not None:
-        self.__class__._record_metrics(client._last_metrics, "update")
+    if result.client._last_metrics is not None:
+        self.__class__._record_metrics(result.client._last_metrics, "update")
 
-    finalize_update(self, skip)
+    finalize_update(self, result.skip_hooks)
 
 
 async def update_by_key(
@@ -191,21 +177,20 @@ async def update_by_key(
     if result is None:
         return
 
-    client, table, key, updates, cond_expr, attr_names, attr_values = result
-    if cond_expr is not None:
-        await client.update_item(
-            table,
-            key,
-            updates=updates,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.condition_expr is not None:
+        await result.client.update_item(
+            result.table,
+            result.key,
+            updates=result.updates,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
     else:
-        await client.update_item(table, key, updates=updates)
+        await result.client.update_item(result.table, result.key, updates=result.updates)
 
-    if client._last_metrics is not None:
-        cls._record_metrics(client._last_metrics, "update")
+    if result.client._last_metrics is not None:
+        cls._record_metrics(result.client._last_metrics, "update")
 
 
 async def delete_by_key(
@@ -214,20 +199,18 @@ async def delete_by_key(
     **kwargs: Any,
 ) -> None:
     """Async delete item by key without fetching (default). No hooks."""
-    client, table, key, cond_expr, attr_names, attr_values = prepare_delete_by_key(
-        cls, condition, kwargs
-    )
+    result = prepare_delete_by_key(cls, condition, kwargs)
 
-    if cond_expr is not None:
-        await client.delete_item(
-            table,
-            key,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.condition_expr is not None:
+        await result.client.delete_item(
+            result.table,
+            result.key,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
     else:
-        await client.delete_item(table, key)
+        await result.client.delete_item(result.table, result.key)
 
-    if client._last_metrics is not None:
-        cls._record_metrics(client._last_metrics, "delete")
+    if result.client._last_metrics is not None:
+        cls._record_metrics(result.client._last_metrics, "delete")
