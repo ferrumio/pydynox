@@ -12,15 +12,12 @@ use crate::kms::operations::{
     DecryptResult, EncryptResult, decrypt_impl, encrypt_impl, sync_decrypt_impl, sync_encrypt_impl,
 };
 use aws_sdk_kms::Client;
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-/// Global shared Tokio runtime (same as DynamoDBClient).
-static RUNTIME: Lazy<Arc<Runtime>> =
-    Lazy::new(|| Arc::new(Runtime::new().expect("Failed to create global Tokio runtime")));
+use crate::runtime::get_runtime;
 
 /// KMS encryptor using envelope encryption.
 ///
@@ -95,7 +92,7 @@ impl KmsEncryptor {
             proxy_url,
         };
 
-        let runtime = RUNTIME.clone();
+        let runtime = get_runtime()?;
         let client = runtime
             .block_on(build_kms_client(&config, None))
             .map_err(|e| {

@@ -11,15 +11,12 @@ use crate::s3::operations::{
     sync_save_to_file, sync_upload_bytes, upload_bytes,
 };
 use aws_sdk_s3::Client;
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-/// Global shared Tokio runtime (same as DynamoDBClient).
-static RUNTIME: Lazy<Arc<Runtime>> =
-    Lazy::new(|| Arc::new(Runtime::new().expect("Failed to create global Tokio runtime")));
+use crate::runtime::get_runtime;
 
 /// S3 client for standalone use.
 ///
@@ -88,7 +85,7 @@ impl S3Client {
             proxy_url,
         };
 
-        let runtime = RUNTIME.clone();
+        let runtime = get_runtime()?;
         let client = runtime
             .block_on(build_s3_client(&config, None))
             .map_err(|e| S3Exception::new_err(format!("Failed to create S3 client: {}", e)))?;
