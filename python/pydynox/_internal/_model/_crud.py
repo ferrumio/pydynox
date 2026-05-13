@@ -82,51 +82,41 @@ def save(
     _start_kms_metrics_collection()
 
     # prepare: run BEFORE_SAVE hooks, auto-generate, version condition, size check
-    (
-        client,
-        table,
-        key_or_item,
-        cond_expr,
-        attr_names,
-        attr_values,
-        skip,
-        use_update,
-        updates,
-    ) = prepare_smart_save(self, condition, skip_hooks, full_replace)
+    result = prepare_smart_save(self, condition, skip_hooks, full_replace)
 
     # Collect KMS metrics from serialization
     kms_duration, kms_calls = _stop_kms_metrics_collection()
 
-    if use_update and updates:
+    if result.use_update and result.updates:
         # Smart update: UpdateItem with only changed fields
-        if cond_expr is not None:
-            client.sync_update_item(
-                table,
-                key_or_item,
-                updates=updates,
-                condition_expression=cond_expr,
-                expression_attribute_names=attr_names,
-                expression_attribute_values=attr_values,
+        if result.condition_expr is not None:
+            result.client.sync_update_item(
+                result.table,
+                result.key_or_item,
+                updates=result.updates,
+                condition_expression=result.condition_expr,
+                expression_attribute_names=result.attr_names,
+                expression_attribute_values=result.attr_values,
             )
         else:
-            client.sync_update_item(table, key_or_item, updates=updates)
+            result.client.sync_update_item(result.table, result.key_or_item, updates=result.updates)
     else:
         # Full replace: PutItem with all fields
-        if cond_expr is not None:
-            client.sync_put_item(
-                table,
-                key_or_item,
-                condition_expression=cond_expr,
-                expression_attribute_names=attr_names,
-                expression_attribute_values=attr_values,
+        if result.condition_expr is not None:
+            result.client.sync_put_item(
+                result.table,
+                result.key_or_item,
+                condition_expression=result.condition_expr,
+                expression_attribute_names=result.attr_names,
+                expression_attribute_values=result.attr_values,
             )
         else:
-            client.sync_put_item(table, key_or_item)
+            result.client.sync_put_item(result.table, result.key_or_item)
 
     # Record metrics from client
-    if client._last_metrics is not None:
-        op_type = "update" if use_update else "put"
-        self.__class__._record_metrics(client._last_metrics, op_type)
+    if result.client._last_metrics is not None:
+        op_type = "update" if result.use_update else "put"
+        self.__class__._record_metrics(result.client._last_metrics, op_type)
 
     # Record KMS metrics
     if kms_calls > 0:
@@ -139,30 +129,28 @@ def save(
         )
 
     # finalize: run AFTER_SAVE hooks and reset change tracking
-    finalize_save(self, skip)
+    finalize_save(self, result.skip_hooks)
 
 
 def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
     """Delete model from DynamoDB."""
     # prepare: run BEFORE_DELETE hooks, version condition
-    client, table, key, cond_expr, attr_names, attr_values, skip = prepare_delete(
-        self, condition, skip_hooks
-    )
+    result = prepare_delete(self, condition, skip_hooks)
 
-    if cond_expr is not None:
-        client.sync_delete_item(
-            table,
-            key,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.condition_expr is not None:
+        result.client.sync_delete_item(
+            result.table,
+            result.item,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
     else:
-        client.sync_delete_item(table, key)
+        result.client.sync_delete_item(result.table, result.item)
 
     # Record metrics from client
-    if client._last_metrics is not None:
-        self.__class__._record_metrics(client._last_metrics, "delete")
+    if result.client._last_metrics is not None:
+        self.__class__._record_metrics(result.client._last_metrics, "delete")
 
     # Start S3 metrics collection for deletes
     _start_s3_metrics_collection()
@@ -180,7 +168,7 @@ def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | N
         )
 
     # finalize: run AFTER_DELETE hooks
-    finalize_delete(self, skip)
+    finalize_delete(self, result.skip_hooks)
 
 
 def update(
@@ -192,38 +180,36 @@ def update(
 ) -> None:
     """Update specific attributes."""
     # prepare: run BEFORE_UPDATE hooks, build expressions
-    client, table, key, update_expr, cond_expr, attr_names, attr_values, updates, skip = (
-        prepare_update(self, atomic, condition, skip_hooks, kwargs)
-    )
+    result = prepare_update(self, atomic, condition, skip_hooks, kwargs)
 
-    if update_expr is not None:
-        client.sync_update_item(
-            table,
-            key,
-            update_expression=update_expr,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.update_expr is not None:
+        result.client.sync_update_item(
+            result.table,
+            result.key,
+            update_expression=result.update_expr,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
-    elif updates is not None:
-        if cond_expr is not None:
-            client.sync_update_item(
-                table,
-                key,
-                updates=updates,
-                condition_expression=cond_expr,
-                expression_attribute_names=attr_names,
-                expression_attribute_values=attr_values,
+    elif result.updates is not None:
+        if result.condition_expr is not None:
+            result.client.sync_update_item(
+                result.table,
+                result.key,
+                updates=result.updates,
+                condition_expression=result.condition_expr,
+                expression_attribute_names=result.attr_names,
+                expression_attribute_values=result.attr_values,
             )
         else:
-            client.sync_update_item(table, key, updates=updates)
+            result.client.sync_update_item(result.table, result.key, updates=result.updates)
 
     # Record metrics from client
-    if client._last_metrics is not None:
-        self.__class__._record_metrics(client._last_metrics, "update")
+    if result.client._last_metrics is not None:
+        self.__class__._record_metrics(result.client._last_metrics, "update")
 
     # finalize: run AFTER_UPDATE hooks
-    finalize_update(self, skip)
+    finalize_update(self, result.skip_hooks)
 
 
 def update_by_key(
@@ -237,22 +223,21 @@ def update_by_key(
     if result is None:
         return
 
-    client, table, key, updates, cond_expr, attr_names, attr_values = result
-    if cond_expr is not None:
-        client.sync_update_item(
-            table,
-            key,
-            updates=updates,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.condition_expr is not None:
+        result.client.sync_update_item(
+            result.table,
+            result.key,
+            updates=result.updates,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
     else:
-        client.sync_update_item(table, key, updates=updates)
+        result.client.sync_update_item(result.table, result.key, updates=result.updates)
 
     # Record metrics from client
-    if client._last_metrics is not None:
-        cls._record_metrics(client._last_metrics, "update")
+    if result.client._last_metrics is not None:
+        cls._record_metrics(result.client._last_metrics, "update")
 
 
 def delete_by_key(
@@ -262,21 +247,19 @@ def delete_by_key(
 ) -> None:
     """Delete item by key without fetching. No hooks."""
     # prepare: extract key, build condition
-    client, table, key, cond_expr, attr_names, attr_values = prepare_delete_by_key(
-        cls, condition, kwargs
-    )
+    result = prepare_delete_by_key(cls, condition, kwargs)
 
-    if cond_expr is not None:
-        client.sync_delete_item(
-            table,
-            key,
-            condition_expression=cond_expr,
-            expression_attribute_names=attr_names,
-            expression_attribute_values=attr_values,
+    if result.condition_expr is not None:
+        result.client.sync_delete_item(
+            result.table,
+            result.key,
+            condition_expression=result.condition_expr,
+            expression_attribute_names=result.attr_names,
+            expression_attribute_values=result.attr_values,
         )
     else:
-        client.sync_delete_item(table, key)
+        result.client.sync_delete_item(result.table, result.key)
 
     # Record metrics from client
-    if client._last_metrics is not None:
-        cls._record_metrics(client._last_metrics, "delete")
+    if result.client._last_metrics is not None:
+        cls._record_metrics(result.client._last_metrics, "delete")
