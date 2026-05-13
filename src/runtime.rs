@@ -15,10 +15,14 @@ static RUNTIME: Lazy<Result<Arc<Runtime>, String>> = Lazy::new(|| {
     })
 });
 
-/// Get the shared Tokio runtime. Returns a clear Python error if init fails.
+/// Get the shared Tokio runtime.
+///
+/// Returns a PyRuntimeError if runtime initialization failed (e.g., in sandboxed
+/// environments with strict thread limits, or when the process has exhausted
+/// system resources).
 pub fn get_runtime() -> PyResult<Arc<Runtime>> {
     RUNTIME
         .as_ref()
-        .cloned()
-        .map_err(|msg| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(msg.clone()))
+        .map(Arc::clone)
+        .map_err(|msg| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(msg.as_str()))
 }
