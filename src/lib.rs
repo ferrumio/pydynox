@@ -25,6 +25,7 @@ mod generators;
 mod kms;
 mod metrics;
 pub mod rate_limiter;
+mod runtime;
 mod s3;
 mod serialization;
 mod table_operations;

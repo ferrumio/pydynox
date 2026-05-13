@@ -25,19 +25,13 @@ mod transaction_ops;
 use aws_sdk_dynamodb::Client;
 use aws_sdk_kms::Client as KmsClient;
 use aws_sdk_s3::Client as S3Client;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use crate::client_internal::{AwsConfig, build_client, build_kms_client, build_s3_client};
-
-/// Global shared Tokio runtime.
-///
-/// Using a single runtime avoids deadlocks on Windows when multiple
-/// DynamoDBClient instances are created. Also shared by S3/KMS clients.
-static RUNTIME: Lazy<Arc<Runtime>> =
-    Lazy::new(|| Arc::new(Runtime::new().expect("Failed to create global Tokio runtime")));
+use crate::runtime::get_runtime;
 
 /// DynamoDB client with flexible credential configuration.
 ///
@@ -196,7 +190,7 @@ impl DynamoDBClient {
             proxy_url,
         };
 
-        let runtime = RUNTIME.clone();
+        let runtime = get_runtime()?;
         let final_region = config.effective_region();
 
         let client = runtime
