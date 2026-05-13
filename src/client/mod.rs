@@ -227,11 +227,11 @@ impl DynamoDBClient {
     ///
     /// Makes a simple ListTables call to verify connectivity.
     /// Returns false if connection fails, true if successful.
-    pub fn ping(&self) -> PyResult<bool> {
+    pub fn ping(&self, py: Python<'_>) -> PyResult<bool> {
         let client = self.client.clone();
-        let result = self
-            .runtime
-            .block_on(async { client.list_tables().limit(1).send().await });
+        let runtime = self.runtime.clone();
+        let result =
+            py.detach(|| runtime.block_on(async { client.list_tables().limit(1).send().await }));
 
         match result {
             Ok(_) => Ok(true),
