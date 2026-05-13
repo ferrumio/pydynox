@@ -71,7 +71,9 @@ async def save(
                 expression_attribute_values=result.attr_values,
             )
         else:
-            await result.client.update_item(result.table, result.key_or_item, updates=result.updates)
+            await result.client.update_item(
+                result.table, result.key_or_item, updates=result.updates
+            )
     else:
         # Full replace: PutItem with all fields
         if result.condition_expr is not None:

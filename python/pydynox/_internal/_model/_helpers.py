@@ -239,7 +239,9 @@ def prepare_smart_save(
                 new_key = old_key.replace(":v", ":cond")
                 renamed_values[new_key] = val
                 renamed_expr = renamed_expr.replace(old_key, new_key)
-            return SmartSaveResult(client, table, key, renamed_expr, attr_names, renamed_values, skip, True, updates)
+            return SmartSaveResult(
+                client, table, key, renamed_expr, attr_names, renamed_values, skip, True, updates
+            )
 
         return SmartSaveResult(client, table, key, None, None, None, skip, True, updates)
 
