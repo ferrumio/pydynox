@@ -8,6 +8,7 @@ from pydynox._internal._logging import _log_debug
 
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
+    from pydynox.model import Model
 
 
 class Transaction:
@@ -49,6 +50,7 @@ class Transaction:
         """
         self._client = client
         self._operations: list[dict[str, Any]] = []
+        self._models: list[tuple[Model, str | None, int]] = []
 
     async def __aenter__(self) -> Transaction:
         """Enter the async context manager."""
@@ -63,6 +65,29 @@ class Transaction:
         """Exit the async context manager and execute the transaction."""
         if exc_type is None:
             await self.commit()
+
+    def save_model(self, model: Model, condition: Any | None = None) -> None:
+        """Add a model save to the transaction.
+
+        Handles version attribute automatically. After commit, the model's
+        version is updated and change tracking is reset.
+
+        Args:
+            model: The model instance to save.
+            condition: Optional additional condition.
+        """
+        _prepare_model_save(self, model, condition)
+
+    def delete_model(self, model: Model, condition: Any | None = None) -> None:
+        """Add a model delete to the transaction.
+
+        Handles version condition automatically.
+
+        Args:
+            model: The model instance to delete.
+            condition: Optional additional condition.
+        """
+        _prepare_model_delete(self, model, condition)
 
     def put(
         self,
@@ -206,8 +231,9 @@ class Transaction:
         _log_debug("transaction", f"Committing transaction ({len(self._operations)} operations)")
         await self._client.transact_write(self._operations)
 
-        # Clear operations after successful commit
+        _finalize_models(self._models)
         self._operations = []
+        self._models = []
 
 
 class SyncTransaction:
@@ -229,6 +255,7 @@ class SyncTransaction:
         """
         self._client = client
         self._operations: list[dict[str, Any]] = []
+        self._models: list[tuple[Model, str | None, int]] = []
 
     def __enter__(self) -> SyncTransaction:
         """Enter the context manager."""
@@ -243,6 +270,29 @@ class SyncTransaction:
         """Exit the context manager and execute the transaction."""
         if exc_type is None:
             self.commit()
+
+    def save_model(self, model: Model, condition: Any | None = None) -> None:
+        """Add a model save to the transaction.
+
+        Handles version attribute automatically. After commit, the model's
+        version is updated and change tracking is reset.
+
+        Args:
+            model: The model instance to save.
+            condition: Optional additional condition.
+        """
+        _prepare_model_save(self, model, condition)
+
+    def delete_model(self, model: Model, condition: Any | None = None) -> None:
+        """Add a model delete to the transaction.
+
+        Handles version condition automatically.
+
+        Args:
+            model: The model instance to delete.
+            condition: Optional additional condition.
+        """
+        _prepare_model_delete(self, model, condition)
 
     def put(
         self,
@@ -345,5 +395,98 @@ class SyncTransaction:
         _log_debug("transaction", f"Committing transaction ({len(self._operations)} operations)")
         self._client.sync_transact_write(self._operations)
 
-        # Clear operations after successful commit
+        _finalize_models(self._models)
         self._operations = []
+        self._models = []
+
+
+def _prepare_model_save(
+    txn: Transaction | SyncTransaction,
+    model: Model,
+    condition: Any | None,
+) -> None:
+    """Build a put operation from a model and track it for post-commit updates."""
+    from pydynox.hooks import HookType
+
+    model._run_hooks(HookType.BEFORE_SAVE)
+    model._apply_auto_generate()
+
+    version_attr = model._get_version_attr_name()
+    version_condition, new_version = model._build_version_condition()
+
+    final_condition = condition
+    if version_condition is not None:
+        final_condition = (
+            final_condition & version_condition if final_condition else version_condition
+        )
+
+    if version_attr is not None:
+        setattr(model, version_attr, new_version)
+
+    table = model._get_table()
+    item = model.to_dict()
+
+    op: dict[str, Any] = {"type": "put", "table": table, "item": item}
+
+    if final_condition is not None:
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+        expr = final_condition.serialize(names, values)
+        op["condition_expression"] = expr
+        op["expression_attribute_names"] = {v: k for k, v in names.items()}
+        op["expression_attribute_values"] = values
+
+    txn._operations.append(op)
+    txn._models.append((model, version_attr, new_version))
+
+
+def _prepare_model_delete(
+    txn: Transaction | SyncTransaction,
+    model: Model,
+    condition: Any | None,
+) -> None:
+    """Build a delete operation from a model and track it."""
+    from pydynox._internal._conditions import ConditionPath
+    from pydynox.hooks import HookType
+
+    model._run_hooks(HookType.BEFORE_DELETE)
+
+    version_attr = model._get_version_attr_name()
+    version_condition = None
+    if version_attr is not None:
+        current_version: int | None = getattr(model, version_attr, None)
+        if current_version is not None:
+            dynamo_name = model._py_to_dynamo.get(version_attr, version_attr)
+            path = ConditionPath(path=[dynamo_name])
+            version_condition = path == current_version
+
+    final_condition = condition
+    if version_condition is not None:
+        final_condition = (
+            final_condition & version_condition if final_condition else version_condition
+        )
+
+    table = model._get_table()
+    key = model._get_key()
+
+    op: dict[str, Any] = {"type": "delete", "table": table, "key": key}
+
+    if final_condition is not None:
+        names: dict[str, str] = {}
+        values: dict[str, Any] = {}
+        expr = final_condition.serialize(names, values)
+        op["condition_expression"] = expr
+        op["expression_attribute_names"] = {v: k for k, v in names.items()}
+        op["expression_attribute_values"] = values
+
+    txn._operations.append(op)
+
+
+def _finalize_models(
+    models: list[tuple[Model, str | None, int]],
+) -> None:
+    """Update version attributes and reset change tracking after successful commit."""
+    for model, version_attr, new_version in models:
+        if version_attr is not None:
+            setattr(model, version_attr, new_version)
+        model._reset_change_tracking()
