@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pydynox._internal._logging import _log_debug
 
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
     from pydynox.model import Model
+
+
+class _ModelUpdate(NamedTuple):
+    model: Model
+    version_attr: str | None
+    new_version: int
 
 
 class Transaction:
@@ -50,7 +56,7 @@ class Transaction:
         """
         self._client = client
         self._operations: list[dict[str, Any]] = []
-        self._models: list[tuple[Model, str | None, int]] = []
+        self._models: list[_ModelUpdate] = []
 
     async def __aenter__(self) -> Transaction:
         """Enter the async context manager."""
@@ -255,7 +261,7 @@ class SyncTransaction:
         """
         self._client = client
         self._operations: list[dict[str, Any]] = []
-        self._models: list[tuple[Model, str | None, int]] = []
+        self._models: list[_ModelUpdate] = []
 
     def __enter__(self) -> SyncTransaction:
         """Enter the context manager."""
@@ -437,7 +443,7 @@ def _prepare_model_save(
         op["expression_attribute_values"] = values
 
     txn._operations.append(op)
-    txn._models.append((model, version_attr, new_version))
+    txn._models.append(_ModelUpdate(model, version_attr, new_version))
 
 
 def _prepare_model_delete(
@@ -483,7 +489,7 @@ def _prepare_model_delete(
 
 
 def _finalize_models(
-    models: list[tuple[Model, str | None, int]],
+    models: list[_ModelUpdate],
 ) -> None:
     """Update version attributes and reset change tracking after successful commit."""
     for model, version_attr, new_version in models:
