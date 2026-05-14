@@ -4,8 +4,23 @@ Tests sync transaction success and rollback behavior.
 """
 
 import pytest
-from pydynox import SyncTransaction
+from pydynox import Model, ModelConfig, SyncTransaction
+from pydynox.attributes import StringAttribute, VersionAttribute
 from pydynox.exceptions import PydynoxException, TransactionCanceledException
+
+
+class VersionedItem(Model):
+    model_config = ModelConfig(table="test_table")
+    pk = StringAttribute(partition_key=True)
+    sk = StringAttribute(sort_key=True)
+    name = StringAttribute()
+    version = VersionAttribute()
+
+
+@pytest.fixture
+def versioned_model(dynamo):
+    VersionedItem.model_config = ModelConfig(table="test_table", client=dynamo)
+    return VersionedItem
 
 
 def test_sync_transact_write_puts_multiple_items(dynamo):
@@ -244,3 +259,103 @@ def test_sync_transact_get_empty_list(dynamo):
     """Test sync transact_get with empty list returns empty list."""
     results = dynamo.sync_transact_get([])
     assert results == []
+
+
+def test_save_model_updates_version_after_commit(versioned_model, dynamo):
+    """save_model bumps version attribute after successful commit."""
+    # GIVEN a saved model with version=1
+    item = versioned_model(pk="TXN_MODEL#1", sk="DOC#1", name="Alice")
+    item.sync_save()
+    assert item.version == 1
+
+    # WHEN we update via transaction using save_model
+    item.name = "Bob"
+    with SyncTransaction(dynamo) as txn:
+        txn.save_model(item)
+
+    # THEN version is bumped locally
+    assert item.version == 2
+
+    # AND the DB has the updated data
+    loaded = versioned_model.sync_get(pk="TXN_MODEL#1", sk="DOC#1")
+    assert loaded is not None
+    assert loaded.name == "Bob"
+    assert loaded.version == 2
+
+
+def test_save_model_allows_subsequent_save(versioned_model, dynamo):
+    """After save_model commit, a follow-up sync_save works (no stale version)."""
+    # GIVEN a model saved via transaction
+    item = versioned_model(pk="TXN_MODEL#2", sk="DOC#1", name="Alice")
+    item.sync_save()
+
+    item.name = "Bob"
+    with SyncTransaction(dynamo) as txn:
+        txn.save_model(item)
+
+    assert item.version == 2
+
+    # WHEN we do a regular save after the transaction
+    item.name = "Charlie"
+    item.sync_save()
+
+    # THEN it succeeds with version=3
+    assert item.version == 3
+    loaded = versioned_model.sync_get(pk="TXN_MODEL#2", sk="DOC#1")
+    assert loaded is not None
+    assert loaded.name == "Charlie"
+    assert loaded.version == 3
+
+
+def test_save_model_multiple_models_in_transaction(versioned_model, dynamo):
+    """Multiple models in one transaction all get version updates."""
+    # GIVEN two models
+    item1 = versioned_model(pk="TXN_MODEL#3", sk="DOC#1", name="Alice")
+    item2 = versioned_model(pk="TXN_MODEL#3", sk="DOC#2", name="Bob")
+    item1.sync_save()
+    item2.sync_save()
+
+    # WHEN both are saved in a single transaction
+    item1.name = "Alice Updated"
+    item2.name = "Bob Updated"
+    with SyncTransaction(dynamo) as txn:
+        txn.save_model(item1)
+        txn.save_model(item2)
+
+    # THEN both versions are bumped
+    assert item1.version == 2
+    assert item2.version == 2
+
+
+def test_delete_model_in_transaction(versioned_model, dynamo):
+    """delete_model removes the item from DynamoDB."""
+    # GIVEN a saved model
+    item = versioned_model(pk="TXN_MODEL#4", sk="DOC#1", name="Alice")
+    item.sync_save()
+
+    # WHEN we delete via transaction
+    with SyncTransaction(dynamo) as txn:
+        txn.delete_model(item)
+
+    # THEN item is gone from DB
+    loaded = versioned_model.sync_get(pk="TXN_MODEL#4", sk="DOC#1")
+    assert loaded is None
+
+
+def test_save_model_without_version_attribute(dynamo):
+    """save_model works for models without VersionAttribute."""
+
+    class SimpleItem(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        name = StringAttribute()
+
+    item = SimpleItem(pk="TXN_MODEL#5", sk="DOC#1", name="Alice")
+
+    with SyncTransaction(dynamo) as txn:
+        txn.save_model(item)
+
+    loaded = dynamo.sync_get_item("test_table", {"pk": "TXN_MODEL#5", "sk": "DOC#1"})
+    assert loaded is not None
+    assert loaded["name"] == "Alice"
