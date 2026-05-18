@@ -224,7 +224,8 @@ async def test_save_to_file_no_partial_on_nonexistent_key(s3_ops, s3_bucket, tmp
 
     # WHEN we attempt to download it
     with pytest.raises(Exception):
-        await s3_ops.save_to_file(s3_bucket, "nonexistent-key-" + str(uuid.uuid4()), str(output_path))
+        key = "nonexistent-key-" + str(uuid.uuid4())
+        await s3_ops.save_to_file(s3_bucket, key, str(output_path))
 
     # THEN neither the final file nor the temp file exist
     assert not output_path.exists()
@@ -241,7 +242,8 @@ async def test_save_to_file_preserves_existing_file_on_failure(s3_ops, s3_bucket
 
     # WHEN we attempt to download a nonexistent key to the same path
     with pytest.raises(Exception):
-        await s3_ops.save_to_file(s3_bucket, "nonexistent-key-" + str(uuid.uuid4()), str(output_path))
+        key = "nonexistent-key-" + str(uuid.uuid4())
+        await s3_ops.save_to_file(s3_bucket, key, str(output_path))
 
     # THEN the original file is unchanged
     assert output_path.read_bytes() == original_content
