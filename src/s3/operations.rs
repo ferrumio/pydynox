@@ -266,10 +266,9 @@ async fn execute_multipart_upload(
 
     let part_size = calculate_part_size(data.len());
     let mut parts = Vec::new();
-    let mut part_number = 1;
     let mut api_calls: u32 = 1;
 
-    for chunk in data.chunks(part_size) {
+    for (part_number, chunk) in (1i32..).zip(data.chunks(part_size)) {
         let upload_result = client
             .upload_part()
             .bucket(bucket)
@@ -302,8 +301,6 @@ async fn execute_multipart_upload(
                 return Err(map_s3_error(e, Some(bucket), Some(key)));
             }
         }
-
-        part_number += 1;
     }
 
     let completed = aws_sdk_s3::types::CompletedMultipartUpload::builder()
