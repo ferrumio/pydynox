@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 from pydynox import Model, ModelConfig, set_default_client
-from pydynox._internal._s3 import S3File, S3Value
+from pydynox._internal._s3 import S3File, S3Operations, S3Value
 from pydynox.attributes import S3Attribute, StringAttribute
 
 
@@ -202,6 +202,78 @@ async def test_null_s3attribute(document_model):
 
     loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
     assert loaded.content is None
+
+
+@pytest.fixture
+def s3_ops(localstack_endpoint):
+    """Create S3Operations for direct save_to_file calls."""
+    return S3Operations(
+        region="us-east-1",
+        access_key="testing",
+        secret_key="testing",
+        endpoint_url=localstack_endpoint,
+    )
+
+
+@pytest.mark.asyncio
+async def test_save_to_file_no_partial_on_nonexistent_key(s3_ops, s3_bucket, tmp_path):
+    """save_to_file must not leave files on disk when the S3 key doesn't exist."""
+    # GIVEN a key that doesn't exist in S3
+    output_path = tmp_path / "should_not_exist.bin"
+    tmp_file = tmp_path / "should_not_exist.bin.pydynox_tmp"
+
+    # WHEN we attempt to download it
+    with pytest.raises(Exception):
+        await s3_ops.save_to_file(s3_bucket, "nonexistent-key-" + str(uuid.uuid4()), str(output_path))
+
+    # THEN neither the final file nor the temp file exist
+    assert not output_path.exists()
+    assert not tmp_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_save_to_file_preserves_existing_file_on_failure(s3_ops, s3_bucket, tmp_path):
+    """save_to_file must not overwrite an existing file when the download fails."""
+    # GIVEN an existing file at the output path
+    output_path = tmp_path / "existing.bin"
+    original_content = b"original content that should be preserved"
+    output_path.write_bytes(original_content)
+
+    # WHEN we attempt to download a nonexistent key to the same path
+    with pytest.raises(Exception):
+        await s3_ops.save_to_file(s3_bucket, "nonexistent-key-" + str(uuid.uuid4()), str(output_path))
+
+    # THEN the original file is unchanged
+    assert output_path.read_bytes() == original_content
+
+
+@pytest.mark.asyncio
+async def test_save_to_file_no_temp_file_on_success(document_model, tmp_path):
+    """save_to_file must not leave .pydynox_tmp files after a successful download."""
+    doc_id = str(uuid.uuid4())
+    content = b"Complete file content"
+
+    # GIVEN an uploaded file
+    doc = document_model(
+        pk=f"DOC#{doc_id}",
+        sk="v1",
+        name="clean.bin",
+    )
+    doc.content = S3File(content, name="clean.bin")
+    await doc.save()
+
+    loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    loaded._attributes["content"]._get_s3_ops(loaded._get_client())
+    loaded.content._s3_ops = loaded._attributes["content"]._s3_ops
+
+    # WHEN we successfully download it
+    output_path = tmp_path / "clean_download.bin"
+    await loaded.content.save_to(str(output_path))
+
+    # THEN the file exists with correct content and no temp file remains
+    assert output_path.read_bytes() == content
+    tmp_file = tmp_path / "clean_download.bin.pydynox_tmp"
+    assert not tmp_file.exists()
 
 
 @pytest.mark.asyncio
