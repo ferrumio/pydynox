@@ -266,10 +266,9 @@ async fn execute_multipart_upload(
 
     let part_size = calculate_part_size(data.len());
     let mut parts = Vec::new();
-    let mut part_number = 1;
     let mut api_calls: u32 = 1;
 
-    for chunk in data.chunks(part_size) {
+    for (part_number, chunk) in (1i32..).zip(data.chunks(part_size)) {
         let upload_result = client
             .upload_part()
             .bucket(bucket)
@@ -302,8 +301,6 @@ async fn execute_multipart_upload(
                 return Err(map_s3_error(e, Some(bucket), Some(key)));
             }
         }
-
-        part_number += 1;
     }
 
     let completed = aws_sdk_s3::types::CompletedMultipartUpload::builder()
@@ -395,39 +392,58 @@ pub async fn execute_save_to_file(
         .await
         .map_err(|e| map_s3_error(e, Some(&bucket), Some(&key)))?;
 
-    let mut file = tokio::fs::File::create(&path)
-        .await
-        .map_err(|e| S3Exception::new_err(format!("Failed to create file: {}", e)))?;
+    let tmp_path = format!("{}.pydynox_tmp", path);
 
-    let mut stream = resp.body;
-    let mut total_bytes: u64 = 0;
-
-    while let Some(chunk) = stream
-        .try_next()
-        .await
-        .map_err(|e| S3Exception::new_err(format!("Failed to read chunk: {}", e)))?
-    {
-        total_bytes += chunk.len() as u64;
-        file.write_all(&chunk)
+    let result = async {
+        let mut file = tokio::fs::File::create(&tmp_path)
             .await
-            .map_err(|e| S3Exception::new_err(format!("Failed to write to file: {}", e)))?;
+            .map_err(|e| S3Exception::new_err(format!("Failed to create file: {}", e)))?;
+
+        let mut stream = resp.body;
+        let mut total_bytes: u64 = 0;
+
+        while let Some(chunk) = stream
+            .try_next()
+            .await
+            .map_err(|e| S3Exception::new_err(format!("Failed to read chunk: {}", e)))?
+        {
+            total_bytes += chunk.len() as u64;
+            file.write_all(&chunk)
+                .await
+                .map_err(|e| S3Exception::new_err(format!("Failed to write to file: {}", e)))?;
+        }
+
+        file.flush()
+            .await
+            .map_err(|e| S3Exception::new_err(format!("Failed to flush file: {}", e)))?;
+
+        Ok::<_, PyErr>(total_bytes)
     }
+    .await;
 
-    file.flush()
-        .await
-        .map_err(|e| S3Exception::new_err(format!("Failed to flush file: {}", e)))?;
+    match result {
+        Ok(total_bytes) => {
+            tokio::fs::rename(&tmp_path, &path)
+                .await
+                .map_err(|e| S3Exception::new_err(format!("Failed to rename temp file: {}", e)))?;
 
-    let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+            let duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-    Ok(SaveToFileResult {
-        bytes_written: total_bytes,
-        metrics: S3Metrics {
-            duration_ms,
-            calls: 1,
-            bytes_uploaded: 0,
-            bytes_downloaded: total_bytes,
-        },
-    })
+            Ok(SaveToFileResult {
+                bytes_written: total_bytes,
+                metrics: S3Metrics {
+                    duration_ms,
+                    calls: 1,
+                    bytes_uploaded: 0,
+                    bytes_downloaded: total_bytes,
+                },
+            })
+        }
+        Err(e) => {
+            let _ = tokio::fs::remove_file(&tmp_path).await;
+            Err(e)
+        }
+    }
 }
 
 pub async fn execute_presigned_url(
