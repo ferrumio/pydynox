@@ -1,19 +1,14 @@
 # Smart save
 
-By default, pydynox tracks which fields changed and only sends those to DynamoDB. This saves WCU (Write Capacity Units) when updating large items.
+By default, pydynox tracks which fields changed and only sends those to DynamoDB.
 
 ## Why this matters
 
-DynamoDB charges for every byte you write. If you have a 10KB item and change one field, sending all 10KB wastes 9 WCU.
+- Atomic partial updates (no race conditions from read-modify-write)
+- Conditional updates (built-in support)
+- Network bandwidth savings (sending less data over the wire)
 
-pydynox optimizes this. It only sends the changed field. One field = 1 WCU instead of 10.
-
-This adds up fast:
-
-- 1 million updates/month on 4KB items
-- Without smart save: 4M WCU = $50/month
-- With smart save (200B average change): 200K WCU = $2.50/month
-- Savings: $47.50/month
+Note that it doesn't save on WCUs as DynamoDB still charges based on the size of the item, not the size of attributes that were updated.
 
 ## How it works
 
@@ -23,35 +18,6 @@ When you load an item from DynamoDB, pydynox stores a snapshot of the original v
     ```python
     --8<-- "docs/examples/smart_save/basic.py"
     ```
-
-## Cost savings
-
-DynamoDB charges 1 WCU per 1KB written.
-
-| Item size | Fields changed | Without smart save | With smart save | Savings |
-|-----------|----------------|-------------------|-----------------|---------|
-| 1KB | 1 field (50B) | 1 WCU | 1 WCU | 0% |
-| 4KB | 1 field (50B) | 4 WCU | 1 WCU | 75% |
-| 10KB | 1 field (50B) | 10 WCU | 1 WCU | 90% |
-| 4KB | 2KB of fields | 4 WCU | 2 WCU | 50% |
-
-## Measure WCU consumed
-
-Run this example to see the WCU difference between smart save and full replace:
-
-=== "wcu_comparison.py"
-    ```python
-    --8<-- "docs/examples/smart_save/wcu_comparison.py"
-    ```
-
-Example output:
-
-```
-=== WCU Comparison ===
-Smart save (UpdateItem): 1 WCU
-Full replace (PutItem):  2 WCU
-Savings: 1 WCU
-```
 
 ## Check if item changed
 
