@@ -20,11 +20,11 @@ path = "src/lib.rs"
 [dependencies]
 pyo3 = { version = ">=0.28.2", features = ["extension-module", "multiple-pymethods"] }
 pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
-aws-sdk-dynamodb = "1.111"
-aws-sdk-kms = "1.106"
-aws-sdk-s3 = "1.132"
-aws-sdk-sts = "1.103"
-aws-config = { version = "1.8", features = ["behavior-version-latest"] }
+aws-sdk-dynamodb = { version = "1.111", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-kms = { version = "1.106", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1.132", default-features = false, features = ["default-https-client", "rt-tokio", "sigv4a"] }
+aws-sdk-sts = { version = "1.103", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-config = { version = "1.8", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio", "credentials-process", "sso"] }
 tokio = { version = "1", features = [
     "rt-multi-thread",
     "sync",
