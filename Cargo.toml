@@ -20,10 +20,10 @@ path = "src/lib.rs"
 [dependencies]
 pyo3 = { version = ">=0.28.2", features = ["extension-module", "multiple-pymethods"] }
 pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
-aws-sdk-dynamodb = { version = "1.111", default-features = false, features = ["default-https-client", "rt-tokio"] }
-aws-sdk-kms = { version = "1.106", default-features = false, features = ["default-https-client", "rt-tokio"] }
-aws-sdk-s3 = { version = "1.132", default-features = false, features = ["default-https-client", "rt-tokio", "sigv4a"] }
-aws-sdk-sts = { version = "1.103", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-dynamodb = { version = "1.112", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-kms = { version = "1.107", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-s3 = { version = "1.133", default-features = false, features = ["default-https-client", "rt-tokio", "sigv4a"] }
+aws-sdk-sts = { version = "1.104", default-features = false, features = ["default-https-client", "rt-tokio"] }
 aws-config = { version = "1.8", default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio", "credentials-process", "sso"] }
 tokio = { version = "1", features = [
     "rt-multi-thread",
@@ -44,7 +44,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.23", features = ["v4"] }
 ulid = "1.1"
-svix-ksuid = "0.9"
+svix-ksuid = "0.10"
 chrono = { version = "0.4", default-features = false, features = [
     "std",
     "clock",
