@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydynox._internal._logging import _log_debug
+from pydynox._internal._throttle_retry import retry_on_throttle, sync_retry_on_throttle
 from pydynox.client._typing import _MixinBase
 
 
@@ -13,6 +14,7 @@ class BatchOperations(_MixinBase):
 
     # ========== BATCH WRITE (ASYNC - default, no prefix) ==========
 
+    @retry_on_throttle
     async def batch_write(
         self,
         table: str,
@@ -39,6 +41,7 @@ class BatchOperations(_MixinBase):
 
     # ========== BATCH GET (ASYNC - default, no prefix) ==========
 
+    @retry_on_throttle
     async def batch_get(
         self,
         table: str,
@@ -58,6 +61,7 @@ class BatchOperations(_MixinBase):
 
     # ========== BATCH WRITE (SYNC - with sync_ prefix) ==========
 
+    @sync_retry_on_throttle
     def sync_batch_write(
         self,
         table: str,
@@ -85,6 +89,7 @@ class BatchOperations(_MixinBase):
 
     # ========== BATCH GET (SYNC - with sync_ prefix) ==========
 
+    @sync_retry_on_throttle
     def sync_batch_get(
         self,
         table: str,
@@ -104,6 +109,7 @@ class BatchOperations(_MixinBase):
 
     # ========== TRANSACT WRITE (SYNC) ==========
 
+    @sync_retry_on_throttle
     def sync_transact_write(self, operations: list[dict[str, Any]]) -> None:
         """Sync version of transact_write. Blocks until complete.
 
@@ -114,6 +120,7 @@ class BatchOperations(_MixinBase):
 
     # ========== TRANSACT GET (SYNC) ==========
 
+    @sync_retry_on_throttle
     def sync_transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
         """Sync version of transact_get. Blocks until complete.
 
@@ -141,6 +148,7 @@ class BatchOperations(_MixinBase):
 
     # ========== TRANSACT WRITE (ASYNC - default) ==========
 
+    @retry_on_throttle
     async def transact_write(self, operations: list[dict[str, Any]]) -> None:
         """Execute a transactional write operation.
 
@@ -151,6 +159,7 @@ class BatchOperations(_MixinBase):
 
     # ========== TRANSACT GET (ASYNC - default) ==========
 
+    @retry_on_throttle
     async def transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
         """Execute a transactional get operation.
 

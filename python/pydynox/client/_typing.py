@@ -11,11 +11,13 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pydynox._internal._metrics import ModelMetrics, OperationMetrics
+    from pydynox.rate_limit import AdaptiveRate, FixedRate
 
     class _MixinBase:
         _client: Any  # pydynox_core.DynamoDBClient (Rust extension)
         _last_metrics: OperationMetrics | None
         _total_metrics: ModelMetrics
+        _rate_limit: FixedRate | AdaptiveRate | None
 
         def _acquire_rcu(self, rcu: float = 1.0) -> None: ...
         def _acquire_wcu(self, wcu: float = 1.0) -> None: ...

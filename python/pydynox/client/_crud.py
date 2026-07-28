@@ -6,6 +6,7 @@ from typing import Any, Literal, overload
 
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import OperationMetrics
+from pydynox._internal._throttle_retry import retry_on_throttle, sync_retry_on_throttle
 from pydynox._internal._tracing import add_response_attributes, trace_operation
 from pydynox.client._typing import _MixinBase
 
@@ -104,6 +105,7 @@ class CrudOperations(_MixinBase):
         return_values: Literal["ALL_OLD"],
     ) -> dict[str, Any] | None: ...
 
+    @retry_on_throttle
     async def put_item(
         self,
         table: str,
@@ -188,6 +190,7 @@ class CrudOperations(_MixinBase):
         return_values: Literal["ALL_OLD"],
     ) -> dict[str, Any] | None: ...
 
+    @sync_retry_on_throttle
     def sync_put_item(
         self,
         table: str,
@@ -249,6 +252,7 @@ class CrudOperations(_MixinBase):
 
     # ========== GET ==========
 
+    @retry_on_throttle
     async def get_item(
         self,
         table: str,
@@ -296,6 +300,7 @@ class CrudOperations(_MixinBase):
         self._record_metrics(metrics, "get")
         return result["item"]
 
+    @sync_retry_on_throttle
     def sync_get_item(
         self,
         table: str,
@@ -373,6 +378,7 @@ class CrudOperations(_MixinBase):
         return_values: Literal["ALL_OLD"],
     ) -> dict[str, Any] | None: ...
 
+    @retry_on_throttle
     async def delete_item(
         self,
         table: str,
@@ -457,6 +463,7 @@ class CrudOperations(_MixinBase):
         return_values: Literal["ALL_OLD"],
     ) -> dict[str, Any] | None: ...
 
+    @sync_retry_on_throttle
     def sync_delete_item(
         self,
         table: str,
@@ -546,6 +553,7 @@ class CrudOperations(_MixinBase):
         return_values: Literal["ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDATED_NEW"],
     ) -> dict[str, Any] | None: ...
 
+    @retry_on_throttle
     async def update_item(
         self,
         table: str,
@@ -640,6 +648,7 @@ class CrudOperations(_MixinBase):
         return_values: Literal["ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDATED_NEW"],
     ) -> dict[str, Any] | None: ...
 
+    @sync_retry_on_throttle
     def sync_update_item(
         self,
         table: str,
