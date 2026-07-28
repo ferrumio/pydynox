@@ -25,24 +25,20 @@ async def track_request(user_id: str, date: str, daily_limit: int = 1000) -> int
     Returns the new request count.
     Raises RateLimitExceeded if over limit.
     """
-    usage = await ApiUsage.get(pk=user_id, sk=date)
-
-    if usage is None:
-        # First request of the day
-        usage = ApiUsage(pk=user_id, sk=date, requests=1)
-        await usage.save()
-        return 1
+    usage = ApiUsage(pk=user_id, sk=date)
 
     try:
+        # add() starts from zero, so the first request of the day needs no
+        # special case. The condition also covers the missing attribute.
         await usage.update(
             atomic=[ApiUsage.requests.add(1)],
-            condition=ApiUsage.requests < daily_limit,
+            condition=(ApiUsage.requests < daily_limit) | ApiUsage.requests.not_exists(),
         )
-        # Fetch updated count
-        updated = await ApiUsage.get(pk=user_id, sk=date)
-        return updated.requests
     except ConditionalCheckFailedException:
         raise RateLimitExceeded(f"User {user_id} exceeded {daily_limit} requests/day")
+
+    updated = await ApiUsage.get(pk=user_id, sk=date)
+    return updated.requests
 
 
 async def main():

@@ -54,20 +54,21 @@ Each `add(1)` is atomic. Even with thousands of concurrent requests, every incre
 `add()` starts from zero when the attribute is missing, so the same call works for the first
 increment and every one after it. This is useful for aggregates you build up over time:
 
-```python
-aggregate = WalletAggregate(wallet_id="wallet-123", currency="USD")
-
-# Works whether the item exists or not
-await aggregate.update(
-    atomic=[
-        WalletAggregate.total_amount.add(25),
-        WalletAggregate.transaction_count.add(1),
-    ]
-)
-```
+=== "aggregate_counters.py"
+    ```python
+    --8<-- "docs/examples/atomic/aggregate_counters.py"
+    ```
 
 DynamoDB creates the item from the key when it is missing, so you don't need a read or a
-separate save first.
+separate save first. That also means a wrong key writes a new item instead of failing. When
+you need the old behaviour, add a condition so the update only touches an existing item:
+
+```python
+await aggregate.update(
+    atomic=[WalletAggregate.total_amount.add(25)],
+    condition=WalletAggregate.wallet_id.exists(),
+)
+```
 
 ### Safe balance transfer
 

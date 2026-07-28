@@ -341,3 +341,19 @@ async def test_atomic_add_negative_on_missing_attribute(dynamo):
     # THEN it goes negative from zero
     result = await User.get(pk="USER#MISSING3", sk="PROFILE")
     assert result.balance == -25
+
+
+@pytest.mark.asyncio
+async def test_atomic_add_with_exists_condition_rejects_missing_item(dynamo):
+    # GIVEN an item that was never saved
+    user = User(pk="USER#MISSING4", sk="PROFILE")
+
+    # WHEN we add with a condition requiring the item to exist
+    # THEN the update is rejected instead of creating the item
+    with pytest.raises(ConditionalCheckFailedException):
+        await user.update(
+            atomic=[User.count.add(5)],
+            condition=User.pk.exists(),
+        )
+
+    assert await User.get(pk="USER#MISSING4", sk="PROFILE") is None

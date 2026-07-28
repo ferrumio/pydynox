@@ -129,11 +129,14 @@ def test_atomic_increment():
 def test_atomic_increment_on_missing_attribute():
     """Test atomic increment when the attribute does not exist yet."""
     with MemoryBackend():
+        # GIVEN a saved item with no total attribute
         aggregate = Aggregate(pk="WALLET#1")
         aggregate.sync_save()
 
+        # WHEN we increment the missing attribute
         aggregate.sync_update(atomic=[Aggregate.total.add(25)])
 
+        # THEN it starts from zero instead of failing
         found = Aggregate.sync_get(pk="WALLET#1")
         assert found is not None
         assert found.total == 25
@@ -142,13 +145,16 @@ def test_atomic_increment_on_missing_attribute():
 def test_atomic_increment_multiple_missing_attributes():
     """Test that commas inside if_not_exists don't break clause splitting."""
     with MemoryBackend():
+        # GIVEN a saved item with no counters
         aggregate = Aggregate(pk="WALLET#1")
         aggregate.sync_save()
 
+        # WHEN we increment two missing attributes in one update
         aggregate.sync_update(
             atomic=[Aggregate.total.add(25), Aggregate.count.add(1)],
         )
 
+        # THEN both are applied, so the SET clause was split correctly
         found = Aggregate.sync_get(pk="WALLET#1")
         assert found is not None
         assert found.total == 25
