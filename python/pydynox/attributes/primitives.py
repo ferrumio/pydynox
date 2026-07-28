@@ -292,7 +292,10 @@ class MapAttribute(Attribute[MT], Generic[MT]):
             return value
         if self._is_pydantic:
             return self.model_class.model_validate(value)  # ty: ignore[unresolved-attribute]
-        fields = {f.name for f in dataclasses.fields(self.model_class)}  # ty: ignore[invalid-argument-type]
+        model_class = self.model_class
+        if not dataclasses.is_dataclass(model_class):
+            return value
+        fields = {f.name for f in dataclasses.fields(model_class)}
         return self.model_class(**{k: v for k, v in value.items() if k in fields})
 
     def _snapshot_key(self, value: Any) -> str | None:

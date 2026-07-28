@@ -130,8 +130,10 @@ fn decrypt_local(data: &[u8], key: &[u8]) -> Result<Vec<u8>, PyErr> {
         .map_err(|e| EncryptionException::new_err(format!("Invalid key: {}", e)))?;
 
     let (nonce_bytes, ciphertext) = data.split_at(NONCE_SIZE);
-    let nonce = Nonce::try_from(nonce_bytes)
-        .map_err(|e| EncryptionException::new_err(format!("Invalid nonce: {}", e)))?;
+    let nonce_array: [u8; NONCE_SIZE] = nonce_bytes
+        .try_into()
+        .map_err(|_| EncryptionException::new_err("Invalid nonce length"))?;
+    let nonce = Nonce::from(nonce_array);
 
     cipher
         .decrypt(&nonce, ciphertext)

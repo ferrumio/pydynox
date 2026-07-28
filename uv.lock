@@ -887,7 +887,7 @@ dev = [
     { name = "pytest-codspeed", specifier = ">=4.2.0" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "pytest-memray", specifier = ">=1.7" },
-    { name = "ruff", specifier = ">=0.8" },
+    { name = "ruff", specifier = ">=0.14.13" },
     { name = "testcontainers", specifier = ">=4.0" },
     { name = "ty", specifier = ">=0.0.64" },
 ]
