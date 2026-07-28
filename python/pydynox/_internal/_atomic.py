@@ -73,7 +73,12 @@ class AtomicSet:
 
 
 class AtomicAdd:
-    """SET field = field + value."""
+    """SET field = if_not_exists(field, 0) + value.
+
+    Uses if_not_exists so the increment also works when the attribute is
+    missing. Referencing the attribute directly would make DynamoDB reject
+    the update with a ValidationException.
+    """
 
     def __init__(self, path: AtomicPath, value: int | float):
         self.path = path
@@ -82,7 +87,8 @@ class AtomicAdd:
     def serialize(self, names: dict[str, str], values: dict[str, Any]) -> str:
         path_str = self.path._serialize_path(names)
         value_ph = _get_value_placeholder(self.value, values)
-        return f"{path_str} = {path_str} + {value_ph}"
+        zero_ph = _get_value_placeholder(0, values)
+        return f"{path_str} = if_not_exists({path_str}, {zero_ph}) + {value_ph}"
 
 
 class AtomicRemove:

@@ -17,6 +17,7 @@ TABLE_SCHEMAS = {
     "orders": ("pk", "sk"),
     "analytics": ("pk", "sk"),
     "api_usage": ("pk", "sk"),
+    "wallet-transaction-aggregates": ("wallet_id", "currency"),
     # Tables with pk only
     "products": ("pk", None),
     "events": ("pk", None),

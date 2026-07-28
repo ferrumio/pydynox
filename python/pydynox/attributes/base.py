@@ -171,7 +171,10 @@ class Attribute(Generic[T]):
         return AtomicSet(self._get_atomic_path(), value)
 
     def add(self, value: int | float) -> AtomicAdd:
-        """Add to a number attribute (atomic increment/decrement)."""
+        """Add to a number attribute (atomic increment/decrement).
+
+        Starts from zero when the attribute does not exist yet.
+        """
         return AtomicAdd(self._get_atomic_path(), value)
 
     def remove(self) -> AtomicRemove:
