@@ -18,8 +18,8 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
-pyo3 = { version = ">=0.28.2", features = ["extension-module", "multiple-pymethods"] }
-pyo3-async-runtimes = { version = "0.28", features = ["tokio-runtime"] }
+pyo3 = { version = "0.29", features = ["extension-module", "multiple-pymethods"] }
+pyo3-async-runtimes = { version = "0.29", features = ["tokio-runtime"] }
 aws-sdk-dynamodb = { version = "1.113", default-features = false, features = ["default-https-client", "rt-tokio"] }
 aws-sdk-kms = { version = "1.109", default-features = false, features = ["default-https-client", "rt-tokio"] }
 aws-sdk-s3 = { version = "1.134", default-features = false, features = ["default-https-client", "rt-tokio", "sigv4a"] }
@@ -35,25 +35,25 @@ tokio = { version = "1", features = [
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
-base64 = "0.22"
+base64 = "0.23"
 once_cell = "1.21"
 zstd = "0.13"
-lz4_flex = "0.13"
+lz4_flex = "0.14"
 flate2 = "1.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.23", features = ["v4"] }
-ulid = "1.1"
+ulid = "3.0"
 svix-ksuid = "0.10"
 chrono = { version = "0.4", default-features = false, features = [
     "std",
     "clock",
 ] }
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 rand = "0.10"
 
 [dev-dependencies]
-pyo3 = { version = ">=0.28.2", features = ["auto-initialize"] }
+pyo3 = { version = "0.29", features = ["auto-initialize"] }
 
 [profile.release]
 lto = true

@@ -26,7 +26,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import is_dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
@@ -78,7 +78,7 @@ def dynamodb_model(
         if is_dataclass(cls):
             from pydynox.integrations.dataclass import from_dataclass
 
-            return from_dataclass(cls, table, partition_key, sort_key, client)
+            return from_dataclass(cast("type[T]", cls), table, partition_key, sort_key, client)
 
         # Check if Pydantic model
         try:
@@ -87,7 +87,7 @@ def dynamodb_model(
             if issubclass(cls, BaseModel):
                 from pydynox.integrations.pydantic import from_pydantic
 
-                return from_pydantic(cls, table, partition_key, sort_key, client)
+                return from_pydantic(cast("type[T]", cls), table, partition_key, sort_key, client)
         except ImportError:
             pass
 

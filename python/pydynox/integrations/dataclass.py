@@ -21,7 +21,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import asdict, fields, is_dataclass
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydynox.integrations._base import add_dynamodb_methods
 
@@ -68,4 +68,7 @@ def from_dataclass(
     def from_dict(klass: type[T], data: dict[str, Any]) -> T:
         return klass(**data)
 
-    return add_dynamodb_methods(cls, table, partition_key, sort_key, client, to_dict, from_dict)
+    # is_dataclass() above narrows cls to type[T | DataclassInstance], so cast back to type[T]
+    return add_dynamodb_methods(
+        cast("type[T]", cls), table, partition_key, sort_key, client, to_dict, from_dict
+    )
