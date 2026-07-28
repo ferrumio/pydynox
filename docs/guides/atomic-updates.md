@@ -51,6 +51,24 @@ The most common use case. Increment or decrement a number:
 
 Each `add(1)` is atomic. Even with thousands of concurrent requests, every increment is counted.
 
+`add()` starts from zero when the attribute is missing, so the same call works for the first
+increment and every one after it. This is useful for aggregates you build up over time:
+
+```python
+aggregate = WalletAggregate(wallet_id="wallet-123", currency="USD")
+
+# Works whether the item exists or not
+await aggregate.update(
+    atomic=[
+        WalletAggregate.total_amount.add(25),
+        WalletAggregate.transaction_count.add(1),
+    ]
+)
+```
+
+DynamoDB creates the item from the key when it is missing, so you don't need a read or a
+separate save first.
+
 ### Safe balance transfer
 
 Combine atomic updates with conditions to prevent overdrafts:
@@ -129,7 +147,7 @@ All operations happen atomically. Either all succeed or none do.
 | Method | Description | Example |
 |--------|-------------|---------|
 | `set(value)` | Set attribute to value | `User.name.set("Jane")` |
-| `add(n)` | Add to number (use negative to subtract) | `User.count.add(1)` |
+| `add(n)` | Add to number, starting from zero if missing (use negative to subtract) | `User.count.add(1)` |
 | `remove()` | Delete the attribute | `User.temp.remove()` |
 | `append(items)` | Add items to end of list | `User.tags.append(["a", "b"])` |
 | `prepend(items)` | Add items to start of list | `User.tags.prepend(["a"])` |

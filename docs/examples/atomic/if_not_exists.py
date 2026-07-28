@@ -32,13 +32,8 @@ async def main():
     await user.update(atomic=[User.login_count.if_not_exists(999)])
     # login_count: still 1
 
-    # Combine with add for "increment or initialize"
-    await user.update(
-        atomic=[
-            User.score.if_not_exists(0),  # Initialize if missing
-        ]
-    )
-    await user.update(atomic=[User.score.add(10)])  # Then increment
+    # add() already initializes from zero, so no if_not_exists is needed
+    await user.update(atomic=[User.score.add(10)])
     # score: 10
 
 

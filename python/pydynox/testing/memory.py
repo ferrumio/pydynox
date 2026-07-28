@@ -15,6 +15,29 @@ from pydynox.exceptions import ConditionalCheckFailedException
 from pydynox.model import Model
 
 
+def _split_top_level(clause: str) -> list[str]:
+    """Split a clause on commas that are not inside parentheses.
+
+    Needed because expressions like `if_not_exists(a, :zero)` contain commas
+    that do not separate assignments.
+    """
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for char in clause:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    parts.append("".join(current))
+    return parts
+
+
 @dataclass
 class FakeMetrics:
     """Fake metrics for in-memory backend."""
@@ -1116,6 +1139,7 @@ class MemoryClient:
         Supports:
         - SET attr = :value
         - SET attr = attr + :value (ADD)
+        - SET attr = if_not_exists(attr, :zero) + :value (missing-safe ADD)
         - REMOVE attr
         """
         # Resolve attribute names
@@ -1128,10 +1152,24 @@ class MemoryClient:
         set_match = re.search(r"SET\s+(.+?)(?:REMOVE|ADD|DELETE|$)", resolved, re.IGNORECASE)
         if set_match:
             set_clause = set_match.group(1).strip()
-            # Split by comma
-            for assignment in set_clause.split(","):
+            # Split by comma, ignoring commas inside function calls like if_not_exists(a, :b)
+            for assignment in _split_top_level(set_clause):
                 assignment = assignment.strip()
                 if not assignment:
+                    continue
+
+                # Check for attr = if_not_exists(attr, :zero) + :value (missing-safe increment)
+                match = re.search(
+                    r"(\w+)\s*=\s*if_not_exists\(\s*\w+\s*,\s*(:?\w+)\s*\)\s*\+\s*(:?\w+)",
+                    assignment,
+                )
+                if match:
+                    attr = match.group(1)
+                    default_key = match.group(2)
+                    value_key = match.group(3)
+                    if attr_values and value_key in attr_values:
+                        default = attr_values.get(default_key, 0)
+                        item[attr] = item.get(attr, default) + attr_values[value_key]
                     continue
 
                 # Check for attr = attr + :value (increment)

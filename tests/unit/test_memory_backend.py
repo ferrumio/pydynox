@@ -20,6 +20,15 @@ class User(Model):
     age = NumberAttribute(default=0)
 
 
+class Aggregate(Model):
+    """Test model with counters that have no default."""
+
+    model_config = ModelConfig(table="aggregates")
+    pk = StringAttribute(partition_key=True)
+    total = NumberAttribute()
+    count = NumberAttribute()
+
+
 def test_memory_backend_context_manager():
     """Test MemoryBackend as context manager."""
     with MemoryBackend():
@@ -115,6 +124,35 @@ def test_atomic_increment():
         found = User.sync_get(pk="USER#1")
         assert found is not None
         assert found.age == 5
+
+
+def test_atomic_increment_on_missing_attribute():
+    """Test atomic increment when the attribute does not exist yet."""
+    with MemoryBackend():
+        aggregate = Aggregate(pk="WALLET#1")
+        aggregate.sync_save()
+
+        aggregate.sync_update(atomic=[Aggregate.total.add(25)])
+
+        found = Aggregate.sync_get(pk="WALLET#1")
+        assert found is not None
+        assert found.total == 25
+
+
+def test_atomic_increment_multiple_missing_attributes():
+    """Test that commas inside if_not_exists don't break clause splitting."""
+    with MemoryBackend():
+        aggregate = Aggregate(pk="WALLET#1")
+        aggregate.sync_save()
+
+        aggregate.sync_update(
+            atomic=[Aggregate.total.add(25), Aggregate.count.add(1)],
+        )
+
+        found = Aggregate.sync_get(pk="WALLET#1")
+        assert found is not None
+        assert found.total == 25
+        assert found.count == 1
 
 
 def test_scan():
