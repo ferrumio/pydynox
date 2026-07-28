@@ -29,7 +29,7 @@ pub fn generate_uuid4() -> String {
 /// `"01ARZ3NDEKTSV4RRFFQ69G5FAV"`
 #[pyfunction]
 pub fn generate_ulid() -> String {
-    Ulid::new().to_string()
+    Ulid::generate().to_string()
 }
 
 /// Generate a KSUID string.
