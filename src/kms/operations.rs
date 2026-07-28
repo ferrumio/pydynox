@@ -102,11 +102,11 @@ fn encrypt_local(plaintext: &[u8], key: &[u8]) -> Result<Vec<u8>, PyErr> {
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     rand::rng().fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     // Encrypt
     let ciphertext = cipher
-        .encrypt(nonce, plaintext)
+        .encrypt(&nonce, plaintext)
         .map_err(|e| EncryptionException::new_err(format!("Encryption failed: {}", e)))?;
 
     // Prepend nonce to ciphertext
@@ -130,10 +130,13 @@ fn decrypt_local(data: &[u8], key: &[u8]) -> Result<Vec<u8>, PyErr> {
         .map_err(|e| EncryptionException::new_err(format!("Invalid key: {}", e)))?;
 
     let (nonce_bytes, ciphertext) = data.split_at(NONCE_SIZE);
-    let nonce = Nonce::from_slice(nonce_bytes);
+    let nonce_array: [u8; NONCE_SIZE] = nonce_bytes
+        .try_into()
+        .map_err(|_| EncryptionException::new_err("Invalid nonce length"))?;
+    let nonce = Nonce::from(nonce_array);
 
     cipher
-        .decrypt(nonce, ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|e| EncryptionException::new_err(format!("Decryption failed: {}", e)))
 }
 

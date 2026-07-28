@@ -40,7 +40,9 @@ jobs:
       - name: Install tools
         run: |
           source .venv/bin/activate
-          pip install ruff ty pytest pydantic opentelemetry-api
+          # Pinned so a new linter release can't fail CI on unrelated PRs.
+          # Keep in sync with the dev dependency group in pyproject.toml.
+          pip install ruff==0.14.13 ty==0.0.64 pytest pydantic opentelemetry-api
 
       - name: Ruff check
         run: |
