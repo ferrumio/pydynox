@@ -38,6 +38,49 @@ def _split_top_level(clause: str) -> list[str]:
     return parts
 
 
+def _split_logical(condition: str, operator: str) -> list[str]:
+    """Split a condition on a logical operator outside parentheses.
+
+    Returns a single-item list when the operator is not present at that level,
+    so callers can tell a combined condition from a plain one.
+    """
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    # Drop wrapping parens first, otherwise every operator looks nested
+    tokens = re.split(rf"(\(|\)|\b{operator}\b)", _strip_outer_parens(condition))
+    for token in tokens:
+        if token == "(":
+            depth += 1
+        elif token == ")":
+            depth -= 1
+        elif token == operator and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(token)
+    parts.append("".join(current))
+    return [stripped for part in parts if (stripped := _strip_outer_parens(part))]
+
+
+def _strip_outer_parens(clause: str) -> str:
+    """Remove wrapping parentheses so a clause can be matched on its own."""
+    clause = clause.strip()
+    while clause.startswith("(") and clause.endswith(")"):
+        inner = clause[1:-1]
+        # Only unwrap when the parens are a matched pair around the whole clause
+        depth = 0
+        for char in inner:
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth < 0:
+                    return clause
+        clause = inner.strip()
+    return clause
+
+
 @dataclass
 class FakeMetrics:
     """Fake metrics for in-memory backend."""
@@ -1017,12 +1060,31 @@ class MemoryClient:
         - attr <= :value
         - attr > :value
         - attr >= :value
+
+        Clauses can be combined with OR and AND.
         """
         if item is None:
             # For attribute_not_exists, None item means condition passes
             if "attribute_not_exists" in condition:
                 return True
             return False
+
+        # Split combined conditions so each clause is evaluated on its own.
+        # Checking the whole string at once would let an attribute_not_exists in
+        # one branch decide the result for every other branch.
+        or_clauses = _split_logical(condition, "OR")
+        if len(or_clauses) > 1:
+            return any(
+                self._check_condition(item, clause, attr_names, attr_values)
+                for clause in or_clauses
+            )
+
+        and_clauses = _split_logical(condition, "AND")
+        if len(and_clauses) > 1:
+            return all(
+                self._check_condition(item, clause, attr_names, attr_values)
+                for clause in and_clauses
+            )
 
         # Resolve attribute names
         resolved_condition = condition

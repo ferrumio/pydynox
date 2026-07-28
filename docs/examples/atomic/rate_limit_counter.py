@@ -37,7 +37,8 @@ async def track_request(user_id: str, date: str, daily_limit: int = 1000) -> int
     except ConditionalCheckFailedException:
         raise RateLimitExceeded(f"User {user_id} exceeded {daily_limit} requests/day")
 
-    updated = await ApiUsage.get(pk=user_id, sk=date)
+    # Consistent read, otherwise the count we just wrote may not be visible yet
+    updated = await ApiUsage.get(pk=user_id, sk=date, consistent_read=True)
     return updated.requests
 
 

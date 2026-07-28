@@ -61,7 +61,7 @@ increment and every one after it. This is useful for aggregates you build up ove
 
 DynamoDB creates the item from the key when it is missing, so you don't need a read or a
 separate save first. That also means a wrong key writes a new item instead of failing. When
-you need the old behaviour, add a condition so the update only touches an existing item:
+you need the old behavior, add a condition so the update only touches an existing item:
 
 ```python
 await aggregate.update(

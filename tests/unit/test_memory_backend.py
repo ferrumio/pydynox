@@ -8,6 +8,7 @@ With async-first API:
 import pytest
 from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.exceptions import ConditionalCheckFailedException
 from pydynox.testing import MemoryBackend
 
 
@@ -366,3 +367,54 @@ async def test_async_update_by_key():
         found = await User.get(pk="USER#1")
         assert found is not None
         assert found.name == "Updated"
+
+
+def test_condition_with_or_evaluates_each_clause():
+    """Test that OR conditions don't let one clause decide the result."""
+    with MemoryBackend():
+        # GIVEN an item whose counter is well below the limit
+        aggregate = Aggregate(pk="WALLET#1", total=1)
+        aggregate.sync_save()
+
+        # WHEN we update with "under limit OR attribute missing"
+        aggregate.sync_update(
+            atomic=[Aggregate.total.add(1)],
+            condition=(Aggregate.total < 100) | Aggregate.total.not_exists(),
+        )
+
+        # THEN the first clause is honoured instead of the attribute_not_exists one
+        found = Aggregate.sync_get(pk="WALLET#1")
+        assert found is not None
+        assert found.total == 2
+
+
+def test_condition_with_or_rejects_when_no_clause_matches():
+    """Test that an OR condition still fails when every clause is false."""
+    with MemoryBackend():
+        # GIVEN an item already at the limit
+        aggregate = Aggregate(pk="WALLET#1", total=100)
+        aggregate.sync_save()
+
+        # WHEN we update with "under limit OR attribute missing"
+        # THEN it is rejected, since the attribute exists and is not under the limit
+        with pytest.raises(ConditionalCheckFailedException):
+            aggregate.sync_update(
+                atomic=[Aggregate.total.add(1)],
+                condition=(Aggregate.total < 100) | Aggregate.total.not_exists(),
+            )
+
+
+def test_condition_with_and_requires_every_clause():
+    """Test that AND conditions require all clauses to pass."""
+    with MemoryBackend():
+        # GIVEN an item with a total of 1 and no count
+        aggregate = Aggregate(pk="WALLET#1", total=1)
+        aggregate.sync_save()
+
+        # WHEN one clause is false
+        # THEN the whole condition fails
+        with pytest.raises(ConditionalCheckFailedException):
+            aggregate.sync_update(
+                atomic=[Aggregate.total.add(1)],
+                condition=(Aggregate.total < 100) & Aggregate.total.not_exists(),
+            )

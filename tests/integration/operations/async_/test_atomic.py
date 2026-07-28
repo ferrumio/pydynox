@@ -300,7 +300,7 @@ async def test_atomic_add_initializes_missing_attribute(dynamo):
 
 @pytest.mark.asyncio
 async def test_atomic_add_creates_item_when_absent(dynamo):
-    # GIVEN an aggregate item that was never saved
+    # GIVEN a user item that was never saved
     user = User(pk="USER#MISSING2", sk="PROFILE")
 
     # WHEN we add to two missing attributes at once
