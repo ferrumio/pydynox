@@ -282,3 +282,78 @@ async def test_atomic_with_not_exists_condition(dynamo):
 
     result = await User.get(pk="USER#COND8", sk="PROFILE")
     assert result.count == 100
+
+
+@pytest.mark.asyncio
+async def test_atomic_add_initializes_missing_attribute(dynamo):
+    # GIVEN a saved user with no count attribute
+    user = User(pk="USER#MISSING1", sk="PROFILE", name="John")
+    await user.save()
+
+    # WHEN we add to the missing attribute
+    await user.update(atomic=[User.count.add(5)])
+
+    # THEN it starts from zero instead of failing
+    result = await User.get(pk="USER#MISSING1", sk="PROFILE")
+    assert result.count == 5
+
+
+@pytest.mark.asyncio
+async def test_atomic_add_creates_item_when_absent(dynamo):
+    # GIVEN a user item that was never saved
+    user = User(pk="USER#MISSING2", sk="PROFILE")
+
+    # WHEN we add to two missing attributes at once
+    await user.update(
+        atomic=[
+            User.balance.add(25),
+            User.count.add(1),
+        ]
+    )
+
+    # THEN the item is created with both values
+    result = await User.get(pk="USER#MISSING2", sk="PROFILE")
+    assert result.balance == 25
+    assert result.count == 1
+
+    # AND a second update keeps incrementing them
+    await user.update(
+        atomic=[
+            User.balance.add(10),
+            User.count.add(1),
+        ]
+    )
+
+    result = await User.get(pk="USER#MISSING2", sk="PROFILE")
+    assert result.balance == 35
+    assert result.count == 2
+
+
+@pytest.mark.asyncio
+async def test_atomic_add_negative_on_missing_attribute(dynamo):
+    # GIVEN a saved user with no balance attribute
+    user = User(pk="USER#MISSING3", sk="PROFILE", name="John")
+    await user.save()
+
+    # WHEN we subtract from the missing attribute
+    await user.update(atomic=[User.balance.add(-25)])
+
+    # THEN it goes negative from zero
+    result = await User.get(pk="USER#MISSING3", sk="PROFILE")
+    assert result.balance == -25
+
+
+@pytest.mark.asyncio
+async def test_atomic_add_with_exists_condition_rejects_missing_item(dynamo):
+    # GIVEN an item that was never saved
+    user = User(pk="USER#MISSING4", sk="PROFILE")
+
+    # WHEN we add with a condition requiring the item to exist
+    # THEN the update is rejected instead of creating the item
+    with pytest.raises(ConditionalCheckFailedException):
+        await user.update(
+            atomic=[User.count.add(5)],
+            condition=User.pk.exists(),
+        )
+
+    assert await User.get(pk="USER#MISSING4", sk="PROFILE") is None

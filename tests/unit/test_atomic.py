@@ -38,11 +38,12 @@ def test_add():
     # WHEN we serialize the operation
     expr, names, values = serialize_atomic([op])
 
-    # THEN the expression should use addition syntax
+    # THEN the expression should use missing-safe addition syntax
     assert "SET" in expr
-    assert "#n0 = #n0 + :v0" in expr
+    assert "#n0 = if_not_exists(#n0, :v1) + :v0" in expr
     assert names["count"] == "#n0"
     assert values[":v0"] == 1
+    assert values[":v1"] == 0
 
 
 def test_add_negative():
@@ -54,7 +55,7 @@ def test_add_negative():
     expr, names, values = serialize_atomic([op])
 
     # THEN the expression should use the negative value
-    assert "#n0 = #n0 + :v0" in expr
+    assert "#n0 = if_not_exists(#n0, :v1) + :v0" in expr
     assert values[":v0"] == -5
 
 
@@ -186,4 +187,5 @@ def test_complex_combination():
     # THEN all operation types should be present
     assert "SET" in expr
     assert "REMOVE" in expr
-    assert len(values) == 2
+    # add(1) uses two placeholders (the delta and the if_not_exists default)
+    assert len(values) == 3
