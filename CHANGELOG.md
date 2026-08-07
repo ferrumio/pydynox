@@ -1,6 +1,75 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.3.1] - 2026-08-07
+
+
+### Bug Fixes
+
+- update the version in a transaction (#396)
+- s3 save prevent corrupted file (#398)
+- make atomic add() work on uninitialized numeric attributes (#438)
+- feed throttle events back into the rate limiter (#439)
+
+
+### CI/CD
+
+- bump github/codeql-action from 4.35.3 to 4.35.4 (#388)
+- bump CodSpeedHQ/action from 4.15.0 to 4.15.1 (#389)
+- bump urllib3 from 2.6.3 to 2.7.0 (#390)
+- bump mako from 1.3.11 to 1.3.12 (#391)
+- bump python-dotenv from 1.2.1 to 1.2.2 (#392)
+- fix security
+- bump pygments from 2.19.2 to 2.20.0 (#399)
+- bump github/codeql-action from 4.35.4 to 4.35.5 (#401)
+- bump codecov/codecov-action from 6.0.0 to 6.0.1 (#400)
+- bump idna from 3.11 to 3.15 (#404)
+- bump pymdown-extensions from 10.20 to 10.21.3 (#405)
+- bump github/codeql-action from 4.35.5 to 4.36.0 (#406)
+- bump github/codeql-action from 4.36.0 to 4.36.1 (#412)
+- bump actions/checkout from 6.0.2 to 6.0.3 (#411)
+- bump CodSpeedHQ/action from 4.15.1 to 4.17.0 (#410)
+- bump astral-sh/setup-uv from 8.1.0 to 8.2.0 (#413)
+- bump actions/checkout from 6.0.3 to 7.0.0 (#422)
+- bump CodSpeedHQ/action from 4.17.0 to 4.18.1 (#424)
+- bump actions/cache from 5.0.5 to 6.1.0 (#427)
+- bump astral-sh/setup-uv from 8.2.0 to 9.0.0 (#426)
+- bump github/codeql-action/upload-sarif from 4.36.1 to 4.37.3 (#428)
+- bump codecov/codecov-action from 6.0.1 to 7.0.0 (#415)
+- bump actions/setup-python from 6.2.0 to 7.0.0 (#429)
+- bump pypa/gh-action-pypi-publish from 1.14.0 to 1.14.2 (#440)
+- bump ossf/scorecard-action from 2.4.3 to 2.4.4 (#445)
+- bump actions/checkout from 7.0.0 to 7.0.1 (#444)
+- bump github/codeql-action/upload-sarif from 4.37.3 to 4.37.6 (#442)
+- bump CodSpeedHQ/action from 4.18.1 to 5.0.2 (#443)
+- bump version to 1.3.1 (#446)
+
+
+### Documentation
+
+- update changelog for v1.3.0 (#382)
+
+
+### Refactoring
+
+- release gil in ping method (#393)
+- create shared tokio runtime (#394)
+- use NamedTuple instead of tuples (#395)
+
+
+### Deps
+
+- bump the rust-dependencies group with 3 updates (#386)
+- bump the dev-dependencies group with 2 updates (#387)
+- bump the dev-dependencies group with 2 updates (#402)
+- bump the rust-dependencies group with 7 updates (#407)
+- bump the dev-dependencies group with 2 updates (#408)
+- bump the rust-dependencies group with 6 updates (#414)
+- bump the dev-dependencies group with 2 updates (#418)
+- bump the dev-dependencies group with 2 updates (#430)
+- bump the rust-dependencies group across 1 directory with 14 updates (#437)
+- bump the dev-dependencies group across 1 directory with 3 updates (#436)
+- bump the dev-dependencies group with 3 updates (#441)
 ## [1.3.0] - 2026-05-10
 
 
