@@ -47,9 +47,32 @@ Use `AdaptiveRate` when you don't know the right rate, or when capacity varies. 
 How adaptive rate works:
 
 1. Starts at 50% of max rate
-2. When throttled, reduces by 20%
+2. When throttled, reduces by 20% and retries
 3. When no throttle for 10 seconds, increases by 10%
 4. Never goes below min or above max
+
+### Retry on throttling
+
+When a rate limiter is configured, a throttled operation is retried instead of failing
+straight away. Each retry lowers the rate first, so the next attempt waits longer for
+capacity: the backoff doubles from 0.1s up to 5s, for at most 10 attempts.
+
+```python
+client = DynamoDBClient(
+    region="us-east-1",
+    rate_limit=AdaptiveRate(max_rcu=100, max_wcu=10),
+)
+
+# Throttling now lowers the rate and retries instead of raising
+client.sync_put_item("users", item)
+```
+
+This is different from the retries the AWS SDK does on its own. The SDK retries at the
+same rate, because it doesn't know about the limiter. These retries feed the throttle
+back into the limiter, so the client slows itself down.
+
+Without a rate limiter nothing changes: `ProvisionedThroughputExceededException` is
+raised on the first throttle, so code that handles it keeps working.
 
 `AdaptiveRate` is good for:
 
