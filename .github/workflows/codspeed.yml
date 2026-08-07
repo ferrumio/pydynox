@@ -57,7 +57,7 @@ jobs:
         run: uv run maturin develop --release
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@a4a36bb07c0638b0b4ca52bf1f3dad1b4289e52f # v4.18.1
+        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
           mode: walltime
           run: uv run pytest --ignore=tests/benchmark --codspeed
