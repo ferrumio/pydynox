@@ -160,11 +160,40 @@ The memory backend supports:
 | `scan()` | ✓ |
 | `batch_write()` | ✓ |
 | `batch_get()` | ✓ |
+| Vector search | ✓ |
+| Vector index lifecycle | ✓ |
 | Conditions | ✓ |
 | Atomic updates | ✓ |
 
 !!! note
     Some advanced features like transactions and GSI queries are not yet supported in the memory backend. Use localstack for those cases.
+
+### Vector search
+
+The memory backend performs exact, deterministic vector search for cosine
+distance, Euclidean distance, and dot product. It also supports vector
+partition keys, equality-only inline filters, projections, and `top_k`.
+
+```python
+with MemoryBackend():
+    Product(
+        pk="PRODUCT#1",
+        tenant_id="TENANT#acme",
+        embedding=[1.0, 0.0],
+    ).sync_save()
+
+    matches = Product.semantic.sync_search(
+        [0.9, 0.1],
+        partition_key="TENANT#acme",
+        top_k=1,
+    )
+
+    assert matches[0].item.pk == "PRODUCT#1"
+```
+
+The memory backend uses exact search. Production vector indexes may not return
+the same ordering for vectors with nearly identical scores, so tests should
+avoid near-ties.
 
 ## Comparison with alternatives
 

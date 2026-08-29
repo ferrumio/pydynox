@@ -13,6 +13,8 @@ class OperationMetrics:
     request_id: str | None
     items_count: int | None
     scanned_count: int | None
+    vector_search_bytes: float | None
+    vector_write_bytes: float | None
 
     def __init__(self, duration_ms: float = 0.0) -> None: ...
 
@@ -157,6 +159,8 @@ class DynamoDBClient:
         encryption: str | None = None,
         kms_key_id: str | None = None,
         global_secondary_indexes: list[dict[str, Any]] | None = None,
+        local_secondary_indexes: list[dict[str, Any]] | None = None,
+        vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
     ) -> None: ...
     def table_exists(self, table_name: str) -> bool: ...
@@ -166,6 +170,62 @@ class DynamoDBClient:
         table_name: str,
         timeout_seconds: int | None = None,
     ) -> None: ...
+    def search_vectors(
+        self,
+        table: str,
+        index_name: str,
+        vector: list[float],
+        top_k: int = 10,
+        search_condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        projection_expression: str | None = None,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    def sync_search_vectors(
+        self,
+        table: str,
+        index_name: str,
+        vector: list[float],
+        top_k: int = 10,
+        search_condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        projection_expression: str | None = None,
+    ) -> dict[str, Any]: ...
+    def create_vector_index(
+        self,
+        table: str,
+        definition: dict[str, Any],
+        wait: bool = False,
+    ) -> Coroutine[Any, Any, None]: ...
+    def sync_create_vector_index(
+        self,
+        table: str,
+        definition: dict[str, Any],
+        wait: bool = False,
+    ) -> None: ...
+    def delete_vector_index(
+        self,
+        table: str,
+        index_name: str,
+        wait: bool = False,
+    ) -> Coroutine[Any, Any, None]: ...
+    def sync_delete_vector_index(
+        self,
+        table: str,
+        index_name: str,
+        wait: bool = False,
+    ) -> None: ...
+    def describe_vector_index(
+        self,
+        table: str,
+        index_name: str,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    def sync_describe_vector_index(
+        self,
+        table: str,
+        index_name: str,
+    ) -> dict[str, Any]: ...
 
     # Async methods
     def async_get_item(

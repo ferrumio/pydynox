@@ -23,6 +23,7 @@ from pydynox.attributes.special import (
     JSONAttribute,
 )
 from pydynox.attributes.ttl import ExpiresIn, TTLAttribute
+from pydynox.attributes.vector import VectorAttribute
 from pydynox.attributes.version import VersionAttribute
 
 __all__ = [
@@ -56,4 +57,6 @@ __all__ = [
     "S3File",
     # Version
     "VersionAttribute",
+    # Vector
+    "VectorAttribute",
 ]

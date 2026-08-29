@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
+from pydynox._internal._vector import VectorIndex
 from pydynox.attributes import Attribute
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
@@ -38,6 +39,7 @@ class ModelMeta(type):
     _hooks: dict[HookType, list[Any]]
     _indexes: dict[str, GlobalSecondaryIndex[Any]]
     _local_indexes: dict[str, LocalSecondaryIndex[Any]]
+    _vector_indexes: dict[str, VectorIndex[Any]]
     _metrics_storage: "MetricsStorage"
     _py_to_dynamo: dict[str, str]
     _dynamo_to_py: dict[str, str]
@@ -51,6 +53,7 @@ class ModelMeta(type):
         hooks: dict[HookType, list[Any]] = {hook_type: [] for hook_type in HookType}
         indexes: dict[str, GlobalSecondaryIndex[Any]] = {}
         local_indexes: dict[str, LocalSecondaryIndex[Any]] = {}
+        vector_indexes: dict[str, VectorIndex[Any]] = {}
 
         for base in bases:
             base_attrs = getattr(base, "_attributes", None)
@@ -91,6 +94,9 @@ class ModelMeta(type):
             base_local_indexes = getattr(base, "_local_indexes", None)
             if base_local_indexes is not None:
                 local_indexes.update(base_local_indexes)
+            base_vector_indexes = getattr(base, "_vector_indexes", None)
+            if base_vector_indexes is not None:
+                vector_indexes.update(base_vector_indexes)
 
         for attr_name, attr_value in namespace.items():
             if isinstance(attr_value, Attribute):
@@ -113,6 +119,9 @@ class ModelMeta(type):
             if isinstance(attr_value, LocalSecondaryIndex):
                 local_indexes[attr_name] = attr_value
 
+            if isinstance(attr_value, VectorIndex):
+                vector_indexes[attr_name] = attr_value
+
         cls = super().__new__(mcs, name, bases, namespace)
 
         cls._attributes = attributes
@@ -123,6 +132,7 @@ class ModelMeta(type):
         cls._hooks = hooks
         cls._indexes = indexes
         cls._local_indexes = local_indexes
+        cls._vector_indexes = vector_indexes
 
         # Build alias lookup dicts
         py_to_dynamo: dict[str, str] = {}
@@ -165,6 +175,9 @@ class ModelMeta(type):
         for idx in local_indexes.values():
             idx._bind_to_model(cls)
 
+        for idx in vector_indexes.values():
+            idx._bind_to_model(cls)
+
         return cls
 
 
@@ -183,6 +196,7 @@ class ModelBase(metaclass=ModelMeta):
     _hooks: ClassVar[dict[HookType, list[Any]]]
     _indexes: ClassVar[dict[str, GlobalSecondaryIndex[Any]]]
     _local_indexes: ClassVar[dict[str, LocalSecondaryIndex[Any]]]
+    _vector_indexes: ClassVar[dict[str, VectorIndex[Any]]]
     _client_instance: ClassVar[DynamoDBClient | None] = None
     _metrics_storage: ClassVar["MetricsStorage"]
     _py_to_dynamo: ClassVar[dict[str, str]]

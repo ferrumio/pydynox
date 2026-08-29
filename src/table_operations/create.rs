@@ -4,7 +4,7 @@ use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::types::{
     AttributeDefinition, BillingMode, GlobalSecondaryIndex, KeySchemaElement, KeyType,
     LocalSecondaryIndex, Projection, ProjectionType, ScalarAttributeType, SseSpecification,
-    SseType, TableClass,
+    SseType, TableClass, VectorIndex as AwsVectorIndex,
 };
 use pyo3::prelude::*;
 use std::collections::HashSet;
@@ -13,6 +13,7 @@ use tokio::runtime::Runtime;
 
 use super::gsi::GsiDefinition;
 use super::lsi::LsiDefinition;
+use super::vector_index::{VectorIndexDefinition, build_vector_index, wait_for_vector_index};
 use super::wait::{execute_wait_for_table_active, sync_wait_for_table_active};
 use crate::errors::{ValidationException, map_sdk_error};
 
@@ -28,6 +29,8 @@ pub struct PreparedCreateTable {
     pub sse_spec: Option<SseSpecification>,
     pub gsi_list: Vec<GlobalSecondaryIndex>,
     pub lsi_list: Vec<LocalSecondaryIndex>,
+    pub vector_index_list: Vec<AwsVectorIndex>,
+    pub vector_index_names: Vec<String>,
     pub wait: bool,
 }
 
@@ -47,6 +50,7 @@ pub fn prepare_create_table(
     kms_key_id: Option<&str>,
     gsis: Option<Vec<GsiDefinition>>,
     lsis: Option<Vec<LsiDefinition>>,
+    vector_indexes: Option<Vec<VectorIndexDefinition>>,
     wait: bool,
 ) -> PyResult<PreparedCreateTable> {
     let hash_attr_type = parse_attribute_type(hash_key_type)?;
@@ -235,6 +239,20 @@ pub fn prepare_create_table(
 
     let billing = parse_billing_mode(billing_mode)?;
 
+    let mut vector_index_list = Vec::new();
+    let mut vector_index_names = Vec::new();
+    if let Some(definitions) = vector_indexes {
+        if billing != BillingMode::PayPerRequest {
+            return Err(ValidationException::new_err(
+                "Vector indexes require PAY_PER_REQUEST billing mode",
+            ));
+        }
+        for definition in definitions {
+            vector_index_names.push(definition.index_name.clone());
+            vector_index_list.push(build_vector_index(&definition)?);
+        }
+    }
+
     let tc = match table_class {
         Some(tc) => Some(parse_table_class(tc)?),
         None => None,
@@ -256,6 +274,8 @@ pub fn prepare_create_table(
         sse_spec,
         gsi_list,
         lsi_list,
+        vector_index_list,
+        vector_index_names,
         wait,
     })
 }
@@ -275,6 +295,10 @@ pub async fn execute_create_table(client: Client, prepared: PreparedCreateTable)
 
     if !prepared.lsi_list.is_empty() {
         request = request.set_local_secondary_indexes(Some(prepared.lsi_list));
+    }
+
+    if !prepared.vector_index_list.is_empty() {
+        request = request.set_vector_indexes(Some(prepared.vector_index_list));
     }
 
     if prepared.billing == BillingMode::Provisioned {
@@ -307,7 +331,10 @@ pub async fn execute_create_table(client: Client, prepared: PreparedCreateTable)
 
     // Wait for table to become active if requested
     if prepared.wait {
-        execute_wait_for_table_active(client, &prepared.table_name, None).await?;
+        execute_wait_for_table_active(client.clone(), &prepared.table_name, None).await?;
+        for index_name in prepared.vector_index_names {
+            wait_for_vector_index(&client, &prepared.table_name, &index_name, true).await?;
+        }
     }
 
     Ok(())
@@ -331,6 +358,7 @@ pub fn create_table<'py>(
     kms_key_id: Option<&str>,
     gsis: Option<Vec<GsiDefinition>>,
     lsis: Option<Vec<LsiDefinition>>,
+    vector_indexes: Option<Vec<VectorIndexDefinition>>,
     wait: bool,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_create_table(
@@ -347,6 +375,7 @@ pub fn create_table<'py>(
         kms_key_id,
         gsis,
         lsis,
+        vector_indexes,
         wait,
     )?;
 
@@ -373,6 +402,7 @@ pub fn sync_create_table(
     kms_key_id: Option<&str>,
     gsis: Option<Vec<GsiDefinition>>,
     lsis: Option<Vec<LsiDefinition>>,
+    vector_indexes: Option<Vec<VectorIndexDefinition>>,
     wait: bool,
 ) -> PyResult<()> {
     let prepared = prepare_create_table(
@@ -389,17 +419,27 @@ pub fn sync_create_table(
         kms_key_id,
         gsis,
         lsis,
+        vector_indexes,
         false, // Don't wait in the async part
     )?;
 
     let client_clone = client.clone();
     let table_name_owned = table_name.to_string();
+    let vector_index_names = prepared.vector_index_names.clone();
 
     runtime.block_on(async { execute_create_table(client_clone, prepared).await })?;
 
     // Wait for table to become active if requested (sync version)
     if wait {
         sync_wait_for_table_active(client, runtime, &table_name_owned, None)?;
+        for index_name in vector_index_names {
+            runtime.block_on(wait_for_vector_index(
+                client,
+                &table_name_owned,
+                &index_name,
+                true,
+            ))?;
+        }
     }
 
     Ok(())

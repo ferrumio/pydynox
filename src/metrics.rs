@@ -3,6 +3,7 @@
 //! This module provides metrics from DynamoDB operations including
 //! duration, consumed capacity, and request IDs.
 
+use aws_sdk_dynamodb::types::ConsumedCapacity;
 use pyo3::prelude::*;
 
 /// Metrics returned from DynamoDB operations.
@@ -36,6 +37,14 @@ pub struct OperationMetrics {
     /// Number of items scanned before filtering.
     #[pyo3(get)]
     pub scanned_count: Option<usize>,
+
+    /// Vector search request bytes consumed.
+    #[pyo3(get)]
+    pub vector_search_bytes: Option<f64>,
+
+    /// Vector write request bytes consumed.
+    #[pyo3(get)]
+    pub vector_write_bytes: Option<f64>,
 }
 
 #[pymethods]
@@ -62,6 +71,12 @@ impl OperationMetrics {
         if let Some(count) = self.items_count {
             parts.push(format!("items={}", count));
         }
+        if let Some(bytes) = self.vector_search_bytes {
+            parts.push(format!("vector_search_bytes={:.0}", bytes));
+        }
+        if let Some(bytes) = self.vector_write_bytes {
+            parts.push(format!("vector_write_bytes={:.0}", bytes));
+        }
         if let Some(ref req_id) = self.request_id {
             // Truncate request_id for readability
             let short_id = if req_id.len() > 8 {
@@ -74,6 +89,19 @@ impl OperationMetrics {
 
         format!("OperationMetrics({})", parts.join(", "))
     }
+}
+
+/// Sum vector write request bytes across all vector indexes.
+pub fn vector_write_bytes(capacity: Option<&ConsumedCapacity>) -> Option<f64> {
+    let total = capacity
+        .and_then(|value| value.vector_indexes())
+        .map(|indexes| {
+            indexes
+                .values()
+                .filter_map(|value| value.vector_write_request_bytes())
+                .sum::<f64>()
+        })?;
+    Some(total)
 }
 
 impl OperationMetrics {
@@ -91,6 +119,8 @@ impl OperationMetrics {
             request_id,
             items_count: None,
             scanned_count: None,
+            vector_search_bytes: None,
+            vector_write_bytes: None,
         }
     }
 
@@ -103,6 +133,17 @@ impl OperationMetrics {
     /// Set scanned count (for query/scan).
     pub fn with_scanned_count(mut self, count: usize) -> Self {
         self.scanned_count = Some(count);
+        self
+    }
+
+    /// Set vector capacity metrics.
+    pub fn with_vector_capacity(
+        mut self,
+        search_bytes: Option<f64>,
+        write_bytes: Option<f64>,
+    ) -> Self {
+        self.vector_search_bytes = search_bytes;
+        self.vector_write_bytes = write_bytes;
         self
     }
 }

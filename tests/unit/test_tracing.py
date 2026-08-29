@@ -124,6 +124,7 @@ def test_enable_tracing_with_config():
         pytest.param("batch_get", "BatchGetItem", id="batch_get"),
         pytest.param("transact_write", "TransactWriteItems", id="transact_write"),
         pytest.param("transact_get", "TransactGetItems", id="transact_get"),
+        pytest.param("search_vectors", "SearchVectors", id="search_vectors"),
     ],
 )
 def test_get_operation_name(operation: str, expected: str):
@@ -325,12 +326,18 @@ def test_add_response_attributes():
         consumed_rcu=1.5,
         consumed_wcu=2.0,
         request_id="ABC123",
+        vector_search_bytes=4096.0,
+        vector_write_bytes=1024.0,
+        returned_rows=10,
     )
 
     # THEN attributes are set on the span
     mock_span.set_attribute.assert_any_call("aws.dynamodb.consumed_capacity.read", 1.5)
     mock_span.set_attribute.assert_any_call("aws.dynamodb.consumed_capacity.write", 2.0)
     mock_span.set_attribute.assert_any_call("aws.request_id", "ABC123")
+    mock_span.set_attribute.assert_any_call("aws.dynamodb.vector_search_bytes", 4096.0)
+    mock_span.set_attribute.assert_any_call("aws.dynamodb.vector_write_bytes", 1024.0)
+    mock_span.set_attribute.assert_any_call("db.response.returned_rows", 10)
 
 
 def test_add_response_attributes_disabled():

@@ -24,6 +24,7 @@ OPERATION_NAMES = {
     "batch_get": "BatchGetItem",
     "transact_write": "TransactWriteItems",
     "transact_get": "TransactGetItems",
+    "search_vectors": "SearchVectors",
 }
 
 
@@ -245,6 +246,9 @@ def add_response_attributes(
     consumed_rcu: float | None = None,
     consumed_wcu: float | None = None,
     request_id: str | None = None,
+    vector_search_bytes: float | None = None,
+    vector_write_bytes: float | None = None,
+    returned_rows: int | None = None,
 ) -> None:
     """Add response attributes to a span.
 
@@ -253,6 +257,9 @@ def add_response_attributes(
         consumed_rcu: Read capacity units consumed.
         consumed_wcu: Write capacity units consumed.
         request_id: AWS request ID.
+        vector_search_bytes: Vector search request bytes consumed.
+        vector_write_bytes: Vector write request bytes consumed.
+        returned_rows: Number of rows returned.
     """
     if span is None:
         return
@@ -267,3 +274,9 @@ def add_response_attributes(
         span.set_attribute("aws.dynamodb.consumed_capacity.write", consumed_wcu)
     if request_id is not None:
         span.set_attribute("aws.request_id", request_id)
+    if vector_search_bytes is not None:
+        span.set_attribute("aws.dynamodb.vector_search_bytes", vector_search_bytes)
+    if vector_write_bytes is not None:
+        span.set_attribute("aws.dynamodb.vector_write_bytes", vector_write_bytes)
+    if returned_rows is not None:
+        span.set_attribute("db.response.returned_rows", returned_rows)

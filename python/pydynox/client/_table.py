@@ -48,6 +48,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
         kms_key_id: str | None = None,
         global_secondary_indexes: list[dict[str, Any]] | None = None,
         local_secondary_indexes: list[dict[str, Any]] | None = None,
+        vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
     ) -> Coroutine[Any, Any, None]:
         """Create a new DynamoDB table. Returns an awaitable.
@@ -64,6 +65,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             global_secondary_indexes: List of GSI definitions.
             local_secondary_indexes: List of LSI definitions.
+            vector_indexes: List of vector index definitions.
             wait: If True, wait for table to become active.
 
         Returns:
@@ -85,6 +87,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id=kms_key_id,
             global_secondary_indexes=global_secondary_indexes,
             local_secondary_indexes=local_secondary_indexes,
+            vector_indexes=vector_indexes,
             wait=wait,
         )
 
@@ -155,6 +158,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
         kms_key_id: str | None = None,
         global_secondary_indexes: list[dict[str, Any]] | None = None,
         local_secondary_indexes: list[dict[str, Any]] | None = None,
+        vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
     ) -> None:
         """Create a new DynamoDB table. Blocks until complete.
@@ -171,6 +175,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             global_secondary_indexes: List of GSI definitions.
             local_secondary_indexes: List of LSI definitions.
+            vector_indexes: List of vector index definitions.
             wait: If True, wait for table to become active.
 
         Example:
@@ -189,6 +194,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id=kms_key_id,
             global_secondary_indexes=global_secondary_indexes,
             local_secondary_indexes=local_secondary_indexes,
+            vector_indexes=vector_indexes,
             wait=wait,
         )
 

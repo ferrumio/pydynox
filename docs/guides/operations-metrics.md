@@ -1,6 +1,34 @@
 # Operations metrics
 
-Track KMS and S3 API calls alongside your DynamoDB operations. When you use encryption or large object storage, pydynox measures the time and calls to these services.
+Track DynamoDB vector capacity, KMS calls, and S3 API calls alongside your
+operations.
+
+## Vector metrics
+
+Vector search and vector index writes use separate capacity measurements.
+`OperationMetrics` exposes both values:
+
+```python
+matches = await Product.semantic.search(query_vector, top_k=10)
+
+print(matches.metrics.vector_search_bytes)
+print(matches.metrics.duration_ms)
+print(matches.metrics.request_id)
+
+await product.save()
+metrics = Product.get_last_metrics()
+if metrics:
+    print(metrics.vector_write_bytes)
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `vector_search_bytes` | float \| None | Search request bytes consumed |
+| `vector_write_bytes` | float \| None | Vector index write bytes consumed |
+
+Search results expose metrics through `VectorSearchResult.metrics`. Put,
+update, and delete operations expose vector write capacity through their
+normal operation metrics.
 
 ## Why track operations metrics
 
@@ -172,4 +200,5 @@ def handler(event, context):
 
 - [Encryption](encryption.md) - Field-level encryption with KMS
 - [S3 attribute](s3-attribute.md) - Store large objects in S3
+- [Vector search](vector-search.md) - Store and search embeddings
 - [Observability](observability.md) - DynamoDB metrics and logging

@@ -12,6 +12,7 @@ Attributes define the fields in your model. Each attribute maps to a DynamoDB ty
 | `BinaryAttribute` | B | bytes | Files, images |
 | `ListAttribute` | L | list | Ordered items |
 | `MapAttribute` | M | dict | Nested objects |
+| `VectorAttribute` | L | list[float] | Embeddings for vector search |
 | `JSONAttribute` | S | dict, list | Complex JSON |
 | `EnumAttribute` | S | Enum | Status, types |
 | `DatetimeAttribute` | S | datetime | Timestamps (ISO) |
@@ -164,6 +165,30 @@ user = User(
     address={"street": "123 Main St", "city": "NYC", "zip": "10001"}
 )
 ```
+
+### VectorAttribute
+
+Store a fixed-size vector as a DynamoDB list of numbers. Values are validated
+against the declared dimensions and converted to 32-bit floating-point
+precision.
+
+```python
+from pydynox.attributes import VectorAttribute
+
+
+class Document(Model):
+    model_config = ModelConfig(table="documents")
+
+    pk = StringAttribute(partition_key=True)
+    embedding = VectorAttribute(dimensions=1024, required=True, alias="emb")
+```
+
+`VectorAttribute` rejects incorrect dimensions, booleans, non-numeric values,
+`NaN`, infinity, and values outside the float32 range. Objects with a
+one-dimensional `tolist()` result are accepted without requiring NumPy.
+
+See [Vector search](vector-search.md) to define a `VectorIndex` and search the
+stored embeddings.
 
 ## JSON and enum types
 

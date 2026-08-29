@@ -9,6 +9,7 @@ from pydynox.client._partiql import PartiqlOperations
 from pydynox.client._query import QueryOperations
 from pydynox.client._scan import ScanOperations
 from pydynox.client._table import TableOperations
+from pydynox.client._vector import VectorOperations
 
 
 class DynamoDBClient(
@@ -19,6 +20,7 @@ class DynamoDBClient(
     BatchOperations,
     TableOperations,
     PartiqlOperations,
+    VectorOperations,
 ):
     """DynamoDB client with flexible credential configuration.
 
