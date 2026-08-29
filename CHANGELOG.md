@@ -1,6 +1,34 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.4.0] - 2026-08-29
+
+
+### CI/CD
+
+- bump CodSpeedHQ/action from 5.0.2 to 5.0.3 (#448)
+- bump astral-sh/setup-uv from 9.0.0 to 10.0.1 (#452)
+- bump github/codeql-action/upload-sarif from 4.37.6 to 4.37.9 (#457)
+
+
+### Documentation
+
+- update changelog for v1.3.1 (#447)
+
+
+### Features
+
+- add DynamoDB vector search support (#459)
+
+
+### Deps
+
+- bump the rust-dependencies group with 2 updates (#449)
+- update constructs requirement in the dev-dependencies group (#450)
+- bump the rust-dependencies group with 2 updates (#451)
+- bump the dev-dependencies group with 2 updates (#453)
+- bump aes-gcm from 0.11.0 to 0.11.1 in the rust-dependencies group (#455)
+- bump the dev-dependencies group with 2 updates (#456)
 ## [1.3.1] - 2026-08-07
 
 
