@@ -6,7 +6,7 @@ use crate::table_operations;
 #[pymethods]
 impl DynamoDBClient {
     /// Sync version of create_table. Blocks until complete.
-    #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, local_secondary_indexes=None, wait=false))]
+    #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, local_secondary_indexes=None, vector_indexes=None, wait=false, timeout_seconds=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn sync_create_table(
         &self,
@@ -22,7 +22,9 @@ impl DynamoDBClient {
         kms_key_id: Option<&str>,
         global_secondary_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
         local_secondary_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
+        vector_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
         wait: bool,
+        timeout_seconds: Option<u64>,
     ) -> PyResult<()> {
         let (range_key_name, range_key_type) = match range_key {
             Some((name, typ)) => (Some(name), Some(typ)),
@@ -39,7 +41,13 @@ impl DynamoDBClient {
             None => None,
         };
 
+        let vector_indexes = match vector_indexes {
+            Some(list) => Some(table_operations::parse_vector_index_definitions(list)?),
+            None => None,
+        };
+
         table_operations::sync_create_table(
+            py,
             &self.client,
             &self.runtime,
             table_name,
@@ -55,7 +63,9 @@ impl DynamoDBClient {
             kms_key_id,
             gsis,
             lsis,
+            vector_indexes,
             wait,
+            timeout_seconds,
         )
     }
 
@@ -85,7 +95,7 @@ impl DynamoDBClient {
     }
 
     /// Create a new DynamoDB table. Returns a Python awaitable.
-    #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, local_secondary_indexes=None, wait=false))]
+    #[pyo3(signature = (table_name, hash_key, range_key=None, billing_mode="PAY_PER_REQUEST", read_capacity=None, write_capacity=None, table_class=None, encryption=None, kms_key_id=None, global_secondary_indexes=None, local_secondary_indexes=None, vector_indexes=None, wait=false, timeout_seconds=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn create_table<'py>(
         &self,
@@ -101,7 +111,9 @@ impl DynamoDBClient {
         kms_key_id: Option<&str>,
         global_secondary_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
         local_secondary_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
+        vector_indexes: Option<&Bound<'_, pyo3::types::PyList>>,
         wait: bool,
+        timeout_seconds: Option<u64>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let (range_key_name, range_key_type) = match range_key {
             Some((name, typ)) => (Some(name), Some(typ)),
@@ -115,6 +127,11 @@ impl DynamoDBClient {
 
         let lsis = match local_secondary_indexes {
             Some(list) => Some(table_operations::parse_lsi_definitions(py, list)?),
+            None => None,
+        };
+
+        let vector_indexes = match vector_indexes {
+            Some(list) => Some(table_operations::parse_vector_index_definitions(list)?),
             None => None,
         };
 
@@ -134,7 +151,9 @@ impl DynamoDBClient {
             kms_key_id,
             gsis,
             lsis,
+            vector_indexes,
             wait,
+            timeout_seconds,
         )
     }
 

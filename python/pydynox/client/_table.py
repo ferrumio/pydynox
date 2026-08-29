@@ -48,7 +48,9 @@ class TableOperations(_MixinBase):  # pragma: no cover
         kms_key_id: str | None = None,
         global_secondary_indexes: list[dict[str, Any]] | None = None,
         local_secondary_indexes: list[dict[str, Any]] | None = None,
+        vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> Coroutine[Any, Any, None]:
         """Create a new DynamoDB table. Returns an awaitable.
 
@@ -64,7 +66,9 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             global_secondary_indexes: List of GSI definitions.
             local_secondary_indexes: List of LSI definitions.
+            vector_indexes: List of vector index definitions.
             wait: If True, wait for table to become active.
+            timeout_seconds: Maximum wait time for the table and vector indexes.
 
         Returns:
             Awaitable that completes when table is created.
@@ -85,7 +89,9 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id=kms_key_id,
             global_secondary_indexes=global_secondary_indexes,
             local_secondary_indexes=local_secondary_indexes,
+            vector_indexes=vector_indexes,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
     def table_exists(self, table_name: str) -> Coroutine[Any, Any, bool]:
@@ -155,7 +161,9 @@ class TableOperations(_MixinBase):  # pragma: no cover
         kms_key_id: str | None = None,
         global_secondary_indexes: list[dict[str, Any]] | None = None,
         local_secondary_indexes: list[dict[str, Any]] | None = None,
+        vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
         """Create a new DynamoDB table. Blocks until complete.
 
@@ -171,7 +179,9 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             global_secondary_indexes: List of GSI definitions.
             local_secondary_indexes: List of LSI definitions.
+            vector_indexes: List of vector index definitions.
             wait: If True, wait for table to become active.
+            timeout_seconds: Maximum wait time for the table and vector indexes.
 
         Example:
             client.sync_create_table("users", partition_key=("pk", "S"))
@@ -189,7 +199,9 @@ class TableOperations(_MixinBase):  # pragma: no cover
             kms_key_id=kms_key_id,
             global_secondary_indexes=global_secondary_indexes,
             local_secondary_indexes=local_secondary_indexes,
+            vector_indexes=vector_indexes,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
     def sync_table_exists(self, table_name: str) -> bool:

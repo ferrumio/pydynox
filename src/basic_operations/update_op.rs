@@ -15,7 +15,7 @@ use crate::conversions::{
     attribute_values_to_py_dict, py_dict_to_attribute_values, py_to_attribute_value_direct,
 };
 use crate::errors::map_sdk_error_with_item;
-use crate::metrics::OperationMetrics;
+use crate::metrics::{OperationMetrics, vector_write_bytes};
 
 /// Prepared update_item data (converted from Python).
 pub struct PreparedUpdateItem {
@@ -137,7 +137,7 @@ pub async fn execute_update_item(
         .table_name(&prepared.table)
         .set_key(Some(prepared.key))
         .update_expression(prepared.update_expression)
-        .return_consumed_capacity(ReturnConsumedCapacity::Total);
+        .return_consumed_capacity(ReturnConsumedCapacity::Indexes);
 
     if let Some(condition) = prepared.condition_expression {
         request = request.condition_expression(condition);
@@ -166,6 +166,7 @@ pub async fn execute_update_item(
     match result {
         Ok(output) => {
             let consumed_wcu = output.consumed_capacity().and_then(|c| c.capacity_units());
+            let vector_write_bytes = vector_write_bytes(output.consumed_capacity());
 
             let attributes = if has_return_values {
                 output.attributes().cloned()
@@ -174,7 +175,8 @@ pub async fn execute_update_item(
             };
 
             Ok(UpdateItemResult {
-                metrics: OperationMetrics::with_capacity(duration_ms, None, consumed_wcu, None),
+                metrics: OperationMetrics::with_capacity(duration_ms, None, consumed_wcu, None)
+                    .with_vector_capacity(None, vector_write_bytes),
                 attributes,
             })
         }

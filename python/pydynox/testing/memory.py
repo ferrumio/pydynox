@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import copy
+import math
 import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Iterator, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterator, TypeVar, cast
 
 from pydynox.config import clear_default_client, get_default_client, set_default_client
 from pydynox.exceptions import ConditionalCheckFailedException
 from pydynox.model import Model
+
+if TYPE_CHECKING:
+    from pydynox._internal._metrics import OperationMetrics
 
 
 def _split_top_level(clause: str) -> list[str]:
@@ -92,6 +96,8 @@ class FakeMetrics:
     scanned_count: int = 0
     count: int = 0
     items_count: int = 0
+    vector_search_bytes: float | None = None
+    vector_write_bytes: float | None = None
 
 
 @dataclass
@@ -291,6 +297,7 @@ class MemoryClient:
         self._diagnostics = None
         self._last_metrics: FakeMetrics | None = None
         self._total_metrics = FakeTotalMetrics()
+        self._vector_index_definitions: dict[tuple[str, str], dict[str, Any]] = {}
         # For compatibility with code that accesses _client directly
         self._client = self
 
@@ -298,6 +305,10 @@ class MemoryClient:
         if seed:
             for table_name, items in seed.items():
                 self._tables[table_name] = {}
+                self._table_schemas[table_name] = {
+                    "partition_key": "pk",
+                    "sort_key": "sk" if any("sk" in item for item in items) else "",
+                }
                 for item in items:
                     # Infer key from first item
                     key_str = self._make_key_string(item)
@@ -404,6 +415,27 @@ class MemoryClient:
         self._last_metrics = metrics
         self._total_metrics.add(metrics, operation)
 
+    def _vector_write_bytes(
+        self,
+        table: str,
+        before: dict[str, Any] | None,
+        after: dict[str, Any] | None,
+    ) -> float | None:
+        """Calculate vector bytes affected by a write."""
+        total = 0
+        found = False
+        for (index_table, _), definition in self._vector_index_definitions.items():
+            if index_table != table:
+                continue
+            attribute = definition["vector_attribute"]
+            vector = (after or {}).get(attribute)
+            if vector is None:
+                vector = (before or {}).get(attribute)
+            if vector is not None:
+                total += len(vector) * 4
+                found = True
+        return float(total) if found else None
+
     # ========== CRUD (internal sync implementations) ==========
 
     def _do_put_item(
@@ -431,8 +463,10 @@ class MemoryClient:
             ):
                 raise ConditionalCheckFailedException("Condition check failed")
 
+        existing = tbl.get(key_str)
         tbl[key_str] = copy.deepcopy(item)
         metrics = self._make_metrics(start, wcu=1)
+        metrics.vector_write_bytes = self._vector_write_bytes(table, existing, item)
         self._record_metrics(metrics, "put")
         return metrics
 
@@ -474,8 +508,9 @@ class MemoryClient:
             ):
                 raise ConditionalCheckFailedException("Condition check failed")
 
-        tbl.pop(key_str, None)
+        existing = tbl.pop(key_str, None)
         metrics = self._make_metrics(start, wcu=1)
+        metrics.vector_write_bytes = self._vector_write_bytes(table, existing, None)
         self._record_metrics(metrics, "delete")
         return metrics
 
@@ -495,6 +530,7 @@ class MemoryClient:
         key_str = self._make_key_string(key)
 
         existing = tbl.get(key_str)
+        before = copy.deepcopy(existing)
 
         # Check condition if provided
         if condition_expression:
@@ -524,6 +560,7 @@ class MemoryClient:
             )
 
         metrics = self._make_metrics(start, wcu=1)
+        metrics.vector_write_bytes = self._vector_write_bytes(table, before, existing)
         self._record_metrics(metrics, "update")
         return metrics
 
@@ -930,6 +967,158 @@ class MemoryClient:
             "metrics": self._make_metrics(start, rcu=len(tbl) * 0.5),
         }
 
+    # ========== VECTOR SEARCH ==========
+
+    def _find_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
+        key = (table, index_name)
+        stored = self._vector_index_definitions.get(key)
+        if stored is not None:
+            return stored
+
+        raise ValueError(f"Vector index '{index_name}' not found on table '{table}'")
+
+    def _vector_projection(
+        self,
+        item: dict[str, Any],
+        definition: dict[str, Any],
+    ) -> dict[str, Any]:
+        projection = definition.get("projection", "ALL")
+        if projection == "ALL":
+            return copy.deepcopy(item)
+
+        selected = set(definition.get("table_key_attributes") or [])
+        selected.add(definition["vector_attribute"])
+        partition_key = definition.get("partition_key")
+        if partition_key is not None:
+            selected.add(partition_key)
+        selected.update(definition.get("inline_filters") or [])
+
+        if projection == "INCLUDE":
+            selected.update(definition.get("non_key_attributes") or [])
+        return {name: copy.deepcopy(item[name]) for name in selected if name in item}
+
+    @staticmethod
+    def _vector_score(left: list[float], right: list[float], distance: str) -> float:
+        if len(left) != len(right):
+            raise ValueError(
+                f"Search vector has {len(left)} dimensions, stored vector has {len(right)}"
+            )
+
+        dot = sum(a * b for a, b in zip(left, right))
+        if distance == "DOT_PRODUCT":
+            return dot
+        if distance == "EUCLIDEAN":
+            return math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right)))
+
+        left_norm = math.sqrt(sum(value * value for value in left))
+        right_norm = math.sqrt(sum(value * value for value in right))
+        if left_norm == 0 or right_norm == 0:
+            raise ValueError("Cosine distance requires non-zero vectors")
+        return 1.0 - (dot / (left_norm * right_norm))
+
+    def _do_search_vectors(
+        self,
+        table: str,
+        index_name: str,
+        vector: list[float],
+        top_k: int = 10,
+        search_condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        projection_expression: str | None = None,
+    ) -> Any:
+        from pydynox._internal._vector import VectorMatch, VectorSearchResult
+
+        if not 1 <= top_k <= 100:
+            raise ValueError("top_k must be between 1 and 100")
+
+        definition = self._find_vector_index(table, index_name)
+        dimensions = definition["dimensions"]
+        if len(vector) != dimensions:
+            raise ValueError(f"Search vector requires {dimensions} dimensions, got {len(vector)}")
+
+        start = time.time()
+        matches: list[VectorMatch[dict[str, Any]]] = []
+        vector_attribute = definition["vector_attribute"]
+        for item in self._get_table(table).values():
+            stored = item.get(vector_attribute)
+            if stored is None:
+                continue
+            if search_condition_expression and not self._check_condition(
+                item,
+                search_condition_expression,
+                expression_attribute_names,
+                expression_attribute_values,
+            ):
+                continue
+
+            score = self._vector_score(vector, stored, definition["distance_function"])
+            projected = self._vector_projection(item, definition)
+            if projection_expression:
+                names = expression_attribute_names or {}
+                requested = [
+                    names.get(name.strip(), name.strip())
+                    for name in projection_expression.split(",")
+                ]
+                projected = {name: projected[name] for name in requested if name in projected}
+            else:
+                projected.pop(vector_attribute, None)
+            matches.append(VectorMatch(item=projected, score=score))
+
+        reverse = definition["distance_function"] == "DOT_PRODUCT"
+        matches.sort(key=lambda match: match.score, reverse=reverse)
+        matches = matches[:top_k]
+
+        metrics = self._make_metrics(start)
+        metrics.items_count = len(matches)
+        metrics.vector_search_bytes = float(len(vector) * 4)
+        self._record_metrics(metrics, "vector_search")
+        return VectorSearchResult(matches, cast("OperationMetrics", metrics))
+
+    async def search_vectors(
+        self,
+        table: str,
+        index_name: str,
+        vector: list[float],
+        top_k: int = 10,
+        search_condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        projection_expression: str | None = None,
+    ) -> Any:
+        return self._do_search_vectors(
+            table,
+            index_name,
+            vector,
+            top_k,
+            search_condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            projection_expression,
+        )
+
+    def sync_search_vectors(
+        self,
+        table: str,
+        index_name: str,
+        vector: list[float],
+        top_k: int = 10,
+        search_condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        projection_expression: str | None = None,
+    ) -> Any:
+        return self._do_search_vectors(
+            table,
+            index_name,
+            vector,
+            top_k,
+            search_condition_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            projection_expression,
+        )
+
     # ========== BATCH ==========
 
     def batch_get_item(
@@ -996,14 +1185,130 @@ class MemoryClient:
     # Alias for async-first API (sync version has sync_ prefix)
     sync_table_exists = table_exists
 
-    def create_table(self, table: str, **kwargs: Any) -> None:
-        """Create a table (just initializes empty dict)."""
+    def _do_create_table(self, table: str, **kwargs: Any) -> None:
+        """Create an in-memory table."""
         if table not in self._tables:
             self._tables[table] = {}
+        partition_key = kwargs.get("partition_key")
+        sort_key = kwargs.get("sort_key")
+        self._table_schemas[table] = {
+            "partition_key": partition_key[0] if partition_key else "pk",
+            "sort_key": sort_key[0] if sort_key else "",
+        }
+        for definition in kwargs.get("vector_indexes") or []:
+            key = (table, definition["index_name"])
+            stored = copy.deepcopy(definition)
+            stored.setdefault(
+                "table_key_attributes",
+                [
+                    name
+                    for name in [
+                        self._table_schemas[table]["partition_key"],
+                        self._table_schemas[table]["sort_key"],
+                    ]
+                    if name
+                ],
+            )
+            self._vector_index_definitions[key] = stored
+
+    async def create_table(self, table: str, **kwargs: Any) -> None:
+        self._do_create_table(table, **kwargs)
+
+    def sync_create_table(self, table: str, **kwargs: Any) -> None:
+        self._do_create_table(table, **kwargs)
+
+    async def create_vector_index(
+        self,
+        table: str,
+        definition: dict[str, Any],
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
+        self._do_create_vector_index(table, definition)
+
+    def sync_create_vector_index(
+        self,
+        table: str,
+        definition: dict[str, Any],
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
+        self._do_create_vector_index(table, definition)
+
+    def _do_create_vector_index(self, table: str, definition: dict[str, Any]) -> None:
+        if table not in self._table_schemas:
+            raise ValueError(f"Table '{table}' does not exist")
+        key = (table, definition["index_name"])
+        if key in self._vector_index_definitions:
+            raise ValueError(
+                f"Vector index '{definition['index_name']}' already exists on table '{table}'"
+            )
+        stored = copy.deepcopy(definition)
+        stored.setdefault(
+            "table_key_attributes",
+            [
+                name
+                for name in [
+                    self._table_schemas[table]["partition_key"],
+                    self._table_schemas[table]["sort_key"],
+                ]
+                if name
+            ],
+        )
+        self._vector_index_definitions[key] = stored
+
+    async def delete_vector_index(
+        self,
+        table: str,
+        index_name: str,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
+        self._do_delete_vector_index(table, index_name)
+
+    def sync_delete_vector_index(
+        self,
+        table: str,
+        index_name: str,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
+        self._do_delete_vector_index(table, index_name)
+
+    def _do_delete_vector_index(self, table: str, index_name: str) -> None:
+        key = (table, index_name)
+        if self._vector_index_definitions.pop(key, None) is None:
+            raise ValueError(f"Vector index '{index_name}' not found on table '{table}'")
+
+    def _describe_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
+        definition = self._find_vector_index(table, index_name)
+        item_count = sum(
+            1 for item in self._get_table(table).values() if definition["vector_attribute"] in item
+        )
+        return {
+            "index_name": index_name,
+            "status": "ACTIVE",
+            "backfilling": False,
+            "item_count": item_count,
+            "size_bytes": None,
+            "index_arn": None,
+            "dimensions": definition["dimensions"],
+            "distance": definition["distance_function"],
+        }
+
+    async def describe_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
+        return self._describe_vector_index(table, index_name)
+
+    def sync_describe_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
+        return self._describe_vector_index(table, index_name)
 
     def delete_table(self, table: str) -> None:
         """Delete a table."""
         self._tables.pop(table, None)
+        self._table_schemas.pop(table, None)
+        self._vector_index_definitions = {
+            key: value for key, value in self._vector_index_definitions.items() if key[0] != table
+        }
 
     # ========== HELPERS ==========
 

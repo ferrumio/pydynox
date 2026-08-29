@@ -31,6 +31,7 @@ mod serialization;
 mod table_operations;
 mod tracing;
 mod transaction_operations;
+mod vector_operations;
 
 use client::DynamoDBClient;
 use rate_limiter::{AdaptiveRate, FixedRate, RateLimitMetrics};

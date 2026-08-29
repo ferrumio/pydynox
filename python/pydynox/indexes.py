@@ -40,5 +40,20 @@ Example:
 """
 
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
+from pydynox._internal._vector import (
+    VectorDistance,
+    VectorIndex,
+    VectorIndexInfo,
+    VectorMatch,
+    VectorSearchResult,
+)
 
-__all__ = ["GlobalSecondaryIndex", "LocalSecondaryIndex"]
+__all__ = [
+    "GlobalSecondaryIndex",
+    "LocalSecondaryIndex",
+    "VectorDistance",
+    "VectorIndex",
+    "VectorIndexInfo",
+    "VectorMatch",
+    "VectorSearchResult",
+]

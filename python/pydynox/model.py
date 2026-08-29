@@ -1241,11 +1241,12 @@ class Model(ModelBase, metaclass=ModelMeta):
         encryption: str | None = None,
         kms_key_id: str | None = None,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
         """Create the DynamoDB table for this model. Async.
 
         Uses the model's schema to build the table definition, including
-        hash key, range key, GSIs, and LSIs defined on the model.
+        hash key, range key, GSIs, LSIs, and vector indexes defined on the model.
 
         Args:
             billing_mode: "PAY_PER_REQUEST" (default) or "PROVISIONED".
@@ -1255,6 +1256,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             encryption: "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED".
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             wait: If True, wait for table to become active.
+            timeout_seconds: Maximum wait time for the table and vector indexes.
 
         Raises:
             ValueError: If model has no partition_key defined.
@@ -1291,6 +1293,14 @@ class Model(ModelBase, metaclass=ModelMeta):
         if cls._local_indexes:
             lsis = [idx.to_create_table_definition(cls) for idx in cls._local_indexes.values()]
 
+        vector_indexes = None
+        if cls._vector_indexes:
+            if billing_mode != "PAY_PER_REQUEST":
+                raise ValueError("Vector indexes require PAY_PER_REQUEST billing mode")
+            vector_indexes = [
+                idx.to_create_table_definition(cls) for idx in cls._vector_indexes.values()
+            ]
+
         await client.create_table(
             table,
             partition_key=partition_key,
@@ -1303,7 +1313,9 @@ class Model(ModelBase, metaclass=ModelMeta):
             kms_key_id=kms_key_id,
             global_secondary_indexes=gsis,
             local_secondary_indexes=lsis,
+            vector_indexes=vector_indexes,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
     @classmethod
@@ -1347,11 +1359,12 @@ class Model(ModelBase, metaclass=ModelMeta):
         encryption: str | None = None,
         kms_key_id: str | None = None,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
         """Create the DynamoDB table for this model. Sync (blocks).
 
         Uses the model's schema to build the table definition, including
-        hash key, range key, GSIs, and LSIs defined on the model.
+        hash key, range key, GSIs, LSIs, and vector indexes defined on the model.
 
         Args:
             billing_mode: "PAY_PER_REQUEST" (default) or "PROVISIONED".
@@ -1361,6 +1374,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             encryption: "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED".
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             wait: If True, wait for table to become active.
+            timeout_seconds: Maximum wait time for the table and vector indexes.
 
         Raises:
             ValueError: If model has no partition_key defined.
@@ -1397,6 +1411,14 @@ class Model(ModelBase, metaclass=ModelMeta):
         if cls._local_indexes:
             lsis = [idx.to_create_table_definition(cls) for idx in cls._local_indexes.values()]
 
+        vector_indexes = None
+        if cls._vector_indexes:
+            if billing_mode != "PAY_PER_REQUEST":
+                raise ValueError("Vector indexes require PAY_PER_REQUEST billing mode")
+            vector_indexes = [
+                idx.to_create_table_definition(cls) for idx in cls._vector_indexes.values()
+            ]
+
         client.sync_create_table(
             table,
             partition_key=partition_key,
@@ -1409,7 +1431,9 @@ class Model(ModelBase, metaclass=ModelMeta):
             kms_key_id=kms_key_id,
             global_secondary_indexes=gsis,
             local_secondary_indexes=lsis,
+            vector_indexes=vector_indexes,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
     @classmethod

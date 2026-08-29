@@ -21,6 +21,7 @@ mod partiql_ops;
 mod query_ops;
 mod table_ops;
 mod transaction_ops;
+mod vector_ops;
 
 use aws_sdk_dynamodb::Client;
 use aws_sdk_kms::Client as KmsClient;
