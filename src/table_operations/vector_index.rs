@@ -2,12 +2,14 @@
 
 use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::types::{
-    CreateVectorIndexAction, DeleteVectorIndexAction, Projection, ProjectionType,
-    SearchSchemaElement, SearchSchemaElementType, VectorAttributeDefinition,
-    VectorDistanceFunction, VectorIndex, VectorIndexDescription, VectorIndexUpdate,
+    AttributeDefinition, CreateVectorIndexAction, DeleteVectorIndexAction, Projection,
+    ProjectionType, ScalarAttributeType, SearchSchemaElement, SearchSchemaElementType,
+    VectorAttributeDefinition, VectorDistanceFunction, VectorIndex, VectorIndexDescription,
+    VectorIndexUpdate,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
@@ -22,6 +24,7 @@ pub struct VectorIndexDefinition {
     pub distance_function: String,
     pub partition_key: Option<String>,
     pub inline_filters: Vec<String>,
+    pub attribute_definitions: Vec<(String, String)>,
     pub projection: String,
     pub non_key_attributes: Option<Vec<String>>,
 }
@@ -121,6 +124,48 @@ pub fn parse_vector_index_definition(
         ));
     }
 
+    let attribute_definitions: Vec<(String, String)> = definition
+        .get_item("attribute_definitions")?
+        .map(|value| value.extract())
+        .transpose()?
+        .unwrap_or_default();
+    let search_schema_names: HashSet<&String> =
+        partition_key.iter().chain(inline_filters.iter()).collect();
+    let mut defined_types = HashMap::new();
+    for (name, attr_type) in &attribute_definitions {
+        if name.is_empty() {
+            return Err(ValidationException::new_err(
+                "Vector search schema attribute name cannot be empty",
+            ));
+        }
+        parse_search_attribute_type(attr_type)?;
+        if !search_schema_names.contains(name) {
+            return Err(ValidationException::new_err(format!(
+                "Attribute definition '{}' is not used by the vector search schema",
+                name
+            )));
+        }
+        if let Some(previous) = defined_types.insert(name, attr_type) {
+            let detail = if previous == attr_type {
+                "is duplicated"
+            } else {
+                "has conflicting types"
+            };
+            return Err(ValidationException::new_err(format!(
+                "Vector search schema attribute '{}' {}",
+                name, detail
+            )));
+        }
+    }
+    for name in partition_key.iter().chain(inline_filters.iter()) {
+        if !defined_types.contains_key(name) {
+            return Err(ValidationException::new_err(format!(
+                "Vector search schema attribute '{}' is missing from attribute_definitions",
+                name
+            )));
+        }
+    }
+
     let projection = definition
         .get_item("projection")?
         .map(|value| value.extract())
@@ -138,6 +183,7 @@ pub fn parse_vector_index_definition(
         distance_function,
         partition_key,
         inline_filters,
+        attribute_definitions,
         projection,
         non_key_attributes,
     })
@@ -149,6 +195,41 @@ pub fn parse_vector_index_definitions(
     definitions
         .iter()
         .map(|item| parse_vector_index_definition(item.cast::<PyDict>()?))
+        .collect()
+}
+
+fn parse_search_attribute_type(value: &str) -> PyResult<ScalarAttributeType> {
+    match value {
+        "S" => Ok(ScalarAttributeType::S),
+        "N" => Ok(ScalarAttributeType::N),
+        "B" => Ok(ScalarAttributeType::B),
+        _ => Err(ValidationException::new_err(format!(
+            "Invalid vector search schema attribute type '{}'. Must be S, N, or B",
+            value
+        ))),
+    }
+}
+
+pub fn build_vector_attribute_definitions(
+    definition: &VectorIndexDefinition,
+) -> PyResult<Vec<AttributeDefinition>> {
+    let mut seen = HashSet::new();
+    definition
+        .attribute_definitions
+        .iter()
+        .filter(|(name, _)| seen.insert(name.clone()))
+        .map(|(name, attr_type)| {
+            AttributeDefinition::builder()
+                .attribute_name(name)
+                .attribute_type(parse_search_attribute_type(attr_type)?)
+                .build()
+                .map_err(|error| {
+                    ValidationException::new_err(format!(
+                        "Invalid vector search schema attribute: {}",
+                        error
+                    ))
+                })
+        })
         .collect()
 }
 
@@ -291,10 +372,12 @@ pub(crate) async fn wait_for_vector_index(
     table: &str,
     index_name: &str,
     present: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<()> {
     let start = Instant::now();
+    let timeout = Duration::from_secs(timeout_seconds.unwrap_or(900));
     loop {
-        if start.elapsed() > Duration::from_secs(900) {
+        if start.elapsed() > timeout {
             return Err(PyErr::new::<pyo3::exceptions::PyTimeoutError, _>(format!(
                 "Timeout waiting for vector index '{}'",
                 index_name
@@ -321,20 +404,74 @@ async fn execute_create_vector_index(
     table: String,
     definition: VectorIndexDefinition,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<()> {
     let index_name = definition.index_name.clone();
+    let existing = client
+        .describe_table()
+        .table_name(&table)
+        .send()
+        .await
+        .map_err(|error| map_sdk_error(error, Some(&table)))?;
+    let existing_types: HashMap<String, String> = existing
+        .table()
+        .map(|description| {
+            description
+                .attribute_definitions()
+                .iter()
+                .map(|attribute| {
+                    (
+                        attribute.attribute_name().to_string(),
+                        attribute.attribute_type().as_str().to_string(),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut new_definitions = Vec::new();
+    let mut seen_definitions = HashSet::new();
+    for (name, attr_type) in &definition.attribute_definitions {
+        if !seen_definitions.insert(name) {
+            continue;
+        }
+        if let Some(existing_type) = existing_types.get(name) {
+            if existing_type != attr_type {
+                return Err(ValidationException::new_err(format!(
+                    "Vector search schema attribute '{}' already exists with type '{}', not '{}'",
+                    name, existing_type, attr_type
+                )));
+            }
+        } else {
+            new_definitions.push(
+                AttributeDefinition::builder()
+                    .attribute_name(name)
+                    .attribute_type(parse_search_attribute_type(attr_type)?)
+                    .build()
+                    .map_err(|error| {
+                        ValidationException::new_err(format!(
+                            "Invalid vector search schema attribute: {}",
+                            error
+                        ))
+                    })?,
+            );
+        }
+    }
     let update = VectorIndexUpdate::builder()
         .create(build_create_action(&definition)?)
         .build();
-    client
+    let mut request = client
         .update_table()
         .table_name(&table)
-        .vector_index_updates(update)
+        .vector_index_updates(update);
+    if !new_definitions.is_empty() {
+        request = request.set_attribute_definitions(Some(new_definitions));
+    }
+    request
         .send()
         .await
         .map_err(|error| map_sdk_error(error, Some(&table)))?;
     if wait {
-        wait_for_vector_index(&client, &table, &index_name, true).await?;
+        wait_for_vector_index(&client, &table, &index_name, true, timeout_seconds).await?;
     }
     Ok(())
 }
@@ -344,6 +481,7 @@ async fn execute_delete_vector_index(
     table: String,
     index_name: String,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<()> {
     let action = DeleteVectorIndexAction::builder()
         .index_name(&index_name)
@@ -360,7 +498,7 @@ async fn execute_delete_vector_index(
         .await
         .map_err(|error| map_sdk_error(error, Some(&table)))?;
     if wait {
-        wait_for_vector_index(&client, &table, &index_name, false).await?;
+        wait_for_vector_index(&client, &table, &index_name, false, timeout_seconds).await?;
     }
     Ok(())
 }
@@ -384,11 +522,12 @@ pub fn create_vector_index<'py>(
     table: &str,
     definition: &Bound<'_, PyDict>,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let definition = parse_vector_index_definition(definition)?;
     let table = table.to_string();
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        execute_create_vector_index(client, table, definition, wait).await
+        execute_create_vector_index(client, table, definition, wait, timeout_seconds).await
     })
 }
 
@@ -399,11 +538,20 @@ pub fn sync_create_vector_index(
     table: &str,
     definition: &Bound<'_, PyDict>,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<()> {
     let definition = parse_vector_index_definition(definition)?;
     let table = table.to_string();
     let client = client.clone();
-    py.detach(|| runtime.block_on(execute_create_vector_index(client, table, definition, wait)))
+    py.detach(|| {
+        runtime.block_on(execute_create_vector_index(
+            client,
+            table,
+            definition,
+            wait,
+            timeout_seconds,
+        ))
+    })
 }
 
 pub fn delete_vector_index<'py>(
@@ -412,11 +560,12 @@ pub fn delete_vector_index<'py>(
     table: &str,
     index_name: &str,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let table = table.to_string();
     let index_name = index_name.to_string();
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        execute_delete_vector_index(client, table, index_name, wait).await
+        execute_delete_vector_index(client, table, index_name, wait, timeout_seconds).await
     })
 }
 
@@ -427,11 +576,20 @@ pub fn sync_delete_vector_index(
     table: &str,
     index_name: &str,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<()> {
     let client = client.clone();
     let table = table.to_string();
     let index_name = index_name.to_string();
-    py.detach(|| runtime.block_on(execute_delete_vector_index(client, table, index_name, wait)))
+    py.detach(|| {
+        runtime.block_on(execute_delete_vector_index(
+            client,
+            table,
+            index_name,
+            wait,
+            timeout_seconds,
+        ))
+    })
 }
 
 pub fn describe_vector_index<'py>(

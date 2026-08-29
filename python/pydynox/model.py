@@ -1241,6 +1241,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         encryption: str | None = None,
         kms_key_id: str | None = None,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
         """Create the DynamoDB table for this model. Async.
 
@@ -1255,6 +1256,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             encryption: "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED".
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             wait: If True, wait for table to become active.
+            timeout_seconds: Maximum wait time for the table and vector indexes.
 
         Raises:
             ValueError: If model has no partition_key defined.
@@ -1313,6 +1315,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             local_secondary_indexes=lsis,
             vector_indexes=vector_indexes,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
     @classmethod
@@ -1356,6 +1359,7 @@ class Model(ModelBase, metaclass=ModelMeta):
         encryption: str | None = None,
         kms_key_id: str | None = None,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
         """Create the DynamoDB table for this model. Sync (blocks).
 
@@ -1370,6 +1374,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             encryption: "AWS_OWNED", "AWS_MANAGED", or "CUSTOMER_MANAGED".
             kms_key_id: KMS key ARN (required for CUSTOMER_MANAGED).
             wait: If True, wait for table to become active.
+            timeout_seconds: Maximum wait time for the table and vector indexes.
 
         Raises:
             ValueError: If model has no partition_key defined.
@@ -1428,6 +1433,7 @@ class Model(ModelBase, metaclass=ModelMeta):
             local_secondary_indexes=lsis,
             vector_indexes=vector_indexes,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
     @classmethod

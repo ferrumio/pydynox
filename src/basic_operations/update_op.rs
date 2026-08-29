@@ -137,7 +137,7 @@ pub async fn execute_update_item(
         .table_name(&prepared.table)
         .set_key(Some(prepared.key))
         .update_expression(prepared.update_expression)
-        .return_consumed_capacity(ReturnConsumedCapacity::Total);
+        .return_consumed_capacity(ReturnConsumedCapacity::Indexes);
 
     if let Some(condition) = prepared.condition_expression {
         request = request.condition_expression(condition);

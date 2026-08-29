@@ -123,6 +123,19 @@ class VectorIndex(Generic[M]):
     def __set_name__(self, owner: type[M], name: str) -> None:
         self._attr_name = name
 
+    def _clone_unbound(self) -> VectorIndex[M]:
+        """Return an independent descriptor for an inherited model."""
+        return VectorIndex(
+            index_name=self.index_name,
+            vector_attribute=self.vector_attribute,
+            distance=self.distance,
+            partition_key=self.partition_key,
+            inline_filters=self.inline_filters,
+            projection=(
+                list(self.projection) if isinstance(self.projection, list) else self.projection
+            ),
+        )
+
     def _bind_to_model(self, model_class: type[M]) -> None:
         attributes = model_class._attributes
         vector_attr = attributes.get(self.vector_attribute)
@@ -147,15 +160,23 @@ class VectorIndex(Generic[M]):
                 "as an inline filter"
             )
 
-        referenced = [
+        search_schema_attributes = [
             value for value in [self.partition_key, *self.inline_filters] if value is not None
         ]
+        referenced = list(search_schema_attributes)
         if isinstance(self.projection, list):
             referenced.extend(self.projection)
         for attr_name in referenced:
             if attr_name not in attributes:
                 raise ValueError(
                     f"Vector index '{self.index_name}' references unknown attribute '{attr_name}'"
+                )
+        for attr_name in search_schema_attributes:
+            attr_type = attributes[attr_name].attr_type
+            if attr_type not in {"S", "N", "B"}:
+                raise ValueError(
+                    f"Vector index '{self.index_name}' search schema attribute "
+                    f"'{attr_name}' must use scalar DynamoDB type S, N, or B"
                 )
 
         self._model_class = model_class
@@ -176,6 +197,19 @@ class VectorIndex(Generic[M]):
             ),
             "dimensions": vector_attr.dimensions,
             "distance_function": self.distance.value,
+            "attribute_definitions": [
+                (
+                    model_class._py_to_dynamo.get(name, name),
+                    model_class._attributes[name].attr_type,
+                )
+                for name in [self.partition_key, *self.inline_filters]
+                if name is not None
+            ],
+            "table_key_attributes": [
+                model_class._py_to_dynamo.get(name, name)
+                for name in [model_class._partition_key, model_class._sort_key]
+                if name is not None
+            ],
         }
 
         if self.partition_key is not None:
@@ -215,13 +249,89 @@ class VectorIndex(Generic[M]):
 
         visit(condition)
 
+    def _serialize_filter(
+        self,
+        condition: Condition,
+        names: dict[str, str],
+        values: dict[str, Any],
+    ) -> str:
+        if isinstance(condition, ConditionAnd):
+            left = self._serialize_filter(condition.left, names, values)
+            right = self._serialize_filter(condition.right, names, values)
+            return f"({left} AND {right})"
+
+        assert isinstance(condition, ConditionComparison)
+        attribute = condition.path.attribute
+        assert attribute is not None
+        path = condition.path._serialize_path(names)
+        placeholder = f":v{len(values)}"
+        values[placeholder] = attribute.serialize(condition.value)
+        return f"{path} = {placeholder}"
+
+    def _prepare_projection(
+        self,
+        names: dict[str, str],
+        as_dict: bool,
+    ) -> str | None:
+        if as_dict:
+            return None
+
+        model_class = self._get_model_class()
+        if self.projection == "ALL":
+            selected = set(model_class._attributes)
+        else:
+            selected = {
+                name
+                for name in [
+                    model_class._partition_key,
+                    model_class._sort_key,
+                    self.vector_attribute,
+                    self.partition_key,
+                    *self.inline_filters,
+                ]
+                if name is not None
+            }
+            if isinstance(self.projection, list):
+                selected.update(self.projection)
+
+        missing_required = [
+            name
+            for name, attribute in model_class._attributes.items()
+            if attribute.required and name not in selected
+        ]
+        if missing_required:
+            missing = ", ".join(sorted(missing_required))
+            raise ValueError(
+                f"Vector index '{self.index_name}' projection does not include required "
+                f"model attributes: {missing}. Use as_dict=True or include them in the projection"
+            )
+
+        placeholders: list[str] = []
+        for name in model_class._attributes:
+            if name not in selected:
+                continue
+            dynamo_name = model_class._py_to_dynamo.get(name, name)
+            placeholder = names.get(dynamo_name)
+            if placeholder is None:
+                placeholder = f"#vector_projection_{len(placeholders)}"
+                names[dynamo_name] = placeholder
+            placeholders.append(placeholder)
+        return ", ".join(placeholders)
+
     def _prepare_search(
         self,
         query_vector: Any,
         partition_key: Any,
         where: Condition | None,
         top_k: int,
-    ) -> tuple[list[float], str | None, dict[str, str] | None, dict[str, Any] | None]:
+        as_dict: bool = False,
+    ) -> tuple[
+        list[float],
+        str | None,
+        dict[str, str] | None,
+        dict[str, Any] | None,
+        str | None,
+    ]:
         model_class = self._get_model_class()
         vector_attr = model_class._attributes[self.vector_attribute]
         assert isinstance(vector_attr, VectorAttribute)
@@ -244,16 +354,19 @@ class VectorIndex(Generic[M]):
         if self.partition_key is not None:
             dynamo_name = model_class._py_to_dynamo.get(self.partition_key, self.partition_key)
             names[dynamo_name] = "#vector_pk"
-            values[":vector_pk"] = partition_key
+            values[":vector_pk"] = model_class._attributes[self.partition_key].serialize(
+                partition_key
+            )
             expressions.append("#vector_pk = :vector_pk")
 
         if where is not None:
             self._validate_filter(where)
-            expressions.append(where.serialize(names, values))
+            expressions.append(self._serialize_filter(where, names, values))
 
         expression = " AND ".join(expressions) if expressions else None
+        projection_expression = self._prepare_projection(names, as_dict)
         attr_names = {placeholder: name for name, placeholder in names.items()} if names else None
-        return vector, expression, attr_names, values or None
+        return vector, expression, attr_names, values or None, projection_expression
 
     def _convert_result(
         self,
@@ -280,8 +393,8 @@ class VectorIndex(Generic[M]):
         as_dict: bool = False,
     ) -> VectorSearchResult[M] | VectorSearchResult[dict[str, Any]]:
         model_class = self._get_model_class()
-        vector, expression, names, values = self._prepare_search(
-            query_vector, partition_key, where, top_k
+        vector, expression, names, values, projection = self._prepare_search(
+            query_vector, partition_key, where, top_k, as_dict
         )
         result = await model_class._get_client().search_vectors(
             model_class._get_table(),
@@ -291,6 +404,7 @@ class VectorIndex(Generic[M]):
             search_condition_expression=expression,
             expression_attribute_names=names,
             expression_attribute_values=values,
+            projection_expression=projection,
         )
         return self._convert_result(result, as_dict)
 
@@ -304,8 +418,8 @@ class VectorIndex(Generic[M]):
         as_dict: bool = False,
     ) -> VectorSearchResult[M] | VectorSearchResult[dict[str, Any]]:
         model_class = self._get_model_class()
-        vector, expression, names, values = self._prepare_search(
-            query_vector, partition_key, where, top_k
+        vector, expression, names, values, projection = self._prepare_search(
+            query_vector, partition_key, where, top_k, as_dict
         )
         result = model_class._get_client().sync_search_vectors(
             model_class._get_table(),
@@ -315,39 +429,64 @@ class VectorIndex(Generic[M]):
             search_condition_expression=expression,
             expression_attribute_names=names,
             expression_attribute_values=values,
+            projection_expression=projection,
         )
         return self._convert_result(result, as_dict)
 
-    async def create(self, *, wait: bool = False) -> None:
+    async def create(
+        self,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
         model_class = self._get_model_class()
         await model_class._get_client().create_vector_index(
             model_class._get_table(),
             self.to_create_table_definition(model_class),
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
-    def sync_create(self, *, wait: bool = False) -> None:
+    def sync_create(
+        self,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
         model_class = self._get_model_class()
         model_class._get_client().sync_create_vector_index(
             model_class._get_table(),
             self.to_create_table_definition(model_class),
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
-    async def delete(self, *, wait: bool = False) -> None:
+    async def delete(
+        self,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
         model_class = self._get_model_class()
         await model_class._get_client().delete_vector_index(
             model_class._get_table(),
             self.index_name,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
-    def sync_delete(self, *, wait: bool = False) -> None:
+    def sync_delete(
+        self,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
         model_class = self._get_model_class()
         model_class._get_client().sync_delete_vector_index(
             model_class._get_table(),
             self.index_name,
             wait=wait,
+            timeout_seconds=timeout_seconds,
         )
 
     async def describe(self) -> VectorIndexInfo:

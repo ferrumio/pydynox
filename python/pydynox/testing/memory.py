@@ -298,7 +298,6 @@ class MemoryClient:
         self._last_metrics: FakeMetrics | None = None
         self._total_metrics = FakeTotalMetrics()
         self._vector_index_definitions: dict[tuple[str, str], dict[str, Any]] = {}
-        self._deleted_vector_indexes: set[tuple[str, str]] = set()
         # For compatibility with code that accesses _client directly
         self._client = self
 
@@ -306,6 +305,10 @@ class MemoryClient:
         if seed:
             for table_name, items in seed.items():
                 self._tables[table_name] = {}
+                self._table_schemas[table_name] = {
+                    "partition_key": "pk",
+                    "sort_key": "sk" if any("sk" in item for item in items) else "",
+                }
                 for item in items:
                     # Infer key from first item
                     key_str = self._make_key_string(item)
@@ -419,7 +422,6 @@ class MemoryClient:
         after: dict[str, Any] | None,
     ) -> float | None:
         """Calculate vector bytes affected by a write."""
-        self._discover_vector_indexes(table)
         total = 0
         found = False
         for (index_table, _), definition in self._vector_index_definitions.items():
@@ -967,36 +969,8 @@ class MemoryClient:
 
     # ========== VECTOR SEARCH ==========
 
-    @staticmethod
-    def _model_classes() -> Iterator[type[Model]]:
-        pending = list(Model.__subclasses__())
-        while pending:
-            model = pending.pop()
-            pending.extend(model.__subclasses__())
-            yield model
-
-    def _discover_vector_indexes(self, table: str) -> None:
-        for model in self._model_classes():
-            config = getattr(model, "model_config", None)
-            if config is None or config.table != table:
-                continue
-            for index in getattr(model, "_vector_indexes", {}).values():
-                key = (table, index.index_name)
-                if key not in self._deleted_vector_indexes:
-                    self._vector_index_definitions.setdefault(
-                        key, index.to_create_table_definition(model)
-                    )
-
     def _find_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
         key = (table, index_name)
-        if key in self._deleted_vector_indexes:
-            raise ValueError(f"Vector index '{index_name}' not found on table '{table}'")
-
-        stored = self._vector_index_definitions.get(key)
-        if stored is not None:
-            return stored
-
-        self._discover_vector_indexes(table)
         stored = self._vector_index_definitions.get(key)
         if stored is not None:
             return stored
@@ -1005,7 +979,6 @@ class MemoryClient:
 
     def _vector_projection(
         self,
-        table: str,
         item: dict[str, Any],
         definition: dict[str, Any],
     ) -> dict[str, Any]:
@@ -1013,15 +986,12 @@ class MemoryClient:
         if projection == "ALL":
             return copy.deepcopy(item)
 
-        selected: set[str] = set()
-        for model in self._model_classes():
-            config = getattr(model, "model_config", None)
-            if config is None or config.table != table:
-                continue
-            for key_name in (model._partition_key, model._sort_key):
-                if key_name is not None:
-                    selected.add(model._py_to_dynamo.get(key_name, key_name))
-            break
+        selected = set(definition.get("table_key_attributes") or [])
+        selected.add(definition["vector_attribute"])
+        partition_key = definition.get("partition_key")
+        if partition_key is not None:
+            selected.add(partition_key)
+        selected.update(definition.get("inline_filters") or [])
 
         if projection == "INCLUDE":
             selected.update(definition.get("non_key_attributes") or [])
@@ -1083,7 +1053,7 @@ class MemoryClient:
                 continue
 
             score = self._vector_score(vector, stored, definition["distance_function"])
-            projected = self._vector_projection(table, item, definition)
+            projected = self._vector_projection(item, definition)
             if projection_expression:
                 names = expression_attribute_names or {}
                 requested = [
@@ -1091,6 +1061,8 @@ class MemoryClient:
                     for name in projection_expression.split(",")
                 ]
                 projected = {name: projected[name] for name in requested if name in projected}
+            else:
+                projected.pop(vector_attribute, None)
             matches.append(VectorMatch(item=projected, score=score))
 
         reverse = definition["distance_function"] == "DOT_PRODUCT"
@@ -1217,10 +1189,27 @@ class MemoryClient:
         """Create an in-memory table."""
         if table not in self._tables:
             self._tables[table] = {}
+        partition_key = kwargs.get("partition_key")
+        sort_key = kwargs.get("sort_key")
+        self._table_schemas[table] = {
+            "partition_key": partition_key[0] if partition_key else "pk",
+            "sort_key": sort_key[0] if sort_key else "",
+        }
         for definition in kwargs.get("vector_indexes") or []:
             key = (table, definition["index_name"])
-            self._deleted_vector_indexes.discard(key)
-            self._vector_index_definitions[key] = copy.deepcopy(definition)
+            stored = copy.deepcopy(definition)
+            stored.setdefault(
+                "table_key_attributes",
+                [
+                    name
+                    for name in [
+                        self._table_schemas[table]["partition_key"],
+                        self._table_schemas[table]["sort_key"],
+                    ]
+                    if name
+                ],
+            )
+            self._vector_index_definitions[key] = stored
 
     async def create_table(self, table: str, **kwargs: Any) -> None:
         self._do_create_table(table, **kwargs)
@@ -1229,28 +1218,67 @@ class MemoryClient:
         self._do_create_table(table, **kwargs)
 
     async def create_vector_index(
-        self, table: str, definition: dict[str, Any], wait: bool = False
+        self,
+        table: str,
+        definition: dict[str, Any],
+        wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
-        key = (table, definition["index_name"])
-        self._deleted_vector_indexes.discard(key)
-        self._vector_index_definitions[key] = copy.deepcopy(definition)
+        self._do_create_vector_index(table, definition)
 
     def sync_create_vector_index(
-        self, table: str, definition: dict[str, Any], wait: bool = False
+        self,
+        table: str,
+        definition: dict[str, Any],
+        wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
+        self._do_create_vector_index(table, definition)
+
+    def _do_create_vector_index(self, table: str, definition: dict[str, Any]) -> None:
+        if table not in self._table_schemas:
+            raise ValueError(f"Table '{table}' does not exist")
         key = (table, definition["index_name"])
-        self._deleted_vector_indexes.discard(key)
-        self._vector_index_definitions[key] = copy.deepcopy(definition)
+        if key in self._vector_index_definitions:
+            raise ValueError(
+                f"Vector index '{definition['index_name']}' already exists on table '{table}'"
+            )
+        stored = copy.deepcopy(definition)
+        stored.setdefault(
+            "table_key_attributes",
+            [
+                name
+                for name in [
+                    self._table_schemas[table]["partition_key"],
+                    self._table_schemas[table]["sort_key"],
+                ]
+                if name
+            ],
+        )
+        self._vector_index_definitions[key] = stored
 
-    async def delete_vector_index(self, table: str, index_name: str, wait: bool = False) -> None:
-        key = (table, index_name)
-        self._vector_index_definitions.pop(key, None)
-        self._deleted_vector_indexes.add(key)
+    async def delete_vector_index(
+        self,
+        table: str,
+        index_name: str,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
+        self._do_delete_vector_index(table, index_name)
 
-    def sync_delete_vector_index(self, table: str, index_name: str, wait: bool = False) -> None:
+    def sync_delete_vector_index(
+        self,
+        table: str,
+        index_name: str,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
+        self._do_delete_vector_index(table, index_name)
+
+    def _do_delete_vector_index(self, table: str, index_name: str) -> None:
         key = (table, index_name)
-        self._vector_index_definitions.pop(key, None)
-        self._deleted_vector_indexes.add(key)
+        if self._vector_index_definitions.pop(key, None) is None:
+            raise ValueError(f"Vector index '{index_name}' not found on table '{table}'")
 
     def _describe_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
         definition = self._find_vector_index(table, index_name)
@@ -1277,11 +1305,9 @@ class MemoryClient:
     def delete_table(self, table: str) -> None:
         """Delete a table."""
         self._tables.pop(table, None)
+        self._table_schemas.pop(table, None)
         self._vector_index_definitions = {
             key: value for key, value in self._vector_index_definitions.items() if key[0] != table
-        }
-        self._deleted_vector_indexes = {
-            key for key in self._deleted_vector_indexes if key[0] != table
         }
 
     # ========== HELPERS ==========

@@ -64,24 +64,33 @@ impl DynamoDBClient {
         )
     }
 
-    #[pyo3(signature = (table, definition, wait=false))]
+    #[pyo3(signature = (table, definition, wait=false, timeout_seconds=None))]
     pub fn create_vector_index<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         definition: &Bound<'_, PyDict>,
         wait: bool,
+        timeout_seconds: Option<u64>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        table_operations::create_vector_index(py, self.client.clone(), table, definition, wait)
+        table_operations::create_vector_index(
+            py,
+            self.client.clone(),
+            table,
+            definition,
+            wait,
+            timeout_seconds,
+        )
     }
 
-    #[pyo3(signature = (table, definition, wait=false))]
+    #[pyo3(signature = (table, definition, wait=false, timeout_seconds=None))]
     pub fn sync_create_vector_index(
         &self,
         py: Python<'_>,
         table: &str,
         definition: &Bound<'_, PyDict>,
         wait: bool,
+        timeout_seconds: Option<u64>,
     ) -> PyResult<()> {
         table_operations::sync_create_vector_index(
             py,
@@ -90,27 +99,37 @@ impl DynamoDBClient {
             table,
             definition,
             wait,
+            timeout_seconds,
         )
     }
 
-    #[pyo3(signature = (table, index_name, wait=false))]
+    #[pyo3(signature = (table, index_name, wait=false, timeout_seconds=None))]
     pub fn delete_vector_index<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         index_name: &str,
         wait: bool,
+        timeout_seconds: Option<u64>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        table_operations::delete_vector_index(py, self.client.clone(), table, index_name, wait)
+        table_operations::delete_vector_index(
+            py,
+            self.client.clone(),
+            table,
+            index_name,
+            wait,
+            timeout_seconds,
+        )
     }
 
-    #[pyo3(signature = (table, index_name, wait=false))]
+    #[pyo3(signature = (table, index_name, wait=false, timeout_seconds=None))]
     pub fn sync_delete_vector_index(
         &self,
         py: Python<'_>,
         table: &str,
         index_name: &str,
         wait: bool,
+        timeout_seconds: Option<u64>,
     ) -> PyResult<()> {
         table_operations::sync_delete_vector_index(
             py,
@@ -119,6 +138,7 @@ impl DynamoDBClient {
             table,
             index_name,
             wait,
+            timeout_seconds,
         )
     }
 

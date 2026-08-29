@@ -176,6 +176,8 @@ partition keys, equality-only inline filters, projections, and `top_k`.
 
 ```python
 with MemoryBackend():
+    Product.sync_create_table()
+
     Product(
         pk="PRODUCT#1",
         tenant_id="TENANT#acme",
@@ -193,7 +195,8 @@ with MemoryBackend():
 
 The memory backend uses exact search. Production vector indexes may not return
 the same ordering for vectors with nearly identical scores, so tests should
-avoid near-ties.
+avoid near-ties. Create the table or index in the test before searching; model
+declarations are not auto-discovered as live indexes.
 
 ## Comparison with alternatives
 

@@ -162,6 +162,7 @@ class DynamoDBClient:
         local_secondary_indexes: list[dict[str, Any]] | None = None,
         vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None: ...
     def table_exists(self, table_name: str) -> bool: ...
     def delete_table(self, table_name: str) -> None: ...
@@ -197,24 +198,28 @@ class DynamoDBClient:
         table: str,
         definition: dict[str, Any],
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> Coroutine[Any, Any, None]: ...
     def sync_create_vector_index(
         self,
         table: str,
         definition: dict[str, Any],
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None: ...
     def delete_vector_index(
         self,
         table: str,
         index_name: str,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> Coroutine[Any, Any, None]: ...
     def sync_delete_vector_index(
         self,
         table: str,
         index_name: str,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None: ...
     def describe_vector_index(
         self,

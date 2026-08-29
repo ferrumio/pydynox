@@ -13,8 +13,11 @@ use tokio::runtime::Runtime;
 
 use super::gsi::GsiDefinition;
 use super::lsi::LsiDefinition;
-use super::vector_index::{VectorIndexDefinition, build_vector_index, wait_for_vector_index};
-use super::wait::{execute_wait_for_table_active, sync_wait_for_table_active};
+use super::vector_index::{
+    VectorIndexDefinition, build_vector_attribute_definitions, build_vector_index,
+    wait_for_vector_index,
+};
+use super::wait::execute_wait_for_table_active;
 use crate::errors::{ValidationException, map_sdk_error};
 
 /// Prepared create table request (converted before async).
@@ -32,6 +35,7 @@ pub struct PreparedCreateTable {
     pub vector_index_list: Vec<AwsVectorIndex>,
     pub vector_index_names: Vec<String>,
     pub wait: bool,
+    pub timeout_seconds: Option<u64>,
 }
 
 /// Prepare create table request - validates and builds all AWS types.
@@ -52,6 +56,7 @@ pub fn prepare_create_table(
     lsis: Option<Vec<LsiDefinition>>,
     vector_indexes: Option<Vec<VectorIndexDefinition>>,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<PreparedCreateTable> {
     let hash_attr_type = parse_attribute_type(hash_key_type)?;
 
@@ -248,6 +253,25 @@ pub fn prepare_create_table(
             ));
         }
         for definition in definitions {
+            for attribute in build_vector_attribute_definitions(&definition)? {
+                let name = attribute.attribute_name().to_string();
+                if let Some(existing) = attribute_definitions
+                    .iter()
+                    .find(|existing| existing.attribute_name() == name)
+                {
+                    if existing.attribute_type() != attribute.attribute_type() {
+                        return Err(ValidationException::new_err(format!(
+                            "Attribute '{}' has conflicting DynamoDB types '{}' and '{}'",
+                            name,
+                            existing.attribute_type().as_str(),
+                            attribute.attribute_type().as_str()
+                        )));
+                    }
+                } else {
+                    defined_attrs.insert(name);
+                    attribute_definitions.push(attribute);
+                }
+            }
             vector_index_names.push(definition.index_name.clone());
             vector_index_list.push(build_vector_index(&definition)?);
         }
@@ -277,6 +301,7 @@ pub fn prepare_create_table(
         vector_index_list,
         vector_index_names,
         wait,
+        timeout_seconds,
     })
 }
 
@@ -331,9 +356,21 @@ pub async fn execute_create_table(client: Client, prepared: PreparedCreateTable)
 
     // Wait for table to become active if requested
     if prepared.wait {
-        execute_wait_for_table_active(client.clone(), &prepared.table_name, None).await?;
+        execute_wait_for_table_active(
+            client.clone(),
+            &prepared.table_name,
+            prepared.timeout_seconds,
+        )
+        .await?;
         for index_name in prepared.vector_index_names {
-            wait_for_vector_index(&client, &prepared.table_name, &index_name, true).await?;
+            wait_for_vector_index(
+                &client,
+                &prepared.table_name,
+                &index_name,
+                true,
+                prepared.timeout_seconds,
+            )
+            .await?;
         }
     }
 
@@ -360,6 +397,7 @@ pub fn create_table<'py>(
     lsis: Option<Vec<LsiDefinition>>,
     vector_indexes: Option<Vec<VectorIndexDefinition>>,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_create_table(
         table_name,
@@ -377,6 +415,7 @@ pub fn create_table<'py>(
         lsis,
         vector_indexes,
         wait,
+        timeout_seconds,
     )?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
@@ -387,6 +426,7 @@ pub fn create_table<'py>(
 /// Sync create_table - blocks until complete.
 #[allow(clippy::too_many_arguments)]
 pub fn sync_create_table(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     table_name: &str,
@@ -404,6 +444,7 @@ pub fn sync_create_table(
     lsis: Option<Vec<LsiDefinition>>,
     vector_indexes: Option<Vec<VectorIndexDefinition>>,
     wait: bool,
+    timeout_seconds: Option<u64>,
 ) -> PyResult<()> {
     let prepared = prepare_create_table(
         table_name,
@@ -420,29 +461,12 @@ pub fn sync_create_table(
         gsis,
         lsis,
         vector_indexes,
-        false, // Don't wait in the async part
+        wait,
+        timeout_seconds,
     )?;
 
     let client_clone = client.clone();
-    let table_name_owned = table_name.to_string();
-    let vector_index_names = prepared.vector_index_names.clone();
-
-    runtime.block_on(async { execute_create_table(client_clone, prepared).await })?;
-
-    // Wait for table to become active if requested (sync version)
-    if wait {
-        sync_wait_for_table_active(client, runtime, &table_name_owned, None)?;
-        for index_name in vector_index_names {
-            runtime.block_on(wait_for_vector_index(
-                client,
-                &table_name_owned,
-                &index_name,
-                true,
-            ))?;
-        }
-    }
-
-    Ok(())
+    py.detach(|| runtime.block_on(execute_create_table(client_clone, prepared)))
 }
 
 /// Build projection for GSI/LSI.

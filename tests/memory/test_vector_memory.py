@@ -54,6 +54,7 @@ class EuclideanDocument(Model):
 
 def test_sync_vector_search_orders_by_cosine_distance() -> None:
     with MemoryBackend():
+        Product.sync_create_table()
         Product(
             pk="1",
             tenant_id="TENANT#1",
@@ -79,7 +80,7 @@ def test_sync_vector_search_orders_by_cosine_distance() -> None:
 
 def test_vector_write_metrics() -> None:
     with MemoryBackend():
-        Product.semantic.sync_create()
+        Product.sync_create_table()
         product = Product(
             pk="1",
             tenant_id="TENANT#1",
@@ -106,6 +107,7 @@ async def test_async_table_creation_registers_vector_index() -> None:
 @pytest.mark.asyncio
 async def test_async_vector_search_applies_inline_filter() -> None:
     with MemoryBackend():
+        await Product.create_table()
         await Product(
             pk="book",
             tenant_id="TENANT#1",
@@ -130,6 +132,7 @@ async def test_async_vector_search_applies_inline_filter() -> None:
 
 def test_vector_search_can_return_dicts() -> None:
     with MemoryBackend():
+        Product.sync_create_table()
         Product(
             pk="1",
             tenant_id="TENANT#1",
@@ -144,10 +147,30 @@ def test_vector_search_can_return_dicts() -> None:
         )
 
         assert matches[0].item["pk"] == "1"
+        assert "embedding" not in matches[0].item
+
+
+def test_model_vector_search_explicitly_requests_vector_attribute() -> None:
+    with MemoryBackend():
+        Product.sync_create_table()
+        Product(
+            pk="1",
+            tenant_id="TENANT#1",
+            category="books",
+            embedding=[1.0, 0.0],
+        ).sync_save()
+
+        matches = Product.semantic.sync_search(
+            [1.0, 0.0],
+            partition_key="TENANT#1",
+        )
+
+        assert matches[0].item.embedding == [1.0, 0.0]
 
 
 def test_dot_product_search_orders_highest_score_first() -> None:
     with MemoryBackend():
+        DotProductDocument.sync_create_table()
         DotProductDocument(pk="1", embedding=[1.0, 0.0]).sync_save()
         DotProductDocument(pk="2", embedding=[2.0, 0.0]).sync_save()
 
@@ -158,6 +181,7 @@ def test_dot_product_search_orders_highest_score_first() -> None:
 
 def test_euclidean_search_applies_top_k_and_projection() -> None:
     with MemoryBackend():
+        EuclideanDocument.sync_create_table()
         EuclideanDocument(
             pk="1",
             title="Closest",
@@ -180,8 +204,27 @@ def test_euclidean_search_applies_top_k_and_projection() -> None:
         assert matches[0].item == {"pk": "1", "title": "Closest"}
 
 
+def test_include_projection_can_build_partial_model() -> None:
+    with MemoryBackend():
+        EuclideanDocument.sync_create_table()
+        EuclideanDocument(
+            pk="1",
+            title="Closest",
+            hidden="secret",
+            embedding=[1.0, 0.0],
+        ).sync_save()
+
+        matches = EuclideanDocument.semantic.sync_search([1.0, 0.0])
+
+        assert matches[0].item.pk == "1"
+        assert matches[0].item.title == "Closest"
+        assert matches[0].item.embedding == [1.0, 0.0]
+        assert matches[0].item.hidden is None
+
+
 def test_empty_vector_index_returns_no_matches() -> None:
     with MemoryBackend():
+        DotProductDocument.sync_create_table()
         matches = DotProductDocument.semantic.sync_search([1.0, 0.0])
 
         assert matches == []
@@ -190,10 +233,42 @@ def test_empty_vector_index_returns_no_matches() -> None:
 
 def test_vector_index_lifecycle_in_memory() -> None:
     with MemoryBackend():
+        Product._get_client().sync_create_table(
+            "vector-products",
+            partition_key=("pk", "S"),
+        )
         Product.semantic.sync_create(wait=True)
         info = Product.semantic.sync_describe()
         assert info.status == "ACTIVE"
         assert info.dimensions == 2
+        with pytest.raises(ValueError, match="already exists"):
+            Product.semantic.sync_create()
         Product.semantic.sync_delete(wait=True)
+        with pytest.raises(ValueError, match="not found"):
+            Product.semantic.sync_describe()
+        with pytest.raises(ValueError, match="not found"):
+            Product.semantic.sync_delete()
+
+
+def test_vector_index_creation_requires_table() -> None:
+    with MemoryBackend():
+        with pytest.raises(ValueError, match="does not exist"):
+            Product.semantic.sync_create()
+
+
+def test_vector_index_is_not_auto_discovered() -> None:
+    with MemoryBackend():
+        Product._get_client().sync_create_table(
+            "vector-products",
+            partition_key=("pk", "S"),
+        )
+
+        with pytest.raises(ValueError, match="not found"):
+            Product.semantic.sync_search(
+                [1.0, 0.0],
+                partition_key="TENANT#1",
+                as_dict=True,
+            )
+
         with pytest.raises(ValueError, match="not found"):
             Product.semantic.sync_describe()

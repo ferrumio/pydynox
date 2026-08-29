@@ -93,15 +93,16 @@ impl OperationMetrics {
 
 /// Sum vector write request bytes across all vector indexes.
 pub fn vector_write_bytes(capacity: Option<&ConsumedCapacity>) -> Option<f64> {
-    let total = capacity
-        .and_then(|value| value.vector_indexes())
-        .map(|indexes| {
-            indexes
-                .values()
-                .filter_map(|value| value.vector_write_request_bytes())
-                .sum::<f64>()
-        })?;
-    Some(total)
+    let indexes = capacity.and_then(|value| value.vector_indexes())?;
+    if indexes.is_empty() {
+        return None;
+    }
+    Some(
+        indexes
+            .values()
+            .filter_map(|value| value.vector_write_request_bytes())
+            .sum(),
+    )
 }
 
 impl OperationMetrics {

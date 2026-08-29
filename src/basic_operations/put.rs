@@ -102,7 +102,7 @@ pub async fn execute_put_item(
         .put_item()
         .table_name(&prepared.table)
         .set_item(Some(prepared.item))
-        .return_consumed_capacity(ReturnConsumedCapacity::Total);
+        .return_consumed_capacity(ReturnConsumedCapacity::Indexes);
 
     if let Some(condition) = prepared.condition_expression {
         request = request.condition_expression(condition);

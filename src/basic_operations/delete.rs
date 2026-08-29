@@ -104,7 +104,7 @@ pub async fn execute_delete_item(
         .delete_item()
         .table_name(&prepared.table)
         .set_key(Some(prepared.key))
-        .return_consumed_capacity(ReturnConsumedCapacity::Total);
+        .return_consumed_capacity(ReturnConsumedCapacity::Indexes);
 
     if let Some(condition) = prepared.condition_expression {
         request = request.condition_expression(condition);

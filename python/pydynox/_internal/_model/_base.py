@@ -98,6 +98,15 @@ class ModelMeta(type):
             if base_vector_indexes is not None:
                 vector_indexes.update(base_vector_indexes)
 
+        for attr_name, index in list(vector_indexes.items()):
+            if attr_name in namespace:
+                if not isinstance(namespace[attr_name], VectorIndex):
+                    vector_indexes.pop(attr_name)
+                continue
+            cloned_index = index._clone_unbound()
+            namespace[attr_name] = cloned_index
+            vector_indexes[attr_name] = cloned_index
+
         for attr_name, attr_value in namespace.items():
             if isinstance(attr_value, Attribute):
                 attr_value.attr_name = attr_name

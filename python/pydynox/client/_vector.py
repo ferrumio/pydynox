@@ -99,10 +99,11 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         definition: dict[str, Any],
         *,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> Coroutine[Any, Any, None]:
         _log_debug("create_vector_index", f'Creating vector index on "{table}"')
         return self._client.create_vector_index(  # type: ignore[attr-defined, no-any-return]
-            table, definition, wait=wait
+            table, definition, wait=wait, timeout_seconds=timeout_seconds
         )
 
     def sync_create_vector_index(
@@ -111,10 +112,11 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         definition: dict[str, Any],
         *,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
         _log_debug("sync_create_vector_index", f'Creating vector index on "{table}"')
         self._client.sync_create_vector_index(  # type: ignore[attr-defined]
-            table, definition, wait=wait
+            table, definition, wait=wait, timeout_seconds=timeout_seconds
         )
 
     def delete_vector_index(
@@ -123,10 +125,11 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         index_name: str,
         *,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> Coroutine[Any, Any, None]:
         _log_debug("delete_vector_index", f'Deleting vector index "{index_name}"')
         return self._client.delete_vector_index(  # type: ignore[attr-defined, no-any-return]
-            table, index_name, wait=wait
+            table, index_name, wait=wait, timeout_seconds=timeout_seconds
         )
 
     def sync_delete_vector_index(
@@ -135,10 +138,11 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         index_name: str,
         *,
         wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None:
         _log_debug("sync_delete_vector_index", f'Deleting vector index "{index_name}"')
         self._client.sync_delete_vector_index(  # type: ignore[attr-defined]
-            table, index_name, wait=wait
+            table, index_name, wait=wait, timeout_seconds=timeout_seconds
         )
 
     def describe_vector_index(

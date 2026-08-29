@@ -153,7 +153,10 @@ class CrudOperations(_MixinBase):
             )
             attributes, metrics = result
             add_response_attributes(
-                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
+                span,
+                consumed_wcu=metrics.consumed_wcu,
+                request_id=metrics.request_id,
+                vector_write_bytes=metrics.vector_write_bytes,
             )
 
         _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
@@ -238,7 +241,10 @@ class CrudOperations(_MixinBase):
                 return_values=return_values,
             )
             add_response_attributes(
-                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
+                span,
+                consumed_wcu=metrics.consumed_wcu,
+                request_id=metrics.request_id,
+                vector_write_bytes=metrics.vector_write_bytes,
             )
 
         _log_operation("put_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
@@ -426,7 +432,10 @@ class CrudOperations(_MixinBase):
             )
             attributes, metrics = result
             add_response_attributes(
-                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
+                span,
+                consumed_wcu=metrics.consumed_wcu,
+                request_id=metrics.request_id,
+                vector_write_bytes=metrics.vector_write_bytes,
             )
 
         _log_operation("delete_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
@@ -510,7 +519,10 @@ class CrudOperations(_MixinBase):
                 return_values=return_values,
             )
             add_response_attributes(
-                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
+                span,
+                consumed_wcu=metrics.consumed_wcu,
+                request_id=metrics.request_id,
+                vector_write_bytes=metrics.vector_write_bytes,
             )
 
         _log_operation("delete_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
@@ -607,7 +619,10 @@ class CrudOperations(_MixinBase):
             )
             attributes, metrics = result
             add_response_attributes(
-                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
+                span,
+                consumed_wcu=metrics.consumed_wcu,
+                request_id=metrics.request_id,
+                vector_write_bytes=metrics.vector_write_bytes,
             )
 
         _log_operation("update_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
@@ -701,7 +716,10 @@ class CrudOperations(_MixinBase):
                 return_values=return_values,
             )
             add_response_attributes(
-                span, consumed_wcu=metrics.consumed_wcu, request_id=metrics.request_id
+                span,
+                consumed_wcu=metrics.consumed_wcu,
+                request_id=metrics.request_id,
+                vector_write_bytes=metrics.vector_write_bytes,
             )
 
         _log_operation("update_item", table, metrics.duration_ms, consumed_wcu=metrics.consumed_wcu)
