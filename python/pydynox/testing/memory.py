@@ -254,6 +254,12 @@ class MemoryBackend:
 
         Use this when testing code that calls the client API directly instead
         of using models.
+
+        Returns:
+            The active in-memory client.
+
+        Raises:
+            RuntimeError: If the backend is not active.
         """
         if self._client is None:
             raise RuntimeError("MemoryBackend client is only available inside its context")

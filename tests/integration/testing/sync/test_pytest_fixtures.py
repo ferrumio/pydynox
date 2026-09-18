@@ -131,8 +131,10 @@ def test_sync_pydynox_memory_backend_clear(pydynox_memory_backend):
 
 def test_sync_pydynox_memory_backend_batch_client(pydynox_memory_backend):
     """Test direct batch calls through the fixture's in-memory client."""
+    # GIVEN the client exposed by the active memory backend
     client = pydynox_memory_backend.client
 
+    # WHEN we write and read multiple items with the batch API
     client.sync_batch_write(
         "users",
         put_items=[
@@ -146,4 +148,5 @@ def test_sync_pydynox_memory_backend_batch_client(pydynox_memory_backend):
         [{"pk": "SYNC_BATCH#1"}, {"pk": "SYNC_BATCH#2"}],
     )
 
+    # THEN both items are returned from in-memory storage
     assert {item["name"] for item in items} == {"Alice", "Bob"}

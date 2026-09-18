@@ -46,6 +46,7 @@ SKIP_FILES = {
     "testing_query.py",
     "testing_scan.py",
     "testing_ttl.py",
+    "testing_batch.py",
     "query_scan.py",
     "basic_fixture.py",
     "basic_fixture_sync.py",

@@ -244,7 +244,7 @@ def test_client_property_is_only_available_while_backend_is_active():
 
 
 def test_sync_batch_operations_with_memory_client():
-    """Test direct sync batch operations, including batches over AWS request limits."""
+    """Test direct sync batch operations with large input collections."""
     put_items = [
         {"pk": f"USER#{index}", "name": f"User {index}", "age": index} for index in range(30)
     ]
