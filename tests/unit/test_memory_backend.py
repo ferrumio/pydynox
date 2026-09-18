@@ -229,6 +229,70 @@ def test_tables_property():
         assert len(backend.tables["users"]) == 1
 
 
+def test_client_property_is_only_available_while_backend_is_active():
+    """Test direct client access follows the backend lifecycle."""
+    backend = MemoryBackend()
+
+    with pytest.raises(RuntimeError, match="only available inside its context"):
+        _ = backend.client
+
+    with backend:
+        assert backend.client is get_default_client()
+
+    with pytest.raises(RuntimeError, match="only available inside its context"):
+        _ = backend.client
+
+
+def test_sync_batch_operations_with_memory_client():
+    """Test direct sync batch operations, including batches over AWS request limits."""
+    put_items = [
+        {"pk": f"USER#{index}", "name": f"User {index}", "age": index} for index in range(30)
+    ]
+    keys = [{"pk": f"USER#{index}"} for index in range(101)]
+
+    with MemoryBackend() as backend:
+        backend.client.sync_batch_write("users", put_items=put_items)
+
+        items = backend.client.sync_batch_get("users", keys, consistent_read=True)
+
+        assert len(items) == 30
+        assert {item["pk"] for item in items} == {f"USER#{index}" for index in range(30)}
+
+        backend.client.sync_batch_write(
+            "users",
+            delete_keys=[{"pk": "USER#0"}, {"pk": "USER#1"}],
+        )
+
+        assert (
+            backend.client.sync_batch_get(
+                "users",
+                [{"pk": "USER#0"}, {"pk": "USER#1"}],
+            )
+            == []
+        )
+
+
+def test_sync_model_batch_get_with_memory_backend():
+    """Test Model.sync_batch_get uses the in-memory batch implementation."""
+    with MemoryBackend():
+        User(pk="USER#1", name="Alice", age=30).sync_save()
+        User(pk="USER#2", name="Bob", age=31).sync_save()
+
+        users = User.sync_batch_get([{"pk": "USER#1"}, {"pk": "USER#2"}])
+
+        assert {user.name for user in users} == {"Alice", "Bob"}
+
+
+def test_batch_write_validates_items_in_strict_mode():
+    """Test batch writes reject values DynamoDB cannot store."""
+    with MemoryBackend() as backend:
+        with pytest.raises(TypeError, match="Unsupported type for DynamoDB"):
+            backend.client.sync_batch_write(
+                "users",
+                put_items=[{"pk": "USER#1", "invalid": object()}],
+            )
+
+
 def test_condition_attribute_not_exists():
     """Test condition with attribute_not_exists."""
     with MemoryBackend():
@@ -269,11 +333,11 @@ def test_isolation_between_contexts():
 def test_table_exists():
     """Test table_exists method."""
     with MemoryBackend() as backend:
-        assert not backend._client.sync_table_exists("users")
+        assert not backend.client.sync_table_exists("users")
 
         User(pk="USER#1", name="Test").sync_save()
 
-        assert backend._client.sync_table_exists("users")
+        assert backend.client.sync_table_exists("users")
 
 
 def test_delete_by_key():
@@ -367,6 +431,35 @@ async def test_async_update_by_key():
         found = await User.get(pk="USER#1")
         assert found is not None
         assert found.name == "Updated"
+
+
+@pytest.mark.asyncio
+async def test_async_batch_operations_with_memory_client():
+    """Test direct async batch operations and Model.batch_get."""
+    with MemoryBackend() as backend:
+        await backend.client.batch_write(
+            "users",
+            put_items=[
+                {"pk": "USER#1", "name": "Alice", "age": 30},
+                {"pk": "USER#2", "name": "Bob", "age": 31},
+            ],
+        )
+
+        items = await backend.client.batch_get(
+            "users",
+            [{"pk": "USER#1"}, {"pk": "USER#2"}],
+        )
+        users = await User.batch_get([{"pk": "USER#1"}, {"pk": "USER#2"}])
+
+        assert {item["name"] for item in items} == {"Alice", "Bob"}
+        assert {user.name for user in users} == {"Alice", "Bob"}
+
+        await backend.client.batch_write(
+            "users",
+            delete_keys=[{"pk": "USER#1"}],
+        )
+
+        assert await User.get(pk="USER#1") is None
 
 
 def test_condition_with_or_evaluates_each_clause():

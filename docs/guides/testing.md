@@ -46,6 +46,35 @@ When you use `pydynox_memory_backend`:
 
 Each test is isolated. Data from one test doesn't leak to another.
 
+### Direct client calls
+
+The fixture replaces pydynox's default client. Models use that client
+automatically. When your code calls the client API directly, use the client
+exposed by the fixture:
+
+```python
+def test_batch_write(pydynox_memory_backend):
+    client = pydynox_memory_backend.client
+
+    client.sync_batch_write(
+        "users",
+        put_items=[
+            {"pk": "USER#1", "name": "Alice"},
+            {"pk": "USER#2", "name": "Bob"},
+        ],
+    )
+
+    items = client.sync_batch_get(
+        "users",
+        [{"pk": "USER#1"}, {"pk": "USER#2"}],
+    )
+
+    assert len(items) == 2
+```
+
+Don't create a new `DynamoDBClient()` in this test. A new client uses its own
+AWS configuration and does not share the fixture's in-memory storage.
+
 ## Fixtures
 
 pydynox provides three fixtures:
@@ -222,6 +251,11 @@ Use localstack for:
 - GSI queries
 - Transactions
 - Full DynamoDB compatibility
+
+Moto's `mock_aws` decorator patches boto3 and botocore clients. pydynox uses
+the AWS SDK for Rust, so the decorator does not intercept its requests. To use
+Moto with pydynox, run Moto in server mode and pass its URL as
+`endpoint_url`. For unit tests, prefer the built-in memory backend.
 
 ## Tips
 

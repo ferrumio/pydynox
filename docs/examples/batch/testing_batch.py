@@ -13,49 +13,32 @@ class User(Model):
 
 
 @pytest.mark.asyncio
-async def test_batch_save(pydynox_memory_backend):
-    """Test saving multiple items."""
-    users = [User(pk=f"USER#{i}", name=f"User {i}", age=20 + i) for i in range(10)]
+async def test_batch_write_and_get(pydynox_memory_backend):
+    """Test writing and reading multiple items."""
+    client = pydynox_memory_backend.client
+    items = [{"pk": f"USER#{i}", "name": f"User {i}", "age": 20 + i} for i in range(10)]
 
-    for user in users:
-        await user.save()
+    await client.batch_write("users", put_items=items)
+    users = await User.batch_get([{"pk": f"USER#{i}"} for i in range(10)])
 
-    # Verify all saved
-    for i in range(10):
-        found = await User.get(pk=f"USER#{i}")
-        assert found is not None
-        assert found.name == f"User {i}"
+    assert len(users) == 10
+    assert {user.name for user in users} == {f"User {i}" for i in range(10)}
 
 
 @pytest.mark.asyncio
 async def test_batch_delete(pydynox_memory_backend):
     """Test deleting multiple items."""
-    # Create users
-    for i in range(5):
-        await User(pk=f"USER#{i}", name=f"User {i}").save()
+    client = pydynox_memory_backend.client
+    items = [{"pk": f"USER#{i}", "name": f"User {i}"} for i in range(5)]
 
-    # Delete some
-    for i in range(3):
-        user = await User.get(pk=f"USER#{i}")
-        await user.delete()
+    await client.batch_write("users", put_items=items)
+    await client.batch_write(
+        "users",
+        delete_keys=[{"pk": f"USER#{i}"} for i in range(3)],
+    )
+    remaining = await client.batch_get(
+        "users",
+        [{"pk": f"USER#{i}"} for i in range(5)],
+    )
 
-    # Verify
-    assert await User.get(pk="USER#0") is None
-    assert await User.get(pk="USER#1") is None
-    assert await User.get(pk="USER#2") is None
-    assert await User.get(pk="USER#3") is not None
-    assert await User.get(pk="USER#4") is not None
-
-
-@pytest.mark.asyncio
-async def test_batch_get(pydynox_memory_backend):
-    """Test getting multiple items."""
-    # Create users
-    for i in range(5):
-        await User(pk=f"USER#{i}", name=f"User {i}").save()
-
-    # Batch get
-    keys = [{"pk": f"USER#{i}"} for i in range(5)]
-    results = await User.batch_get(keys)
-
-    assert len(results) == 5
+    assert {item["pk"] for item in remaining} == {"USER#3", "USER#4"}
