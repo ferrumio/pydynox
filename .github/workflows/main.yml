@@ -68,7 +68,7 @@ jobs:
               run: |
                   source .venv/bin/activate
                   pip install dist/*.whl
-                  pip install pytest pytest-asyncio pytest-cov hypothesis testcontainers boto3 pydantic opentelemetry-api opentelemetry-sdk
+                  pip install pytest pytest-asyncio coverage hypothesis testcontainers boto3 pydantic opentelemetry-api opentelemetry-sdk
 
             - name: Run tests with coverage
               run: |

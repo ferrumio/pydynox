@@ -59,6 +59,8 @@ exposed by the fixture:
 
 Don't create a new `DynamoDBClient()` in this test. A new client uses its own
 AWS configuration and does not share the fixture's in-memory storage.
+The fixture client exposes only the operations supported by the memory
+backend. Use Moto in server mode or localstack when you need the full client.
 
 ## Fixtures
 
@@ -221,10 +223,10 @@ Moto with pydynox, run Moto in server mode and pass its URL as
 
 | Feature | pydynox fixture | moto | localstack |
 |---------|-----------------|------|------------|
-| Setup | None | Server mode | Docker |
+| Setup | None | Server mode + process | Docker |
 | Speed | Fastest | Fast | Slow |
 | Accuracy | Good | Good | Best |
-| Dependencies | None | moto | Docker |
+| Dependencies | None | `moto[server]` | Docker |
 | GSI support | No | Yes | Yes |
 | Transactions | No | Yes | Yes |
 
