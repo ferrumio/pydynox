@@ -50,6 +50,7 @@ SKIP_FILES = {
     "query_scan.py",
     "basic_fixture.py",
     "basic_fixture_sync.py",
+    "direct_client_calls.py",
     "seed_data.py",
     "inspect_data.py",
     "lambda_handler.py",

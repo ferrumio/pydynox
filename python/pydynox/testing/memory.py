@@ -17,6 +17,7 @@ from pydynox.model import Model
 
 if TYPE_CHECKING:
     from pydynox._internal._metrics import OperationMetrics
+    from pydynox.client import DynamoDBClient
 
 
 def _split_top_level(clause: str) -> list[str]:
@@ -249,7 +250,7 @@ class MemoryBackend:
         return self._client._tables
 
     @property
-    def client(self) -> MemoryClient:
+    def client(self) -> DynamoDBClient:
         """Access the active in-memory client.
 
         Use this when testing code that calls the client API directly instead
@@ -263,7 +264,7 @@ class MemoryBackend:
         """
         if self._client is None:
             raise RuntimeError("MemoryBackend client is only available inside its context")
-        return self._client
+        return cast("DynamoDBClient", self._client)
 
     def clear(self) -> None:
         """Clear all data from all tables."""
@@ -1138,7 +1139,7 @@ class MemoryClient:
 
     # ========== BATCH ==========
 
-    def batch_get_item(
+    def _batch_get_item(
         self,
         request_items: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
@@ -1165,7 +1166,7 @@ class MemoryClient:
             "metrics": self._make_metrics(start, rcu=total_rcu),
         }
 
-    def batch_write_item(
+    def _batch_write_item(
         self,
         request_items: dict[str, list[dict[str, Any]]],
     ) -> dict[str, Any]:
@@ -1201,7 +1202,7 @@ class MemoryClient:
         consistent_read: bool = False,
     ) -> list[dict[str, Any]]:
         """Internal sync batch get implementation."""
-        result = self.batch_get_item(
+        result = self._batch_get_item(
             {
                 table: {
                     "Keys": keys,
@@ -1220,7 +1221,7 @@ class MemoryClient:
         """Internal sync batch write implementation."""
         requests = [{"PutRequest": {"Item": item}} for item in put_items or []]
         requests.extend({"DeleteRequest": {"Key": key}} for key in delete_keys or [])
-        self.batch_write_item({table: requests})
+        self._batch_write_item({table: requests})
 
     async def batch_get(
         self,

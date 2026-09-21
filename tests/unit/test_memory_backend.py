@@ -6,7 +6,7 @@ With async-first API:
 """
 
 import pytest
-from pydynox import Model, ModelConfig, get_default_client
+from pydynox import BatchWriter, Model, ModelConfig, SyncBatchWriter, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.exceptions import ConditionalCheckFailedException
 from pydynox.testing import MemoryBackend
@@ -245,24 +245,42 @@ def test_client_property_is_only_available_while_backend_is_active():
 
 def test_sync_batch_operations_with_memory_client():
     """Test direct sync batch operations with large input collections."""
+    # GIVEN 30 items to write and a key list larger than the stored set
     put_items = [
         {"pk": f"USER#{index}", "name": f"User {index}", "age": index} for index in range(30)
     ]
     keys = [{"pk": f"USER#{index}"} for index in range(101)]
 
     with MemoryBackend() as backend:
+        # WHEN we write the items and read them back in one batch
         backend.client.sync_batch_write("users", put_items=put_items)
 
         items = backend.client.sync_batch_get("users", keys, consistent_read=True)
 
+        # THEN only the keys that exist come back
         assert len(items) == 30
         assert {item["pk"] for item in items} == {f"USER#{index}" for index in range(30)}
 
+
+def test_sync_batch_write_deletes_items_with_memory_client():
+    """Test direct sync batch writes delete stored items."""
+    # GIVEN two stored items
+    with MemoryBackend() as backend:
+        backend.client.sync_batch_write(
+            "users",
+            put_items=[
+                {"pk": "USER#0", "name": "Alice"},
+                {"pk": "USER#1", "name": "Bob"},
+            ],
+        )
+
+        # WHEN we delete two of the stored items
         backend.client.sync_batch_write(
             "users",
             delete_keys=[{"pk": "USER#0"}, {"pk": "USER#1"}],
         )
 
+        # THEN neither deleted item is returned
         assert (
             backend.client.sync_batch_get(
                 "users",
@@ -270,6 +288,23 @@ def test_sync_batch_operations_with_memory_client():
             )
             == []
         )
+
+
+def test_sync_batch_writer_with_memory_client():
+    """Test SyncBatchWriter flushes through the in-memory client."""
+    # GIVEN an active memory backend
+    with MemoryBackend() as backend:
+        # WHEN a SyncBatchWriter context collects two puts
+        with SyncBatchWriter(backend.client, "users") as batch:
+            batch.put({"pk": "USER#1", "name": "Alice"})
+            batch.put({"pk": "USER#2", "name": "Bob"})
+
+        # THEN the context flushes both items to in-memory storage
+        items = backend.client.sync_batch_get(
+            "users",
+            [{"pk": "USER#1"}, {"pk": "USER#2"}],
+        )
+        assert {item["name"] for item in items} == {"Alice", "Bob"}
 
 
 def test_sync_model_batch_get_with_memory_backend():
@@ -285,12 +320,33 @@ def test_sync_model_batch_get_with_memory_backend():
 
 def test_batch_write_validates_items_in_strict_mode():
     """Test batch writes reject values DynamoDB cannot store."""
+    # GIVEN a strict backend and an item holding a type DynamoDB cannot store
     with MemoryBackend() as backend:
+        # WHEN we batch write it
+        # THEN the write is rejected
         with pytest.raises(TypeError, match="Unsupported type for DynamoDB"):
             backend.client.sync_batch_write(
                 "users",
                 put_items=[{"pk": "USER#1", "invalid": object()}],
             )
+
+
+def test_batch_write_skips_validation_when_not_strict():
+    """Test batch writes keep unsupported values when strict mode is off."""
+    # GIVEN a backend with strict mode off
+    with MemoryBackend(strict=False) as backend:
+        unsupported_value = 1 + 2j
+
+        # WHEN we batch write an item holding a type DynamoDB cannot store
+        backend.client.sync_batch_write(
+            "users",
+            put_items=[{"pk": "USER#1", "invalid": unsupported_value}],
+        )
+
+        # THEN the item is stored without validation
+        items = backend.client.sync_batch_get("users", [{"pk": "USER#1"}])
+        assert len(items) == 1
+        assert items[0]["invalid"] == unsupported_value
 
 
 def test_condition_attribute_not_exists():
@@ -460,6 +516,24 @@ async def test_async_batch_operations_with_memory_client():
         )
 
         assert await User.get(pk="USER#1") is None
+
+
+@pytest.mark.asyncio
+async def test_async_batch_writer_with_memory_client():
+    """Test BatchWriter flushes through the in-memory client."""
+    # GIVEN an active memory backend
+    with MemoryBackend() as backend:
+        # WHEN a BatchWriter context collects two puts
+        async with BatchWriter(backend.client, "users") as batch:
+            batch.put({"pk": "USER#1", "name": "Alice"})
+            batch.put({"pk": "USER#2", "name": "Bob"})
+
+        # THEN the context flushes both items to in-memory storage
+        items = await backend.client.batch_get(
+            "users",
+            [{"pk": "USER#1"}, {"pk": "USER#2"}],
+        )
+        assert {item["name"] for item in items} == {"Alice", "Bob"}
 
 
 def test_condition_with_or_evaluates_each_clause():
