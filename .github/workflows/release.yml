@@ -94,6 +94,36 @@ jobs:
           name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-manylinux-aarch64
           path: dist/*.whl
 
+  build-musllinux:
+    name: Build musllinux ${{ matrix.platform.target }} cp${{ matrix.python }}
+    needs: prepare
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        platform:
+          - runner: ubuntu-latest
+            target: x86_64
+          - runner: ubuntu-24.04-arm
+            target: aarch64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          target: ${{ matrix.platform.target }}
+          args: --release --locked --out dist -i python${{ matrix.python }}
+          manylinux: musllinux_1_2
+          sccache: true
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pydynox-${{ needs.prepare.outputs.version }}-cp${{ matrix.python }}-musllinux-${{ matrix.platform.target }}
+          path: dist/*.whl
+
   build-macos:
     name: Build macOS ${{ matrix.target }} cp${{ matrix.python }}
     needs: prepare
@@ -139,7 +169,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    needs: [prepare, build-linux-x86, build-linux-arm, build-macos, build-sdist]
+    needs: [prepare, build-linux-x86, build-linux-arm, build-musllinux, build-macos, build-sdist]
     runs-on: ubuntu-latest
     environment:
       name: pypi
