@@ -248,6 +248,23 @@ class MemoryBackend:
             return {}
         return self._client._tables
 
+    @property
+    def client(self) -> MemoryClient:
+        """Access the active in-memory client.
+
+        Use this when testing code that calls the client API directly instead
+        of using models.
+
+        Returns:
+            The active in-memory client.
+
+        Raises:
+            RuntimeError: If the backend is not active.
+        """
+        if self._client is None:
+            raise RuntimeError("MemoryBackend client is only available inside its context")
+        return self._client
+
     def clear(self) -> None:
         """Clear all data from all tables."""
         if self._client is not None:
@@ -1121,7 +1138,7 @@ class MemoryClient:
 
     # ========== BATCH ==========
 
-    def batch_get_item(
+    def _batch_get_item(
         self,
         request_items: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
@@ -1148,7 +1165,7 @@ class MemoryClient:
             "metrics": self._make_metrics(start, rcu=total_rcu),
         }
 
-    def batch_write_item(
+    def _batch_write_item(
         self,
         request_items: dict[str, list[dict[str, Any]]],
     ) -> dict[str, Any]:
@@ -1162,6 +1179,7 @@ class MemoryClient:
             for request in requests:
                 if "PutRequest" in request:
                     item = request["PutRequest"]["Item"]
+                    self._validate_item(item)
                     key_str = self._make_key_string(item)
                     tbl[key_str] = copy.deepcopy(item)
                     total_wcu += 1
@@ -1175,6 +1193,70 @@ class MemoryClient:
             "UnprocessedItems": {},
             "metrics": self._make_metrics(start, wcu=total_wcu),
         }
+
+    def _do_batch_get(
+        self,
+        table: str,
+        keys: list[dict[str, Any]],
+        consistent_read: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Internal sync batch get implementation."""
+        result = self._batch_get_item(
+            {
+                table: {
+                    "Keys": keys,
+                    "ConsistentRead": consistent_read,
+                }
+            }
+        )
+        return result["Responses"].get(table, [])
+
+    def _do_batch_write(
+        self,
+        table: str,
+        put_items: list[dict[str, Any]] | None = None,
+        delete_keys: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Internal sync batch write implementation."""
+        requests = [{"PutRequest": {"Item": item}} for item in put_items or []]
+        requests.extend({"DeleteRequest": {"Key": key}} for key in delete_keys or [])
+        self._batch_write_item({table: requests})
+
+    async def batch_get(
+        self,
+        table: str,
+        keys: list[dict[str, Any]],
+        consistent_read: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Async batch get items."""
+        return self._do_batch_get(table, keys, consistent_read)
+
+    def sync_batch_get(
+        self,
+        table: str,
+        keys: list[dict[str, Any]],
+        consistent_read: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Sync batch get items."""
+        return self._do_batch_get(table, keys, consistent_read)
+
+    async def batch_write(
+        self,
+        table: str,
+        put_items: list[dict[str, Any]] | None = None,
+        delete_keys: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Async batch write items."""
+        self._do_batch_write(table, put_items, delete_keys)
+
+    def sync_batch_write(
+        self,
+        table: str,
+        put_items: list[dict[str, Any]] | None = None,
+        delete_keys: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Sync batch write items."""
+        self._do_batch_write(table, put_items, delete_keys)
 
     # ========== TABLE ==========
 

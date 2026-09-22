@@ -2,10 +2,29 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
-if TYPE_CHECKING:
-    from pydynox.client import DynamoDBClient
+
+class _AsyncBatchWriteClient(Protocol):
+    """Client interface required by BatchWriter."""
+
+    async def batch_write(
+        self,
+        table: str,
+        put_items: list[dict[str, Any]] | None = None,
+        delete_keys: list[dict[str, Any]] | None = None,
+    ) -> None: ...
+
+
+class _SyncBatchWriteClient(Protocol):
+    """Client interface required by SyncBatchWriter."""
+
+    def sync_batch_write(
+        self,
+        table: str,
+        put_items: list[dict[str, Any]] | None = None,
+        delete_keys: list[dict[str, Any]] | None = None,
+    ) -> None: ...
 
 
 class BatchWriter:
@@ -22,11 +41,11 @@ class BatchWriter:
         ...     batch.delete({"pk": "USER#3", "sk": "PROFILE"})
     """
 
-    def __init__(self, client: DynamoDBClient, table: str):
+    def __init__(self, client: _AsyncBatchWriteClient, table: str):
         """Create a BatchWriter.
 
         Args:
-            client: The DynamoDBClient to use.
+            client: A client that supports async batch writes.
             table: The table name.
         """
         self._client = client
@@ -95,11 +114,11 @@ class SyncBatchWriter:
         ...     batch.delete({"pk": "USER#3", "sk": "PROFILE"})
     """
 
-    def __init__(self, client: DynamoDBClient, table: str):
+    def __init__(self, client: _SyncBatchWriteClient, table: str):
         """Create a SyncBatchWriter.
 
         Args:
-            client: The DynamoDBClient to use.
+            client: A client that supports sync batch writes.
             table: The table name.
         """
         self._client = client

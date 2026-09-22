@@ -1,7 +1,7 @@
 """Testing batch operations with pydynox_memory_backend."""
 
 import pytest
-from pydynox import Model, ModelConfig
+from pydynox import BatchWriter, Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
 
 
@@ -13,49 +13,36 @@ class User(Model):
 
 
 @pytest.mark.asyncio
-async def test_batch_save(pydynox_memory_backend):
-    """Test saving multiple items."""
-    users = [User(pk=f"USER#{i}", name=f"User {i}", age=20 + i) for i in range(10)]
+async def test_batch_write_and_get(pydynox_memory_backend):
+    """Test writing and reading multiple items."""
+    client = pydynox_memory_backend.client
 
-    for user in users:
-        await user.save()
+    async with BatchWriter(client, "users") as batch:
+        for i in range(10):
+            batch.put({"pk": f"USER#{i}", "name": f"User {i}", "age": 20 + i})
 
-    # Verify all saved
-    for i in range(10):
-        found = await User.get(pk=f"USER#{i}")
-        assert found is not None
-        assert found.name == f"User {i}"
+    users = await User.batch_get([{"pk": f"USER#{i}"} for i in range(10)])
+
+    assert len(users) == 10
+    assert {user.name for user in users} == {f"User {i}" for i in range(10)}
 
 
 @pytest.mark.asyncio
 async def test_batch_delete(pydynox_memory_backend):
     """Test deleting multiple items."""
-    # Create users
-    for i in range(5):
-        await User(pk=f"USER#{i}", name=f"User {i}").save()
+    client = pydynox_memory_backend.client
 
-    # Delete some
-    for i in range(3):
-        user = await User.get(pk=f"USER#{i}")
-        await user.delete()
+    async with BatchWriter(client, "users") as batch:
+        for i in range(5):
+            batch.put({"pk": f"USER#{i}", "name": f"User {i}"})
 
-    # Verify
-    assert await User.get(pk="USER#0") is None
-    assert await User.get(pk="USER#1") is None
-    assert await User.get(pk="USER#2") is None
-    assert await User.get(pk="USER#3") is not None
-    assert await User.get(pk="USER#4") is not None
+    async with BatchWriter(client, "users") as batch:
+        for i in range(3):
+            batch.delete({"pk": f"USER#{i}"})
 
+    remaining = await client.batch_get(
+        "users",
+        [{"pk": f"USER#{i}"} for i in range(5)],
+    )
 
-@pytest.mark.asyncio
-async def test_batch_get(pydynox_memory_backend):
-    """Test getting multiple items."""
-    # Create users
-    for i in range(5):
-        await User(pk=f"USER#{i}", name=f"User {i}").save()
-
-    # Batch get
-    keys = [{"pk": f"USER#{i}"} for i in range(5)]
-    results = await User.batch_get(keys)
-
-    assert len(results) == 5
+    assert {item["pk"] for item in remaining} == {"USER#3", "USER#4"}
