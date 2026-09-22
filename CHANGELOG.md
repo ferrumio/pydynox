@@ -1,6 +1,40 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.5.0] - 2026-09-22
+
+
+### Bug Fixes
+
+- support batch operations in memory backend (#473)
+
+
+### CI/CD
+
+- bump actions/deploy-pages from 5.0.0 to 5.0.1 (#465)
+- bump orhun/git-cliff-action from 4.8.0 to 4.9.0 (#466)
+- bump CodSpeedHQ/action from 5.0.3 to 5.2.1 (#463)
+- bump astral-sh/setup-uv from 10.0.1 to 10.1.0 (#470)
+- bump github/codeql-action/upload-sarif from 4.37.9 to 4.38.0 (#469)
+
+
+### Documentation
+
+- update changelog for v1.4.0 (#460)
+
+
+### Miscellaneous
+
+- build musllinux for alpine images (#472)
+- bump v1.5.0 (#476)
+
+
+### Deps
+
+- bump the dev-dependencies group with 2 updates (#462)
+- bump the rust-dependencies group across 1 directory with 9 updates (#464)
+- bump the dev-dependencies group with 2 updates (#468)
+- bump the rust-dependencies group with 4 updates (#467)
 ## [1.4.0] - 2026-08-29
 
 
