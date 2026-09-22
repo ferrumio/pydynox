@@ -139,6 +139,29 @@ async def test_pydynox_memory_backend_clear(pydynox_memory_backend):
     assert await User.get(pk="USER#1") is None
 
 
+@pytest.mark.asyncio
+async def test_pydynox_memory_backend_batch_client(pydynox_memory_backend):
+    """Test direct batch calls through the fixture's in-memory client."""
+    # GIVEN the client exposed by the active memory backend
+    client = pydynox_memory_backend.client
+
+    # WHEN we write and read multiple items with the batch API
+    await client.batch_write(
+        "users",
+        put_items=[
+            {"pk": "BATCH#1", "name": "Alice", "age": 30},
+            {"pk": "BATCH#2", "name": "Bob", "age": 31},
+        ],
+    )
+    items = await client.batch_get(
+        "users",
+        [{"pk": "BATCH#1"}, {"pk": "BATCH#2"}],
+    )
+
+    # THEN both items are returned from in-memory storage
+    assert {item["name"] for item in items} == {"Alice", "Bob"}
+
+
 # ========== Tests using pydynox_memory_backend_seeded fixture ==========
 
 

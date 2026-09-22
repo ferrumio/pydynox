@@ -55,7 +55,7 @@ dev = [
     "ty>=0.0.64",
     "opentelemetry-api>=1.0",
     "opentelemetry-sdk>=1.0",
-    "pytest-cov>=7.0.0",
+    "coverage>=7.0",
 ]
 docs = ["zensical", "pdoc3>=0.11.0"]
 
