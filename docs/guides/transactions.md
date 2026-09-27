@@ -5,9 +5,10 @@ Run multiple operations that succeed or fail together. If any operation fails, D
 ## Key features
 
 - All-or-nothing operations
-- Put, delete, update, and read in one transaction
+- Put, delete, update, and condition checks in a write transaction
+- Atomic reads through `transact_get`
 - Max 100 items per transaction
-- Metrics on every operation (see [observability](observability.md))
+- Optional request tokens for idempotent writes
 
 ## Getting started
 
@@ -46,6 +47,45 @@ You can also use `transact_write` directly for more complex operations:
     --8<-- "docs/examples/transactions/transact_write.py"
     ```
 
+## Retrying a transaction with a request token
+
+A write can succeed in DynamoDB even if your application receives a timeout. Retrying it in a new call could apply the same change twice, such as reserving stock twice.
+
+Pass `client_request_token` to identify retries of the same transaction. DynamoDB applies identical requests with the same token only once within its idempotency window.
+
+=== "Async (default)"
+    ```python
+    --8<-- "docs/examples/transactions/idempotency.py"
+    ```
+
+=== "Sync"
+    ```python
+    --8<-- "docs/examples/transactions/sync_idempotency.py"
+    ```
+
+Both client methods also accept the token:
+
+```python
+await client.transact_write(operations, client_request_token=token)
+client.sync_transact_write(operations, client_request_token=token)
+```
+
+The parameter is optional and keyword-only. Existing calls keep their current behavior. Omitting it or passing `None` lets the AWS SDK generate a token for each call; that generated token is reused by the SDK's own retries.
+
+### Token rules
+
+- Use a string of 1–36 characters. Invalid lengths raise `ValueError` before a request is sent.
+- Create or store the token once for each logical operation. Reuse it across application retries or process restarts.
+- The token is valid for ten minutes after the first request completes. After that, DynamoDB treats the same token as a new request.
+- Retry with the same request parameters, including IDs, timestamps, conditions, and version values. Changing them while reusing the token raises `IdempotentParameterMismatchException`, available from `pydynox.exceptions`.
+- Use a new token for a new logical operation.
+
+If `commit()` raises a connection error, the transaction keeps its queued operations. You can retry `commit()` on that object without rebuilding the payload. A successful commit clears the queue. Rebuilding a transaction with `save_model()` may generate new IDs, timestamps, or version values, so it is not necessarily the same request.
+
+This token covers DynamoDB transaction writes. It does not deduplicate Python hooks, external side effects, or requests beyond the ten-minute window.
+
+See [AWS ClientRequestToken](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html#DDB-TransactWriteItems-request-ClientRequestToken) for the service behavior.
+
 ## API reference
 
 ### Transaction class
@@ -56,6 +96,8 @@ You can also use `transact_write` directly for more complex operations:
 | `tx.delete(table, key)` | Remove an item |
 | `tx.update(table, key, updates)` | Update specific attributes |
 | `tx.condition_check(table, key, condition)` | Check a condition without modifying |
+
+Both `Transaction(client, *, client_request_token=None)` and `SyncTransaction(client, *, client_request_token=None)` accept an optional token.
 
 ### Client methods
 
@@ -102,7 +144,7 @@ If you exceed these limits, the transaction fails before any operation runs.
 
 ## Error handling
 
-If a transaction fails, DynamoDB returns an error and no changes are made:
+If DynamoDB cancels a transaction, none of its writes are applied. A connection error or timeout can leave the outcome unknown; use the same request token when retrying, as described above.
 
 === "error_handling.py"
     ```python
@@ -116,6 +158,7 @@ Common reasons for transaction failures:
 - More than 100 items
 - Condition check failed
 - Throughput exceeded
+- Reusing a request token with different parameters
 
 ## Sync API
 

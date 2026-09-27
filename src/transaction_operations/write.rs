@@ -19,7 +19,16 @@ const TRANSACTION_MAX_ITEMS: usize = 100;
 fn prepare_transact_write(
     py: Python<'_>,
     operations: &Bound<'_, PyList>,
+    client_request_token: Option<&str>,
 ) -> PyResult<Vec<TransactWriteItem>> {
+    if let Some(token) = client_request_token
+        && !(1..=36).contains(&token.chars().count())
+    {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "client_request_token must contain between 1 and 36 characters",
+        ));
+    }
+
     if operations.is_empty() {
         return Ok(vec![]);
     }
@@ -49,6 +58,7 @@ fn prepare_transact_write(
 async fn execute_transact_write(
     client: Client,
     transact_items: Vec<TransactWriteItem>,
+    client_request_token: Option<String>,
 ) -> Result<
     (),
     aws_sdk_dynamodb::error::SdkError<
@@ -62,6 +72,7 @@ async fn execute_transact_write(
     client
         .transact_write_items()
         .set_transact_items(Some(transact_items))
+        .set_client_request_token(client_request_token)
         .send()
         .await?;
 
@@ -73,20 +84,28 @@ async fn execute_transact_write(
 /// Sync version of transact_write. Blocks until complete.
 ///
 /// All operations run atomically. Either all succeed or all fail.
+/// The optional token must contain 1–36 characters and is forwarded to DynamoDB.
 pub fn sync_transact_write(
     py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     operations: &Bound<'_, PyList>,
+    client_request_token: Option<String>,
 ) -> PyResult<()> {
-    let transact_items = prepare_transact_write(py, operations)?;
+    let transact_items = prepare_transact_write(py, operations, client_request_token.as_deref())?;
 
     if transact_items.is_empty() {
         return Ok(());
     }
 
     let client = client.clone();
-    let result = py.detach(|| runtime.block_on(execute_transact_write(client, transact_items)));
+    let result = py.detach(|| {
+        runtime.block_on(execute_transact_write(
+            client,
+            transact_items,
+            client_request_token,
+        ))
+    });
 
     match result {
         Ok(()) => Ok(()),
@@ -97,15 +116,17 @@ pub fn sync_transact_write(
 /// Execute a transactional write operation. Returns a Python awaitable.
 ///
 /// All operations run atomically. Either all succeed or all fail.
+/// The optional token must contain 1–36 characters and is forwarded to DynamoDB.
 pub fn transact_write<'py>(
     py: Python<'py>,
     client: Client,
     operations: &Bound<'_, PyList>,
+    client_request_token: Option<String>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let transact_items = prepare_transact_write(py, operations)?;
+    let transact_items = prepare_transact_write(py, operations, client_request_token.as_deref())?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
-        let result = execute_transact_write(client, transact_items).await;
+        let result = execute_transact_write(client, transact_items, client_request_token).await;
 
         match result {
             Ok(()) => Ok(Python::attach(|py| py.None())),

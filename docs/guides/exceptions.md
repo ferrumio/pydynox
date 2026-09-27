@@ -23,6 +23,7 @@ All pydynox exceptions inherit from `PydynoxException`. You can catch specific e
 | `ValidationException` | Invalid input (bad key, wrong type, etc.) |
 | `ConditionalCheckFailedException` | Condition expression returned false |
 | `TransactionCanceledException` | Transaction failed |
+| `IdempotentParameterMismatchException` | A transaction token was reused with different request parameters within ten minutes |
 | `ProvisionedThroughputExceededException` | Request rate too high |
 | `AccessDeniedException` | IAM permission denied |
 | `CredentialsException` | AWS credentials missing or invalid |
@@ -34,7 +35,7 @@ All pydynox exceptions inherit from `PydynoxException`. You can catch specific e
 
 ### Basic error handling
 
-Import exceptions from `pydynox.pydynox_core`:
+Import exceptions from `pydynox.exceptions`:
 
 === "handling_errors.py"
     ```python

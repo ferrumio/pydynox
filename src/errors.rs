@@ -21,6 +21,11 @@ create_exception!(pydynox, ConditionalCheckFailedException, PydynoxException);
 create_exception!(pydynox, TransactionCanceledException, PydynoxException);
 create_exception!(
     pydynox,
+    IdempotentParameterMismatchException,
+    PydynoxException
+);
+create_exception!(
+    pydynox,
     ProvisionedThroughputExceededException,
     PydynoxException
 );
@@ -56,6 +61,10 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "TransactionCanceledException",
         m.py().get_type::<TransactionCanceledException>(),
+    )?;
+    m.add(
+        "IdempotentParameterMismatchException",
+        m.py().get_type::<IdempotentParameterMismatchException>(),
     )?;
     m.add(
         "ProvisionedThroughputExceededException",
@@ -258,6 +267,11 @@ fn map_dynamodb_code(
         Some("TransactionCanceledException") => {
             let msg = message.unwrap_or("Transaction was canceled");
             TransactionCanceledException::new_err(msg.to_string())
+        }
+        Some("IdempotentParameterMismatchException") => {
+            let msg =
+                message.unwrap_or("Client request token was reused with different parameters");
+            IdempotentParameterMismatchException::new_err(msg.to_string())
         }
         Some("ItemCollectionSizeLimitExceededException") => {
             ValidationException::new_err("Item collection size limit exceeded")

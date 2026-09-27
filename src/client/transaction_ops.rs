@@ -8,12 +8,21 @@ impl DynamoDBClient {
     /// Sync version of transact_write. Blocks until complete.
     ///
     /// All operations run atomically. Either all succeed or all fail.
+    /// An optional client request token identifies retries of the same transaction.
+    #[pyo3(signature = (operations, *, client_request_token=None))]
     pub fn sync_transact_write(
         &self,
         py: Python<'_>,
         operations: &Bound<'_, pyo3::types::PyList>,
+        client_request_token: Option<String>,
     ) -> PyResult<()> {
-        transaction_operations::sync_transact_write(py, &self.client, &self.runtime, operations)
+        transaction_operations::sync_transact_write(
+            py,
+            &self.client,
+            &self.runtime,
+            operations,
+            client_request_token,
+        )
     }
 
     /// Sync version of transact_get. Blocks until complete.
@@ -43,12 +52,20 @@ impl DynamoDBClient {
     /// Execute a transactional write operation. Returns a Python awaitable.
     ///
     /// All operations run atomically. Either all succeed or all fail.
+    /// An optional client request token identifies retries of the same transaction.
+    #[pyo3(signature = (operations, *, client_request_token=None))]
     pub fn transact_write<'py>(
         &self,
         py: Python<'py>,
         operations: &Bound<'_, pyo3::types::PyList>,
+        client_request_token: Option<String>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        transaction_operations::transact_write(py, self.client.clone(), operations)
+        transaction_operations::transact_write(
+            py,
+            self.client.clone(),
+            operations,
+            client_request_token,
+        )
     }
 
     /// Execute a transactional get operation. Returns a Python awaitable.
