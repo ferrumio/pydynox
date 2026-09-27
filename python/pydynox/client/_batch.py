@@ -110,13 +110,34 @@ class BatchOperations(_MixinBase):
     # ========== TRANSACT WRITE (SYNC) ==========
 
     @sync_retry_on_throttle
-    def sync_transact_write(self, operations: list[dict[str, Any]]) -> None:
+    def sync_transact_write(
+        self,
+        operations: list[dict[str, Any]],
+        *,
+        client_request_token: str | None = None,
+    ) -> None:
         """Sync version of transact_write. Blocks until complete.
 
         All operations run atomically. Either all succeed or all fail.
+
+        Args:
+            operations: List of put, update, delete, or condition check operations.
+            client_request_token: Optional 1–36 character token for retrying the same
+                request. DynamoDB deduplicates identical requests for ten minutes
+                after the first request completes. None lets the SDK generate a token.
+
+        Raises:
+            ValueError: If the token is empty or longer than 36 characters.
+            IdempotentParameterMismatchException: If the token was used with different
+                request parameters within the ten-minute window.
         """
         _log_debug("sync_transact_write", f"Running transaction ({len(operations)} operations)")
-        self._client.sync_transact_write(operations)  # type: ignore[attr-defined]
+        if client_request_token is None:
+            self._client.sync_transact_write(operations)  # type: ignore[attr-defined]
+        else:
+            self._client.sync_transact_write(  # type: ignore[attr-defined]
+                operations, client_request_token=client_request_token
+            )
 
     # ========== TRANSACT GET (SYNC) ==========
 
@@ -149,13 +170,34 @@ class BatchOperations(_MixinBase):
     # ========== TRANSACT WRITE (ASYNC - default) ==========
 
     @retry_on_throttle
-    async def transact_write(self, operations: list[dict[str, Any]]) -> None:
+    async def transact_write(
+        self,
+        operations: list[dict[str, Any]],
+        *,
+        client_request_token: str | None = None,
+    ) -> None:
         """Execute a transactional write operation.
 
         All operations run atomically. Either all succeed or all fail.
+
+        Args:
+            operations: List of put, update, delete, or condition check operations.
+            client_request_token: Optional 1–36 character token for retrying the same
+                request. DynamoDB deduplicates identical requests for ten minutes
+                after the first request completes. None lets the SDK generate a token.
+
+        Raises:
+            ValueError: If the token is empty or longer than 36 characters.
+            IdempotentParameterMismatchException: If the token was used with different
+                request parameters within the ten-minute window.
         """
         _log_debug("transact_write", f"Running transaction ({len(operations)} operations)")
-        await self._client.transact_write(operations)  # type: ignore[attr-defined]
+        if client_request_token is None:
+            await self._client.transact_write(operations)  # type: ignore[attr-defined]
+        else:
+            await self._client.transact_write(  # type: ignore[attr-defined]
+                operations, client_request_token=client_request_token
+            )
 
     # ========== TRANSACT GET (ASYNC - default) ==========
 

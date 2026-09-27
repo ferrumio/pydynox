@@ -48,13 +48,17 @@ class Transaction:
         ...     )
     """
 
-    def __init__(self, client: DynamoDBClient):
+    def __init__(self, client: DynamoDBClient, *, client_request_token: str | None = None) -> None:
         """Create a Transaction.
 
         Args:
             client: The DynamoDBClient to use.
+            client_request_token: Optional 1–36 character token for retrying the same
+                transaction within ten minutes of its first completion. None lets
+                the SDK generate a token. Reuse the same payload when retrying.
         """
         self._client = client
+        self._client_request_token = client_request_token
         self._operations: list[dict[str, Any]] = []
         self._models: list[_ModelUpdate] = []
 
@@ -228,14 +232,21 @@ class Transaction:
         Can also be called manually to execute operations early.
 
         Raises:
-            ValueError: If a condition check fails or validation error occurs.
-            RuntimeError: If the transaction fails for other reasons.
+            ValueError: If the token is empty or longer than 36 characters.
+            TransactionCanceledException: If a transaction condition fails.
+            IdempotentParameterMismatchException: If the token was used with different
+                request parameters within the ten-minute window.
         """
         if not self._operations:
             return
 
         _log_debug("transaction", f"Committing transaction ({len(self._operations)} operations)")
-        await self._client.transact_write(self._operations)
+        if self._client_request_token is None:
+            await self._client.transact_write(self._operations)
+        else:
+            await self._client.transact_write(
+                self._operations, client_request_token=self._client_request_token
+            )
 
         _finalize_models(self._models)
         self._operations = []
@@ -253,13 +264,17 @@ class SyncTransaction:
         ...     txn.delete("users", {"pk": "USER#2", "sk": "PROFILE"})
     """
 
-    def __init__(self, client: DynamoDBClient):
+    def __init__(self, client: DynamoDBClient, *, client_request_token: str | None = None) -> None:
         """Create a SyncTransaction.
 
         Args:
             client: The DynamoDBClient to use.
+            client_request_token: Optional 1–36 character token for retrying the same
+                transaction within ten minutes of its first completion. None lets
+                the SDK generate a token. Reuse the same payload when retrying.
         """
         self._client = client
+        self._client_request_token = client_request_token
         self._operations: list[dict[str, Any]] = []
         self._models: list[_ModelUpdate] = []
 
@@ -394,12 +409,23 @@ class SyncTransaction:
 
         Called automatically when exiting the context manager.
         Can also be called manually to execute operations early.
+
+        Raises:
+            ValueError: If the token is empty or longer than 36 characters.
+            TransactionCanceledException: If a transaction condition fails.
+            IdempotentParameterMismatchException: If the token was used with different
+                request parameters within the ten-minute window.
         """
         if not self._operations:
             return
 
         _log_debug("transaction", f"Committing transaction ({len(self._operations)} operations)")
-        self._client.sync_transact_write(self._operations)
+        if self._client_request_token is None:
+            self._client.sync_transact_write(self._operations)
+        else:
+            self._client.sync_transact_write(
+                self._operations, client_request_token=self._client_request_token
+            )
 
         _finalize_models(self._models)
         self._operations = []

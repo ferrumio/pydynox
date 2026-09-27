@@ -60,6 +60,7 @@ ResourceInUseException = pydynox_core.ResourceInUseException
 ValidationException = pydynox_core.ValidationException
 ConditionalCheckFailedException = pydynox_core.ConditionalCheckFailedException
 TransactionCanceledException = pydynox_core.TransactionCanceledException
+IdempotentParameterMismatchException = pydynox_core.IdempotentParameterMismatchException
 ProvisionedThroughputExceededException = pydynox_core.ProvisionedThroughputExceededException
 AccessDeniedException = pydynox_core.AccessDeniedException
 CredentialsException = pydynox_core.CredentialsException
@@ -75,6 +76,7 @@ __all__ = [
     "ValidationException",
     "ConditionalCheckFailedException",
     "TransactionCanceledException",
+    "IdempotentParameterMismatchException",
     "ProvisionedThroughputExceededException",
     "AccessDeniedException",
     "CredentialsException",
