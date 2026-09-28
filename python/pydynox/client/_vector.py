@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox._internal._logging import _log_debug
 from pydynox._internal._tracing import add_response_attributes, trace_operation
 from pydynox._internal._vector import VectorMatch, VectorSearchResult
@@ -33,7 +32,6 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         projection_expression: str | None = None,
-        decimal_fields: DecimalFields | None = None,
     ) -> VectorSearchResult[dict[str, Any]]:
         _log_debug("search_vectors", f'Searching vector index "{index_name}"')
         with trace_operation("search_vectors", table, self.get_region()) as span:
@@ -46,7 +44,6 @@ class VectorOperations(_MixinBase):  # pragma: no cover
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 projection_expression=projection_expression,
-                **decimal_options(decimal_fields),
             )
             result = _convert_search_result(value)
             if span is not None:
@@ -71,7 +68,6 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         projection_expression: str | None = None,
-        decimal_fields: DecimalFields | None = None,
     ) -> VectorSearchResult[dict[str, Any]]:
         _log_debug("sync_search_vectors", f'Searching vector index "{index_name}"')
         with trace_operation("search_vectors", table, self.get_region()) as span:
@@ -84,7 +80,6 @@ class VectorOperations(_MixinBase):  # pragma: no cover
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 projection_expression=projection_expression,
-                **decimal_options(decimal_fields),
             )
             result = _convert_search_result(value)
             if span is not None:

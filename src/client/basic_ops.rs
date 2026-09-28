@@ -3,7 +3,7 @@ use pyo3::types::PyDict;
 
 use super::DynamoDBClient;
 use crate::basic_operations;
-use crate::conversions::DecimalFields;
+use crate::conversions::NumberSchema;
 use crate::metrics::OperationMetrics;
 
 #[pymethods]
@@ -76,7 +76,7 @@ impl DynamoDBClient {
     /// # Returns
     ///
     /// A Python awaitable that resolves to dict with item (or None) and metrics.
-    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None, *, decimal_fields=None))]
+    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn get_item<'py>(
         &self,
@@ -86,7 +86,7 @@ impl DynamoDBClient {
         consistent_read: bool,
         projection: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        decimal_fields: DecimalFields,
+        _number_schema: NumberSchema,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::get_item(
             py,
@@ -96,12 +96,12 @@ impl DynamoDBClient {
             consistent_read,
             projection,
             expression_attribute_names,
-            decimal_fields,
+            _number_schema,
         )
     }
 
     /// Sync get_item - blocks until complete.
-    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None, *, decimal_fields=None))]
+    #[pyo3(signature = (table, key, consistent_read=false, projection=None, expression_attribute_names=None, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn sync_get_item(
         &self,
@@ -111,7 +111,7 @@ impl DynamoDBClient {
         consistent_read: bool,
         projection: Option<String>,
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
-        decimal_fields: DecimalFields,
+        _number_schema: NumberSchema,
     ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
         basic_operations::sync_get_item(
             py,
@@ -122,7 +122,7 @@ impl DynamoDBClient {
             consistent_read,
             projection,
             expression_attribute_names,
-            decimal_fields,
+            _number_schema,
         )
     }
 

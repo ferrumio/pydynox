@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox.client._typing import _MixinBase
 from pydynox.query import AsyncQueryResult, QueryResult
 
@@ -26,8 +25,6 @@ class QueryOperations(_MixinBase):
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> QueryResult:
         """Query items from a DynamoDB table (sync).
 
@@ -63,7 +60,6 @@ class QueryOperations(_MixinBase):
             last_evaluated_key=last_evaluated_key,
             acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]
             consistent_read=consistent_read,
-            **decimal_options(decimal_fields),
         )
 
     def query(
@@ -80,8 +76,6 @@ class QueryOperations(_MixinBase):
         index_name: str | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
         consistent_read: bool = False,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> AsyncQueryResult:
         """Query items from a DynamoDB table (async).
 
@@ -117,5 +111,4 @@ class QueryOperations(_MixinBase):
             last_evaluated_key=last_evaluated_key,
             acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]
             consistent_read=consistent_read,
-            **decimal_options(decimal_fields),
         )

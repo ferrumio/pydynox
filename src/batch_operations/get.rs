@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 use crate::conversions::{
-    DecimalFields, attribute_values_to_py_dict_with_decimals, py_dict_to_attribute_values,
+    NumberSchema, attribute_values_to_py_dict_with_decimals, py_dict_to_attribute_values,
 };
 use crate::errors::map_sdk_error;
 
@@ -169,7 +169,7 @@ pub fn sync_batch_get(
     table: &str,
     keys: &Bound<'_, PyList>,
     consistent_read: bool,
-    decimal_fields: DecimalFields,
+    number_schema: NumberSchema,
 ) -> PyResult<Vec<Py<PyAny>>> {
     let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
 
@@ -180,7 +180,7 @@ pub fn sync_batch_get(
             let mut py_results: Vec<Py<PyAny>> = Vec::new();
             for item in raw.items {
                 let py_dict =
-                    attribute_values_to_py_dict_with_decimals(py, item, decimal_fields.as_ref())?;
+                    attribute_values_to_py_dict_with_decimals(py, item, number_schema.as_ref())?;
                 py_results.push(py_dict.into_any().unbind());
             }
             Ok(py_results)
@@ -214,7 +214,7 @@ pub fn batch_get<'py>(
     table: &str,
     keys: &Bound<'_, PyList>,
     consistent_read: bool,
-    decimal_fields: DecimalFields,
+    number_schema: NumberSchema,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
 
@@ -228,7 +228,7 @@ pub fn batch_get<'py>(
                     let py_dict = attribute_values_to_py_dict_with_decimals(
                         py,
                         item,
-                        decimal_fields.as_ref(),
+                        number_schema.as_ref(),
                     )?;
                     py_list.append(py_dict)?;
                 }

@@ -97,22 +97,22 @@ async def test_model_reads_updates_batches_and_transactions(account_model, dynam
         if mode == "sync":
             with SyncTransaction(dynamo) as txn:
                 txn.save_model(second)
-            snapshot = dynamo.sync_transact_get(gets, decimal_fields={"b"})
+            snapshot = dynamo.sync_transact_get(gets)
             dynamo.sync_batch_write("test_table", put_items=[{"pk": pk, "sk": "3", "b": EXACT}])
-            raw_batch = dynamo.sync_batch_get(
-                "test_table", [{"pk": pk, "sk": "3"}], decimal_fields={"b"}
-            )
+            raw_batch = dynamo.sync_batch_get("test_table", [{"pk": pk, "sk": "3"}])
         else:
             async with Transaction(dynamo) as txn:
                 txn.save_model(second)
-            snapshot = await dynamo.transact_get(gets, decimal_fields={"b"})
+            snapshot = await dynamo.transact_get(gets)
             await dynamo.batch_write("test_table", put_items=[{"pk": pk, "sk": "3", "b": EXACT}])
-            raw_batch = await dynamo.batch_get(
-                "test_table", [{"pk": pk, "sk": "3"}], decimal_fields={"b"}
-            )
-        assert snapshot[0]["b"] == EXACT
+            raw_batch = await dynamo.batch_get("test_table", [{"pk": pk, "sk": "3"}])
+        assert type(snapshot[0]["b"]) is float
         assert snapshot[1] is None
-        assert raw_batch[0]["b"] == EXACT
+        assert type(raw_batch[0]["b"]) is float
+        # A model read of the same transaction/batch writes is exact automatically.
+        written = Account.sync_batch_get([{"pk": pk, "sk": "2"}, {"pk": pk, "sk": "3"}])
+        assert len(written) == 2
+        assert all(item.balance == EXACT for item in written)
         assert context.prec == 6
 
     # THEN the default raw API still returns floats
@@ -131,11 +131,11 @@ async def test_concurrent_exact_and_default_reads_share_a_client(account_model, 
     await account_model(**key, balance=EXACT).save()
     # WHEN both requests run concurrently
     exact, ordinary = await asyncio.gather(
-        dynamo.get_item("test_table", key, decimal_fields={"b"}),
+        account_model.get(**key),
         dynamo.get_item("test_table", key),
     )
     # THEN one request cannot change the other's decoding
-    assert exact["b"] == EXACT
+    assert exact.balance == EXACT
     assert type(ordinary["b"]) is float
     await dynamo.delete_item("test_table", key)
 
@@ -253,3 +253,29 @@ async def test_collection_hydrates_decimal_and_number_members(dynamo, mode):
     assert type(result.measurements[0].amount) is float
     payment.sync_delete()
     measurement.sync_delete()
+
+
+async def test_unknown_discriminator_preserves_parent_number_decoding(dynamo):
+    # GIVEN a NumberAttribute parent with a decimal subclass
+    class Event(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        kind = StringAttribute(discriminator=True)
+        amount = NumberAttribute()
+
+    class Payment(Event):
+        amount = DecimalAttribute()
+
+    key = {"pk": str(uuid4()), "sk": "unknown"}
+    await dynamo.put_item("test_table", {**key, "kind": "UnknownEvent", "amount": Decimal("1.25")})
+    try:
+        # WHEN loading an item whose discriminator falls back to the parent
+        loaded = await Event.get(**key)
+        raw = await Event.get(**key, as_dict=True)
+        # THEN neither model hydration nor as_dict changes NumberAttribute's type
+        assert type(loaded) is Event
+        assert type(loaded.amount) is float
+        assert type(raw["amount"]) is float
+    finally:
+        await dynamo.delete_item("test_table", key)

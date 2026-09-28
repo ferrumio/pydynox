@@ -8,8 +8,30 @@ use std::collections::{HashMap, HashSet};
 
 use crate::decimal;
 
-/// Per-request DynamoDB names to decode as exact decimals.
-pub type DecimalFields = Option<HashSet<String>>;
+/// Private model schema, copied when a native read is prepared.
+#[derive(FromPyObject)]
+pub struct ModelNumberSchema {
+    #[pyo3(item)]
+    pub fields: HashSet<String>,
+    #[pyo3(item)]
+    pub variants: HashMap<String, HashMap<String, HashSet<String>>>,
+    #[pyo3(item, default)]
+    pub fallback_fields: HashSet<String>,
+}
+
+pub type NumberSchema = Option<ModelNumberSchema>;
+
+impl ModelNumberSchema {
+    fn fields_for_item(&self, item: &HashMap<String, AttributeValue>) -> &HashSet<String> {
+        for (name, variants) in &self.variants {
+            if let Some(AttributeValue::S(value)) = item.get(name) {
+                return variants.get(value).unwrap_or(&self.fallback_fields);
+            }
+        }
+        // Continuation keys and projections may omit the discriminator.
+        &self.fields
+    }
+}
 
 /// Parse a DynamoDB number string to a Python int or float.
 ///
@@ -212,12 +234,13 @@ pub fn attribute_values_to_py_dict(
 pub fn attribute_values_to_py_dict_with_decimals<'py>(
     py: Python<'py>,
     item: HashMap<String, AttributeValue>,
-    decimal_fields: Option<&HashSet<String>>,
+    number_schema: Option<&ModelNumberSchema>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let result = PyDict::new(py);
+    let fields = number_schema.map(|schema| schema.fields_for_item(&item));
 
     for (key, value) in item {
-        let py_value = if decimal_fields.is_some_and(|fields| fields.contains(&key)) {
+        let py_value = if fields.is_some_and(|fields| fields.contains(&key)) {
             match value {
                 AttributeValue::N(n) => decimal::from_number_string(py, &n)?,
                 other => attribute_value_to_py_direct(py, other)?,

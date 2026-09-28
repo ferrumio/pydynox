@@ -410,7 +410,7 @@ class GSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import QueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}
@@ -451,7 +451,6 @@ class GSIQueryResult(Generic[M]):
             index_name=self._index_name,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
-            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> GSIQueryResult[M]:
@@ -522,7 +521,7 @@ class AsyncGSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import AsyncQueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}
@@ -563,7 +562,6 @@ class AsyncGSIQueryResult(Generic[M]):
             index_name=self._index_name,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
-            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncGSIQueryResult[M]:
@@ -854,7 +852,7 @@ class LSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import QueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}
@@ -894,7 +892,6 @@ class LSIQueryResult(Generic[M]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=self._consistent_read,
-            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> LSIQueryResult[M]:
@@ -967,7 +964,7 @@ class AsyncLSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import AsyncQueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}
@@ -1007,7 +1004,6 @@ class AsyncLSIQueryResult(Generic[M]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=self._consistent_read,
-            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncLSIQueryResult[M]:

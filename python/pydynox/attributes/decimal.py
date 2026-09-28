@@ -11,13 +11,14 @@ from pydynox.attributes.base import Attribute
 
 
 class DecimalAttribute(Attribute[Decimal]):
-    """Store exact decimal values as DynamoDB numbers.
+    """Store exact decimal values in model fields as DynamoDB numbers.
 
     Accepts Decimal and integer values. Build fractional values from strings,
     such as Decimal("19.99"), to avoid binary floating-point rounding.
 
     Model reads return Decimal directly from the DynamoDB number text.
-    NumberAttribute keeps its existing int/float behavior.
+    Direct client reads keep int/float decoding and may lose precision.
+    No client configuration is needed for models.
     """
 
     attr_type = "N"

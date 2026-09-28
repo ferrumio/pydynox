@@ -10,7 +10,7 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 
 use crate::conversions::{
-    DecimalFields, attribute_values_to_py_dict_with_decimals, extract_string_map,
+    NumberSchema, attribute_values_to_py_dict_with_decimals, extract_string_map,
     py_dict_to_attribute_values,
 };
 use crate::errors::map_sdk_error;
@@ -110,7 +110,7 @@ pub fn sync_get_item(
     consistent_read: bool,
     projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
-    decimal_fields: DecimalFields,
+    number_schema: NumberSchema,
 ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
     // Prepare: convert Python -> Rust (needs GIL)
     let prepared = prepare_get_item(
@@ -130,7 +130,7 @@ pub fn sync_get_item(
         Ok(raw) => {
             if let Some(item) = raw.item {
                 let py_dict =
-                    attribute_values_to_py_dict_with_decimals(py, item, decimal_fields.as_ref())?;
+                    attribute_values_to_py_dict_with_decimals(py, item, number_schema.as_ref())?;
                 Ok((Some(py_dict.into_any().unbind()), raw.metrics))
             } else {
                 Ok((None, raw.metrics))
@@ -150,7 +150,7 @@ pub fn get_item<'py>(
     consistent_read: bool,
     projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
-    decimal_fields: DecimalFields,
+    number_schema: NumberSchema,
 ) -> PyResult<Bound<'py, PyAny>> {
     // Prepare: convert Python -> Rust (needs GIL, done before async)
     let prepared = prepare_get_item(
@@ -174,7 +174,7 @@ pub fn get_item<'py>(
                     let py_dict = attribute_values_to_py_dict_with_decimals(
                         py,
                         item,
-                        decimal_fields.as_ref(),
+                        number_schema.as_ref(),
                     )?;
                     py_result.set_item("item", py_dict)?;
                 } else {

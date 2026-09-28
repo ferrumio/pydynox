@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import ListWithMetrics
 from pydynox.client._typing import _MixinBase
@@ -21,8 +20,6 @@ class PartiqlOperations(_MixinBase):
         parameters: list[Any] | None = None,
         consistent_read: bool = False,
         next_token: str | None = None,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> ListWithMetrics:
         """Execute a PartiQL statement (sync)."""
         _log_debug("sync_execute_statement", f"Executing: {statement[:50]}...")
@@ -32,7 +29,6 @@ class PartiqlOperations(_MixinBase):
             parameters=parameters,
             consistent_read=consistent_read,
             next_token=next_token,
-            **decimal_options(decimal_fields),
         )
         _log_operation(
             "execute_statement",
@@ -50,8 +46,6 @@ class PartiqlOperations(_MixinBase):
         parameters: list[Any] | None = None,
         consistent_read: bool = False,
         next_token: str | None = None,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> ListWithMetrics:
         """Execute a PartiQL statement (async)."""
         _log_debug("execute_statement", f"Executing: {statement[:50]}...")
@@ -61,7 +55,6 @@ class PartiqlOperations(_MixinBase):
             parameters=parameters,
             consistent_read=consistent_read,
             next_token=next_token,
-            **decimal_options(decimal_fields),
         )
         metrics = result["metrics"]
         _log_operation(

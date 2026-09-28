@@ -42,7 +42,9 @@ def test_exact_round_trip_ignores_arithmetic_context(text):
         context.prec = 6
         # WHEN Rust serializes and decodes the number
         encoded = pydynox_core.item_to_dynamo({"amount": value, "count": 2, "ratio": 0.5})
-        result = pydynox_core.item_from_dynamo(encoded, decimal_fields={"amount"})
+        result = pydynox_core.item_from_dynamo(
+            encoded, _number_schema={"fields": {"amount"}, "variants": {}}
+        )
         # THEN no float or Decimal arithmetic context rounds the value
         assert Decimal(encoded["amount"]["N"]) == value
         assert result["amount"] == value
@@ -177,7 +179,7 @@ def test_raw_nested_decimal_writes_and_top_level_selection():
     # WHEN using the raw item helpers
     encoded = pydynox_core.item_to_dynamo(item)
     result = pydynox_core.item_from_dynamo(
-        encoded, decimal_fields={"amount", "metadata", "missing"}
+        encoded, _number_schema={"fields": {"amount", "metadata", "missing"}, "variants": {}}
     )
     # THEN selection applies to top-level scalar N values only
     assert result["amount"] == EXACT
@@ -185,24 +187,25 @@ def test_raw_nested_decimal_writes_and_top_level_selection():
     assert result["samples"] == [0.5]
 
 
-def test_lazy_query_copies_requested_decimal_fields():
-    # GIVEN a raw query that has not fetched its first page yet
+def test_lazy_model_query_keeps_its_schema_private():
+    # GIVEN a model query and an ordinary raw query sharing one backend
     from pydynox.query import QueryResult
 
     with MemoryBackend() as backend:
-        backend.client.sync_put_item("accounts", {"pk": "a", "balance": EXACT})
-        fields = {"balance"}
-        query = QueryResult(
+        Account(pk="a", sk="1", balance=EXACT).sync_save()
+        exact = Account.sync_query("a")
+        ordinary = QueryResult(
             backend.client,
-            "accounts",
+            "decimal_accounts",
             "pk = :pk",
             expression_attribute_values={":pk": "a"},
-            decimal_fields=fields,
         )
-        # WHEN the caller mutates its set before iteration
-        fields.clear()
-        # THEN this query retains its original decoding choice
-        assert list(query)[0]["balance"] == EXACT
+        # WHEN the raw query runs before the model query
+        raw = list(ordinary)
+        typed = list(exact)
+        # THEN neither query changes the other's decoding
+        assert type(raw[0]["b"]) is float
+        assert typed[0].balance == EXACT
 
 
 def test_decimal_default_and_size_use_numeric_representation():
@@ -307,3 +310,125 @@ def test_native_requests_reject_invalid_decimals_before_io(method, text):
     # THEN validation fails locally without attempting a network request
     with pytest.raises(ValueError):
         getattr(client, method)("accounts", {"pk": "a", "amount": Decimal(text)})
+
+
+@pytest.mark.parametrize("value", [EXACT, Decimal("1E-130"), Decimal("42"), 42, 0.25])
+def test_number_attribute_preserves_caller_supplied_values(value):
+    # GIVEN a NumberAttribute receiving an application-owned value
+    class Measurement(Model):
+        pk = StringAttribute(partition_key=True)
+        amount = NumberAttribute(alias="a")
+
+    data = {"pk": "a", "a": value}
+    # WHEN loading a dictionary, as supported before DecimalAttribute existed
+    loaded = Measurement.from_dict(data)
+    # THEN deserialization preserves both the object and its numeric precision
+    assert loaded.amount is value
+    assert loaded.to_dict()["a"] is value
+    assert data["a"] is value
+    assert not loaded.is_dirty
+
+
+def test_public_read_apis_do_not_expose_decimal_configuration():
+    # GIVEN the public client, iterator, and MemoryBackend APIs
+    import inspect
+
+    from pydynox import DynamoDBClient
+    from pydynox.query import AsyncQueryResult, AsyncScanResult, QueryResult, ScanResult
+    from pydynox.testing.memory import MemoryClient
+
+    readers = [QueryResult, AsyncQueryResult, ScanResult, AsyncScanResult]
+    for client in (DynamoDBClient, MemoryClient):
+        for name in ("get_item", "query", "scan", "batch_get", "search_vectors"):
+            readers.append(getattr(client, name))
+            if hasattr(client, f"sync_{name}"):
+                readers.append(getattr(client, f"sync_{name}"))
+    # THEN numeric decoding is not a caller-facing option
+    for reader in readers:
+        parameters = inspect.signature(reader).parameters
+        assert "decimal_fields" not in parameters
+        assert "_number_schema" not in parameters
+
+
+async def test_memory_model_reads_share_metrics_without_changing_raw_decoding():
+    # GIVEN a model and a raw read using the same backend
+    import asyncio
+
+    with MemoryBackend() as backend:
+        await Account(pk="a", sk="1", balance=EXACT).save()
+        # WHEN both read APIs run in the same task group
+        exact, raw = await asyncio.gather(
+            Account.get(pk="a", sk="1"),
+            backend.client.get_item("decimal_accounts", {"pk": "a", "sk": "1"}),
+        )
+        # THEN decoding stays separate and metrics reach the original client
+        assert exact.balance == EXACT
+        assert type(raw["b"]) is float
+        assert backend.client.get_total_metrics().get_count == 2
+        assert backend.client.get_last_metrics() is not None
+
+
+@pytest.mark.parametrize("number", ["1", "1.0", "1E3"])
+def test_polymorphic_native_decoding_uses_each_models_number_type(number):
+    # GIVEN two model variants sharing the same DynamoDB field
+    schema = {
+        "fields": {"amount"},
+        "variants": {"kind": {"Payment": {"amount"}, "Measurement": set()}},
+    }
+    # WHEN the number arrives through the native decoder
+    payment = pydynox_core.item_from_dynamo(
+        {"kind": {"S": "Payment"}, "amount": {"N": number}},
+        _number_schema=schema,
+    )
+    measurement = pydynox_core.item_from_dynamo(
+        {"kind": {"S": "Measurement"}, "amount": {"N": number}},
+        _number_schema=schema,
+    )
+    ordinary = pydynox_core.dynamo_to_py({"N": number})
+    # THEN the exact model gets Decimal and NumberAttribute keeps the wire type
+    assert payment["amount"] == Decimal(number)
+    assert type(payment["amount"]) is Decimal
+    assert measurement["amount"] == ordinary
+    assert type(measurement["amount"]) is type(ordinary)
+
+
+@pytest.mark.parametrize(
+    "attribute,expected_type", [(NumberAttribute, float), (DecimalAttribute, Decimal)]
+)
+def test_unknown_discriminator_uses_the_parent_numeric_type(attribute, expected_type):
+    # GIVEN an item whose model subclass is not registered in this application
+    class Event(Model):
+        model_config = ModelConfig(table="decimal_events")
+        pk = StringAttribute(partition_key=True)
+        kind = StringAttribute(discriminator=True)
+        amount = attribute()
+
+    class Payment(Event):
+        amount = DecimalAttribute()
+
+    with MemoryBackend() as backend:
+        backend.client.sync_put_item(
+            "decimal_events", {"pk": "a", "kind": "UnknownEvent", "amount": Decimal("1.25")}
+        )
+        # WHEN normal model resolution falls back to the parent class
+        loaded = Event.sync_get(pk="a")
+        # THEN the parent's declared numeric type still controls decoding
+        assert type(loaded) is Event
+        assert type(loaded.amount) is expected_type
+
+
+@pytest.mark.parametrize("exact", [False, True])
+def test_native_unknown_discriminator_uses_fallback_schema(exact):
+    # GIVEN a parent schema and an unknown discriminator value
+    schema = {
+        "fields": {"amount"},
+        "variants": {"kind": {"Payment": {"amount"}}},
+        "fallback_fields": {"amount"} if exact else set(),
+    }
+    # WHEN decoding the original DynamoDB number text
+    item = pydynox_core.item_from_dynamo(
+        {"kind": {"S": "UnknownEvent"}, "amount": {"N": "1.25"}},
+        _number_schema=schema,
+    )
+    # THEN the parent schema determines the type
+    assert type(item["amount"]) is (Decimal if exact else float)

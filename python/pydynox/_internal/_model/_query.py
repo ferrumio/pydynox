@@ -174,12 +174,11 @@ def sync_execute_statement(
     consistent_read: bool = False,
 ) -> list[M]:
     """Execute a PartiQL statement (sync)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     result = client.sync_execute_statement(
         statement,
         parameters=parameters,
         consistent_read=consistent_read,
-        **cls._decimal_read_options(),
     )
     return [cls.from_dict(item) for item in result]
 
@@ -192,7 +191,7 @@ def sync_parallel_scan(
     as_dict: bool = False,
 ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
     """Parallel scan (sync)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     table = cls._get_table()
 
     names: dict[str, str] = {}
@@ -215,7 +214,6 @@ def sync_parallel_scan(
         expression_attribute_names=attr_names if attr_names else None,
         expression_attribute_values=values if values else None,
         consistent_read=use_consistent,
-        **cls._decimal_read_options(),
     )
 
     if as_dict:
@@ -343,12 +341,11 @@ async def execute_statement(
     consistent_read: bool = False,
 ) -> list[M]:
     """Execute a PartiQL statement (async, default)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     result = await client.execute_statement(
         statement,
         parameters=parameters,
         consistent_read=consistent_read,
-        **cls._decimal_read_options(),
     )
     return [cls.from_dict(item) for item in result]
 
@@ -361,7 +358,7 @@ async def parallel_scan(
     as_dict: bool = False,
 ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
     """Parallel scan (async, default)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     table = cls._get_table()
 
     names: dict[str, str] = {}
@@ -384,7 +381,6 @@ async def parallel_scan(
         expression_attribute_names=attr_names if attr_names else None,
         expression_attribute_values=values if values else None,
         consistent_read=use_consistent,
-        **cls._decimal_read_options(),
     )
 
     if as_dict:

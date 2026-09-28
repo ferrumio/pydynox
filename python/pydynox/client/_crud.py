@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Literal, overload
 
-from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._metrics import OperationMetrics
 from pydynox._internal._throttle_retry import retry_on_throttle, sync_retry_on_throttle
@@ -266,8 +265,6 @@ class CrudOperations(_MixinBase):
         key: dict[str, Any],
         consistent_read: bool = False,
         projection: list[str] | None = None,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any] | None:
         """Get an item from a DynamoDB table by its key (async).
 
@@ -297,7 +294,6 @@ class CrudOperations(_MixinBase):
                 consistent_read=consistent_read,
                 projection=projection_expr,
                 expression_attribute_names=attr_names,
-                **decimal_options(decimal_fields),
             )
             metrics = result["metrics"]
             add_response_attributes(
@@ -317,8 +313,6 @@ class CrudOperations(_MixinBase):
         key: dict[str, Any],
         consistent_read: bool = False,
         projection: list[str] | None = None,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any] | None:
         """Get an item from a DynamoDB table by its key (sync).
 
@@ -352,7 +346,6 @@ class CrudOperations(_MixinBase):
                 consistent_read=consistent_read,
                 projection=projection_expr,
                 expression_attribute_names=attr_names,
-                **decimal_options(decimal_fields),
             )
             add_response_attributes(
                 span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id

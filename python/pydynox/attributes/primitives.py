@@ -7,10 +7,8 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any, Generic, TypeVar, overload
 
-from pydynox import pydynox_core
 from pydynox.attributes.base import Attribute
 
 MT = TypeVar("MT")
@@ -183,12 +181,6 @@ class NumberAttribute(Attribute[float]):
     """
 
     attr_type = "N"
-
-    def deserialize(self, value: Any) -> int | float | None:
-        """Keep normal numeric types when reading mixed model schemas."""
-        if isinstance(value, Decimal):
-            return pydynox_core.decimal_to_number(value)
-        return value
 
 
 class BooleanAttribute(Attribute[bool]):

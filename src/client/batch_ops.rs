@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 use super::DynamoDBClient;
 use crate::batch_operations;
-use crate::conversions::DecimalFields;
+use crate::conversions::NumberSchema;
 
 #[pymethods]
 impl DynamoDBClient {
@@ -25,14 +25,14 @@ impl DynamoDBClient {
     }
 
     /// Sync batch get items from a DynamoDB table.
-    #[pyo3(signature = (table, keys, consistent_read, *, decimal_fields=None))]
+    #[pyo3(signature = (table, keys, consistent_read, *, _number_schema=None))]
     pub fn sync_batch_get(
         &self,
         py: Python<'_>,
         table: &str,
         keys: &Bound<'_, pyo3::types::PyList>,
         consistent_read: bool,
-        decimal_fields: DecimalFields,
+        _number_schema: NumberSchema,
     ) -> PyResult<Vec<Py<PyAny>>> {
         batch_operations::sync_batch_get(
             py,
@@ -41,7 +41,7 @@ impl DynamoDBClient {
             table,
             keys,
             consistent_read,
-            decimal_fields,
+            _number_schema,
         )
     }
 
@@ -61,14 +61,14 @@ impl DynamoDBClient {
     /// Async batch get items from a DynamoDB table (default, no prefix).
     ///
     /// Returns a Python awaitable that gets items in batch.
-    #[pyo3(signature = (table, keys, consistent_read, *, decimal_fields=None))]
+    #[pyo3(signature = (table, keys, consistent_read, *, _number_schema=None))]
     pub fn batch_get<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         keys: &Bound<'_, pyo3::types::PyList>,
         consistent_read: bool,
-        decimal_fields: DecimalFields,
+        _number_schema: NumberSchema,
     ) -> PyResult<Bound<'py, PyAny>> {
         batch_operations::batch_get(
             py,
@@ -76,7 +76,7 @@ impl DynamoDBClient {
             table,
             keys,
             consistent_read,
-            decimal_fields,
+            _number_schema,
         )
     }
 }

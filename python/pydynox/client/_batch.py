@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox._internal._logging import _log_debug
 from pydynox._internal._throttle_retry import retry_on_throttle, sync_retry_on_throttle
 from pydynox.client._typing import _MixinBase
@@ -48,8 +47,6 @@ class BatchOperations(_MixinBase):
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> list[dict[str, Any]]:
         """Async batch get items from a DynamoDB table.
 
@@ -60,9 +57,7 @@ class BatchOperations(_MixinBase):
         """
         _log_debug("batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        return await self._client.batch_get(
-            table, keys, consistent_read, **decimal_options(decimal_fields)
-        )  # type: ignore[attr-defined, no-any-return]
+        return await self._client.batch_get(table, keys, consistent_read)  # type: ignore[attr-defined, no-any-return]
 
     # ========== BATCH WRITE (SYNC - with sync_ prefix) ==========
 
@@ -100,8 +95,6 @@ class BatchOperations(_MixinBase):
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
-        *,
-        decimal_fields: DecimalFields | None = None,
     ) -> list[dict[str, Any]]:
         """Sync batch get items from a DynamoDB table.
 
@@ -112,9 +105,7 @@ class BatchOperations(_MixinBase):
         """
         _log_debug("sync_batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        return self._client.sync_batch_get(
-            table, keys, consistent_read, **decimal_options(decimal_fields)
-        )  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_batch_get(table, keys, consistent_read)  # type: ignore[attr-defined, no-any-return]
 
     # ========== TRANSACT WRITE (SYNC) ==========
 
@@ -151,9 +142,7 @@ class BatchOperations(_MixinBase):
     # ========== TRANSACT GET (SYNC) ==========
 
     @sync_retry_on_throttle
-    def sync_transact_get(
-        self, gets: list[dict[str, Any]], *, decimal_fields: DecimalFields | None = None
-    ) -> list[dict[str, Any] | None]:
+    def sync_transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
         """Sync version of transact_get. Blocks until complete.
 
         Reads multiple items atomically. Either all reads succeed or all fail.
@@ -176,7 +165,7 @@ class BatchOperations(_MixinBase):
             ])
         """
         _log_debug("sync_transact_get", f"Transact getting ({len(gets)} keys)")
-        return self._client.sync_transact_get(gets, **decimal_options(decimal_fields))  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_transact_get(gets)  # type: ignore[attr-defined, no-any-return]
 
     # ========== TRANSACT WRITE (ASYNC - default) ==========
 
@@ -213,9 +202,7 @@ class BatchOperations(_MixinBase):
     # ========== TRANSACT GET (ASYNC - default) ==========
 
     @retry_on_throttle
-    async def transact_get(
-        self, gets: list[dict[str, Any]], *, decimal_fields: DecimalFields | None = None
-    ) -> list[dict[str, Any] | None]:
+    async def transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]:
         """Execute a transactional get operation.
 
         Reads multiple items atomically. Either all reads succeed or all fail.
@@ -227,4 +214,4 @@ class BatchOperations(_MixinBase):
             List of items (or None for items that don't exist).
         """
         _log_debug("transact_get", f"Transact getting ({len(gets)} keys)")
-        return await self._client.transact_get(gets, **decimal_options(decimal_fields))  # type: ignore[attr-defined, no-any-return]
+        return await self._client.transact_get(gets)  # type: ignore[attr-defined, no-any-return]

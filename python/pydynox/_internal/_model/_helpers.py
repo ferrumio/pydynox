@@ -74,7 +74,7 @@ def prepare_get(
     cls: type[M], consistent_read: bool | None, keys: dict[str, Any]
 ) -> tuple[DynamoDBClient, str, dict[str, Any], bool]:
     """Prepare get operation. Returns (client, table, keys, use_consistent)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     table = cls._get_table()
 
     # Translate python key names to DynamoDB aliases

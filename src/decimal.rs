@@ -101,7 +101,7 @@ pub fn validate_decimal(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Py
     Ok(decimal.unbind())
 }
 
-/// Restore NumberAttribute's usual representation after a mixed-model read.
+/// Match the default numeric decoding for values stored by MemoryBackend.
 #[pyfunction]
 pub fn decimal_to_number(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
     if is_decimal(value)? {

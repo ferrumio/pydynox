@@ -396,7 +396,7 @@ class VectorIndex(Generic[M]):
         vector, expression, names, values, projection = self._prepare_search(
             query_vector, partition_key, where, top_k, as_dict
         )
-        result = await model_class._get_client().search_vectors(
+        result = await model_class._get_read_client().search_vectors(
             model_class._get_table(),
             self.index_name,
             vector,
@@ -405,7 +405,6 @@ class VectorIndex(Generic[M]):
             expression_attribute_names=names,
             expression_attribute_values=values,
             projection_expression=projection,
-            **model_class._decimal_read_options(),
         )
         return self._convert_result(result, as_dict)
 
@@ -422,7 +421,7 @@ class VectorIndex(Generic[M]):
         vector, expression, names, values, projection = self._prepare_search(
             query_vector, partition_key, where, top_k, as_dict
         )
-        result = model_class._get_client().sync_search_vectors(
+        result = model_class._get_read_client().sync_search_vectors(
             model_class._get_table(),
             self.index_name,
             vector,
@@ -431,7 +430,6 @@ class VectorIndex(Generic[M]):
             expression_attribute_names=names,
             expression_attribute_values=values,
             projection_expression=projection,
-            **model_class._decimal_read_options(),
         )
         return self._convert_result(result, as_dict)
 

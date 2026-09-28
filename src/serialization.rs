@@ -459,19 +459,33 @@ pub fn item_to_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<Py<P
 /// # result = {"pk": "USER#123", "name": "John", "age": 30}
 /// ```
 #[pyfunction]
-#[pyo3(signature = (item, *, decimal_fields=None))]
+#[pyo3(signature = (item, *, _number_schema=None))]
 pub fn item_from_dynamo(
     py: Python<'_>,
     item: &Bound<'_, PyDict>,
-    decimal_fields: crate::conversions::DecimalFields,
+    _number_schema: crate::conversions::NumberSchema,
 ) -> PyResult<Py<PyDict>> {
     let result = PyDict::new(py);
+    let mut fields = _number_schema.as_ref().map(|schema| &schema.fields);
+    if let Some(schema) = &_number_schema {
+        for (name, variants) in &schema.variants {
+            if let Some(value) = item.get_item(name)?
+                && let Ok(attr) = value.cast::<PyDict>()
+                && let Some(discriminator) = attr.get_item("S")?
+            {
+                fields = Some(
+                    variants
+                        .get(&discriminator.extract::<String>()?)
+                        .unwrap_or(&schema.fallback_fields),
+                );
+                break;
+            }
+        }
+    }
     for (k, v) in item.iter() {
         let key: String = k.extract()?;
         let attr = v.cast::<PyDict>()?;
-        let value = if decimal_fields
-            .as_ref()
-            .is_some_and(|fields| fields.contains(&key))
+        let value = if fields.is_some_and(|fields| fields.contains(&key))
             && let Some(number) = attr.get_item("N")?
         {
             decimal::from_number_string(py, &number.extract::<String>()?)?

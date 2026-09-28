@@ -34,9 +34,7 @@ async def get(
 ) -> M | dict[str, Any] | None:
     """Async get item by key (default). Returns model instance, dict, or None."""
     client, table, keys_dict, use_consistent = prepare_get(cls, consistent_read, keys)
-    item = await client.get_item(
-        table, keys_dict, consistent_read=use_consistent, **cls._decimal_read_options()
-    )
+    item = await client.get_item(table, keys_dict, consistent_read=use_consistent)
 
     if client._last_metrics is not None:
         cls._record_metrics(client._last_metrics, "get")

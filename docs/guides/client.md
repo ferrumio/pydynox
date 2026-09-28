@@ -258,33 +258,11 @@ Get the deleted item back. Useful when you need to archive or log what was remov
 !!! tip
     `return_values="ALL_NEW"` on `update_item` is the most useful one. You get the full item after the update in one call instead of doing update + get.
 
-### Exact decimal reads
+### Decimal values
 
-Raw writes accept `Decimal`. Reads default to `int` and `float`; use
-`decimal_fields` for exact values:
-
-```python
-from decimal import Decimal
-
-await client.put_item("accounts", {"pk": "A#1", "balance": Decimal("19.99")})
-item = await client.get_item("accounts", {"pk": "A#1"}, decimal_fields={"balance"})
-assert item["balance"] == Decimal("19.99")
-```
-
-Pass a set or frozenset of top-level DynamoDB names, using aliases where defined.
-Selected scalar numbers become `Decimal`. The selection applies per request,
-including all pages and continuation keys.
-
-Supported by `get_item`, `query`, `scan`, `parallel_scan`,
-`batch_get`, `transact_get`, `execute_statement`, and `search_vectors`, including
-their `sync_` versions, and by `pydynox_core.item_from_dynamo`.
-
-`DecimalAttribute` models select fields automatically. Polymorphic reads and
-collections combine member selections: models keep their declared types, while
-raw dictionaries keep the combined selection.
-
-Unselected and nested numbers, write `return_values`, and exception items keep
-default decoding.
+Exact `Decimal` reads are supported only through models with
+[DecimalAttribute](attributes.md#decimalattribute). Direct client calls accept
+`Decimal` on writes, but read numbers as `int` or `float` and may lose precision.
 
 ### Utility methods
 

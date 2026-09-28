@@ -8,9 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{
-    DecimalFields, attribute_values_to_py_dict_with_decimals, py_dict_to_attribute_values,
-};
+use crate::conversions::{attribute_values_to_py_dict, py_dict_to_attribute_values};
 use crate::errors::map_sdk_error;
 
 /// Maximum items per transaction (DynamoDB limit).
@@ -93,7 +91,6 @@ pub fn sync_transact_get(
     client: &Client,
     runtime: &Arc<Runtime>,
     gets: &Bound<'_, PyList>,
-    decimal_fields: DecimalFields,
 ) -> PyResult<Vec<Option<Py<PyAny>>>> {
     let transact_items = prepare_transact_get(py, gets)?;
 
@@ -109,11 +106,7 @@ pub fn sync_transact_get(
             let mut items: Vec<Option<Py<PyAny>>> = Vec::with_capacity(raw.responses.len());
             for response in raw.responses {
                 if let Some(item) = response {
-                    let py_dict = attribute_values_to_py_dict_with_decimals(
-                        py,
-                        item,
-                        decimal_fields.as_ref(),
-                    )?;
+                    let py_dict = attribute_values_to_py_dict(py, item)?;
                     items.push(Some(py_dict.into_any().unbind()));
                 } else {
                     items.push(None);
@@ -132,7 +125,6 @@ pub fn transact_get<'py>(
     py: Python<'py>,
     client: Client,
     gets: &Bound<'_, PyList>,
-    decimal_fields: DecimalFields,
 ) -> PyResult<Bound<'py, PyAny>> {
     let transact_items = prepare_transact_get(py, gets)?;
 
@@ -144,11 +136,7 @@ pub fn transact_get<'py>(
                 let py_list = PyList::empty(py);
                 for response in raw.responses {
                     if let Some(item) = response {
-                        let py_dict = attribute_values_to_py_dict_with_decimals(
-                            py,
-                            item,
-                            decimal_fields.as_ref(),
-                        )?;
+                        let py_dict = attribute_values_to_py_dict(py, item)?;
                         py_list.append(py_dict)?;
                     } else {
                         py_list.append(py.None())?;

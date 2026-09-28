@@ -106,9 +106,9 @@ class Product(Model):
 
 ### DecimalAttribute
 
-Store exact decimal values as DynamoDB `N`. Accepts `Decimal` and `int`; model
-reads return `Decimal`, including with `as_dict=True`. No read option is needed.
-`NumberAttribute` keeps its `int` and `float` behavior.
+`DecimalAttribute` works exclusively with models. It stores `Decimal` and `int`
+as DynamoDB `N`; model reads return `Decimal`, including with `as_dict=True`.
+No client configuration is needed. `NumberAttribute` keeps its current behavior.
 
 Use `Decimal("19.99")` for fractions. `Decimal(19.99)` carries the float's
 approximation. Direct float, string, or boolean inputs raise `TypeError`,
@@ -133,7 +133,7 @@ Reads and serialization do not round. Your own arithmetic uses Python's decimal
 context (28 digits by default); adjust it with `decimal.localcontext()` as needed.
 
 This is a scalar field. Nested maps, lists, and number sets keep their current
-read behavior. For raw operations, see [exact decimal reads](client.md#exact-decimal-reads).
+read behavior. For raw operations, see [decimal values with the client](client.md#decimal-values).
 
 ### BooleanAttribute
 

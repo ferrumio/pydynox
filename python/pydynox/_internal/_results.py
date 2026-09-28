@@ -218,7 +218,7 @@ class ModelQueryResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
@@ -246,7 +246,6 @@ class ModelQueryResult(BaseModelResult[T]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=use_consistent,
-            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> ModelQueryResult[T]:
@@ -299,7 +298,7 @@ class AsyncModelQueryResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
@@ -327,7 +326,6 @@ class AsyncModelQueryResult(BaseModelResult[T]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=use_consistent,
-            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncModelQueryResult[T]:
@@ -379,7 +377,7 @@ class ModelScanResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         filter_expr, projection_expr, attr_names, attr_values, use_consistent = _build_scan_params(
@@ -400,7 +398,6 @@ class ModelScanResult(BaseModelResult[T]):
             consistent_read=use_consistent,
             segment=self._segment,
             total_segments=self._total_segments,
-            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> ModelScanResult[T]:
@@ -451,7 +448,7 @@ class AsyncModelScanResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         filter_expr, projection_expr, attr_names, attr_values, use_consistent = _build_scan_params(
@@ -472,7 +469,6 @@ class AsyncModelScanResult(BaseModelResult[T]):
             consistent_read=use_consistent,
             segment=self._segment,
             total_segments=self._total_segments,
-            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncModelScanResult[T]:
