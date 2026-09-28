@@ -50,6 +50,23 @@ class User(Model):
     --8<-- "docs/examples/models/with_defaults.py"
     ```
 
+### Strict attribute names
+
+Set `strict_attributes=True` to catch misspelled field names. Unknown constructor
+arguments and public assignments raise `AttributeError` with the model and field name.
+The option defaults to `False`.
+
+```python
+--8<-- "docs/examples/models/strict_attributes.py"
+```
+
+Constructor arguments must use declared Python field names. Assignments also allow
+writable properties and private state such as `user._cache`.
+
+Loading with `get()`, query results, or `from_dict()` still accepts extra stored
+fields and resolves DynamoDB aliases. Extra fields are ignored by the model.
+Use `User(**data)` to validate field names in application input.
+
 ## CRUD operations
 
 pydynox uses an async-first API. Methods without prefix are async (default), methods with `sync_` prefix are sync.
@@ -228,6 +245,7 @@ This is about 2x faster because you skip the read operation.
 | `skip_hooks` | bool | False | Skip lifecycle hooks |
 | `max_size` | int | None | Max item size in bytes |
 | `consistent_read` | bool | False | Use strongly consistent reads by default |
+| `strict_attributes` | bool | False | Reject unknown constructor arguments and public assignments |
 
 ### Setting a default client
 

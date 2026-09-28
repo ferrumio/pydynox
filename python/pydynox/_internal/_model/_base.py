@@ -236,6 +236,12 @@ class ModelBase(metaclass=ModelMeta):
     _json_snapshots: dict[str, str | None]
 
     def __init__(self, **kwargs: Any) -> None:
+        config = getattr(type(self), "model_config", None)
+        if config is not None and config.strict_attributes:
+            for name in kwargs:
+                if name not in self._attributes:
+                    raise AttributeError(f"{type(self).__name__} has no attribute '{name}'")
+
         # Initialize change tracking (must be first to avoid __setattr__ issues)
         object.__setattr__(self, "_original", None)
         object.__setattr__(self, "_changed", set())
@@ -289,7 +295,13 @@ class ModelBase(metaclass=ModelMeta):
 
         # Track changes if we have an original snapshot
         original = object.__getattribute__(self, "_original")
-        if original is not None and name in self._attributes:
+        if name not in self._attributes:
+            config = getattr(type(self), "model_config", None)
+            if config is not None and config.strict_attributes:
+                descriptor = getattr(type(self), name, None)
+                if not isinstance(descriptor, property) or descriptor.fset is None:
+                    raise AttributeError(f"{type(self).__name__} has no attribute '{name}'")
+        elif original is not None:
             changed = object.__getattribute__(self, "_changed")
             old_value = original.get(name)
             if value != old_value:
@@ -495,6 +507,7 @@ class ModelBase(metaclass=ModelMeta):
         that only send changed fields to DynamoDB.
 
         If the model has a discriminator field, returns the correct subclass.
+        Extra stored fields are ignored, including with strict_attributes enabled.
         """
         # Check if we should return a subclass based on discriminator
         target_cls: type[M] = cls
@@ -518,7 +531,17 @@ class ModelBase(metaclass=ModelMeta):
                 deserialized[attr_name] = target_cls._attributes[attr_name].deserialize(value)
             else:
                 deserialized[attr_name] = value
-        instance = target_cls(**deserialized)
+        config = getattr(target_cls, "model_config", None)
+        if config is not None and config.strict_attributes:
+            # Stored items can contain fields outside this model's schema.
+            model_values = {
+                name: value
+                for name, value in deserialized.items()
+                if name in target_cls._attributes
+            }
+        else:
+            model_values = deserialized
+        instance = target_cls(**model_values)
         # Store original for change tracking with Python names and deserialized values
         # so __setattr__ can compare correctly (it looks up by Python attr name)
         instance._original = deserialized.copy()
