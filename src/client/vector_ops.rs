@@ -2,12 +2,13 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use super::DynamoDBClient;
+use crate::conversions::DecimalFields;
 use crate::table_operations;
 use crate::vector_operations;
 
 #[pymethods]
 impl DynamoDBClient {
-    #[pyo3(signature = (table, index_name, vector, top_k=10, search_condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, projection_expression=None))]
+    #[pyo3(signature = (table, index_name, vector, top_k=10, search_condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, projection_expression=None, *, decimal_fields=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn search_vectors<'py>(
         &self,
@@ -20,6 +21,7 @@ impl DynamoDBClient {
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         projection_expression: Option<String>,
+        decimal_fields: DecimalFields,
     ) -> PyResult<Bound<'py, PyAny>> {
         vector_operations::search_vectors(
             py,
@@ -32,10 +34,11 @@ impl DynamoDBClient {
             expression_attribute_names,
             expression_attribute_values,
             projection_expression,
+            decimal_fields,
         )
     }
 
-    #[pyo3(signature = (table, index_name, vector, top_k=10, search_condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, projection_expression=None))]
+    #[pyo3(signature = (table, index_name, vector, top_k=10, search_condition_expression=None, expression_attribute_names=None, expression_attribute_values=None, projection_expression=None, *, decimal_fields=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn sync_search_vectors(
         &self,
@@ -48,6 +51,7 @@ impl DynamoDBClient {
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         projection_expression: Option<String>,
+        decimal_fields: DecimalFields,
     ) -> PyResult<Py<PyAny>> {
         vector_operations::sync_search_vectors(
             py,
@@ -61,6 +65,7 @@ impl DynamoDBClient {
             expression_attribute_names,
             expression_attribute_values,
             projection_expression,
+            decimal_fields,
         )
     }
 

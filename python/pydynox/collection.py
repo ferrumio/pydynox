@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast
 
+from pydynox._internal._decimal import decimal_options
 from pydynox.hooks import HookType
 
 if TYPE_CHECKING:
@@ -238,6 +239,7 @@ class Collection:
             index_name=index,
             limit=limit,
             consistent_read=consistent_read,
+            **decimal_options(set().union(*(model._decimal_fields for model in self._models))),
         )
 
         items = [item async for item in query_result]
@@ -286,6 +288,7 @@ class Collection:
             index_name=index,
             limit=limit,
             consistent_read=consistent_read,
+            **decimal_options(set().union(*(model._decimal_fields for model in self._models))),
         )
 
         items = list(query_result)

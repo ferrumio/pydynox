@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox._internal._logging import _log_debug, _log_operation
 from pydynox._internal._metrics import OperationMetrics
 from pydynox._internal._tracing import add_response_attributes, trace_operation
@@ -30,6 +31,8 @@ class ScanOperations(_MixinBase):
         consistent_read: bool = False,
         segment: int | None = None,
         total_segments: int | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> ScanResult:
         """Scan items from a DynamoDB table (sync).
 
@@ -65,6 +68,7 @@ class ScanOperations(_MixinBase):
             consistent_read=consistent_read,
             segment=segment,
             total_segments=total_segments,
+            **decimal_options(decimal_fields),
         )
 
     def scan(
@@ -81,6 +85,8 @@ class ScanOperations(_MixinBase):
         consistent_read: bool = False,
         segment: int | None = None,
         total_segments: int | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> AsyncScanResult:
         """Scan items from a DynamoDB table (async).
 
@@ -116,6 +122,7 @@ class ScanOperations(_MixinBase):
             consistent_read=consistent_read,
             segment=segment,
             total_segments=total_segments,
+            **decimal_options(decimal_fields),
         )
 
     # ========== COUNT ==========
@@ -185,6 +192,8 @@ class ScanOperations(_MixinBase):
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], OperationMetrics]:
         """Parallel scan - runs multiple segment scans concurrently (sync).
 
@@ -217,6 +226,7 @@ class ScanOperations(_MixinBase):
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 consistent_read=consistent_read,
+                **decimal_options(decimal_fields),
             )
             add_response_attributes(
                 span, consumed_rcu=metrics.consumed_rcu, request_id=metrics.request_id
@@ -235,6 +245,8 @@ class ScanOperations(_MixinBase):
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], OperationMetrics]:
         """Parallel scan - runs multiple segment scans concurrently (async).
 
@@ -267,6 +279,7 @@ class ScanOperations(_MixinBase):
                 expression_attribute_names=expression_attribute_names,
                 expression_attribute_values=expression_attribute_values,
                 consistent_read=consistent_read,
+                **decimal_options(decimal_fields),
             )
             items: list[dict[str, Any]] = result["items"]
             metrics: OperationMetrics = result["metrics"]

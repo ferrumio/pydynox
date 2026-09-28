@@ -11,7 +11,8 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 
 use crate::conversions::{
-    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+    DecimalFields, attribute_values_to_py_dict_with_decimals, extract_string_map,
+    py_dict_to_attribute_values,
 };
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
@@ -158,13 +159,24 @@ async fn execute_search_vectors(
     }
 }
 
-fn raw_to_python(py: Python<'_>, raw: RawVectorSearchResult) -> PyResult<Py<PyAny>> {
+fn raw_to_python(
+    py: Python<'_>,
+    raw: RawVectorSearchResult,
+    decimal_fields: &DecimalFields,
+) -> PyResult<Py<PyAny>> {
     let result = PyDict::new(py);
     let matches = PyList::empty(py);
 
     for vector_match in raw.matches {
         let value = PyDict::new(py);
-        value.set_item("item", attribute_values_to_py_dict(py, vector_match.item)?)?;
+        value.set_item(
+            "item",
+            attribute_values_to_py_dict_with_decimals(
+                py,
+                vector_match.item,
+                decimal_fields.as_ref(),
+            )?,
+        )?;
         value.set_item("score", vector_match.score)?;
         matches.append(value)?;
     }
@@ -187,6 +199,7 @@ pub fn sync_search_vectors(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     projection_expression: Option<String>,
+    decimal_fields: DecimalFields,
 ) -> PyResult<Py<PyAny>> {
     let prepared = prepare_search_vectors(
         py,
@@ -202,7 +215,7 @@ pub fn sync_search_vectors(
     let result = py.detach(|| runtime.block_on(execute_search_vectors(client.clone(), prepared)));
 
     match result {
-        Ok(raw) => raw_to_python(py, raw),
+        Ok(raw) => raw_to_python(py, raw, &decimal_fields),
         Err((error, table)) => Err(map_sdk_error(error, Some(&table))),
     }
 }
@@ -219,6 +232,7 @@ pub fn search_vectors<'py>(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     projection_expression: Option<String>,
+    decimal_fields: DecimalFields,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_search_vectors(
         py,
@@ -234,7 +248,7 @@ pub fn search_vectors<'py>(
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         match execute_search_vectors(client, prepared).await {
-            Ok(raw) => Python::attach(|py| raw_to_python(py, raw)),
+            Ok(raw) => Python::attach(|py| raw_to_python(py, raw, &decimal_fields)),
             Err((error, table)) => Err(map_sdk_error(error, Some(&table))),
         }
     })

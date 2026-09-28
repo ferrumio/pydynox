@@ -405,6 +405,7 @@ class VectorIndex(Generic[M]):
             expression_attribute_names=names,
             expression_attribute_values=values,
             projection_expression=projection,
+            **model_class._decimal_read_options(),
         )
         return self._convert_result(result, as_dict)
 
@@ -430,6 +431,7 @@ class VectorIndex(Generic[M]):
             expression_attribute_names=names,
             expression_attribute_values=values,
             projection_expression=projection,
+            **model_class._decimal_read_options(),
         )
         return self._convert_result(result, as_dict)
 

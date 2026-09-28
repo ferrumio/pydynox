@@ -37,7 +37,9 @@ def get(
     """Get an item by key. Returns model instance, dict, or None."""
     # prepare: get client, table, resolve consistent_read
     client, table, keys_dict, use_consistent = prepare_get(cls, consistent_read, keys)
-    item = client.sync_get_item(table, keys_dict, consistent_read=use_consistent)
+    item = client.sync_get_item(
+        table, keys_dict, consistent_read=use_consistent, **cls._decimal_read_options()
+    )
 
     # Record metrics from client
     if client._last_metrics is not None:

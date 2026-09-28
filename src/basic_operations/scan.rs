@@ -10,7 +10,8 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 
 use crate::conversions::{
-    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+    DecimalFields, attribute_values_to_py_dict_with_decimals, extract_string_map,
+    py_dict_to_attribute_values,
 };
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
@@ -172,15 +173,19 @@ pub async fn execute_scan(
 }
 
 /// Convert raw scan result to Python types.
-fn raw_to_py_result(py: Python<'_>, raw: RawScanResult) -> PyResult<ScanResult> {
+fn raw_to_py_result(
+    py: Python<'_>,
+    raw: RawScanResult,
+    decimal_fields: &DecimalFields,
+) -> PyResult<ScanResult> {
     let mut items = Vec::new();
     for item in raw.items {
-        let py_dict = attribute_values_to_py_dict(py, item)?;
+        let py_dict = attribute_values_to_py_dict_with_decimals(py, item, decimal_fields.as_ref())?;
         items.push(py_dict.into_any().unbind());
     }
 
     let last_key = if let Some(lek) = raw.last_evaluated_key {
-        let py_dict = attribute_values_to_py_dict(py, lek)?;
+        let py_dict = attribute_values_to_py_dict_with_decimals(py, lek, decimal_fields.as_ref())?;
         Some(py_dict.into_any().unbind())
     } else {
         None
@@ -210,6 +215,7 @@ pub fn sync_scan(
     consistent_read: bool,
     segment: Option<i32>,
     total_segments: Option<i32>,
+    decimal_fields: DecimalFields,
 ) -> PyResult<ScanResult> {
     let prepared = prepare_scan(
         py,
@@ -229,7 +235,7 @@ pub fn sync_scan(
     let result = py.detach(|| runtime.block_on(execute_scan(client.clone(), prepared)));
 
     match result {
-        Ok(raw) => raw_to_py_result(py, raw),
+        Ok(raw) => raw_to_py_result(py, raw, &decimal_fields),
         Err((e, tbl)) => Err(map_sdk_error(e, Some(&tbl))),
     }
 }
@@ -250,6 +256,7 @@ pub fn scan<'py>(
     consistent_read: bool,
     segment: Option<i32>,
     total_segments: Option<i32>,
+    decimal_fields: DecimalFields,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_scan(
         py,
@@ -275,13 +282,21 @@ pub fn scan<'py>(
 
                 let mut items = Vec::new();
                 for item in raw.items {
-                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    let py_dict = attribute_values_to_py_dict_with_decimals(
+                        py,
+                        item,
+                        decimal_fields.as_ref(),
+                    )?;
                     items.push(py_dict.into_any().unbind());
                 }
                 py_result.set_item("items", items)?;
 
                 if let Some(lek) = raw.last_evaluated_key {
-                    let py_dict = attribute_values_to_py_dict(py, lek)?;
+                    let py_dict = attribute_values_to_py_dict_with_decimals(
+                        py,
+                        lek,
+                        decimal_fields.as_ref(),
+                    )?;
                     py_result.set_item("last_evaluated_key", py_dict)?;
                 } else {
                     py_result.set_item("last_evaluated_key", py.None())?;
@@ -659,6 +674,7 @@ pub fn sync_parallel_scan(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     consistent_read: bool,
+    decimal_fields: DecimalFields,
 ) -> PyResult<(Vec<Py<PyAny>>, OperationMetrics)> {
     let prepared = prepare_parallel_scan(
         py,
@@ -677,7 +693,8 @@ pub fn sync_parallel_scan(
         Ok(raw) => {
             let mut items = Vec::new();
             for item in raw.items {
-                let py_dict = attribute_values_to_py_dict(py, item)?;
+                let py_dict =
+                    attribute_values_to_py_dict_with_decimals(py, item, decimal_fields.as_ref())?;
                 items.push(py_dict.into_any().unbind());
             }
             Ok((items, raw.metrics))
@@ -698,6 +715,7 @@ pub fn parallel_scan<'py>(
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
     expression_attribute_values: Option<&Bound<'_, PyDict>>,
     consistent_read: bool,
+    decimal_fields: DecimalFields,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_parallel_scan(
         py,
@@ -719,7 +737,11 @@ pub fn parallel_scan<'py>(
 
                 let mut items = Vec::new();
                 for item in raw.items {
-                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    let py_dict = attribute_values_to_py_dict_with_decimals(
+                        py,
+                        item,
+                        decimal_fields.as_ref(),
+                    )?;
                     items.push(py_dict.into_any().unbind());
                 }
                 py_result.set_item("items", items)?;

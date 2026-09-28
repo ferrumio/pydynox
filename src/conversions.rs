@@ -4,7 +4,12 @@ use aws_sdk_dynamodb::primitives::Blob;
 use aws_sdk_dynamodb::types::AttributeValue;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+use crate::decimal;
+
+/// Per-request DynamoDB names to decode as exact decimals.
+pub type DecimalFields = Option<HashSet<String>>;
 
 /// Parse a DynamoDB number string to a Python int or float.
 ///
@@ -52,7 +57,7 @@ pub fn extract_string_map(
 /// This is the fast path — goes straight from PyAny to AttributeValue
 /// without creating an intermediate Python dict.
 ///
-/// Handles: str, bool, int, float, None, bytes, set, frozenset, list, dict.
+/// Handles: str, bool, int, float, Decimal, None, bytes, set, frozenset, list, dict.
 #[allow(clippy::only_used_in_recursion)]
 pub fn py_to_attribute_value_direct(
     py: Python<'_>,
@@ -87,9 +92,11 @@ pub fn py_to_attribute_value_direct(
             map.insert(key, value);
         }
         Ok(AttributeValue::M(map))
+    } else if decimal::is_decimal(obj)? {
+        Ok(AttributeValue::N(decimal::to_number_string(obj)?))
     } else {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-            "Unsupported type for DynamoDB: {}. Supported types: str, int, float, bool, None, list, dict, bytes, set",
+            "Unsupported type for DynamoDB: {}. Supported types: str, int, float, Decimal, bool, None, list, dict, bytes, set",
             obj.get_type().name()?
         )))
     }
@@ -195,10 +202,29 @@ pub fn attribute_values_to_py_dict(
     py: Python<'_>,
     item: HashMap<String, AttributeValue>,
 ) -> PyResult<Bound<'_, PyDict>> {
+    attribute_values_to_py_dict_with_decimals(py, item, None)
+}
+
+/// Convert selected top-level numeric attributes directly to Decimal.
+///
+/// Names are DynamoDB attribute names, after aliases. The selection belongs
+/// to this response, so concurrent requests may use different model schemas.
+pub fn attribute_values_to_py_dict_with_decimals<'py>(
+    py: Python<'py>,
+    item: HashMap<String, AttributeValue>,
+    decimal_fields: Option<&HashSet<String>>,
+) -> PyResult<Bound<'py, PyDict>> {
     let result = PyDict::new(py);
 
     for (key, value) in item {
-        let py_value = attribute_value_to_py_direct(py, value)?;
+        let py_value = if decimal_fields.is_some_and(|fields| fields.contains(&key)) {
+            match value {
+                AttributeValue::N(n) => decimal::from_number_string(py, &n)?,
+                other => attribute_value_to_py_direct(py, other)?,
+            }
+        } else {
+            attribute_value_to_py_direct(py, value)?
+        };
         result.set_item(key, py_value)?;
     }
 

@@ -8,15 +8,55 @@ import re
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Context, Decimal, localcontext
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Iterator, TypeVar, cast
 
+from pydynox import pydynox_core
+from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox.config import clear_default_client, get_default_client, set_default_client
 from pydynox.exceptions import ConditionalCheckFailedException
 from pydynox.model import Model
 
 if TYPE_CHECKING:
     from pydynox._internal._metrics import OperationMetrics
+
+
+def _decode_item(item: dict[str, Any], decimal_fields: DecimalFields | None) -> dict[str, Any]:
+    """Match native number decoding without changing stored values."""
+
+    def ordinary(value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return pydynox_core.decimal_to_number(value)
+        if isinstance(value, dict):
+            return {key: ordinary(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [ordinary(child) for child in value]
+        return copy.deepcopy(value)
+
+    result = {}
+    for name, value in item.items():
+        if (
+            decimal_fields
+            and name in decimal_fields
+            and isinstance(value, (Decimal, int, float))
+            and not isinstance(value, bool)
+        ):
+            result[name] = Decimal(str(value))
+        else:
+            result[name] = ordinary(value)
+    return result
+
+
+def _add_numbers(left: Any, right: Any, *, subtract: bool = False) -> Any:
+    """DynamoDB arithmetic must not use the application's Decimal precision."""
+    if isinstance(left, Decimal) or isinstance(right, Decimal):
+        # Cover the full DynamoDB exponent range before validating the result.
+        with localcontext(Context(prec=300, Emin=-300, Emax=300)):
+            left, right = Decimal(str(left)), Decimal(str(right))
+            result = left - right if subtract else left + right
+        return pydynox_core.validate_decimal(result)
+    return left - right if subtract else left + right
 
 
 def _split_top_level(clause: str) -> list[str]:
@@ -299,7 +339,7 @@ def memory_backend(
 class MemoryClient:
     """In-memory client that mimics DynamoDBClient interface."""
 
-    _VALID_DYNAMO_TYPES = (str, int, float, bool, type(None), list, dict, bytes, set)
+    _VALID_DYNAMO_TYPES = (str, int, float, Decimal, bool, type(None), list, dict, bytes, set)
 
     def __init__(
         self,
@@ -336,7 +376,9 @@ class MemoryClient:
         if not self._strict:
             return
         if isinstance(value, self._VALID_DYNAMO_TYPES):
-            if isinstance(value, dict):
+            if isinstance(value, Decimal):
+                pydynox_core.validate_decimal(value)
+            elif isinstance(value, dict):
                 for v in value.values():
                     self._validate_value(v)
             elif isinstance(value, list):
@@ -408,6 +450,15 @@ class MemoryClient:
                     pk = item_or_key[key]
                     break
 
+        # DynamoDB compares numeric keys by value, including zero sort keys.
+        def decimal_key(value: Any) -> Any:
+            if not isinstance(value, Decimal):
+                return value
+            text = pydynox_core.py_to_dynamo(value)["N"]
+            fixed = format(Decimal(text), "f")
+            return fixed.rstrip("0").rstrip(".") if "." in fixed else fixed
+
+        pk, sk = decimal_key(pk), decimal_key(sk)
         if pk and sk:
             return f"{pk}|{sk}"
         return str(pk)
@@ -488,7 +539,12 @@ class MemoryClient:
         return metrics
 
     def _do_get_item(
-        self, table: str, key: dict[str, Any], consistent_read: bool = False
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any] | None:
         """Internal sync get item implementation."""
         start = time.time()
@@ -499,7 +555,7 @@ class MemoryClient:
         self._record_metrics(metrics, "get")
         if item is None:
             return None
-        return copy.deepcopy(item)
+        return _decode_item(item, decimal_fields)
 
     def _do_delete_item(
         self,
@@ -542,6 +598,7 @@ class MemoryClient:
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> FakeMetrics:
         """Internal sync update item implementation."""
+        self._validate_item(expression_attribute_values or {})
         start = time.time()
         tbl = self._get_table(table)
         key_str = self._make_key_string(key)
@@ -601,10 +658,15 @@ class MemoryClient:
         )
 
     def sync_get_item(
-        self, table: str, key: dict[str, Any], consistent_read: bool = False
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any] | None:
         """Sync get item."""
-        return self._do_get_item(table, key, consistent_read)
+        return self._do_get_item(table, key, consistent_read, **decimal_options(decimal_fields))
 
     def sync_delete_item(
         self,
@@ -664,10 +726,15 @@ class MemoryClient:
         )
 
     async def get_item(
-        self, table: str, key: dict[str, Any], consistent_read: bool = False
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any] | None:
         """Async get item (default)."""
-        return self._do_get_item(table, key, consistent_read)
+        return self._do_get_item(table, key, consistent_read, **decimal_options(decimal_fields))
 
     async def delete_item(
         self,
@@ -722,6 +789,8 @@ class MemoryClient:
         exclusive_start_key: dict[str, Any] | None = None,
         index_name: str | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
         """Internal sync query page implementation."""
         result = self.query(
@@ -735,6 +804,7 @@ class MemoryClient:
             consistent_read,
             exclusive_start_key,
             index_name,
+            **decimal_options(decimal_fields),
         )
         metrics = result["metrics"]
         metrics.items_count = len(result["items"])
@@ -753,6 +823,8 @@ class MemoryClient:
         total_segments: int | None = None,
         index_name: str | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
         """Internal sync scan page implementation."""
         result = self.scan(
@@ -766,6 +838,7 @@ class MemoryClient:
             segment,
             total_segments,
             index_name,
+            **decimal_options(decimal_fields),
         )
         metrics = result["metrics"]
         metrics.items_count = len(result["items"])
@@ -786,6 +859,8 @@ class MemoryClient:
         exclusive_start_key: dict[str, Any] | None = None,
         index_name: str | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
         """Sync query page."""
         return self._do_query_page(
@@ -800,6 +875,7 @@ class MemoryClient:
             exclusive_start_key,
             index_name,
             projection_expression,
+            **decimal_options(decimal_fields),
         )
 
     def sync_scan_page(
@@ -815,6 +891,8 @@ class MemoryClient:
         total_segments: int | None = None,
         index_name: str | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, FakeMetrics]:
         """Sync scan page."""
         return self._do_scan_page(
@@ -829,6 +907,7 @@ class MemoryClient:
             total_segments,
             index_name,
             projection_expression,
+            **decimal_options(decimal_fields),
         )
 
     # ========== ASYNC QUERY/SCAN (default, no prefix) ==========
@@ -846,6 +925,8 @@ class MemoryClient:
         exclusive_start_key: dict[str, Any] | None = None,
         index_name: str | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any]:
         """Async query page (default). Returns dict like Rust client."""
         items, last_key, metrics = self._do_query_page(
@@ -860,6 +941,7 @@ class MemoryClient:
             exclusive_start_key,
             index_name,
             projection_expression,
+            **decimal_options(decimal_fields),
         )
         return {
             "items": items,
@@ -880,6 +962,8 @@ class MemoryClient:
         total_segments: int | None = None,
         index_name: str | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any]:
         """Async scan page (default). Returns dict like Rust client."""
         items, last_key, metrics = self._do_scan_page(
@@ -894,6 +978,7 @@ class MemoryClient:
             total_segments,
             index_name,
             projection_expression,
+            **decimal_options(decimal_fields),
         )
         return {
             "items": items,
@@ -913,6 +998,8 @@ class MemoryClient:
         consistent_read: bool = False,
         exclusive_start_key: dict[str, Any] | None = None,
         index_name: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any]:
         """Query items from the in-memory table."""
         start = time.time()
@@ -930,7 +1017,7 @@ class MemoryClient:
                 if filter_expression is None or self._check_condition(
                     item, filter_expression, expression_attribute_names, expression_attribute_values
                 ):
-                    items.append(copy.deepcopy(item))
+                    items.append(_decode_item(item, decimal_fields))
 
         # Sort (simplified - just by first key)
         if not scan_index_forward:
@@ -960,6 +1047,8 @@ class MemoryClient:
         segment: int | None = None,
         total_segments: int | None = None,
         index_name: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any]:
         """Scan all items from the in-memory table."""
         start = time.time()
@@ -970,7 +1059,7 @@ class MemoryClient:
             if filter_expression is None or self._check_condition(
                 item, filter_expression, expression_attribute_names, expression_attribute_values
             ):
-                items.append(copy.deepcopy(item))
+                items.append(_decode_item(item, decimal_fields))
 
         # Apply limit
         if limit and len(items) > limit:
@@ -1043,6 +1132,8 @@ class MemoryClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> Any:
         from pydynox._internal._vector import VectorMatch, VectorSearchResult
 
@@ -1080,7 +1171,7 @@ class MemoryClient:
                 projected = {name: projected[name] for name in requested if name in projected}
             else:
                 projected.pop(vector_attribute, None)
-            matches.append(VectorMatch(item=projected, score=score))
+            matches.append(VectorMatch(item=_decode_item(projected, decimal_fields), score=score))
 
         reverse = definition["distance_function"] == "DOT_PRODUCT"
         matches.sort(key=lambda match: match.score, reverse=reverse)
@@ -1102,6 +1193,8 @@ class MemoryClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> Any:
         return self._do_search_vectors(
             table,
@@ -1112,6 +1205,7 @@ class MemoryClient:
             expression_attribute_names,
             expression_attribute_values,
             projection_expression,
+            **decimal_options(decimal_fields),
         )
 
     def sync_search_vectors(
@@ -1124,6 +1218,8 @@ class MemoryClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> Any:
         return self._do_search_vectors(
             table,
@@ -1134,6 +1230,7 @@ class MemoryClient:
             expression_attribute_names,
             expression_attribute_values,
             projection_expression,
+            **decimal_options(decimal_fields),
         )
 
     # ========== BATCH ==========
@@ -1199,6 +1296,8 @@ class MemoryClient:
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> list[dict[str, Any]]:
         """Internal sync batch get implementation."""
         result = self._batch_get_item(
@@ -1209,7 +1308,7 @@ class MemoryClient:
                 }
             }
         )
-        return result["Responses"].get(table, [])
+        return [_decode_item(item, decimal_fields) for item in result["Responses"].get(table, [])]
 
     def _do_batch_write(
         self,
@@ -1227,18 +1326,22 @@ class MemoryClient:
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> list[dict[str, Any]]:
         """Async batch get items."""
-        return self._do_batch_get(table, keys, consistent_read)
+        return self._do_batch_get(table, keys, consistent_read, **decimal_options(decimal_fields))
 
     def sync_batch_get(
         self,
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> list[dict[str, Any]]:
         """Sync batch get items."""
-        return self._do_batch_get(table, keys, consistent_read)
+        return self._do_batch_get(table, keys, consistent_read, **decimal_options(decimal_fields))
 
     async def batch_write(
         self,
@@ -1618,7 +1721,7 @@ class MemoryClient:
                     value_key = match.group(3)
                     if attr_values and value_key in attr_values:
                         default = attr_values.get(default_key, 0)
-                        item[attr] = item.get(attr, default) + attr_values[value_key]
+                        item[attr] = _add_numbers(item.get(attr, default), attr_values[value_key])
                     continue
 
                 # Check for attr = attr + :value (increment)
@@ -1628,7 +1731,7 @@ class MemoryClient:
                     value_key = match.group(3)
                     if attr_values and value_key in attr_values:
                         current = item.get(attr, 0)
-                        item[attr] = current + attr_values[value_key]
+                        item[attr] = _add_numbers(current, attr_values[value_key])
                     continue
 
                 # Check for attr = attr - :value (decrement)
@@ -1638,7 +1741,7 @@ class MemoryClient:
                     value_key = match.group(3)
                     if attr_values and value_key in attr_values:
                         current = item.get(attr, 0)
-                        item[attr] = current - attr_values[value_key]
+                        item[attr] = _add_numbers(current, attr_values[value_key], subtract=True)
                     continue
 
                 # Simple assignment: attr = :value
@@ -1665,8 +1768,8 @@ class MemoryClient:
             value_key = add_match.group(2)
             if attr_values and value_key in attr_values:
                 add_value = attr_values[value_key]
-                if isinstance(add_value, (int, float)):
-                    item[attr] = item.get(attr, 0) + add_value
+                if isinstance(add_value, (int, float, Decimal)):
+                    item[attr] = _add_numbers(item.get(attr, 0), add_value)
                 elif isinstance(add_value, set):
                     current = item.get(attr, set())
                     item[attr] = current | add_value

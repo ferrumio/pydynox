@@ -10,7 +10,8 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 
 use crate::conversions::{
-    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+    DecimalFields, attribute_values_to_py_dict_with_decimals, extract_string_map,
+    py_dict_to_attribute_values,
 };
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
@@ -109,6 +110,7 @@ pub fn sync_get_item(
     consistent_read: bool,
     projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
+    decimal_fields: DecimalFields,
 ) -> PyResult<(Option<Py<PyAny>>, OperationMetrics)> {
     // Prepare: convert Python -> Rust (needs GIL)
     let prepared = prepare_get_item(
@@ -127,7 +129,8 @@ pub fn sync_get_item(
     match result {
         Ok(raw) => {
             if let Some(item) = raw.item {
-                let py_dict = attribute_values_to_py_dict(py, item)?;
+                let py_dict =
+                    attribute_values_to_py_dict_with_decimals(py, item, decimal_fields.as_ref())?;
                 Ok((Some(py_dict.into_any().unbind()), raw.metrics))
             } else {
                 Ok((None, raw.metrics))
@@ -147,6 +150,7 @@ pub fn get_item<'py>(
     consistent_read: bool,
     projection_expression: Option<String>,
     expression_attribute_names: Option<&Bound<'_, PyDict>>,
+    decimal_fields: DecimalFields,
 ) -> PyResult<Bound<'py, PyAny>> {
     // Prepare: convert Python -> Rust (needs GIL, done before async)
     let prepared = prepare_get_item(
@@ -167,7 +171,11 @@ pub fn get_item<'py>(
             Ok(raw) => {
                 let py_result = PyDict::new(py);
                 if let Some(item) = raw.item {
-                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    let py_dict = attribute_values_to_py_dict_with_decimals(
+                        py,
+                        item,
+                        decimal_fields.as_ref(),
+                    )?;
                     py_result.set_item("item", py_dict)?;
                 } else {
                     py_result.set_item("item", py.None())?;

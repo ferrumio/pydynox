@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from pydynox._internal._decimal import DecimalFields, decimal_options
 from pydynox._internal._logging import _log_debug, _log_operation, _log_warning
 from pydynox._internal._tracing import add_response_attributes, trace_operation
 
@@ -51,7 +52,10 @@ class QueryResult:
         last_evaluated_key: dict[str, Any] | None = None,
         acquire_rcu: Callable[[float], None] | None = None,
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ):
+        self._decimal_fields = frozenset(decimal_fields or ())
         self._client = client
         self._table = table
         self._key_condition_expression = key_condition_expression
@@ -151,6 +155,7 @@ class QueryResult:
                 scan_index_forward=self._scan_index_forward,
                 index_name=self._index_name,
                 consistent_read=self._consistent_read,
+                **decimal_options(self._decimal_fields),
             )
             add_response_attributes(
                 span,
@@ -207,7 +212,10 @@ class AsyncQueryResult:
         last_evaluated_key: dict[str, Any] | None = None,
         acquire_rcu: Callable[[float], None] | None = None,
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ):
+        self._decimal_fields = frozenset(decimal_fields or ())
         self._client = client
         self._table = table
         self._key_condition_expression = key_condition_expression
@@ -303,6 +311,7 @@ class AsyncQueryResult:
                 scan_index_forward=self._scan_index_forward,
                 index_name=self._index_name,
                 consistent_read=self._consistent_read,
+                **decimal_options(self._decimal_fields),
             )
 
             self._current_page = result["items"]
@@ -372,7 +381,10 @@ class ScanResult:
         consistent_read: bool = False,
         segment: int | None = None,
         total_segments: int | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ):
+        self._decimal_fields = frozenset(decimal_fields or ())
         self._client = client
         self._table = table
         self._filter_expression = filter_expression
@@ -466,6 +478,7 @@ class ScanResult:
                 consistent_read=self._consistent_read,
                 segment=self._segment,
                 total_segments=self._total_segments,
+                **decimal_options(self._decimal_fields),
             )
             add_response_attributes(
                 span,
@@ -520,7 +533,10 @@ class AsyncScanResult:
         consistent_read: bool = False,
         segment: int | None = None,
         total_segments: int | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ):
+        self._decimal_fields = frozenset(decimal_fields or ())
         self._client = client
         self._table = table
         self._filter_expression = filter_expression
@@ -614,6 +630,7 @@ class AsyncScanResult:
                 consistent_read=self._consistent_read,
                 segment=self._segment,
                 total_segments=self._total_segments,
+                **decimal_options(self._decimal_fields),
             )
 
             self._current_page = result["items"]

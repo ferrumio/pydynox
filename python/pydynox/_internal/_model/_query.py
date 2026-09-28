@@ -179,6 +179,7 @@ def sync_execute_statement(
         statement,
         parameters=parameters,
         consistent_read=consistent_read,
+        **cls._decimal_read_options(),
     )
     return [cls.from_dict(item) for item in result]
 
@@ -214,6 +215,7 @@ def sync_parallel_scan(
         expression_attribute_names=attr_names if attr_names else None,
         expression_attribute_values=values if values else None,
         consistent_read=use_consistent,
+        **cls._decimal_read_options(),
     )
 
     if as_dict:
@@ -346,6 +348,7 @@ async def execute_statement(
         statement,
         parameters=parameters,
         consistent_read=consistent_read,
+        **cls._decimal_read_options(),
     )
     return [cls.from_dict(item) for item in result]
 
@@ -381,6 +384,7 @@ async def parallel_scan(
         expression_attribute_names=attr_names if attr_names else None,
         expression_attribute_values=values if values else None,
         consistent_read=use_consistent,
+        **cls._decimal_read_options(),
     )
 
     if as_dict:

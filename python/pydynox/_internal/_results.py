@@ -246,6 +246,7 @@ class ModelQueryResult(BaseModelResult[T]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=use_consistent,
+            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> ModelQueryResult[T]:
@@ -326,6 +327,7 @@ class AsyncModelQueryResult(BaseModelResult[T]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=use_consistent,
+            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncModelQueryResult[T]:
@@ -398,6 +400,7 @@ class ModelScanResult(BaseModelResult[T]):
             consistent_read=use_consistent,
             segment=self._segment,
             total_segments=self._total_segments,
+            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> ModelScanResult[T]:
@@ -469,6 +472,7 @@ class AsyncModelScanResult(BaseModelResult[T]):
             consistent_read=use_consistent,
             segment=self._segment,
             total_segments=self._total_segments,
+            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncModelScanResult[T]:

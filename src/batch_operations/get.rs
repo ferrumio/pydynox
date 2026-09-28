@@ -8,7 +8,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{attribute_values_to_py_dict, py_dict_to_attribute_values};
+use crate::conversions::{
+    DecimalFields, attribute_values_to_py_dict_with_decimals, py_dict_to_attribute_values,
+};
 use crate::errors::map_sdk_error;
 
 /// Maximum items per batch get request (DynamoDB limit).
@@ -167,6 +169,7 @@ pub fn sync_batch_get(
     table: &str,
     keys: &Bound<'_, PyList>,
     consistent_read: bool,
+    decimal_fields: DecimalFields,
 ) -> PyResult<Vec<Py<PyAny>>> {
     let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
 
@@ -176,7 +179,8 @@ pub fn sync_batch_get(
         Ok(raw) => {
             let mut py_results: Vec<Py<PyAny>> = Vec::new();
             for item in raw.items {
-                let py_dict = attribute_values_to_py_dict(py, item)?;
+                let py_dict =
+                    attribute_values_to_py_dict_with_decimals(py, item, decimal_fields.as_ref())?;
                 py_results.push(py_dict.into_any().unbind());
             }
             Ok(py_results)
@@ -210,6 +214,7 @@ pub fn batch_get<'py>(
     table: &str,
     keys: &Bound<'_, PyList>,
     consistent_read: bool,
+    decimal_fields: DecimalFields,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
 
@@ -220,7 +225,11 @@ pub fn batch_get<'py>(
             Ok(raw) => {
                 let py_list = PyList::empty(py);
                 for item in raw.items {
-                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    let py_dict = attribute_values_to_py_dict_with_decimals(
+                        py,
+                        item,
+                        decimal_fields.as_ref(),
+                    )?;
                     py_list.append(py_dict)?;
                 }
                 Ok(py_list.into_any().unbind())

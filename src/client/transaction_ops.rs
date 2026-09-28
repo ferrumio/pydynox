@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 use super::DynamoDBClient;
+use crate::conversions::DecimalFields;
 use crate::transaction_operations;
 
 #[pymethods]
@@ -41,12 +42,20 @@ impl DynamoDBClient {
     /// # Returns
     ///
     /// List of items (or None for items that don't exist).
+    #[pyo3(signature = (gets, *, decimal_fields=None))]
     pub fn sync_transact_get(
         &self,
         py: Python<'_>,
         gets: &Bound<'_, pyo3::types::PyList>,
+        decimal_fields: DecimalFields,
     ) -> PyResult<Vec<Option<Py<PyAny>>>> {
-        transaction_operations::sync_transact_get(py, &self.client, &self.runtime, gets)
+        transaction_operations::sync_transact_get(
+            py,
+            &self.client,
+            &self.runtime,
+            gets,
+            decimal_fields,
+        )
     }
 
     /// Execute a transactional write operation. Returns a Python awaitable.
@@ -71,11 +80,13 @@ impl DynamoDBClient {
     /// Execute a transactional get operation. Returns a Python awaitable.
     ///
     /// Reads multiple items atomically. Either all reads succeed or all fail.
+    #[pyo3(signature = (gets, *, decimal_fields=None))]
     pub fn transact_get<'py>(
         &self,
         py: Python<'py>,
         gets: &Bound<'_, pyo3::types::PyList>,
+        decimal_fields: DecimalFields,
     ) -> PyResult<Bound<'py, PyAny>> {
-        transaction_operations::transact_get(py, self.client.clone(), gets)
+        transaction_operations::transact_get(py, self.client.clone(), gets, decimal_fields)
     }
 }

@@ -451,6 +451,7 @@ class GSIQueryResult(Generic[M]):
             index_name=self._index_name,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
+            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> GSIQueryResult[M]:
@@ -562,6 +563,7 @@ class AsyncGSIQueryResult(Generic[M]):
             index_name=self._index_name,
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
+            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncGSIQueryResult[M]:
@@ -892,6 +894,7 @@ class LSIQueryResult(Generic[M]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=self._consistent_read,
+            **self._model_class._decimal_read_options(),
         )
 
     def __iter__(self) -> LSIQueryResult[M]:
@@ -1004,6 +1007,7 @@ class AsyncLSIQueryResult(Generic[M]):
             last_evaluated_key=self._start_key,
             acquire_rcu=client._acquire_rcu,
             consistent_read=self._consistent_read,
+            **self._model_class._decimal_read_options(),
         )
 
     def __aiter__(self) -> AsyncLSIQueryResult[M]:

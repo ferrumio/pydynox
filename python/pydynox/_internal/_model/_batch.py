@@ -37,7 +37,9 @@ async def batch_get(
     # Translate python key names to DynamoDB aliases
     aliased_keys = [{cls._py_to_dynamo.get(k, k): v for k, v in key.items()} for key in keys]
 
-    items = await client.batch_get(table, aliased_keys, consistent_read=consistent_read or False)
+    items = await client.batch_get(
+        table, aliased_keys, consistent_read=consistent_read or False, **cls._decimal_read_options()
+    )
 
     if as_dict:
         return items
@@ -78,7 +80,9 @@ def sync_batch_get(
     # Translate python key names to DynamoDB aliases
     aliased_keys = [{cls._py_to_dynamo.get(k, k): v for k, v in key.items()} for key in keys]
 
-    items = client.sync_batch_get(table, aliased_keys, consistent_read=consistent_read or False)
+    items = client.sync_batch_get(
+        table, aliased_keys, consistent_read=consistent_read or False, **cls._decimal_read_options()
+    )
 
     if as_dict:
         return items

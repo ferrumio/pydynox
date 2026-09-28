@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Coroutine
-from typing import Any
+from decimal import Decimal
+from typing import Any, overload
+
+from pydynox._internal._decimal import DecimalFields
 
 # Metrics
 class OperationMetrics:
@@ -51,7 +54,11 @@ class DynamoDBClient:
         table: str,
         key: dict[str, Any],
         consistent_read: bool = False,
-    ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
+        projection: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
     def delete_item(
         self,
         table: str,
@@ -83,6 +90,8 @@ class DynamoDBClient:
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
     def sync_query_page(
         self,
@@ -97,6 +106,8 @@ class DynamoDBClient:
         scan_index_forward: bool | None = None,
         index_name: str | None = None,
         consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, OperationMetrics]: ...
     def scan_page(
         self,
@@ -111,6 +122,8 @@ class DynamoDBClient:
         consistent_read: bool = False,
         segment: int | None = None,
         total_segments: int | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
     def sync_scan_page(
         self,
@@ -125,6 +138,8 @@ class DynamoDBClient:
         consistent_read: bool = False,
         segment: int | None = None,
         total_segments: int | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> tuple[list[dict[str, Any]], dict[str, Any] | None, OperationMetrics]: ...
     def count(
         self,
@@ -145,7 +160,10 @@ class DynamoDBClient:
         self,
         table: str,
         keys: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]: ...
+        consistent_read: bool,
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> Coroutine[Any, Any, list[dict[str, Any]]]: ...
     async def transact_write(
         self,
         operations: list[dict[str, Any]],
@@ -192,6 +210,8 @@ class DynamoDBClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
     def sync_search_vectors(
         self,
@@ -203,6 +223,8 @@ class DynamoDBClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         projection_expression: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
     ) -> dict[str, Any]: ...
     def create_vector_index(
         self,
@@ -324,7 +346,9 @@ class DynamoDBClient:
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
         consistent_read: bool = False,
-    ) -> tuple[list[dict[str, Any]], OperationMetrics]: ...
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
     def async_parallel_scan(
         self,
         table: str,
@@ -343,7 +367,9 @@ class DynamoDBClient:
         parameters: list[Any] | None = None,
         consistent_read: bool = False,
         next_token: str | None = None,
-    ) -> tuple[list[dict[str, Any]], str | None, OperationMetrics]: ...
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
     def async_execute_statement(
         self,
         statement: str,
@@ -351,6 +377,51 @@ class DynamoDBClient:
         consistent_read: bool = False,
         next_token: str | None = None,
     ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    def sync_get_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        projection: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
+    def sync_batch_get(
+        self,
+        table: str,
+        keys: list[dict[str, Any]],
+        consistent_read: bool,
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> list[dict[str, Any]]: ...
+    def transact_get(
+        self, gets: list[dict[str, Any]], *, decimal_fields: DecimalFields | None = None
+    ) -> Coroutine[Any, Any, list[dict[str, Any] | None]]: ...
+    def sync_transact_get(
+        self, gets: list[dict[str, Any]], *, decimal_fields: DecimalFields | None = None
+    ) -> list[dict[str, Any] | None]: ...
+    def sync_parallel_scan(
+        self,
+        table: str,
+        total_segments: int,
+        filter_expression: str | None = None,
+        projection_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        consistent_read: bool = False,
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> tuple[list[dict[str, Any]], OperationMetrics]: ...
+    def sync_execute_statement(
+        self,
+        statement: str,
+        parameters: list[Any] | None = None,
+        consistent_read: bool = False,
+        next_token: str | None = None,
+        *,
+        decimal_fields: DecimalFields | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None, OperationMetrics]: ...
 
 # Rate limiting
 class FixedRate:
@@ -388,7 +459,9 @@ def enable_sdk_debug() -> None: ...
 def py_to_dynamo(value: Any) -> dict[str, Any]: ...
 def dynamo_to_py(value: dict[str, Any]) -> Any: ...
 def item_to_dynamo(item: dict[str, Any]) -> dict[str, Any]: ...
-def item_from_dynamo(item: dict[str, Any]) -> dict[str, Any]: ...
+def item_from_dynamo(
+    item: dict[str, Any], *, decimal_fields: DecimalFields | None = None
+) -> dict[str, Any]: ...
 
 # Exceptions
 class PydynoxException(Exception): ...
@@ -588,3 +661,9 @@ class HotPartitionTracker:
     def get_write_count(self, table: str, pk: str) -> int: ...
     def get_read_count(self, table: str, pk: str) -> int: ...
     def clear(self) -> None: ...
+
+@overload
+def validate_decimal(value: Decimal | int) -> Decimal: ...
+@overload
+def validate_decimal(value: None) -> None: ...
+def decimal_to_number(value: Decimal) -> int | float: ...

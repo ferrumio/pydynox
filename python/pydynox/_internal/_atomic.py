@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -80,7 +81,7 @@ class AtomicAdd:
     the update with a ValidationException.
     """
 
-    def __init__(self, path: AtomicPath, value: int | float):
+    def __init__(self, path: AtomicPath, value: int | float | Decimal):
         self.path = path
         self.value = value
 
