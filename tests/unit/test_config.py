@@ -39,6 +39,7 @@ def test_model_config_defaults():
     assert config.client is None
     assert config.skip_hooks is False
     assert config.max_size is None
+    assert config.strict_attributes is False
 
 
 def test_model_config_with_client():
@@ -64,6 +65,7 @@ def test_model_config_with_options():
         client=mock_client,
         skip_hooks=True,
         max_size=400000,
+        strict_attributes=True,
     )
 
     # THEN all options should be set correctly
@@ -71,6 +73,7 @@ def test_model_config_with_options():
     assert config.client is mock_client
     assert config.skip_hooks is True
     assert config.max_size == 400000
+    assert config.strict_attributes is True
 
 
 def test_set_default_client():

@@ -72,6 +72,8 @@ class ModelConfig:
             If set, overrides the client's detector threshold for this model.
         hot_partition_reads: Override reads threshold for hot partition detection.
             If set, overrides the client's detector threshold for this model.
+        strict_attributes: Reject unknown constructor arguments and public attribute
+            assignments (default: False). Extra fields in stored items are ignored.
 
     Example:
         >>> from pydynox import DynamoDBClient, Model, ModelConfig
@@ -104,3 +106,4 @@ class ModelConfig:
     consistent_read: bool = field(default=False)
     hot_partition_writes: int | None = field(default=None)
     hot_partition_reads: int | None = field(default=None)
+    strict_attributes: bool = field(default=False)
