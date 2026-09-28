@@ -19,6 +19,7 @@ mod client;
 mod client_internal;
 mod compression;
 mod conversions;
+mod decimal;
 mod diagnostics;
 mod errors;
 mod generators;
@@ -61,6 +62,8 @@ fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(dynamo_to_py_py, m)?)?;
     m.add_function(wrap_pyfunction!(item_to_dynamo, m)?)?;
     m.add_function(wrap_pyfunction!(item_from_dynamo, m)?)?;
+    m.add_function(wrap_pyfunction!(decimal::validate_decimal, m)?)?;
+    m.add_function(wrap_pyfunction!(decimal::decimal_to_number, m)?)?;
 
     // Register exception classes
     errors::register_exceptions(m)?;

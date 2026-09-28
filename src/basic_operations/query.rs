@@ -10,7 +10,8 @@ use std::time::Instant;
 use tokio::runtime::Runtime;
 
 use crate::conversions::{
-    attribute_values_to_py_dict, extract_string_map, py_dict_to_attribute_values,
+    NumberSchema, attribute_values_to_py_dict_with_decimals, extract_string_map,
+    py_dict_to_attribute_values,
 };
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
@@ -172,15 +173,19 @@ pub async fn execute_query(
 }
 
 /// Convert raw query result to Python types.
-fn raw_to_py_result(py: Python<'_>, raw: RawQueryResult) -> PyResult<QueryResult> {
+fn raw_to_py_result(
+    py: Python<'_>,
+    raw: RawQueryResult,
+    number_schema: &NumberSchema,
+) -> PyResult<QueryResult> {
     let mut items = Vec::new();
     for item in raw.items {
-        let py_dict = attribute_values_to_py_dict(py, item)?;
+        let py_dict = attribute_values_to_py_dict_with_decimals(py, item, number_schema.as_ref())?;
         items.push(py_dict.into_any().unbind());
     }
 
     let last_key = if let Some(lek) = raw.last_evaluated_key {
-        let py_dict = attribute_values_to_py_dict(py, lek)?;
+        let py_dict = attribute_values_to_py_dict_with_decimals(py, lek, number_schema.as_ref())?;
         Some(py_dict.into_any().unbind())
     } else {
         None
@@ -210,6 +215,7 @@ pub fn sync_query(
     scan_index_forward: Option<bool>,
     index_name: Option<String>,
     consistent_read: bool,
+    number_schema: NumberSchema,
 ) -> PyResult<QueryResult> {
     let prepared = prepare_query(
         py,
@@ -229,7 +235,7 @@ pub fn sync_query(
     let result = py.detach(|| runtime.block_on(execute_query(client.clone(), prepared)));
 
     match result {
-        Ok(raw) => raw_to_py_result(py, raw),
+        Ok(raw) => raw_to_py_result(py, raw, &number_schema),
         Err((e, tbl)) => Err(map_sdk_error(e, Some(&tbl))),
     }
 }
@@ -250,6 +256,7 @@ pub fn query<'py>(
     scan_index_forward: Option<bool>,
     index_name: Option<String>,
     consistent_read: bool,
+    number_schema: NumberSchema,
 ) -> PyResult<Bound<'py, PyAny>> {
     let prepared = prepare_query(
         py,
@@ -275,13 +282,18 @@ pub fn query<'py>(
 
                 let mut items = Vec::new();
                 for item in raw.items {
-                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    let py_dict = attribute_values_to_py_dict_with_decimals(
+                        py,
+                        item,
+                        number_schema.as_ref(),
+                    )?;
                     items.push(py_dict.into_any().unbind());
                 }
                 py_result.set_item("items", items)?;
 
                 if let Some(lek) = raw.last_evaluated_key {
-                    let py_dict = attribute_values_to_py_dict(py, lek)?;
+                    let py_dict =
+                        attribute_values_to_py_dict_with_decimals(py, lek, number_schema.as_ref())?;
                     py_result.set_item("last_evaluated_key", py_dict)?;
                 } else {
                     py_result.set_item("last_evaluated_key", py.None())?;

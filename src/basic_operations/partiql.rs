@@ -9,7 +9,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 
-use crate::conversions::{attribute_values_to_py_dict, py_to_attribute_value_direct};
+use crate::conversions::{
+    NumberSchema, attribute_values_to_py_dict_with_decimals, py_to_attribute_value_direct,
+};
 use crate::errors::map_sdk_error;
 use crate::metrics::OperationMetrics;
 
@@ -95,6 +97,7 @@ pub fn sync_execute_statement(
     parameters: Option<&Bound<'_, PyList>>,
     consistent_read: bool,
     next_token: Option<String>,
+    number_schema: NumberSchema,
 ) -> PyResult<(Vec<Py<PyAny>>, Option<String>, OperationMetrics)> {
     let params = match parameters {
         Some(list) => Some(convert_parameters(py, list)?),
@@ -115,7 +118,8 @@ pub fn sync_execute_statement(
         Ok(raw) => {
             let mut items = Vec::with_capacity(raw.items.len());
             for item in raw.items {
-                let py_dict = attribute_values_to_py_dict(py, item)?;
+                let py_dict =
+                    attribute_values_to_py_dict_with_decimals(py, item, number_schema.as_ref())?;
                 items.push(py_dict.into_any().unbind());
             }
             Ok((items, raw.next_token, raw.metrics))
@@ -133,6 +137,7 @@ pub fn execute_statement<'py>(
     parameters: Option<&Bound<'_, PyList>>,
     consistent_read: bool,
     next_token: Option<String>,
+    number_schema: NumberSchema,
 ) -> PyResult<Bound<'py, PyAny>> {
     let params = match parameters {
         Some(list) => Some(convert_parameters(py, list)?),
@@ -149,7 +154,11 @@ pub fn execute_statement<'py>(
 
                 let mut items = Vec::with_capacity(raw.items.len());
                 for item in raw.items {
-                    let py_dict = attribute_values_to_py_dict(py, item)?;
+                    let py_dict = attribute_values_to_py_dict_with_decimals(
+                        py,
+                        item,
+                        number_schema.as_ref(),
+                    )?;
                     items.push(py_dict.into_any().unbind());
                 }
                 py_result.set_item("items", items)?;

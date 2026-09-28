@@ -258,6 +258,12 @@ Get the deleted item back. Useful when you need to archive or log what was remov
 !!! tip
     `return_values="ALL_NEW"` on `update_item` is the most useful one. You get the full item after the update in one call instead of doing update + get.
 
+### Decimal values
+
+Exact `Decimal` reads are supported only through models with
+[DecimalAttribute](attributes.md#decimalattribute). Direct client calls accept
+`Decimal` on writes, but read numbers as `int` or `float` and may lose precision.
+
 ### Utility methods
 
 | Method | Description |

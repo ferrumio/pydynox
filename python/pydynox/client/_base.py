@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pydynox import pydynox_core
+    from pydynox._internal._decimal import NumberSchema
     from pydynox._internal._metrics import ModelMetrics, OperationMetrics
+    from pydynox.client import DynamoDBClient
     from pydynox.diagnostics import HotPartitionDetector
     from pydynox.rate_limit import AdaptiveRate, FixedRate
 
@@ -78,6 +80,14 @@ class BaseClient:
             "max_retries": max_retries,
             "proxy_url": proxy_url,
         }
+
+    def _for_model_read(self, schema: NumberSchema) -> DynamoDBClient:
+        from typing import cast
+
+        from pydynox.client._client import DynamoDBClient
+        from pydynox.client._model_read import _ModelReadClient
+
+        return _ModelReadClient(cast(DynamoDBClient, self), schema)
 
     @property
     def rate_limit(self) -> FixedRate | AdaptiveRate | None:

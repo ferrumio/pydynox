@@ -6,6 +6,7 @@ from pydynox._internal._encryption import EncryptionMode
 from pydynox._internal._s3 import S3File
 from pydynox.attributes.base import Attribute
 from pydynox.attributes.compressed import CompressedAttribute
+from pydynox.attributes.decimal import DecimalAttribute
 from pydynox.attributes.encrypted import EncryptedAttribute
 from pydynox.attributes.primitives import (
     BinaryAttribute,
@@ -32,6 +33,7 @@ __all__ = [
     # Primitives
     "StringAttribute",
     "NumberAttribute",
+    "DecimalAttribute",
     "BooleanAttribute",
     "BinaryAttribute",
     "ListAttribute",

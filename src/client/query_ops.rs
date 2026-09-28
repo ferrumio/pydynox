@@ -3,6 +3,7 @@ use pyo3::types::PyDict;
 
 use super::DynamoDBClient;
 use crate::basic_operations;
+use crate::conversions::NumberSchema;
 use crate::metrics::OperationMetrics;
 
 #[pymethods]
@@ -22,7 +23,7 @@ impl DynamoDBClient {
     /// * `scan_index_forward` - Sort order (true = ascending)
     /// * `index_name` - GSI or LSI name
     /// * `consistent_read` - Use strongly consistent read
-    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
     pub fn query_page<'py>(
@@ -39,6 +40,7 @@ impl DynamoDBClient {
         scan_index_forward: Option<bool>,
         index_name: Option<String>,
         consistent_read: bool,
+        _number_schema: NumberSchema,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::query(
             py,
@@ -54,11 +56,12 @@ impl DynamoDBClient {
             scan_index_forward,
             index_name,
             consistent_read,
+            _number_schema,
         )
     }
 
     /// Sync query_page - blocks until complete.
-    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false))]
+    #[pyo3(signature = (table, key_condition_expression, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, scan_index_forward=None, index_name=None, consistent_read=false, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
     pub fn sync_query_page(
@@ -75,6 +78,7 @@ impl DynamoDBClient {
         scan_index_forward: Option<bool>,
         index_name: Option<String>,
         consistent_read: bool,
+        _number_schema: NumberSchema,
     ) -> PyResult<(Vec<Py<PyAny>>, Option<Py<PyAny>>, OperationMetrics)> {
         let result = basic_operations::sync_query(
             py,
@@ -91,6 +95,7 @@ impl DynamoDBClient {
             scan_index_forward,
             index_name,
             consistent_read,
+            _number_schema,
         )?;
         Ok((result.items, result.last_evaluated_key, result.metrics))
     }
@@ -110,7 +115,7 @@ impl DynamoDBClient {
     /// * `consistent_read` - Use strongly consistent read
     /// * `segment` - Segment number for parallel scan
     /// * `total_segments` - Total segments for parallel scan
-    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
+    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
     pub fn scan_page<'py>(
@@ -127,6 +132,7 @@ impl DynamoDBClient {
         consistent_read: bool,
         segment: Option<i32>,
         total_segments: Option<i32>,
+        _number_schema: NumberSchema,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::scan(
             py,
@@ -142,11 +148,12 @@ impl DynamoDBClient {
             consistent_read,
             segment,
             total_segments,
+            _number_schema,
         )
     }
 
     /// Sync scan_page - blocks until complete.
-    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None))]
+    #[pyo3(signature = (table, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, limit=None, exclusive_start_key=None, index_name=None, consistent_read=false, segment=None, total_segments=None, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::type_complexity)]
     pub fn sync_scan_page(
@@ -163,6 +170,7 @@ impl DynamoDBClient {
         consistent_read: bool,
         segment: Option<i32>,
         total_segments: Option<i32>,
+        _number_schema: NumberSchema,
     ) -> PyResult<(Vec<Py<PyAny>>, Option<Py<PyAny>>, OperationMetrics)> {
         let result = basic_operations::sync_scan(
             py,
@@ -179,6 +187,7 @@ impl DynamoDBClient {
             consistent_read,
             segment,
             total_segments,
+            _number_schema,
         )?;
         Ok((result.items, result.last_evaluated_key, result.metrics))
     }
@@ -252,7 +261,7 @@ impl DynamoDBClient {
     /// # Returns
     ///
     /// A Python awaitable that resolves to dict with items and metrics.
-    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
+    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn parallel_scan<'py>(
         &self,
@@ -264,6 +273,7 @@ impl DynamoDBClient {
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         consistent_read: bool,
+        _number_schema: NumberSchema,
     ) -> PyResult<Bound<'py, PyAny>> {
         basic_operations::parallel_scan(
             py,
@@ -275,11 +285,12 @@ impl DynamoDBClient {
             expression_attribute_names,
             expression_attribute_values,
             consistent_read,
+            _number_schema,
         )
     }
 
     /// Sync parallel_scan - blocks until all segments complete.
-    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false))]
+    #[pyo3(signature = (table, total_segments, filter_expression=None, projection_expression=None, expression_attribute_names=None, expression_attribute_values=None, consistent_read=false, *, _number_schema=None))]
     #[allow(clippy::too_many_arguments)]
     pub fn sync_parallel_scan(
         &self,
@@ -291,6 +302,7 @@ impl DynamoDBClient {
         expression_attribute_names: Option<&Bound<'_, PyDict>>,
         expression_attribute_values: Option<&Bound<'_, PyDict>>,
         consistent_read: bool,
+        _number_schema: NumberSchema,
     ) -> PyResult<(Vec<Py<PyAny>>, OperationMetrics)> {
         basic_operations::sync_parallel_scan(
             py,
@@ -303,6 +315,7 @@ impl DynamoDBClient {
             expression_attribute_names,
             expression_attribute_values,
             consistent_read,
+            _number_schema,
         )
     }
 }

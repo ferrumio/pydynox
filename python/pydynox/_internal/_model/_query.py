@@ -174,7 +174,7 @@ def sync_execute_statement(
     consistent_read: bool = False,
 ) -> list[M]:
     """Execute a PartiQL statement (sync)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     result = client.sync_execute_statement(
         statement,
         parameters=parameters,
@@ -191,7 +191,7 @@ def sync_parallel_scan(
     as_dict: bool = False,
 ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
     """Parallel scan (sync)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     table = cls._get_table()
 
     names: dict[str, str] = {}
@@ -341,7 +341,7 @@ async def execute_statement(
     consistent_read: bool = False,
 ) -> list[M]:
     """Execute a PartiQL statement (async, default)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     result = await client.execute_statement(
         statement,
         parameters=parameters,
@@ -358,7 +358,7 @@ async def parallel_scan(
     as_dict: bool = False,
 ) -> tuple[list[M] | list[dict[str, Any]], OperationMetrics]:
     """Parallel scan (async, default)."""
-    client = cls._get_client()
+    client = cls._get_read_client()
     table = cls._get_table()
 
     names: dict[str, str] = {}

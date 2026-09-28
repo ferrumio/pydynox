@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
+from pydynox._internal._decimal import model_read_client
 from pydynox._internal._indexes import GlobalSecondaryIndex, LocalSecondaryIndex
 from pydynox._internal._vector import VectorIndex
-from pydynox.attributes import Attribute
+from pydynox.attributes import Attribute, DecimalAttribute
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
@@ -43,6 +44,8 @@ class ModelMeta(type):
     _metrics_storage: "MetricsStorage"
     _py_to_dynamo: dict[str, str]
     _dynamo_to_py: dict[str, str]
+    _decimal_fields: set[str]
+    _declared_decimal_fields: frozenset[str]
 
     def __new__(mcs, name: str, bases: tuple[type, ...], namespace: dict[str, Any]) -> ModelMeta:
         attributes: dict[str, Attribute[Any]] = {}
@@ -153,6 +156,12 @@ class ModelMeta(type):
                 dynamo_to_py[alias] = attr_name
         cls._py_to_dynamo = py_to_dynamo
         cls._dynamo_to_py = dynamo_to_py
+        cls._decimal_fields = {
+            py_to_dynamo.get(attr_name, attr_name)
+            for attr_name, attr in attributes.items()
+            if isinstance(attr, DecimalAttribute)
+        }
+        cls._declared_decimal_fields = frozenset(cls._decimal_fields)
 
         # Register this class in ALL parent discriminator registries
         if discriminator_attr and name != "ModelBase" and name != "Model":
@@ -163,6 +172,7 @@ class ModelMeta(type):
                     base_registry = getattr(current, "_discriminator_registry", None)
                     if base_registry is not None:
                         base_registry[name] = cls
+                        getattr(current, "_decimal_fields").update(cls._decimal_fields)
                     # Move to parent
                     parent_bases = getattr(current, "__bases__", ())
                     current = None
@@ -210,8 +220,15 @@ class ModelBase(metaclass=ModelMeta):
     _metrics_storage: ClassVar["MetricsStorage"]
     _py_to_dynamo: ClassVar[dict[str, str]]
     _dynamo_to_py: ClassVar[dict[str, str]]
+    _decimal_fields: ClassVar[set[str]]
+    _declared_decimal_fields: ClassVar[frozenset[str]]
 
     model_config: ClassVar[ModelConfig]
+
+    @classmethod
+    def _get_read_client(cls) -> Any:
+        """Select exact fields internally, before the native result is decoded."""
+        return model_read_client(cls._get_client(), [cls])
 
     # Change tracking
     _original: dict[str, Any] | None

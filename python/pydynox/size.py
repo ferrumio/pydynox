@@ -14,6 +14,7 @@ Example:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 
 # DynamoDB item size limit
@@ -68,7 +69,7 @@ def calculate_string_size(value: str) -> int:
     return len(value.encode("utf-8"))
 
 
-def calculate_number_size(value: float | int) -> int:
+def calculate_number_size(value: float | int | Decimal) -> int:
     """Calculate size of a number attribute.
 
     DynamoDB numbers are stored as variable-length. Size depends on
@@ -82,6 +83,13 @@ def calculate_number_size(value: float | int) -> int:
     Returns:
         Size in bytes.
     """
+    if isinstance(value, Decimal):
+        from pydynox import pydynox_core
+
+        # The native serializer validates the value and trims insignificant zeros.
+        coefficient = pydynox_core.py_to_dynamo(value)["N"].split("E")[0].lstrip("-")
+        return 1 if coefficient == "0" else 1 + (len(coefficient) + 1) // 2
+
     # Convert to string to count significant digits
     str_value = str(value)
 
@@ -209,7 +217,7 @@ def calculate_attribute_size(value: Any) -> int:
         return calculate_boolean_size(value)
     elif isinstance(value, str):
         return calculate_string_size(value)
-    elif isinstance(value, (int, float)):
+    elif isinstance(value, (int, float, Decimal)):
         return calculate_number_size(value)
     elif isinstance(value, bytes):
         return calculate_binary_size(value)

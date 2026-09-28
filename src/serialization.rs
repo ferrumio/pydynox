@@ -13,6 +13,7 @@
 //! |-------------|---------------|--------|
 //! | str | S | `{"S": "hello"}` |
 //! | int, float | N | `{"N": "42"}` |
+//! | Decimal | N | `{"N": "123E-2"}` |
 //! | bool | BOOL | `{"BOOL": true}` |
 //! | None | NULL | `{"NULL": true}` |
 //! | list | L | `{"L": [...]}` |
@@ -23,6 +24,7 @@
 //! | set[bytes] | BS | `{"BS": ["base64..."]}` |
 
 use crate::conversions::parse_number_to_py;
+use crate::decimal;
 use base64::Engine;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
@@ -117,9 +119,11 @@ pub fn py_to_dynamo<'py>(py: Python<'py>, obj: &Bound<'py, PyAny>) -> PyResult<P
             })
             .collect::<PyResult<HashMap<_, _>>>()?;
         result.set_item("M", map)?;
+    } else if decimal::is_decimal(obj)? {
+        result.set_item("N", decimal::to_number_string(obj)?)?;
     } else {
         return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-            "Unsupported type for DynamoDB: {}. Supported types: str, int, float, bool, None, list, dict, bytes, set",
+            "Unsupported type for DynamoDB: {}. Supported types: str, int, float, Decimal, bool, None, list, dict, bytes, set",
             obj.get_type().name()?
         )));
     }
@@ -455,12 +459,39 @@ pub fn item_to_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<Py<P
 /// # result = {"pk": "USER#123", "name": "John", "age": 30}
 /// ```
 #[pyfunction]
-pub fn item_from_dynamo(py: Python<'_>, item: &Bound<'_, PyDict>) -> PyResult<Py<PyDict>> {
+#[pyo3(signature = (item, *, _number_schema=None))]
+pub fn item_from_dynamo(
+    py: Python<'_>,
+    item: &Bound<'_, PyDict>,
+    _number_schema: crate::conversions::NumberSchema,
+) -> PyResult<Py<PyDict>> {
     let result = PyDict::new(py);
+    let mut fields = _number_schema.as_ref().map(|schema| &schema.fields);
+    if let Some(schema) = &_number_schema {
+        for (name, variants) in &schema.variants {
+            if let Some(value) = item.get_item(name)?
+                && let Ok(attr) = value.cast::<PyDict>()
+                && let Some(discriminator) = attr.get_item("S")?
+            {
+                fields = Some(
+                    variants
+                        .get(&discriminator.extract::<String>()?)
+                        .unwrap_or(&schema.fallback_fields),
+                );
+                break;
+            }
+        }
+    }
     for (k, v) in item.iter() {
         let key: String = k.extract()?;
         let attr = v.cast::<PyDict>()?;
-        let value = dynamo_to_py(py, attr)?;
+        let value = if fields.is_some_and(|fields| fields.contains(&key))
+            && let Some(number) = attr.get_item("N")?
+        {
+            decimal::from_number_string(py, &number.extract::<String>()?)?
+        } else {
+            dynamo_to_py(py, attr)?
+        };
         result.set_item(key, value)?;
     }
     Ok(result.unbind())

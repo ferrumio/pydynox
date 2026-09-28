@@ -4,7 +4,34 @@ use aws_sdk_dynamodb::primitives::Blob;
 use aws_sdk_dynamodb::types::AttributeValue;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+use crate::decimal;
+
+/// Private model schema, copied when a native read is prepared.
+#[derive(FromPyObject)]
+pub struct ModelNumberSchema {
+    #[pyo3(item)]
+    pub fields: HashSet<String>,
+    #[pyo3(item)]
+    pub variants: HashMap<String, HashMap<String, HashSet<String>>>,
+    #[pyo3(item, default)]
+    pub fallback_fields: HashSet<String>,
+}
+
+pub type NumberSchema = Option<ModelNumberSchema>;
+
+impl ModelNumberSchema {
+    fn fields_for_item(&self, item: &HashMap<String, AttributeValue>) -> &HashSet<String> {
+        for (name, variants) in &self.variants {
+            if let Some(AttributeValue::S(value)) = item.get(name) {
+                return variants.get(value).unwrap_or(&self.fallback_fields);
+            }
+        }
+        // Continuation keys and projections may omit the discriminator.
+        &self.fields
+    }
+}
 
 /// Parse a DynamoDB number string to a Python int or float.
 ///
@@ -52,7 +79,7 @@ pub fn extract_string_map(
 /// This is the fast path — goes straight from PyAny to AttributeValue
 /// without creating an intermediate Python dict.
 ///
-/// Handles: str, bool, int, float, None, bytes, set, frozenset, list, dict.
+/// Handles: str, bool, int, float, Decimal, None, bytes, set, frozenset, list, dict.
 #[allow(clippy::only_used_in_recursion)]
 pub fn py_to_attribute_value_direct(
     py: Python<'_>,
@@ -87,9 +114,11 @@ pub fn py_to_attribute_value_direct(
             map.insert(key, value);
         }
         Ok(AttributeValue::M(map))
+    } else if decimal::is_decimal(obj)? {
+        Ok(AttributeValue::N(decimal::to_number_string(obj)?))
     } else {
         Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(format!(
-            "Unsupported type for DynamoDB: {}. Supported types: str, int, float, bool, None, list, dict, bytes, set",
+            "Unsupported type for DynamoDB: {}. Supported types: str, int, float, Decimal, bool, None, list, dict, bytes, set",
             obj.get_type().name()?
         )))
     }
@@ -195,10 +224,30 @@ pub fn attribute_values_to_py_dict(
     py: Python<'_>,
     item: HashMap<String, AttributeValue>,
 ) -> PyResult<Bound<'_, PyDict>> {
+    attribute_values_to_py_dict_with_decimals(py, item, None)
+}
+
+/// Convert selected top-level numeric attributes directly to Decimal.
+///
+/// Names are DynamoDB attribute names, after aliases. The selection belongs
+/// to this response, so concurrent requests may use different model schemas.
+pub fn attribute_values_to_py_dict_with_decimals<'py>(
+    py: Python<'py>,
+    item: HashMap<String, AttributeValue>,
+    number_schema: Option<&ModelNumberSchema>,
+) -> PyResult<Bound<'py, PyDict>> {
     let result = PyDict::new(py);
+    let fields = number_schema.map(|schema| schema.fields_for_item(&item));
 
     for (key, value) in item {
-        let py_value = attribute_value_to_py_direct(py, value)?;
+        let py_value = if fields.is_some_and(|fields| fields.contains(&key)) {
+            match value {
+                AttributeValue::N(n) => decimal::from_number_string(py, &n)?,
+                other => attribute_value_to_py_direct(py, other)?,
+            }
+        } else {
+            attribute_value_to_py_direct(py, value)?
+        };
         result.set_item(key, py_value)?;
     }
 

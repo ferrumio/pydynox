@@ -396,7 +396,7 @@ class VectorIndex(Generic[M]):
         vector, expression, names, values, projection = self._prepare_search(
             query_vector, partition_key, where, top_k, as_dict
         )
-        result = await model_class._get_client().search_vectors(
+        result = await model_class._get_read_client().search_vectors(
             model_class._get_table(),
             self.index_name,
             vector,
@@ -421,7 +421,7 @@ class VectorIndex(Generic[M]):
         vector, expression, names, values, projection = self._prepare_search(
             query_vector, partition_key, where, top_k, as_dict
         )
-        result = model_class._get_client().sync_search_vectors(
+        result = model_class._get_read_client().sync_search_vectors(
             model_class._get_table(),
             self.index_name,
             vector,

@@ -31,7 +31,7 @@ async def batch_get(
     if not keys:
         return []
 
-    client = cls._get_client()
+    client = cls._get_read_client()
     table = cls._get_table()
 
     # Translate python key names to DynamoDB aliases
@@ -72,7 +72,7 @@ def sync_batch_get(
     if not keys:
         return []
 
-    client = cls._get_client()
+    client = cls._get_read_client()
     table = cls._get_table()
 
     # Translate python key names to DynamoDB aliases

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast
 
+from pydynox._internal._decimal import model_read_client
 from pydynox.hooks import HookType
 
 if TYPE_CHECKING:
@@ -223,7 +224,7 @@ class Collection:
             >>> result.users   # [User(...)]
             >>> result.orders  # [Order(...)]
         """
-        client = self._get_client()
+        client = model_read_client(self._get_client(), self._models)
         table = self._get_table()
 
         # Build query parameters
@@ -271,7 +272,7 @@ class Collection:
             >>> result.users   # [User(...)]
             >>> result.orders  # [Order(...)]
         """
-        client = self._get_client()
+        client = model_read_client(self._get_client(), self._models)
         table = self._get_table()
 
         # Build query parameters

@@ -410,7 +410,7 @@ class GSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import QueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}
@@ -521,7 +521,7 @@ class AsyncGSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import AsyncQueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}
@@ -852,7 +852,7 @@ class LSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import QueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}
@@ -964,7 +964,7 @@ class AsyncLSIQueryResult(Generic[M]):
     def _build_query(self) -> Any:
         from pydynox.query import AsyncQueryResult
 
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         names: dict[str, str] = {}

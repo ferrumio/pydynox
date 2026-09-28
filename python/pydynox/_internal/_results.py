@@ -218,7 +218,7 @@ class ModelQueryResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
@@ -298,7 +298,7 @@ class AsyncModelQueryResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         key_cond, filter_expr, projection_expr, attr_names, attr_values, use_consistent = (
@@ -377,7 +377,7 @@ class ModelScanResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         filter_expr, projection_expr, attr_names, attr_values, use_consistent = _build_scan_params(
@@ -448,7 +448,7 @@ class AsyncModelScanResult(BaseModelResult[T]):
         self._initialized = False
 
     def _build_result(self) -> Any:
-        client = self._model_class._get_client()
+        client = self._model_class._get_read_client()
         table = self._model_class._get_table()
 
         filter_expr, projection_expr, attr_names, attr_values, use_consistent = _build_scan_params(

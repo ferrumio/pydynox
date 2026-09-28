@@ -7,7 +7,8 @@ Attributes define the fields in your model. Each attribute maps to a DynamoDB ty
 | Type | DynamoDB | Python | Use case |
 |------|----------|--------|----------|
 | `StringAttribute` | S | str | Text, IDs, keys |
-| `NumberAttribute` | N | int, float | Counts, prices |
+| `NumberAttribute` | N | int, float | Counts, measurements |
+| `DecimalAttribute` | N | Decimal | Exact decimal amounts |
 | `BooleanAttribute` | BOOL | bool | Flags |
 | `BinaryAttribute` | B | bytes | Files, images |
 | `ListAttribute` | L | list | Ordered items |
@@ -102,6 +103,37 @@ class Product(Model):
     price = NumberAttribute()
     quantity = NumberAttribute(default=0)
 ```
+
+### DecimalAttribute
+
+`DecimalAttribute` works exclusively with models. It stores `Decimal` and `int`
+as DynamoDB `N`; model reads return `Decimal`, including with `as_dict=True`.
+No client configuration is needed. `NumberAttribute` keeps its current behavior.
+
+Use `Decimal("19.99")` for fractions. `Decimal(19.99)` carries the float's
+approximation. Direct float, string, or boolean inputs raise `TypeError`,
+including in `Model.from_dict()`.
+
+=== "Async"
+    ```python
+    --8<-- "docs/examples/models/decimal_attribute.py"
+    ```
+
+=== "Sync"
+    ```python
+    --8<-- "docs/examples/models/decimal_attribute_sync.py"
+    ```
+
+DynamoDB allows 38 significant digits. Nonzero values must satisfy
+`1E-130 <= abs(value) < 1E126`. Out-of-range values, excess precision, `NaN`, and
+infinity raise `ValueError` before the request. Trailing zeros and notation may
+change; the numeric value stays exact.
+
+Reads and serialization do not round. Your own arithmetic uses Python's decimal
+context (28 digits by default); adjust it with `decimal.localcontext()` as needed.
+
+This is a scalar field. Nested maps, lists, and number sets keep their current
+read behavior. For raw operations, see [decimal values with the client](client.md#decimal-values).
 
 ### BooleanAttribute
 
