@@ -106,14 +106,13 @@ class Product(Model):
 
 ### DecimalAttribute
 
-Use `DecimalAttribute` when a value must keep its decimal precision. It accepts
-Python `Decimal` and `int` values and returns `Decimal` on model reads. Both
-`NumberAttribute` and `DecimalAttribute` use DynamoDB's `N` type. Existing
-`NumberAttribute` fields keep their `int` and `float` behavior.
+Store exact decimal values as DynamoDB `N`. Accepts `Decimal` and `int`; model
+reads return `Decimal`, including with `as_dict=True`. No read option is needed.
+`NumberAttribute` keeps its `int` and `float` behavior.
 
-Build fractional values from strings: `Decimal("19.99")`. Passing a float, string,
-or boolean directly to the attribute raises `TypeError`. `Decimal(19.99)` already
-contains the float's approximation; converting it cannot recover the intended value.
+Use `Decimal("19.99")` for fractions. `Decimal(19.99)` carries the float's
+approximation. Direct float, string, or boolean inputs raise `TypeError`,
+including in `Model.from_dict()`.
 
 === "Async"
     ```python
@@ -125,26 +124,16 @@ contains the float's approximation; converting it cannot recover the intended va
     --8<-- "docs/examples/models/decimal_attribute_sync.py"
     ```
 
-No read option is needed on models. Reads decode the selected fields directly
-from DynamoDB's number text, including aliases, indexes, batches, and pagination
-keys. Model reads with `as_dict=True` also return `Decimal` for those fields.
+DynamoDB allows 38 significant digits. Nonzero values must satisfy
+`1E-130 <= abs(value) < 1E126`. Out-of-range values, excess precision, `NaN`, and
+infinity raise `ValueError` before the request. Trailing zeros and notation may
+change; the numeric value stays exact.
 
-DynamoDB supports up to 38 significant digits. Nonzero magnitudes range from
-`1E-130` through `9.9999999999999999999999999999999999999E125`. Values outside
-these limits, `NaN`, and infinity raise `ValueError` before a request is sent.
-Trailing zeros and scientific notation may change after a round trip; the
-numeric value stays exact.
+Reads and serialization do not round. Your own arithmetic uses Python's decimal
+context (28 digits by default); adjust it with `decimal.localcontext()` as needed.
 
-Serialization and reads do not round using Python's decimal context. Your own
-arithmetic still uses that context, whose default precision is 28 digits. Set
-the precision and rounding rules your application needs, for example with
-`decimal.localcontext()`. DynamoDB atomic updates run on the server.
-
-When loading dictionaries yourself, provide `Decimal` or `int` values to
-`Model.from_dict()`. A float is rejected because its lost precision cannot be
-recovered. See [exact decimal reads with the client](client.md#exact-decimal-reads)
-for raw operations. Nested maps, lists, and number sets keep their existing read
-behavior; `DecimalAttribute` describes a scalar number field.
+This is a scalar field. Nested maps, lists, and number sets keep their current
+read behavior. For raw operations, see [exact decimal reads](client.md#exact-decimal-reads).
 
 ### BooleanAttribute
 

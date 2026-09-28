@@ -260,9 +260,8 @@ Get the deleted item back. Useful when you need to archive or log what was remov
 
 ### Exact decimal reads
 
-Raw writes accept Python `Decimal` values and store them as DynamoDB numbers.
-Raw reads keep their existing `int` and `float` defaults. To read an exact number,
-pass the optional keyword `decimal_fields`:
+Raw writes accept `Decimal`. Reads default to `int` and `float`; use
+`decimal_fields` for exact values:
 
 ```python
 from decimal import Decimal
@@ -272,25 +271,20 @@ item = await client.get_item("accounts", {"pk": "A#1"}, decimal_fields={"balance
 assert item["balance"] == Decimal("19.99")
 ```
 
-Use a set or frozenset of top-level DynamoDB attribute names, including aliases.
-Only selected scalar `N` values become `Decimal`. Unselected numbers and nested
-values keep the default decoding. This choice belongs to each request, so
-concurrent reads can use different selections.
+Pass a set or frozenset of top-level DynamoDB names, using aliases where defined.
+Selected scalar numbers become `Decimal`. The selection applies per request,
+including all pages and continuation keys.
 
-The option is available on `get_item`, `query`, `scan`, `parallel_scan`,
+Supported by `get_item`, `query`, `scan`, `parallel_scan`,
 `batch_get`, `transact_get`, `execute_statement`, and `search_vectors`, including
-their `sync_` versions. Queries and scans apply it to every page and continuation
-key. `pydynox_core.item_from_dynamo` supports the same option for raw DynamoDB
-AttributeValue dictionaries.
+their `sync_` versions, and by `pydynox_core.item_from_dynamo`.
 
-`DecimalAttribute` models select their fields automatically. A polymorphic model
-or collection selects decimal fields from its member models. Returned models
-still use each field's declared type; raw dictionaries retain that combined
-selection.
+`DecimalAttribute` models select fields automatically. Polymorphic reads and
+collections combine member selections: models keep their declared types, while
+raw dictionaries keep the combined selection.
 
-Write responses requested through `return_values` and items attached to
-exceptions keep their default numeric decoding. Use an exact read when you need
-those numbers as `Decimal`.
+Unselected and nested numbers, write `return_values`, and exception items keep
+default decoding.
 
 ### Utility methods
 
