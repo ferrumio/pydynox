@@ -23,6 +23,7 @@ mod gsi;
 mod lsi;
 mod vector_index;
 mod wait;
+mod wait_for_table_deleted;
 
 // Re-export sync operations (with sync_ prefix)
 pub use create::sync_create_table;
@@ -32,6 +33,7 @@ pub use vector_index::{
     sync_create_vector_index, sync_delete_vector_index, sync_describe_vector_index,
 };
 pub use wait::sync_wait_for_table_active;
+pub use wait_for_table_deleted::sync_wait_for_table_deleted;
 
 // Re-export async operations (no prefix - default)
 pub use create::create_table;
@@ -39,6 +41,7 @@ pub use delete::delete_table;
 pub use exists::table_exists;
 pub use vector_index::{create_vector_index, delete_vector_index, describe_vector_index};
 pub use wait::wait_for_table_active;
+pub use wait_for_table_deleted::wait_for_table_deleted;
 
 // Re-export GSI/LSI parsing (unchanged)
 pub use gsi::parse_gsi_definitions;

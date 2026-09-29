@@ -75,8 +75,8 @@ impl DynamoDBClient {
     }
 
     /// Sync version of delete_table. Blocks until complete.
-    pub fn sync_delete_table(&self, table_name: &str) -> PyResult<()> {
-        table_operations::sync_delete_table(&self.client, &self.runtime, table_name)
+    pub fn sync_delete_table(&self, table_name: &str, wait: bool, timeout_seconds: Option<u64>) -> PyResult<()> {
+        table_operations::sync_delete_table(&self.client, &self.runtime, table_name, wait, timeout_seconds)
     }
 
     /// Sync version of wait_for_table_active. Blocks until complete.
@@ -171,8 +171,10 @@ impl DynamoDBClient {
         &self,
         py: Python<'py>,
         table_name: &str,
+        wait: bool,
+        timeout_seconds: Option<u64>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        table_operations::delete_table(py, self.client.clone(), table_name)
+        table_operations::delete_table(py, self.client.clone(), table_name, wait, timeout_seconds)
     }
 
     /// Wait for a table to become active. Returns a Python awaitable.
