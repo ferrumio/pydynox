@@ -1,6 +1,43 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.6.0] - 2026-09-30
+
+
+### CI/CD
+
+- bump github/codeql-action/upload-sarif from 4.38.0 to 4.38.1 (#481)
+- bump orhun/git-cliff-action from 4.9.0 to 4.9.1 (#478)
+- bump codecov/codecov-action from 7.0.0 to 7.1.1 (#482)
+- bump github/codeql-action/upload-sarif from 4.38.1 to 4.38.2 (#495)
+- bump astral-sh/setup-uv from 10.1.0 to 10.2.0 (#496)
+
+
+### Documentation
+
+- update changelog for v1.5.0 (#477)
+
+
+### Features
+
+- support explicit transaction idempotency tokens (#485)
+- add exact DecimalAttribute support (#491)
+- add optional strict model attribute validation (#492)
+- add distributed locks with native lease renewal (#500)
+
+
+### Miscellaneous
+
+- bump pymdown-extensions from 10.21.3 to 11.0.1 (#483)
+- bump v1.6.0 (#501)
+
+
+### Deps
+
+- bump the rust-dependencies group with 4 updates (#479)
+- bump the dev-dependencies group with 2 updates (#480)
+- bump the rust-dependencies group with 2 updates (#493)
+- bump the dev-dependencies group with 2 updates (#494)
 ## [1.5.0] - 2026-09-22
 
 
