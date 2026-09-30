@@ -3,8 +3,11 @@
 Run from the repository with the native extension installed:
 
 ```bash
-uv run python benchmarks/locks/run.py --localstack --hold 600 --output /tmp/locks.json
+uv run python benchmarks/locks/run.py --localstack --hold 600 > /tmp/locks.json
 ```
+
+The JSON report goes to stdout; progress goes to stderr. Use shell redirection
+to save the report.
 
 The runner creates and removes its own table. It measures uncontended calls,
 contenders sharing one key, independent keys, simultaneous renewing locks,

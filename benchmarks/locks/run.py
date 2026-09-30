@@ -6,9 +6,9 @@ import json
 import platform
 import resource
 import statistics
+import sys
 import time
 from contextlib import nullcontext
-from pathlib import Path
 from uuid import uuid4
 
 from pydynox import DynamoDBClient
@@ -86,7 +86,7 @@ async def workload(client, table, name, concurrency, samples, lease_duration, ho
         "process_peak_rss_kib": usage.ru_maxrss,
         **metrics,
     }
-    print(json.dumps(result), flush=True)
+    print(json.dumps(result), file=sys.stderr, flush=True)
     return result
 
 
@@ -143,8 +143,7 @@ async def run(args, endpoint):
         "item_note": "UUID owner/version; key length varies by workload; each row is under 1 KiB.",
         "workloads": results,
     }
-    if args.output:
-        args.output.write_text(json.dumps(report, indent=2) + "\n")
+    print(json.dumps(report, indent=2))
     return int(any(result["failures"] for result in results))
 
 
@@ -157,7 +156,6 @@ def main():
     parser.add_argument("--samples", type=int, default=100)
     parser.add_argument("--concurrency", type=int, default=10)
     parser.add_argument("--hold", type=float, default=0, help="Long-hold duration in seconds")
-    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.samples < 1 or args.concurrency < 1 or args.hold < 0:
         parser.error("samples/concurrency must be positive and hold must be nonnegative")
