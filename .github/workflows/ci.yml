@@ -72,6 +72,9 @@ jobs:
       - name: Rust clippy
         run: cargo clippy --all-targets -- -D warnings
 
+      - name: Test lock clock assumptions
+        run: cargo test --locked --test lock_clock
+
   build:
     name: Build (${{ matrix.os }} / py${{ matrix.python }})
     runs-on: ${{ matrix.os }}

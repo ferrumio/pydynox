@@ -14,6 +14,9 @@ use crate::conversions::attribute_values_to_py_dict;
 
 // Create Python exception classes
 create_exception!(pydynox, PydynoxException, PyException);
+create_exception!(pydynox, LockNotAcquired, PydynoxException);
+create_exception!(pydynox, LockLost, PydynoxException);
+create_exception!(pydynox, LockReleaseError, PydynoxException);
 create_exception!(pydynox, ResourceNotFoundException, PydynoxException);
 create_exception!(pydynox, ResourceInUseException, PydynoxException);
 create_exception!(pydynox, ValidationException, PydynoxException);
@@ -42,6 +45,9 @@ create_exception!(pydynox, S3AttributeException, S3Exception);
 /// Register exception classes with the Python module.
 pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("PydynoxException", m.py().get_type::<PydynoxException>())?;
+    m.add("LockNotAcquired", m.py().get_type::<LockNotAcquired>())?;
+    m.add("LockLost", m.py().get_type::<LockLost>())?;
+    m.add("LockReleaseError", m.py().get_type::<LockReleaseError>())?;
     m.add(
         "ResourceNotFoundException",
         m.py().get_type::<ResourceNotFoundException>(),

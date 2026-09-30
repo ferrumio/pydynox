@@ -29,6 +29,9 @@ All pydynox exceptions inherit from `PydynoxException`. You can catch specific e
 | `CredentialsException` | AWS credentials missing or invalid |
 | `SerializationException` | Cannot convert data to/from DynamoDB format |
 | `ConnectionException` | Cannot connect to DynamoDB |
+| `LockNotAcquired` | Lock acquisition budget expired under contention |
+| `LockLost` | The guard no longer has valid ownership |
+| `LockReleaseError` | Lock release could not be confirmed |
 | `EncryptionException` | KMS encryption/decryption failed |
 | `S3AttributeException` | S3 upload/download failed |
 | `ItemTooLargeException` | Item exceeds max_size limit (Python-only) |

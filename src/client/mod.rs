@@ -95,6 +95,10 @@ pub struct DynamoDBClient {
     /// Shared config for lazy S3/KMS client creation
     #[allow(dead_code)]
     pub(crate) config: Arc<AwsConfig>,
+    /// Observation history and an SDK configuration dedicated to bounded lease requests.
+    pub(crate) lock_state: Arc<crate::lock::ClientState>,
+    pub(crate) lock_client: OnceCell<Client>,
+    pub(crate) process_id: u32,
     /// S3 client (lazy, created on first S3 operation)
     #[allow(dead_code)]
     pub(crate) s3_client: OnceCell<S3Client>,
@@ -208,6 +212,9 @@ impl DynamoDBClient {
             runtime,
             region: final_region,
             config: Arc::new(config),
+            lock_state: Arc::new(crate::lock::ClientState::default()),
+            lock_client: OnceCell::new(),
+            process_id: std::process::id(),
             s3_client: OnceCell::new(),
             kms_client: OnceCell::new(),
         })

@@ -10,12 +10,17 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Context, Decimal, localcontext
 from functools import wraps
+from threading import RLock
 from typing import TYPE_CHECKING, Any, Callable, Iterator, TypeVar, cast
 
 from pydynox import pydynox_core
 from pydynox._internal._decimal import NumberSchema
 from pydynox.config import clear_default_client, get_default_client, set_default_client
-from pydynox.exceptions import ConditionalCheckFailedException
+from pydynox.exceptions import (
+    ConditionalCheckFailedException,
+    ResourceNotFoundException,
+    ValidationException,
+)
 from pydynox.model import Model
 
 if TYPE_CHECKING:
@@ -370,6 +375,8 @@ class MemoryClient:
         self._vector_index_definitions: dict[tuple[str, str], dict[str, Any]] = {}
         # For compatibility with code that accesses _client directly
         self._client = self
+        self._lock_state = pydynox_core.MemoryLockState()
+        self._lock_mutex = RLock()
 
         # Load seed data
         if seed:
@@ -381,8 +388,44 @@ class MemoryClient:
                 }
                 for item in items:
                     # Infer key from first item
-                    key_str = self._make_key_string(item)
+                    key_str = self._make_key_string(item, table_name)
                     self._tables[table_name][key_str] = copy.deepcopy(item)
+
+    def _lock_check_table(self, table: str) -> None:
+        schema = self._table_schemas.get(table)
+        if schema is None:
+            raise ResourceNotFoundException(f"Lock table '{table}' does not exist")
+        if schema["partition_key"] != "key" or schema["sort_key"]:
+            raise ValidationException("Lock table requires partition key 'key' and no sort key")
+
+    def _lock_get(self, table: str, key: str) -> dict[str, Any] | None:
+        """Atomic testing adapter; the lease protocol runs in Rust."""
+        with self._lock_mutex:
+            self._lock_check_table(table)
+            return self.sync_get_item(table, {"key": key}, consistent_read=True)
+
+    def _lock_put(
+        self, table: str, item: dict[str, Any], owner: str | None, version: str | None
+    ) -> None:
+        with self._lock_mutex:
+            self._lock_check_table(table)
+            if owner is None:
+                self.sync_put_item(table, item, "attribute_not_exists(#key)", {"#key": "key"})
+            else:
+                self.sync_put_item(
+                    table,
+                    item,
+                    "#owner = :owner AND #version = :version",
+                    {"#owner": "owner", "#version": "version"},
+                    {":owner": owner, ":version": version},
+                )
+
+    def _lock_delete(self, table: str, key: str, owner: str) -> None:
+        with self._lock_mutex:
+            self._lock_check_table(table)
+            self.sync_delete_item(
+                table, {"key": key}, "#owner = :owner", {"#owner": "owner"}, {":owner": owner}
+            )
 
     def _validate_value(self, value: Any) -> None:
         """Raise TypeError if value is not a valid DynamoDB type (recursive)."""
@@ -447,16 +490,17 @@ class MemoryClient:
         """No-op for memory backend."""
         pass
 
-    def _make_key_string(self, item_or_key: dict[str, Any]) -> str:
+    def _make_key_string(self, item_or_key: dict[str, Any], table: str = "") -> str:
         """Create a unique key string from item or key dict.
 
-        Uses only pk and sk fields (if present) to create consistent keys.
+        Use the declared schema, or infer common keys for unregistered tables.
         """
-        pk = item_or_key.get("pk", "")
-        sk = item_or_key.get("sk", "")
+        schema = self._table_schemas.get(table)
+        pk = item_or_key.get(schema["partition_key"] if schema else "pk", "")
+        sk = item_or_key.get(schema["sort_key"] if schema else "sk", "")
 
         # Also check for common key patterns
-        if not pk:
+        if not pk and (not schema or schema["partition_key"] not in item_or_key):
             # Try to find partition_key by looking for common patterns
             for key in ["pk", "PK", "partition_key", "id", "short_code"]:
                 if key in item_or_key:
@@ -531,7 +575,7 @@ class MemoryClient:
         self._validate_item(item)
         start = time.time()
         tbl = self._get_table(table)
-        key_str = self._make_key_string(item)
+        key_str = self._make_key_string(item, table)
 
         # Check condition if provided
         if condition_expression:
@@ -560,7 +604,7 @@ class MemoryClient:
         """Internal sync get item implementation."""
         start = time.time()
         tbl = self._get_table(table)
-        key_str = self._make_key_string(key)
+        key_str = self._make_key_string(key, table)
         item = tbl.get(key_str)
         metrics = self._make_metrics(start, rcu=1)
         self._record_metrics(metrics, "get")
@@ -579,7 +623,7 @@ class MemoryClient:
         """Internal sync delete item implementation."""
         start = time.time()
         tbl = self._get_table(table)
-        key_str = self._make_key_string(key)
+        key_str = self._make_key_string(key, table)
 
         # Check condition if provided
         if condition_expression:
@@ -612,7 +656,7 @@ class MemoryClient:
         self._validate_item(expression_attribute_values or {})
         start = time.time()
         tbl = self._get_table(table)
-        key_str = self._make_key_string(key)
+        key_str = self._make_key_string(key, table)
 
         existing = tbl.get(key_str)
         before = copy.deepcopy(existing)
@@ -1229,7 +1273,7 @@ class MemoryClient:
             responses[table_name] = []
 
             for key in keys:
-                key_str = self._make_key_string(key)
+                key_str = self._make_key_string(key, table_name)
                 item = tbl.get(key_str)
                 if item:
                     responses[table_name].append(copy.deepcopy(item))
@@ -1256,12 +1300,12 @@ class MemoryClient:
                 if "PutRequest" in request:
                     item = request["PutRequest"]["Item"]
                     self._validate_item(item)
-                    key_str = self._make_key_string(item)
+                    key_str = self._make_key_string(item, table_name)
                     tbl[key_str] = copy.deepcopy(item)
                     total_wcu += 1
                 elif "DeleteRequest" in request:
                     key = request["DeleteRequest"]["Key"]
-                    key_str = self._make_key_string(key)
+                    key_str = self._make_key_string(key, table_name)
                     tbl.pop(key_str, None)
                     total_wcu += 1
 

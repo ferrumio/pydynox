@@ -1,0 +1,233 @@
+{
+  "environment": "LocalStack 4.4.0",
+  "region": "us-east-1",
+  "platform": "Linux-6.18.48-109.150.amzn2023.aarch64-aarch64-with-glibc2.34",
+  "python": "3.14.7",
+  "table": "dedicated key(S), no indexes or TTL",
+  "capacity_note": "Successful reported capacity only; failures may consume additional units.",
+  "item_note": "UUID owner/version; key length varies by workload; each row is under 1 KiB.",
+  "workloads": [
+    {
+      "workload": "uncontended",
+      "concurrency": 1,
+      "samples_per_worker": 100,
+      "lease_seconds": 30,
+      "hold_seconds": 0,
+      "elapsed_seconds": 2.123,
+      "acquisition_ms": {
+        "p50": 10.011,
+        "p95": 11.221,
+        "p99": 12.074
+      },
+      "cycle_ms": {
+        "p50": 20.099,
+        "p95": 22.002,
+        "p99": 23.793
+      },
+      "mean_cycle_ms": 21.161,
+      "failures": [],
+      "completions_per_worker": [
+        100
+      ],
+      "cpu_seconds": 0.312,
+      "process_peak_rss_kib": 145336,
+      "read_requests": 0,
+      "write_requests": 200,
+      "conditional_failures": 0,
+      "request_failures": 0,
+      "renewals": 0,
+      "consumed_rcu": 0.0,
+      "consumed_wcu": 200.0
+    },
+    {
+      "workload": "one_key",
+      "concurrency": 10,
+      "samples_per_worker": 5,
+      "lease_seconds": 3,
+      "hold_seconds": 0.01,
+      "elapsed_seconds": 3.124,
+      "acquisition_ms": {
+        "p50": 9.803,
+        "p95": 1696.553,
+        "p99": 2033.117
+      },
+      "cycle_ms": {
+        "p50": 30.323,
+        "p95": 1715.939,
+        "p99": 2052.699
+      },
+      "mean_cycle_ms": 318.81,
+      "failures": [],
+      "completions_per_worker": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "cpu_seconds": 0.23,
+      "process_peak_rss_kib": 145336,
+      "read_requests": 42,
+      "write_requests": 114,
+      "conditional_failures": 14,
+      "request_failures": 0,
+      "renewals": 0,
+      "consumed_rcu": 42.0,
+      "consumed_wcu": 100.0
+    },
+    {
+      "workload": "independent_keys",
+      "concurrency": 10,
+      "samples_per_worker": 5,
+      "lease_seconds": 3,
+      "hold_seconds": 0.01,
+      "elapsed_seconds": 0.561,
+      "acquisition_ms": {
+        "p50": 51.467,
+        "p95": 56.543,
+        "p99": 56.687
+      },
+      "cycle_ms": {
+        "p50": 110.78,
+        "p95": 116.917,
+        "p99": 117.739
+      },
+      "mean_cycle_ms": 106.594,
+      "failures": [],
+      "completions_per_worker": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "cpu_seconds": 0.148,
+      "process_peak_rss_kib": 145336,
+      "read_requests": 0,
+      "write_requests": 100,
+      "conditional_failures": 0,
+      "request_failures": 0,
+      "renewals": 0,
+      "consumed_rcu": 0.0,
+      "consumed_wcu": 100.0
+    },
+    {
+      "workload": "active_locks",
+      "concurrency": 10,
+      "samples_per_worker": 1,
+      "lease_seconds": 3,
+      "hold_seconds": 4,
+      "elapsed_seconds": 4.092,
+      "acquisition_ms": {
+        "p50": 33.818,
+        "p95": 56.105,
+        "p99": 56.105
+      },
+      "cycle_ms": {
+        "p50": 4064.851,
+        "p95": 4085.857,
+        "p99": 4085.857
+      },
+      "mean_cycle_ms": 4067.35,
+      "failures": [],
+      "completions_per_worker": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "cpu_seconds": 0.07,
+      "process_peak_rss_kib": 145336,
+      "read_requests": 0,
+      "write_requests": 50,
+      "conditional_failures": 0,
+      "request_failures": 0,
+      "renewals": 30,
+      "consumed_rcu": 0.0,
+      "consumed_wcu": 50.0
+    },
+    {
+      "workload": "recovery",
+      "concurrency": 1,
+      "samples_per_worker": 1,
+      "lease_seconds": 3,
+      "hold_seconds": 0,
+      "elapsed_seconds": 3.108,
+      "acquisition_ms": {
+        "p50": 3098.774,
+        "p95": 3098.774,
+        "p99": 3098.774
+      },
+      "cycle_ms": {
+        "p50": 3108.021,
+        "p95": 3108.021,
+        "p99": 3108.021
+      },
+      "mean_cycle_ms": 3108.021,
+      "failures": [],
+      "completions_per_worker": [
+        1
+      ],
+      "cpu_seconds": 0.015,
+      "process_peak_rss_kib": 145336,
+      "read_requests": 7,
+      "write_requests": 3,
+      "conditional_failures": 1,
+      "request_failures": 0,
+      "renewals": 0,
+      "consumed_rcu": 7.0,
+      "consumed_wcu": 2.0
+    },
+    {
+      "workload": "long_hold",
+      "concurrency": 1,
+      "samples_per_worker": 1,
+      "lease_seconds": 30,
+      "hold_seconds": 600.0,
+      "elapsed_seconds": 600.118,
+      "acquisition_ms": {
+        "p50": 9.19,
+        "p95": 9.19,
+        "p99": 9.19
+      },
+      "cycle_ms": {
+        "p50": 600118.077,
+        "p95": 600118.077,
+        "p99": 600118.077
+      },
+      "mean_cycle_ms": 600118.077,
+      "failures": [],
+      "completions_per_worker": [
+        1
+      ],
+      "cpu_seconds": 0.119,
+      "process_peak_rss_kib": 145336,
+      "read_requests": 0,
+      "write_requests": 61,
+      "conditional_failures": 0,
+      "request_failures": 0,
+      "renewals": 59,
+      "consumed_rcu": 0.0,
+      "consumed_wcu": 61.0
+    }
+  ],
+  "run_date": "2026-09-30",
+  "build_profile": "dev (unoptimized + debuginfo)",
+  "limitations": "Other tests ran on the same host. No AWS or reference-library comparison."
+}

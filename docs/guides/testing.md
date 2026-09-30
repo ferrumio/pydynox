@@ -180,6 +180,7 @@ The memory backend supports:
 | Vector index lifecycle | ✓ |
 | Conditions | ✓ |
 | Atomic updates | ✓ |
+| Distributed lock decorators and contexts | ✓ |
 
 !!! note
     Some advanced features like transactions and GSI queries are not yet supported in the memory backend. Use localstack for those cases.

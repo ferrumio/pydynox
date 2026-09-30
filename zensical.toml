@@ -38,6 +38,7 @@ nav = [
         "guides/auto-generate.md",
         "guides/rate-limiting.md",
         "guides/optimistic-locking.md",
+        "guides/distributed-locks.md",
         "guides/smart-save.md",
         "guides/inheritance.md",
         "guides/encryption.md",

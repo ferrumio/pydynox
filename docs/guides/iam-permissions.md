@@ -34,6 +34,16 @@ For read and write operations:
 }
 ```
 
+### Distributed locks
+
+Grant `dynamodb:GetItem`, `dynamodb:PutItem`, `dynamodb:UpdateItem`, and
+`dynamodb:DeleteItem` on the dedicated lock table. An ownership check inside a
+transaction also needs `dynamodb:ConditionCheckItem` on that table and the
+permissions for the transaction's protected writes.
+
+Provision the table separately. Runtime locks do not need table-management
+permissions.
+
 ### Batch operations
 
 Add these for batch read/write:
