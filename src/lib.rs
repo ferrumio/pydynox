@@ -24,6 +24,7 @@ mod diagnostics;
 mod errors;
 mod generators;
 mod kms;
+mod lock;
 mod metrics;
 pub mod rate_limiter;
 mod runtime;
@@ -67,6 +68,7 @@ fn pydynox_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Register exception classes
     errors::register_exceptions(m)?;
+    lock::register(m)?;
 
     // Register compression functions
     compression::register_compression(m)?;

@@ -55,6 +55,9 @@ class ItemTooLargeException(Exception):
 
 # These are the actual exception classes from Rust
 PydynoxException = pydynox_core.PydynoxException
+LockNotAcquired = pydynox_core.LockNotAcquired
+LockLost = pydynox_core.LockLost
+LockReleaseError = pydynox_core.LockReleaseError
 ResourceNotFoundException = pydynox_core.ResourceNotFoundException
 ResourceInUseException = pydynox_core.ResourceInUseException
 ValidationException = pydynox_core.ValidationException
@@ -71,6 +74,9 @@ S3AttributeException = pydynox_core.S3AttributeException
 
 __all__ = [
     "PydynoxException",
+    "LockNotAcquired",
+    "LockLost",
+    "LockReleaseError",
     "ResourceNotFoundException",
     "ResourceInUseException",
     "ValidationException",
