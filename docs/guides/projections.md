@@ -97,6 +97,12 @@ for user in User.sync_scan(fields=["pk", "status"]):
 |-----------|------|---------|-------------|
 | `projection` | list[str] | None | List of field names to fetch |
 
+### client.batch_get / Model.batch_get
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `projection` | list[str] | None | List of field names to fetch (same for `sync_` methods). See [batch operations](batch.md) |
+
 ### client.query / client.scan
 
 | Parameter | Type | Default | Description |

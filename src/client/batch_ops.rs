@@ -25,13 +25,16 @@ impl DynamoDBClient {
     }
 
     /// Sync batch get items from a DynamoDB table.
-    #[pyo3(signature = (table, keys, consistent_read, *, _number_schema=None))]
+    #[pyo3(signature = (table, keys, consistent_read, projection=None, expression_attribute_names=None, *, _number_schema=None))]
+    #[allow(clippy::too_many_arguments)]
     pub fn sync_batch_get(
         &self,
         py: Python<'_>,
         table: &str,
         keys: &Bound<'_, pyo3::types::PyList>,
         consistent_read: bool,
+        projection: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, pyo3::types::PyDict>>,
         _number_schema: NumberSchema,
     ) -> PyResult<Vec<Py<PyAny>>> {
         batch_operations::sync_batch_get(
@@ -41,6 +44,8 @@ impl DynamoDBClient {
             table,
             keys,
             consistent_read,
+            projection,
+            expression_attribute_names,
             _number_schema,
         )
     }
@@ -61,13 +66,16 @@ impl DynamoDBClient {
     /// Async batch get items from a DynamoDB table (default, no prefix).
     ///
     /// Returns a Python awaitable that gets items in batch.
-    #[pyo3(signature = (table, keys, consistent_read, *, _number_schema=None))]
+    #[pyo3(signature = (table, keys, consistent_read, projection=None, expression_attribute_names=None, *, _number_schema=None))]
+    #[allow(clippy::too_many_arguments)]
     pub fn batch_get<'py>(
         &self,
         py: Python<'py>,
         table: &str,
         keys: &Bound<'_, pyo3::types::PyList>,
         consistent_read: bool,
+        projection: Option<String>,
+        expression_attribute_names: Option<&Bound<'_, pyo3::types::PyDict>>,
         _number_schema: NumberSchema,
     ) -> PyResult<Bound<'py, PyAny>> {
         batch_operations::batch_get(
@@ -76,6 +84,8 @@ impl DynamoDBClient {
             table,
             keys,
             consistent_read,
+            projection,
+            expression_attribute_names,
             _number_schema,
         )
     }

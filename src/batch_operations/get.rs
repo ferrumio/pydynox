@@ -1,15 +1,17 @@
 //! Batch get operations for DynamoDB.
 
 use aws_sdk_dynamodb::Client;
-use aws_sdk_dynamodb::types::{AttributeValue, KeysAndAttributes};
+use aws_sdk_dynamodb::types::AttributeValue;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
+use super::request::build_keys_and_attributes;
 use crate::conversions::{
-    NumberSchema, attribute_values_to_py_dict_with_decimals, py_dict_to_attribute_values,
+    NumberSchema, attribute_values_to_py_dict_with_decimals, extract_string_map,
+    py_dict_to_attribute_values,
 };
 use crate::errors::map_sdk_error;
 
@@ -24,6 +26,8 @@ struct PreparedBatchGet {
     table: String,
     keys: Vec<HashMap<String, AttributeValue>>,
     consistent_read: bool,
+    projection_expression: Option<String>,
+    expression_attribute_names: Option<HashMap<String, String>>,
 }
 
 /// Prepare batch get - convert Python dicts to Rust types (needs GIL).
@@ -32,6 +36,8 @@ fn prepare_batch_get(
     table: &str,
     keys: &Bound<'_, PyList>,
     consistent_read: bool,
+    projection_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<PreparedBatchGet> {
     let mut all_keys: Vec<HashMap<String, AttributeValue>> = Vec::new();
     for key in keys.iter() {
@@ -39,11 +45,14 @@ fn prepare_batch_get(
         let dynamo_key = py_dict_to_attribute_values(py, key_dict)?;
         all_keys.push(dynamo_key);
     }
+    let names = extract_string_map(expression_attribute_names)?;
 
     Ok(PreparedBatchGet {
         table: table.to_string(),
         keys: all_keys,
         consistent_read,
+        projection_expression,
+        expression_attribute_names: names,
     })
 }
 
@@ -76,11 +85,13 @@ async fn execute_batch_get(
         let mut retries = 0;
 
         while !pending.is_empty() && retries < BATCH_MAX_RETRIES {
-            let mut builder = KeysAndAttributes::builder().set_keys(Some(pending.clone()));
-            if prepared.consistent_read {
-                builder = builder.consistent_read(true);
-            }
-            let keys_and_attrs = builder.build().map_err(|e| {
+            let keys_and_attrs = build_keys_and_attributes(
+                pending.clone(),
+                prepared.consistent_read,
+                prepared.projection_expression.as_deref(),
+                prepared.expression_attribute_names.as_ref(),
+            )
+            .map_err(|e| {
                 (
                     aws_sdk_dynamodb::error::SdkError::construction_failure(format!(
                         "Failed to build keys and attributes: {}",
@@ -158,10 +169,13 @@ async fn execute_batch_get(
 /// * `runtime` - Tokio runtime
 /// * `table` - Table name
 /// * `keys` - List of keys to get (as Python dicts)
+/// * `projection_expression` - Optional projection expression (applied to every request)
+/// * `expression_attribute_names` - Placeholder names used by the projection expression
 ///
 /// # Returns
 ///
 /// A list of items (as Python dicts) that were found.
+#[allow(clippy::too_many_arguments)]
 pub fn sync_batch_get(
     py: Python<'_>,
     client: &Client,
@@ -169,9 +183,18 @@ pub fn sync_batch_get(
     table: &str,
     keys: &Bound<'_, PyList>,
     consistent_read: bool,
+    projection_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
     number_schema: NumberSchema,
 ) -> PyResult<Vec<Py<PyAny>>> {
-    let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
+    let prepared = prepare_batch_get(
+        py,
+        table,
+        keys,
+        consistent_read,
+        projection_expression,
+        expression_attribute_names,
+    )?;
 
     let result = py.detach(|| runtime.block_on(execute_batch_get(client, &prepared)));
 
@@ -204,19 +227,31 @@ pub fn sync_batch_get(
 /// * `client` - DynamoDB client
 /// * `table` - Table name
 /// * `keys` - List of keys to get (as Python dicts)
+/// * `projection_expression` - Optional projection expression (applied to every request)
+/// * `expression_attribute_names` - Placeholder names used by the projection expression
 ///
 /// # Returns
 ///
 /// A Python awaitable that resolves to a list of items (as Python dicts).
+#[allow(clippy::too_many_arguments)]
 pub fn batch_get<'py>(
     py: Python<'py>,
     client: Client,
     table: &str,
     keys: &Bound<'_, PyList>,
     consistent_read: bool,
+    projection_expression: Option<String>,
+    expression_attribute_names: Option<&Bound<'_, PyDict>>,
     number_schema: NumberSchema,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let prepared = prepare_batch_get(py, table, keys, consistent_read)?;
+    let prepared = prepare_batch_get(
+        py,
+        table,
+        keys,
+        consistent_read,
+        projection_expression,
+        expression_attribute_names,
+    )?;
 
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let result = execute_batch_get(&client, &prepared).await;

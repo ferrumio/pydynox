@@ -76,6 +76,9 @@ jobs:
       - name: Test lock clock assumptions
         run: cargo test --locked --test lock_clock
 
+      - name: Test batch get request building
+        run: cargo test --locked --test batch_get_request
+
   build:
     name: Build (${{ matrix.os }} / py${{ matrix.python }})
     runs-on: ${{ matrix.os }}

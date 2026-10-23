@@ -24,6 +24,20 @@ Fetch multiple items by their keys. DynamoDB limits batch gets to 100 items per 
 
 Items are returned in any order (not guaranteed to match input order). Missing items are silently skipped.
 
+#### Projection
+
+Pass `projection` to fetch only the attributes you need. It works like `projection` on `get_item`: a list of attribute names, with dot notation for nested attributes. Reserved words such as `name` are handled for you. The projection is sent with every 100-key request and with every retry of unprocessed keys.
+
+=== "batch_get_projection.py"
+    ```python
+    --8<-- "docs/examples/batch/batch_get_projection.py"
+    ```
+
+DynamoDB returns only the attributes you list. Key attributes are not added automatically, so include them if you need them. On a Model, fields you leave out are `None`.
+
+!!! note
+    Projection reduces data transfer, not RCU cost. See [projections](projections.md).
+
 ### Batch write
 
 Use `BatchWriter` to save or delete many items. The batch writer handles all the complexity for you: it groups items into batches, sends them to DynamoDB, and retries any items that fail.
@@ -78,6 +92,7 @@ For sync code (scripts, CLI tools, or frameworks that don't support async), use 
 | `keys` | list[dict] | required | List of key dicts (partition key + optional sort key) |
 | `consistent_read` | bool | False | Use strongly consistent reads |
 | `as_dict` | bool | False | Return dicts instead of Model instances |
+| `projection` | list[str] | None | Attribute names to fetch. Dot notation for nested attributes |
 
 ### Context managers
 

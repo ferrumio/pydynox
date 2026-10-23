@@ -297,3 +297,73 @@ def test_sync_model_batch_get_missing_items(dynamo, user_model):
     # THEN only the existing item is returned
     assert len(users) == 1
     assert users[0].name == "Found"
+
+
+def test_sync_batch_get_projection_returns_only_requested_attributes(dynamo):
+    """Test sync batch get with a projection returns only the listed attributes."""
+    # GIVEN items with several attributes, including reserved words
+    uid = str(uuid.uuid4())
+    items = [
+        {"pk": f"SBGPROJ#{uid}", "sk": f"ITEM#{i}", "name": f"n{i}", "status": "ok", "extra": i}
+        for i in range(3)
+    ]
+    for item in items:
+        dynamo.sync_put_item("test_table", item)
+
+    # WHEN batch getting with a projection on reserved words and a key
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    results = dynamo.sync_batch_get("test_table", keys, projection=["sk", "name", "status"])
+
+    # THEN only those attributes come back
+    assert len(results) == 3
+    for result in results:
+        assert set(result) == {"sk", "name", "status"}
+
+
+def test_sync_batch_get_projection_applies_to_every_chunk(dynamo):
+    """Test sync batch get projection is sent with each 100-key request."""
+    # GIVEN 150 items (two requests)
+    uid = str(uuid.uuid4())
+    items = [
+        {"pk": f"SBGCHUNK#{uid}", "sk": f"ITEM#{i:03d}", "name": "x", "big": i} for i in range(150)
+    ]
+    dynamo.sync_batch_write("test_table", put_items=items)
+
+    # WHEN batch getting them with a projection
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    results = dynamo.sync_batch_get("test_table", keys, projection=["name"])
+
+    # THEN every item from both requests is projected
+    assert len(results) == 150
+    assert all(set(r) == {"name"} for r in results)
+
+
+def test_sync_batch_get_without_projection_returns_everything(dynamo):
+    """Test sync batch get without a projection still returns all attributes."""
+    # GIVEN an item
+    uid = str(uuid.uuid4())
+    dynamo.sync_put_item("test_table", {"pk": f"SBGALL#{uid}", "sk": "A", "name": "n", "age": 1})
+
+    # WHEN batch getting with no projection
+    results = dynamo.sync_batch_get("test_table", [{"pk": f"SBGALL#{uid}", "sk": "A"}])
+
+    # THEN all attributes are returned
+    assert set(results[0]) == {"pk", "sk", "name", "age"}
+
+
+def test_sync_model_batch_get_projection(dynamo, user_model):
+    """Model.sync_batch_get with a projection leaves other fields unset."""
+    # GIVEN existing items
+    uid = str(uuid.uuid4())
+    for i in range(2):
+        dynamo.sync_put_item(
+            "test_table", {"pk": f"SMBGPROJ#{uid}", "sk": f"USER#{i}", "name": f"n{i}", "age": 30}
+        )
+
+    # WHEN batch getting with a projection that includes the keys
+    keys = [{"pk": f"SMBGPROJ#{uid}", "sk": f"USER#{i}"} for i in range(2)]
+    users = user_model.sync_batch_get(keys, projection=["pk", "sk", "name"])
+
+    # THEN projected fields are set and others are not
+    assert {u.name for u in users} == {"n0", "n1"}
+    assert all(u.age is None for u in users)

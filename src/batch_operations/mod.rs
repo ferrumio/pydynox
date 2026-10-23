@@ -10,6 +10,7 @@
 //! retry unprocessed items with exponential backoff.
 
 mod get;
+mod request;
 mod write;
 
 // Re-export async operations (default, no prefix)

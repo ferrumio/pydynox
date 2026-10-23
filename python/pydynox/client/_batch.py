@@ -6,6 +6,7 @@ from typing import Any
 
 from pydynox._internal._logging import _log_debug
 from pydynox._internal._throttle_retry import retry_on_throttle, sync_retry_on_throttle
+from pydynox.client._crud import _build_projection
 from pydynox.client._typing import _MixinBase
 
 
@@ -47,6 +48,7 @@ class BatchOperations(_MixinBase):
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
+        projection: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Async batch get items from a DynamoDB table.
 
@@ -54,10 +56,20 @@ class BatchOperations(_MixinBase):
         - Splitting requests to respect the 100-item limit per batch
         - Retrying unprocessed keys with exponential backoff
         - Combining results from multiple requests
+
+        Args:
+            table: Table name.
+            keys: List of key dicts.
+            consistent_read: Use strongly consistent reads.
+            projection: List of attributes to return. Use dot notation for nested:
+                ["name", "address.city"]. Key attributes are not added for you.
         """
         _log_debug("batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        return await self._client.batch_get(table, keys, consistent_read)  # type: ignore[attr-defined, no-any-return]
+        projection_expr, attr_names = _build_projection(projection)
+        return await self._client.batch_get(  # type: ignore[attr-defined, no-any-return]
+            table, keys, consistent_read, projection_expr, attr_names
+        )
 
     # ========== BATCH WRITE (SYNC - with sync_ prefix) ==========
 
@@ -95,6 +107,7 @@ class BatchOperations(_MixinBase):
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
+        projection: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Sync batch get items from a DynamoDB table.
 
@@ -102,10 +115,20 @@ class BatchOperations(_MixinBase):
         - Splitting requests to respect the 100-item limit per batch
         - Retrying unprocessed keys with exponential backoff
         - Combining results from multiple requests
+
+        Args:
+            table: Table name.
+            keys: List of key dicts.
+            consistent_read: Use strongly consistent reads.
+            projection: List of attributes to return. Use dot notation for nested:
+                ["name", "address.city"]. Key attributes are not added for you.
         """
         _log_debug("sync_batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        return self._client.sync_batch_get(table, keys, consistent_read)  # type: ignore[attr-defined, no-any-return]
+        projection_expr, attr_names = _build_projection(projection)
+        return self._client.sync_batch_get(  # type: ignore[attr-defined, no-any-return]
+            table, keys, consistent_read, projection_expr, attr_names
+        )
 
     # ========== TRANSACT WRITE (SYNC) ==========
 

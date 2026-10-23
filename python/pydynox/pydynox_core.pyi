@@ -161,6 +161,8 @@ class DynamoDBClient:
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool,
+        projection: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
         *,
         _number_schema: NumberSchema | None = None,
     ) -> Coroutine[Any, Any, list[dict[str, Any]]]: ...
@@ -392,6 +394,8 @@ class DynamoDBClient:
         table: str,
         keys: list[dict[str, Any]],
         consistent_read: bool,
+        projection: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
         *,
         _number_schema: NumberSchema | None = None,
     ) -> list[dict[str, Any]]: ...

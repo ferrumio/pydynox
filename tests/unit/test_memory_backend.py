@@ -629,3 +629,59 @@ def test_condition_with_and_requires_every_clause():
                 atomic=[Aggregate.total.add(1)],
                 condition=(Aggregate.total < 100) & Aggregate.total.not_exists(),
             )
+
+
+def test_sync_batch_get_projection_returns_only_requested_attributes():
+    """Test direct sync batch get keeps only projected attributes."""
+    # GIVEN stored items with a nested map
+    items = [
+        {"pk": f"USER#{i}", "name": f"User {i}", "age": i, "address": {"city": "Paris", "zip": "1"}}
+        for i in range(3)
+    ]
+
+    with MemoryBackend() as backend:
+        backend.client.sync_batch_write("users", put_items=items)
+
+        # WHEN batch getting with a projection (reserved word and nested path)
+        results = backend.client.sync_batch_get(
+            "users",
+            [{"pk": f"USER#{i}"} for i in range(3)],
+            projection=["name", "address.city"],
+        )
+
+        # THEN only the projected attributes come back
+        assert len(results) == 3
+        assert all(set(r) == {"name", "address"} for r in results)
+        assert all(r["address"] == {"city": "Paris"} for r in results)
+
+        # AND stored items are untouched
+        full = backend.client.sync_batch_get("users", [{"pk": "USER#0"}])
+        assert set(full[0]) == {"pk", "name", "age", "address"}
+
+
+@pytest.mark.asyncio
+async def test_model_batch_get_projection_with_memory_backend():
+    """Test Model batch get projection, with an aliased field, in memory."""
+
+    # GIVEN a model with an aliased attribute and stored items
+    class Profile(Model):
+        model_config = ModelConfig(table="profiles")
+        pk = StringAttribute(partition_key=True)
+        name = StringAttribute()
+        email = StringAttribute(alias="em")
+
+    with MemoryBackend():
+        await Profile(pk="P#1", name="Ann", email="ann@example.com").save()
+        await Profile(pk="P#2", name="Bob", email="bob@example.com").save()
+        keys = [{"pk": "P#1"}, {"pk": "P#2"}]
+
+        # WHEN batch getting with a projection on the Python field name
+        profiles = await Profile.batch_get(keys, projection=["pk", "email"])
+        synced = Profile.sync_batch_get(keys, projection=["pk", "email"])
+        dicts = await Profile.batch_get(keys, projection=["name"], as_dict=True)
+
+        # THEN only projected fields are populated, aliases are honoured
+        assert {p.email for p in profiles} == {"ann@example.com", "bob@example.com"}
+        assert all(p.name is None for p in profiles)
+        assert {p.email for p in synced} == {"ann@example.com", "bob@example.com"}
+        assert all(set(d) == {"name"} for d in dicts)

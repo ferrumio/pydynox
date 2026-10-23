@@ -312,3 +312,108 @@ async def test_model_batch_get_missing_items(dynamo, user_model):
     # THEN only the existing item is returned
     assert len(users) == 1
     assert users[0].name == "Found"
+
+
+# ========== projection tests ==========
+
+
+@pytest.mark.asyncio
+async def test_batch_get_projection_returns_only_requested_attributes(dynamo):
+    """Test batch get with a projection returns only the listed attributes."""
+    # GIVEN items with several attributes, including reserved words
+    uid = str(uuid.uuid4())
+    items = [
+        {"pk": f"BGPROJ#{uid}", "sk": f"ITEM#{i}", "name": f"n{i}", "status": "ok", "extra": i}
+        for i in range(3)
+    ]
+    for item in items:
+        await dynamo.put_item("test_table", item)
+
+    # WHEN batch getting with a projection on reserved words and a key
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    results = await dynamo.batch_get("test_table", keys, projection=["sk", "name", "status"])
+
+    # THEN only those attributes come back
+    assert len(results) == 3
+    for result in results:
+        assert set(result) == {"sk", "name", "status"}
+    assert {r["name"] for r in results} == {"n0", "n1", "n2"}
+
+
+@pytest.mark.asyncio
+async def test_batch_get_projection_supports_nested_attributes(dynamo):
+    """Test batch get projection with dot notation for nested attributes."""
+    # GIVEN an item with a nested map
+    uid = str(uuid.uuid4())
+    await dynamo.put_item(
+        "test_table",
+        {"pk": f"BGNEST#{uid}", "sk": "A", "address": {"city": "Paris", "zip": "75001"}},
+    )
+
+    # WHEN batch getting with a nested projection
+    results = await dynamo.batch_get(
+        "test_table", [{"pk": f"BGNEST#{uid}", "sk": "A"}], projection=["address.city"]
+    )
+
+    # THEN only the nested attribute is returned
+    assert results == [{"address": {"city": "Paris"}}]
+
+
+@pytest.mark.asyncio
+async def test_batch_get_projection_applies_to_every_chunk(dynamo):
+    """Test batch get projection is sent with each 100-key request."""
+    # GIVEN 150 items (two requests)
+    uid = str(uuid.uuid4())
+    items = [
+        {"pk": f"BGCHUNK#{uid}", "sk": f"ITEM#{i:03d}", "name": "x", "big": i} for i in range(150)
+    ]
+    await dynamo.batch_write("test_table", put_items=items)
+
+    # WHEN batch getting them with a projection
+    keys = [{"pk": item["pk"], "sk": item["sk"]} for item in items]
+    results = await dynamo.batch_get("test_table", keys, projection=["name"])
+
+    # THEN every item from both requests is projected
+    assert len(results) == 150
+    assert all(set(r) == {"name"} for r in results)
+
+
+@pytest.mark.asyncio
+async def test_batch_get_without_projection_returns_everything(dynamo):
+    """Test batch get without a projection still returns all attributes."""
+    # GIVEN an item
+    uid = str(uuid.uuid4())
+    await dynamo.put_item("test_table", {"pk": f"BGALL#{uid}", "sk": "A", "name": "n", "age": 1})
+
+    # WHEN batch getting with no projection and with an empty one
+    keys = [{"pk": f"BGALL#{uid}", "sk": "A"}]
+    default = await dynamo.batch_get("test_table", keys)
+    empty = await dynamo.batch_get("test_table", keys, projection=[])
+
+    # THEN all attributes are returned both times
+    assert set(default[0]) == {"pk", "sk", "name", "age"}
+    assert empty == default
+
+
+@pytest.mark.asyncio
+async def test_model_batch_get_projection(dynamo, user_model):
+    """Model.batch_get with a projection leaves other fields unset."""
+    # GIVEN existing items
+    uid = str(uuid.uuid4())
+    for i in range(2):
+        await dynamo.put_item(
+            "test_table", {"pk": f"MBGPROJ#{uid}", "sk": f"USER#{i}", "name": f"n{i}", "age": 30}
+        )
+
+    # WHEN batch getting with a projection that includes the keys
+    keys = [{"pk": f"MBGPROJ#{uid}", "sk": f"USER#{i}"} for i in range(2)]
+    users = await user_model.batch_get(keys, projection=["pk", "sk", "name"])
+
+    # THEN projected fields are set and others are not
+    assert {u.name for u in users} == {"n0", "n1"}
+    assert all(u.age is None for u in users)
+    assert all(u.sk.startswith("USER#") for u in users)
+
+    # AND as_dict returns only the projected attributes
+    as_dicts = await user_model.batch_get(keys, projection=["name"], as_dict=True)
+    assert all(set(d) == {"name"} for d in as_dicts)

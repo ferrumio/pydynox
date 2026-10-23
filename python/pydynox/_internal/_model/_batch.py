@@ -12,11 +12,18 @@ if TYPE_CHECKING:
 M = TypeVar("M", bound="Model")
 
 
+def _dynamo_projection(cls: type[M], projection: list[str] | None) -> list[str] | None:
+    if not projection:
+        return None
+    return [cls._py_to_dynamo.get(field, field) for field in projection]
+
+
 async def batch_get(
     cls: type[M],
     keys: list[dict[str, Any]],
     consistent_read: bool | None = None,
     as_dict: bool = False,
+    projection: list[str] | None = None,
 ) -> list[M] | list[dict[str, Any]]:
     """Async batch get items by keys (default, no prefix).
 
@@ -24,6 +31,7 @@ async def batch_get(
         keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
+        projection: List of attribute names to fetch. Other fields are None.
 
     Returns:
         List of model instances or dicts.
@@ -37,7 +45,12 @@ async def batch_get(
     # Translate python key names to DynamoDB aliases
     aliased_keys = [{cls._py_to_dynamo.get(k, k): v for k, v in key.items()} for key in keys]
 
-    items = await client.batch_get(table, aliased_keys, consistent_read=consistent_read or False)
+    items = await client.batch_get(
+        table,
+        aliased_keys,
+        consistent_read=consistent_read or False,
+        projection=_dynamo_projection(cls, projection),
+    )
 
     if as_dict:
         return items
@@ -58,6 +71,7 @@ def sync_batch_get(
     keys: list[dict[str, Any]],
     consistent_read: bool | None = None,
     as_dict: bool = False,
+    projection: list[str] | None = None,
 ) -> list[M] | list[dict[str, Any]]:
     """Sync batch get items by keys.
 
@@ -65,6 +79,7 @@ def sync_batch_get(
         keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
+        projection: List of attribute names to fetch. Other fields are None.
 
     Returns:
         List of model instances or dicts.
@@ -78,7 +93,12 @@ def sync_batch_get(
     # Translate python key names to DynamoDB aliases
     aliased_keys = [{cls._py_to_dynamo.get(k, k): v for k, v in key.items()} for key in keys]
 
-    items = client.sync_batch_get(table, aliased_keys, consistent_read=consistent_read or False)
+    items = client.sync_batch_get(
+        table,
+        aliased_keys,
+        consistent_read=consistent_read or False,
+        projection=_dynamo_projection(cls, projection),
+    )
 
     if as_dict:
         return items
