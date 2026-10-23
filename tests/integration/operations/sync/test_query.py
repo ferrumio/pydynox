@@ -1,6 +1,10 @@
 """Sync integration tests for query operation."""
 
+import uuid
+
 import pytest
+from pydynox import Model, ModelConfig
+from pydynox.attributes import MapAttribute, StringAttribute
 
 
 @pytest.fixture
@@ -326,3 +330,26 @@ def test_sync_query_consistent_read_with_filter(populated_table):
 
     # THEN only filtered items are returned
     assert count == 2
+
+
+def test_sync_model_query_fields_nested_alias(dynamo):
+    """Model.sync_query fields use the alias at the root of a nested path."""
+
+    # GIVEN a model whose address map is stored as "addr"
+    class Customer(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        address = MapAttribute(alias="addr")
+
+    pk = f"SQALIAS#{uuid.uuid4()}"
+    dynamo.sync_put_item(
+        "test_table", {"pk": pk, "sk": "C#1", "addr": {"city": "Paris", "zip": "1"}}
+    )
+
+    # WHEN querying a nested field by its Python name
+    customers = list(Customer.sync_query(partition_key=pk, fields=["pk", "address.city"]))
+
+    # THEN only the nested field comes back
+    assert len(customers) == 1
+    assert customers[0].address == {"city": "Paris"}

@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 from pydynox import DynamoDBClient, Model, ModelConfig
-from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.attributes import MapAttribute, NumberAttribute, StringAttribute
 
 
 @pytest.fixture
@@ -244,3 +244,56 @@ async def test_model_scan_with_fields(user_model):
         assert "email" not in item
         assert "age" not in item
         assert "city" not in item
+
+
+@pytest.mark.asyncio
+async def test_model_query_fields_nested_alias(dynamo):
+    """Model.query fields use the alias at the root of a nested path."""
+
+    # GIVEN a model whose address map is stored as "addr"
+    class Customer(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        address = MapAttribute(alias="addr")
+
+    pk = f"QALIAS#{uuid.uuid4()}"
+    await dynamo.put_item(
+        "test_table", {"pk": pk, "sk": "C#1", "addr": {"city": "Paris", "zip": "1"}}
+    )
+
+    # WHEN querying a nested field by its Python name
+    customers = [c async for c in Customer.query(partition_key=pk, fields=["pk", "address.city"])]
+
+    # THEN only the nested field comes back
+    assert len(customers) == 1
+    assert customers[0].address == {"city": "Paris"}
+
+
+@pytest.mark.asyncio
+async def test_model_scan_fields_nested_alias(dynamo):
+    """Model.scan fields use the alias at the root of a nested path."""
+
+    # GIVEN a model whose address map is stored as "addr"
+    class Customer(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        address = MapAttribute(alias="addr")
+
+    pk = f"SALIAS#{uuid.uuid4()}"
+    await dynamo.put_item(
+        "test_table", {"pk": pk, "sk": "C#1", "addr": {"city": "Paris", "zip": "1"}}
+    )
+
+    # WHEN scanning a nested field by its Python name
+    customers = [
+        c
+        async for c in Customer.scan(
+            filter_condition=Customer.pk == pk, fields=["pk", "address.city"]
+        )
+    ]
+
+    # THEN only the nested field comes back
+    assert len(customers) == 1
+    assert customers[0].address == {"city": "Paris"}

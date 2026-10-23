@@ -6,6 +6,7 @@ Aliases let you use readable Python names while storing short names in DynamoDB.
 from __future__ import annotations
 
 import pytest
+from pydynox._internal._results import _build_query_params, _build_scan_params
 from pydynox.attributes import MapAttribute, NumberAttribute, StringAttribute
 from pydynox.config import ModelConfig
 from pydynox.model import Model
@@ -438,3 +439,25 @@ async def test_batch_get_projection_with_nested_alias(sync):
         assert len(customers) == 1
         assert customers[0].address == {"city": "Paris"}
         assert customers[0].name is None
+
+
+@pytest.mark.parametrize("operation", ["query", "scan"])
+def test_query_and_scan_fields_translate_nested_alias(operation):
+    """query and scan fields use the alias at the root of a nested path."""
+    # WHEN building the projection for a nested field by its Python name
+    fields = ["pk", "address.city"]
+    if operation == "query":
+        _, _, projection_expr, attr_names, _, _ = _build_query_params(
+            CustomerWithMapAlias, "C#1", None, None, None, fields
+        )
+    else:
+        _, projection_expr, attr_names, _, _ = _build_scan_params(
+            CustomerWithMapAlias, None, None, fields
+        )
+
+    # THEN the root is sent as the alias and the nested part stays the same
+    assert projection_expr == "#proj0_0, #proj1_0.#proj1_1"
+    assert attr_names is not None
+    assert attr_names["#proj0_0"] == "pk"
+    assert attr_names["#proj1_0"] == "addr"
+    assert attr_names["#proj1_1"] == "city"

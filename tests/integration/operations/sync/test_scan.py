@@ -1,6 +1,10 @@
 """Sync integration tests for scan operation."""
 
+import uuid
+
 import pytest
+from pydynox import Model, ModelConfig
+from pydynox.attributes import MapAttribute, StringAttribute
 
 
 @pytest.fixture
@@ -140,3 +144,28 @@ def test_sync_scan_with_projection(scan_data):
         assert "name" in item
         # status should not be in result (projected out)
         assert "status" not in item
+
+
+def test_sync_model_scan_fields_nested_alias(dynamo):
+    """Model.sync_scan fields use the alias at the root of a nested path."""
+
+    # GIVEN a model whose address map is stored as "addr"
+    class Customer(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        address = MapAttribute(alias="addr")
+
+    pk = f"SSALIAS#{uuid.uuid4()}"
+    dynamo.sync_put_item(
+        "test_table", {"pk": pk, "sk": "C#1", "addr": {"city": "Paris", "zip": "1"}}
+    )
+
+    # WHEN scanning a nested field by its Python name
+    customers = list(
+        Customer.sync_scan(filter_condition=Customer.pk == pk, fields=["pk", "address.city"])
+    )
+
+    # THEN only the nested field comes back
+    assert len(customers) == 1
+    assert customers[0].address == {"city": "Paris"}
