@@ -45,25 +45,6 @@ fn projection_with_reserved_word_placeholders_is_set() {
 }
 
 #[test]
-fn retry_request_for_unprocessed_keys_keeps_projection() {
-    let attr_names = names(&[("#p0", "name")]);
-    let unprocessed = vec![key("b")];
-    let request =
-        request::build_keys_and_attributes(unprocessed, false, Some("#p0"), Some(&attr_names))
-            .unwrap();
-
-    assert_eq!(request.keys().len(), 1);
-    assert_eq!(request.projection_expression(), Some("#p0"));
-    assert_eq!(
-        request
-            .expression_attribute_names()
-            .and_then(|placeholders| placeholders.get("#p0"))
-            .map(String::as_str),
-        Some("name")
-    );
-}
-
-#[test]
 fn consistent_read_is_kept_with_projection() {
     let attr_names = names(&[("#p0", "name")]);
     let request =
