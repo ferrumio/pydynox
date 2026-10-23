@@ -31,7 +31,8 @@ async def batch_get(
         keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
-        projection: List of attribute names to fetch. Other fields are None.
+        projection: List of attribute names to fetch. Other fields get their
+            default or None. Required fields must be included.
 
     Returns:
         List of model instances or dicts.
@@ -79,7 +80,8 @@ def sync_batch_get(
         keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
-        projection: List of attribute names to fetch. Other fields are None.
+        projection: List of attribute names to fetch. Other fields get their
+            default or None. Required fields must be included.
 
     Returns:
         List of model instances or dicts.

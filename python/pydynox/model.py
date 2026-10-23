@@ -316,7 +316,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             keys: List of key dicts (each with partition_key and optional sort_key).
             consistent_read: Use strongly consistent read.
             as_dict: If True, return dicts instead of Model instances.
-            projection: List of attribute names to fetch. Other fields are None.
+            projection: List of attribute names to fetch. Other fields get their
+                default or None. Required fields must be included.
                 Key attributes are not added for you.
 
         Returns:
@@ -380,7 +381,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             keys: List of key dicts (each with partition_key and optional sort_key).
             consistent_read: Use strongly consistent read.
             as_dict: If True, return dicts instead of Model instances.
-            projection: List of attribute names to fetch. Other fields are None.
+            projection: List of attribute names to fetch. Other fields get their
+                default or None. Required fields must be included.
                 Key attributes are not added for you.
 
         Returns:

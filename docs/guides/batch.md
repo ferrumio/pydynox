@@ -33,7 +33,9 @@ Pass `projection` to fetch only the attributes you need. It works like `projecti
     --8<-- "docs/examples/batch/batch_get_projection.py"
     ```
 
-DynamoDB returns only the attributes you list. Key attributes are not added automatically, so include them if you need them. On a Model, fields you leave out are `None`.
+DynamoDB returns only the attributes you list. Key attributes are not added automatically, so include them if you need them.
+
+On a Model, a field you leave out gets its default value, or `None` if it has no default. If you leave out a `required=True` field, creating the model fails with `ValueError`. Include required fields in the projection, or use `as_dict=True`.
 
 !!! note
     Projection reduces data transfer, not RCU cost. See [projections](projections.md).
