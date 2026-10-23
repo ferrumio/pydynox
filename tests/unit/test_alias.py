@@ -6,7 +6,7 @@ Aliases let you use readable Python names while storing short names in DynamoDB.
 from __future__ import annotations
 
 import pytest
-from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.attributes import MapAttribute, NumberAttribute, StringAttribute
 from pydynox.config import ModelConfig
 from pydynox.model import Model
 from pydynox.testing import MemoryBackend
@@ -388,3 +388,53 @@ def test_alias_param_stored_on_attribute():
 def test_alias_values(field_name, expected_alias):
     attr = UserWithAlias._attributes[field_name]
     assert attr.alias == expected_alias
+
+
+# ── Projection paths ─────────────────────────────────────────────────────────
+
+
+class CustomerWithMapAlias(Model):
+    model_config = ModelConfig(table="customers")
+
+    pk = StringAttribute(partition_key=True)
+    name = StringAttribute()
+    address = MapAttribute(alias="addr")
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        pytest.param("address", "addr", id="top_level_alias"),
+        pytest.param("address.city", "addr.city", id="nested_alias"),
+        pytest.param("address.geo.lat", "addr.geo.lat", id="deep_nested_alias"),
+        pytest.param("name", "name", id="no_alias"),
+        pytest.param("name.first", "name.first", id="nested_no_alias"),
+        pytest.param("unknown.address", "unknown.address", id="unknown_root"),
+    ],
+)
+def test_dynamo_path_translates_only_the_root(path, expected):
+    assert CustomerWithMapAlias._dynamo_path(path) == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
+async def test_batch_get_projection_with_nested_alias(sync):
+    """batch_get projection uses the alias at the root of a nested path."""
+    with MemoryBackend():
+        # GIVEN a customer whose address map is stored as "addr"
+        await CustomerWithMapAlias(
+            pk="C#1", name="Ann", address={"city": "Paris", "zip": "75001"}
+        ).save()
+        keys = [{"pk": "C#1"}]
+        projection = ["pk", "address.city"]
+
+        # WHEN batch getting a nested field by its Python name
+        if sync:
+            customers = CustomerWithMapAlias.sync_batch_get(keys, projection=projection)
+        else:
+            customers = await CustomerWithMapAlias.batch_get(keys, projection=projection)
+
+        # THEN only the nested field comes back
+        assert len(customers) == 1
+        assert customers[0].address == {"city": "Paris"}
+        assert customers[0].name is None

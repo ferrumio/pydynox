@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 from pydynox import Model, ModelConfig
-from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.attributes import MapAttribute, NumberAttribute, StringAttribute
 
 
 def test_sync_batch_get_returns_items(dynamo):
@@ -367,3 +367,25 @@ def test_sync_model_batch_get_projection(dynamo, user_model):
     # THEN projected fields are set and others are not
     assert {u.name for u in users} == {"n0", "n1"}
     assert all(u.age is None for u in users)
+
+
+def test_sync_model_batch_get_projection_nested_alias(dynamo):
+    """Model.sync_batch_get uses the alias at the root of a nested path."""
+
+    # GIVEN a model whose address map is stored as "addr"
+    class Customer(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        address = MapAttribute(alias="addr")
+
+    uid = str(uuid.uuid4())
+    key = {"pk": f"SMBGALIAS#{uid}", "sk": "C#1"}
+    dynamo.sync_put_item("test_table", {**key, "addr": {"city": "Paris", "zip": "75001"}})
+
+    # WHEN batch getting a nested field by its Python name
+    customers = Customer.sync_batch_get([key], projection=["pk", "sk", "address.city"])
+
+    # THEN only the nested field comes back
+    assert len(customers) == 1
+    assert customers[0].address == {"city": "Paris"}

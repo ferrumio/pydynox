@@ -15,7 +15,7 @@ M = TypeVar("M", bound="Model")
 def _dynamo_projection(cls: type[M], projection: list[str] | None) -> list[str] | None:
     if not projection:
         return None
-    return [cls._py_to_dynamo.get(field, field) for field in projection]
+    return [cls._dynamo_path(path) for path in projection]
 
 
 async def batch_get(
