@@ -185,6 +185,9 @@ Table operations follow the async-first pattern. Async methods have no prefix, s
 | `table_exists(table)` | `sync_table_exists(table)` | Check if table exists |
 | `delete_table(table)` | `sync_delete_table(table)` | Delete a table |
 | `wait_for_table_active(table)` | `sync_wait_for_table_active(table)` | Wait for table to be ready |
+| `wait_for_table_deleted(table)` | `sync_wait_for_table_deleted(table)` | Wait for table to be gone |
+
+`delete_table` and `sync_delete_table` also take keyword-only `wait=False` and `timeout_seconds=None`. With `wait=True`, the call returns after the table no longer exists.
 
 See [table operations](tables.md) for details.
 

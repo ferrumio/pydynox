@@ -144,6 +144,7 @@ Async is the default. Sync methods have `sync_` prefix.
 | `await client.table_exists()` | `client.sync_table_exists()` |
 | `await client.delete_table()` | `client.sync_delete_table()` |
 | `await client.wait_for_table_active()` | `client.sync_wait_for_table_active()` |
+| `await client.wait_for_table_deleted()` | `client.sync_wait_for_table_deleted()` |
 
 ### Client CRUD
 

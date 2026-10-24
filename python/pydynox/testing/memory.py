@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import math
 import re
@@ -1542,13 +1543,39 @@ class MemoryClient:
     def sync_describe_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
         return self._describe_vector_index(table, index_name)
 
-    def delete_table(self, table: str) -> None:
-        """Delete a table."""
+    def _do_delete_table(self, table: str) -> None:
+        """Delete a table. Deletion is immediate, so there is nothing to wait for."""
         self._tables.pop(table, None)
         self._table_schemas.pop(table, None)
         self._vector_index_definitions = {
             key: value for key, value in self._vector_index_definitions.items() if key[0] != table
         }
+
+    async def delete_table(
+        self, table: str, *, wait: bool = False, timeout_seconds: int | None = None
+    ) -> None:
+        self._do_delete_table(table)
+
+    def sync_delete_table(
+        self, table: str, *, wait: bool = False, timeout_seconds: int | None = None
+    ) -> None:
+        self._do_delete_table(table)
+
+    async def wait_for_table_deleted(self, table: str, timeout_seconds: int | None = None) -> None:
+        """Wait until the table is gone. Raise TimeoutError if it still exists in time."""
+        deadline = time.monotonic() + (60 if timeout_seconds is None else timeout_seconds)
+        while table in self._tables:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Timeout waiting for table '{table}' to be deleted")
+            await asyncio.sleep(0.05)
+
+    def sync_wait_for_table_deleted(self, table: str, timeout_seconds: int | None = None) -> None:
+        """Wait until the table is gone. Raise TimeoutError if it still exists in time."""
+        deadline = time.monotonic() + (60 if timeout_seconds is None else timeout_seconds)
+        while table in self._tables:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Timeout waiting for table '{table}' to be deleted")
+            time.sleep(0.05)
 
     # ========== HELPERS ==========
 

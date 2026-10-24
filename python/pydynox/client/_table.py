@@ -109,20 +109,32 @@ class TableOperations(_MixinBase):  # pragma: no cover
         _log_debug("table_exists", f'Checking if table "{table_name}" exists')
         return self._client.table_exists(table_name)  # type: ignore[attr-defined, no-any-return]
 
-    def delete_table(self, table_name: str) -> Coroutine[Any, Any, None]:
+    def delete_table(
+        self,
+        table_name: str,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> Coroutine[Any, Any, None]:
         """Delete a table. Returns an awaitable.
 
         Args:
             table_name: Name of the table to delete.
+            wait: If True, wait until the table no longer exists.
+            timeout_seconds: Maximum time to wait (default: 60). Only used with wait.
 
         Returns:
-            Awaitable that completes when table is deleted.
+            Awaitable that completes when the delete request is accepted,
+            or when the table is gone if wait is True.
 
         Example:
             await client.delete_table("users")
+            await client.delete_table("users", wait=True, timeout_seconds=60)
         """
         _log_debug("delete_table", f'Deleting table "{table_name}"')
-        return self._client.delete_table(table_name)  # type: ignore[attr-defined, no-any-return]
+        return self._client.delete_table(  # type: ignore[attr-defined, no-any-return]
+            table_name, wait=wait, timeout_seconds=timeout_seconds
+        )
 
     def wait_for_table_active(
         self,
@@ -143,6 +155,31 @@ class TableOperations(_MixinBase):  # pragma: no cover
         """
         _log_debug("wait_for_table_active", f'Waiting for table "{table_name}" to become active')
         return self._client.wait_for_table_active(  # type: ignore[attr-defined, no-any-return]
+            table_name, timeout_seconds=timeout_seconds
+        )
+
+    def wait_for_table_deleted(
+        self,
+        table_name: str,
+        timeout_seconds: int | None = None,
+    ) -> Coroutine[Any, Any, None]:
+        """Wait for a table to be deleted. Returns an awaitable.
+
+        Completes right away if the table does not exist.
+
+        Args:
+            table_name: Name of the table to wait for.
+            timeout_seconds: Maximum time to wait (default: 60).
+
+        Returns:
+            Awaitable that completes when the table no longer exists.
+
+        Example:
+            await client.delete_table("users")
+            await client.wait_for_table_deleted("users")
+        """
+        _log_debug("wait_for_table_deleted", f'Waiting for table "{table_name}" to be deleted')
+        return self._client.wait_for_table_deleted(  # type: ignore[attr-defined, no-any-return]
             table_name, timeout_seconds=timeout_seconds
         )
 
@@ -220,17 +257,28 @@ class TableOperations(_MixinBase):  # pragma: no cover
         _log_debug("sync_table_exists", f'Checking if table "{table_name}" exists')
         return self._client.sync_table_exists(table_name)  # type: ignore[attr-defined, no-any-return]
 
-    def sync_delete_table(self, table_name: str) -> None:
+    def sync_delete_table(
+        self,
+        table_name: str,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None:
         """Delete a table. Blocks until complete.
 
         Args:
             table_name: Name of the table to delete.
+            wait: If True, wait until the table no longer exists.
+            timeout_seconds: Maximum time to wait (default: 60). Only used with wait.
 
         Example:
             client.sync_delete_table("users")
+            client.sync_delete_table("users", wait=True, timeout_seconds=60)
         """
         _log_debug("sync_delete_table", f'Deleting table "{table_name}"')
-        self._client.sync_delete_table(table_name)  # type: ignore[attr-defined]
+        self._client.sync_delete_table(  # type: ignore[attr-defined]
+            table_name, wait=wait, timeout_seconds=timeout_seconds
+        )
 
     def sync_wait_for_table_active(
         self,
@@ -250,5 +298,27 @@ class TableOperations(_MixinBase):  # pragma: no cover
             "sync_wait_for_table_active", f'Waiting for table "{table_name}" to become active'
         )
         self._client.sync_wait_for_table_active(  # type: ignore[attr-defined]
+            table_name, timeout_seconds=timeout_seconds
+        )
+
+    def sync_wait_for_table_deleted(
+        self,
+        table_name: str,
+        timeout_seconds: int | None = None,
+    ) -> None:
+        """Wait for a table to be deleted. Blocks until complete.
+
+        Returns right away if the table does not exist.
+
+        Args:
+            table_name: Name of the table to wait for.
+            timeout_seconds: Maximum time to wait (default: 60).
+
+        Example:
+            client.sync_delete_table("users")
+            client.sync_wait_for_table_deleted("users")
+        """
+        _log_debug("sync_wait_for_table_deleted", f'Waiting for table "{table_name}" to be deleted')
+        self._client.sync_wait_for_table_deleted(  # type: ignore[attr-defined]
             table_name, timeout_seconds=timeout_seconds
         )

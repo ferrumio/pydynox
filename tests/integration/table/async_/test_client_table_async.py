@@ -63,6 +63,37 @@ async def test_async_wait_for_table_active(client):
 
 
 @pytest.mark.asyncio
+async def test_async_wait_for_table_deleted(client):
+    """Test async wait_for_table_deleted after delete."""
+    await client.create_table("async_wait_deleted", partition_key=("pk", "S"), wait=True)
+    await client.delete_table("async_wait_deleted")
+
+    await client.wait_for_table_deleted("async_wait_deleted", timeout_seconds=30)
+
+    assert await client.table_exists("async_wait_deleted") is False
+
+
+@pytest.mark.asyncio
+async def test_async_wait_for_table_deleted_already_absent(client):
+    """Test async waiter returns at once for a table that does not exist."""
+    await client.wait_for_table_deleted("async_never_existed_12345")
+
+
+@pytest.mark.asyncio
+async def test_async_delete_table_with_wait_allows_recreation(client):
+    """Test async delete_table(wait=True) lets the same name be created again."""
+    await client.create_table("async_recreate", partition_key=("pk", "S"), wait=True)
+
+    await client.delete_table("async_recreate", wait=True, timeout_seconds=30)
+    assert await client.table_exists("async_recreate") is False
+
+    await client.create_table("async_recreate", partition_key=("pk", "S"), wait=True)
+    assert await client.table_exists("async_recreate") is True
+
+    await client.delete_table("async_recreate")
+
+
+@pytest.mark.asyncio
 async def test_async_create_table_with_gsi(client):
     """Test async create_table with GSI."""
     await client.create_table(

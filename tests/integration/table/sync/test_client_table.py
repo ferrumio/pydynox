@@ -125,6 +125,34 @@ def test_wait_for_table_active(client):
     client.sync_delete_table("wait_active_table")
 
 
+def test_wait_for_table_deleted(client):
+    """Test waiting for a table to be gone after delete."""
+    client.sync_create_table("wait_deleted_table", partition_key=("pk", "S"), wait=True)
+    client.sync_delete_table("wait_deleted_table")
+
+    client.sync_wait_for_table_deleted("wait_deleted_table", timeout_seconds=30)
+
+    assert client.sync_table_exists("wait_deleted_table") is False
+
+
+def test_wait_for_table_deleted_already_absent(client):
+    """Test the waiter returns at once for a table that does not exist."""
+    client.sync_wait_for_table_deleted("never_existed_table_12345")
+
+
+def test_delete_table_with_wait_allows_recreation(client):
+    """Test wait=True lets the same table name be created again."""
+    client.sync_create_table("recreate_table", partition_key=("pk", "S"), wait=True)
+
+    client.sync_delete_table("recreate_table", wait=True, timeout_seconds=30)
+    assert client.sync_table_exists("recreate_table") is False
+
+    client.sync_create_table("recreate_table", partition_key=("pk", "S"), wait=True)
+    assert client.sync_table_exists("recreate_table")
+
+    client.sync_delete_table("recreate_table")
+
+
 # ============ Error Cases ============
 
 
@@ -132,6 +160,12 @@ def test_delete_nonexistent_table_raises_error(client):
     """Test that deleting a non-existent table raises ResourceNotFoundException."""
     with pytest.raises(ResourceNotFoundException):
         client.sync_delete_table("nonexistent_table_12345")
+
+
+def test_delete_nonexistent_table_with_wait_raises_error(client):
+    """Test that wait=True keeps the delete error for a missing table."""
+    with pytest.raises(ResourceNotFoundException):
+        client.sync_delete_table("nonexistent_table_12345", wait=True)
 
 
 def test_create_duplicate_table_raises_error(client):
