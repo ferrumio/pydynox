@@ -196,8 +196,31 @@ class DynamoDBClient:
         timeout_seconds: int | None = None,
     ) -> None: ...
     def table_exists(self, table_name: str) -> bool: ...
-    def delete_table(self, table_name: str) -> None: ...
+    def delete_table(
+        self,
+        table_name: str,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None: ...
+    def sync_delete_table(
+        self,
+        table_name: str,
+        *,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
+    ) -> None: ...
     def wait_for_table_active(
+        self,
+        table_name: str,
+        timeout_seconds: int | None = None,
+    ) -> None: ...
+    def wait_for_table_deleted(
+        self,
+        table_name: str,
+        timeout_seconds: int | None = None,
+    ) -> None: ...
+    def sync_wait_for_table_deleted(
         self,
         table_name: str,
         timeout_seconds: int | None = None,

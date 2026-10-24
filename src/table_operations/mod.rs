@@ -4,7 +4,7 @@
 //! - `create` - Create a new table with optional GSIs and LSIs
 //! - `delete` - Delete a table
 //! - `exists` - Check if a table exists
-//! - `wait` - Wait for table to become active
+//! - `wait` - Wait for table to become active or to be deleted
 //! - `gsi` - GSI definition and parsing
 //! - `lsi` - LSI definition and parsing
 //!
@@ -14,7 +14,7 @@
 //! - `create_table()` - async (returns Python awaitable)
 //! - `sync_create_table()` - sync (blocks until complete)
 //!
-//! Same pattern for delete_table, table_exists, wait_for_table_active.
+//! Same pattern for delete_table, table_exists, wait_for_table_active, wait_for_table_deleted.
 
 mod create;
 mod delete;
@@ -31,14 +31,14 @@ pub use exists::sync_table_exists;
 pub use vector_index::{
     sync_create_vector_index, sync_delete_vector_index, sync_describe_vector_index,
 };
-pub use wait::sync_wait_for_table_active;
+pub use wait::{sync_wait_for_table_active, sync_wait_for_table_deleted};
 
 // Re-export async operations (no prefix - default)
 pub use create::create_table;
 pub use delete::delete_table;
 pub use exists::table_exists;
 pub use vector_index::{create_vector_index, delete_vector_index, describe_vector_index};
-pub use wait::wait_for_table_active;
+pub use wait::{wait_for_table_active, wait_for_table_deleted};
 
 // Re-export GSI/LSI parsing (unchanged)
 pub use gsi::parse_gsi_definitions;

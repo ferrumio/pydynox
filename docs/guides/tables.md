@@ -31,6 +31,7 @@ Table operations follow the async-first pattern:
 | Check exists | `await client.table_exists(...)` | `client.sync_table_exists(...)` |
 | Delete table | `await client.delete_table(...)` | `client.sync_delete_table(...)` |
 | Wait for active | `await client.wait_for_table_active(...)` | `client.sync_wait_for_table_active(...)` |
+| Wait for deleted | `await client.wait_for_table_deleted(...)` | `client.sync_wait_for_table_deleted(...)` |
 
 Same pattern for Model:
 
@@ -136,6 +137,42 @@ Before creating a table, check if it already exists:
 
 !!! warning
     This permanently deletes the table and all its data. There is no confirmation prompt.
+
+### Wait for a table to be deleted
+
+DynamoDB deletes tables in the background. The delete call can return while the table is still in the `DELETING` state. If you need to create the same table again, wait for the deletion first.
+
+Pass `wait=True` to the client delete methods:
+
+=== "Async (default)"
+    ```python
+    --8<-- "docs/examples/tables/delete_table_wait_async.py"
+    ```
+
+=== "Sync"
+    ```python
+    --8<-- "docs/examples/tables/delete_table_wait.py"
+    ```
+
+Or delete first and wait later with `wait_for_table_deleted`:
+
+=== "Async (default)"
+    ```python
+    await client.delete_table("users")
+    # Do other cleanup...
+    await client.wait_for_table_deleted("users", timeout_seconds=30)
+    ```
+
+=== "Sync"
+    ```python
+    client.sync_delete_table("users")
+    # Do other cleanup...
+    client.sync_wait_for_table_deleted("users", timeout_seconds=30)
+    ```
+
+The waiter returns right away if the table does not exist. It raises `TimeoutError` if the table is still there after `timeout_seconds` (default 60). Other errors, such as missing permissions, are raised as they are. They do not count as a deleted table.
+
+Without `wait=True`, `delete_table` behaves as before. The memory backend deletes tables at once, so the waiter returns immediately.
 
 ## Advanced
 
@@ -260,10 +297,12 @@ Or wait separately:
 | `sync_create_table(...)` | Create table (sync) |
 | `table_exists(table_name)` | Check if table exists (async) |
 | `sync_table_exists(table_name)` | Check if table exists (sync) |
-| `delete_table(table_name)` | Delete table (async) |
-| `sync_delete_table(table_name)` | Delete table (sync) |
+| `delete_table(table_name, wait=False, timeout_seconds=None)` | Delete table (async) |
+| `sync_delete_table(table_name, wait=False, timeout_seconds=None)` | Delete table (sync) |
 | `wait_for_table_active(table_name, ...)` | Wait for table (async) |
 | `sync_wait_for_table_active(table_name, ...)` | Wait for table (sync) |
+| `wait_for_table_deleted(table_name, timeout_seconds=None)` | Wait until table is gone (async) |
+| `sync_wait_for_table_deleted(table_name, timeout_seconds=None)` | Wait until table is gone (sync) |
 
 ### client.create_table() / client.sync_create_table() parameters
 
