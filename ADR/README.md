@@ -30,6 +30,7 @@ An ADR is a short document that describes a decision, why it was made, and what 
 | 018 | [Async-first design](018-async-first-design.md) | Accepted |
 | 019 | [Release GIL during sync block_on](019-gil-release-sync-operations.md) | Accepted |
 | 020 | [Split client.rs into domain modules](020-split-client-into-modules.md) | Accepted |
+| 021 | [Optional Pydantic integration via `PydanticModel`](021-pydantic-base-model.md) | Proposed |
 
 ## Adding a new ADR
 
