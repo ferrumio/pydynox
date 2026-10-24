@@ -232,55 +232,55 @@ def test_delete_table_wait_options_are_keyword_only(fake_dynamodb) -> None:
 # ========== GIL release ==========
 
 
-def _ticks_while_waiting_times_out(blocking_call) -> int:
-    """Count how often a second Python thread runs while the call blocks."""
-    ticks = 0
-    done = threading.Event()
+def _helper_ran_before_wait_returned(blocking_call) -> bool:
+    """Run the call while a helper thread records when it gets to run."""
+    entering_call = threading.Event()
+    helper_ran_at: list[float] = []
 
-    def tick() -> None:
-        nonlocal ticks
-        while not done.is_set():
-            ticks += 1
-            time.sleep(0.01)
+    def helper() -> None:
+        entering_call.wait()
+        time.sleep(0.3)
+        helper_ran_at.append(time.monotonic())
 
-    ticker = threading.Thread(target=tick)
-    ticker.start()
+    thread = threading.Thread(target=helper)
+    thread.start()
     try:
+        entering_call.set()
         with pytest.raises(TimeoutError):
             blocking_call()
+        returned_at = time.monotonic()
     finally:
-        done.set()
-        ticker.join()
-    return ticks
+        thread.join()
+    return helper_ran_at[0] < returned_at
 
 
 def test_sync_wait_for_table_deleted_releases_the_gil(fake_dynamodb) -> None:
-    # GIVEN a table that never goes away and a thread that keeps counting
+    # GIVEN a table that never goes away and a helper thread that needs the GIL to run
     server = fake_dynamodb({"DescribeTable": [_EXISTS]})
     client = _client(server)
 
     # WHEN a sync wait blocks until its one second timeout
-    ticks = _ticks_while_waiting_times_out(
+    helper_ran_first = _helper_ran_before_wait_returned(
         lambda: client.sync_wait_for_table_deleted("users", timeout_seconds=1)
     )
 
-    # THEN the other thread kept running, so the GIL was not held
-    assert ticks > 20
+    # THEN the helper thread ran while the waiter was still blocked, so the GIL was not held
+    assert helper_ran_first
 
 
 def test_sync_wait_for_table_active_releases_the_gil(fake_dynamodb) -> None:
-    # GIVEN a table that never becomes active and a thread that keeps counting
+    # GIVEN a table that never becomes active and a helper thread that needs the GIL to run
     creating = {"Table": {"TableName": "users", "TableStatus": "CREATING"}}
     server = fake_dynamodb({"DescribeTable": [creating]})
     client = _client(server)
 
     # WHEN a sync wait blocks until its one second timeout
-    ticks = _ticks_while_waiting_times_out(
+    helper_ran_first = _helper_ran_before_wait_returned(
         lambda: client.sync_wait_for_table_active("users", timeout_seconds=1)
     )
 
-    # THEN the other thread kept running, so the GIL was not held
-    assert ticks > 20
+    # THEN the helper thread ran while the waiter was still blocked, so the GIL was not held
+    assert helper_ran_first
 
 
 # ========== Python wrapper forwarding ==========
