@@ -97,10 +97,12 @@ impl DynamoDBClient {
     #[pyo3(signature = (table_name, timeout_seconds=None))]
     pub fn sync_wait_for_table_active(
         &self,
+        py: Python<'_>,
         table_name: &str,
         timeout_seconds: Option<u64>,
     ) -> PyResult<()> {
         table_operations::sync_wait_for_table_active(
+            py,
             &self.client,
             &self.runtime,
             table_name,

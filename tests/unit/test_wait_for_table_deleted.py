@@ -6,6 +6,8 @@ polling loop runs for real without Docker or AWS credentials.
 
 from __future__ import annotations
 
+import threading
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -227,6 +229,60 @@ def test_delete_table_wait_options_are_keyword_only(fake_dynamodb) -> None:
         client.sync_delete_table("users", True)  # type: ignore[misc]
 
 
+# ========== GIL release ==========
+
+
+def _ticks_while_waiting_times_out(blocking_call) -> int:
+    """Count how often a second Python thread runs while the call blocks."""
+    ticks = 0
+    done = threading.Event()
+
+    def tick() -> None:
+        nonlocal ticks
+        while not done.is_set():
+            ticks += 1
+            time.sleep(0.01)
+
+    ticker = threading.Thread(target=tick)
+    ticker.start()
+    try:
+        with pytest.raises(TimeoutError):
+            blocking_call()
+    finally:
+        done.set()
+        ticker.join()
+    return ticks
+
+
+def test_sync_wait_for_table_deleted_releases_the_gil(fake_dynamodb) -> None:
+    # GIVEN a table that never goes away and a thread that keeps counting
+    server = fake_dynamodb({"DescribeTable": [_EXISTS]})
+    client = _client(server)
+
+    # WHEN a sync wait blocks until its one second timeout
+    ticks = _ticks_while_waiting_times_out(
+        lambda: client.sync_wait_for_table_deleted("users", timeout_seconds=1)
+    )
+
+    # THEN the other thread kept running, so the GIL was not held
+    assert ticks > 20
+
+
+def test_sync_wait_for_table_active_releases_the_gil(fake_dynamodb) -> None:
+    # GIVEN a table that never becomes active and a thread that keeps counting
+    creating = {"Table": {"TableName": "users", "TableStatus": "CREATING"}}
+    server = fake_dynamodb({"DescribeTable": [creating]})
+    client = _client(server)
+
+    # WHEN a sync wait blocks until its one second timeout
+    ticks = _ticks_while_waiting_times_out(
+        lambda: client.sync_wait_for_table_active("users", timeout_seconds=1)
+    )
+
+    # THEN the other thread kept running, so the GIL was not held
+    assert ticks > 20
+
+
 # ========== Python wrapper forwarding ==========
 
 
@@ -341,3 +397,61 @@ def test_memory_backend_wait_for_absent_table_succeeds() -> None:
     # Very simple test: the call only has to return, so there are no sections
     with MemoryBackend() as backend:
         backend.client.sync_wait_for_table_deleted("never_created")
+
+
+async def test_memory_backend_async_wait_times_out_while_table_exists() -> None:
+    with MemoryBackend() as backend:
+        # GIVEN a table that still exists in the memory backend
+        backend.client.sync_create_table("users", partition_key=("pk", "S"))
+
+        # WHEN waiting for its deletion with a zero timeout
+        # THEN a TimeoutError names the table
+        with pytest.raises(TimeoutError, match="users"):
+            await backend.client.wait_for_table_deleted("users", timeout_seconds=0)
+
+        # AND the table is untouched
+        assert backend.client.sync_table_exists("users")
+
+
+def test_memory_backend_sync_wait_times_out_while_table_exists() -> None:
+    with MemoryBackend() as backend:
+        # GIVEN a table that still exists in the memory backend
+        backend.client.sync_create_table("users", partition_key=("pk", "S"))
+
+        # WHEN waiting for its deletion with a zero timeout
+        # THEN a TimeoutError names the table
+        with pytest.raises(TimeoutError, match="users"):
+            backend.client.sync_wait_for_table_deleted("users", timeout_seconds=0)
+
+        # AND the table is untouched
+        assert backend.client.sync_table_exists("users")
+
+
+async def test_memory_backend_async_wait_returns_once_table_is_deleted() -> None:
+    with MemoryBackend() as backend:
+        # GIVEN a table that another thread deletes shortly after the wait starts
+        backend.client.sync_create_table("users", partition_key=("pk", "S"))
+        deleter = threading.Timer(0.2, backend.client.sync_delete_table, args=("users",))
+        deleter.start()
+
+        # WHEN waiting for the table to be deleted
+        await backend.client.wait_for_table_deleted("users", timeout_seconds=5)
+        deleter.join()
+
+        # THEN the wait ends and the table is gone
+        assert not backend.client.sync_table_exists("users")
+
+
+def test_memory_backend_sync_wait_returns_once_table_is_deleted() -> None:
+    with MemoryBackend() as backend:
+        # GIVEN a table that another thread deletes shortly after the wait starts
+        backend.client.sync_create_table("users", partition_key=("pk", "S"))
+        deleter = threading.Timer(0.2, backend.client.sync_delete_table, args=("users",))
+        deleter.start()
+
+        # WHEN waiting for the table to be deleted
+        backend.client.sync_wait_for_table_deleted("users", timeout_seconds=5)
+        deleter.join()
+
+        # THEN the wait ends and the table is gone
+        assert not backend.client.sync_table_exists("users")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import math
 import re
@@ -1561,10 +1562,20 @@ class MemoryClient:
         self._do_delete_table(table)
 
     async def wait_for_table_deleted(self, table: str, timeout_seconds: int | None = None) -> None:
-        """Return at once, because the memory backend deletes tables immediately."""
+        """Wait until the table is gone. Raise TimeoutError if it still exists in time."""
+        deadline = time.monotonic() + (60 if timeout_seconds is None else timeout_seconds)
+        while table in self._tables:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Timeout waiting for table '{table}' to be deleted")
+            await asyncio.sleep(0.05)
 
     def sync_wait_for_table_deleted(self, table: str, timeout_seconds: int | None = None) -> None:
-        """Return at once, because the memory backend deletes tables immediately."""
+        """Wait until the table is gone. Raise TimeoutError if it still exists in time."""
+        deadline = time.monotonic() + (60 if timeout_seconds is None else timeout_seconds)
+        while table in self._tables:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Timeout waiting for table '{table}' to be deleted")
+            time.sleep(0.05)
 
     # ========== HELPERS ==========
 

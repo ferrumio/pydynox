@@ -106,8 +106,9 @@ pub fn wait_for_table_active<'py>(
     })
 }
 
-/// Sync wait_for_table_active - blocks until complete.
+/// Sync wait_for_table_active - blocks until complete, without holding the GIL.
 pub fn sync_wait_for_table_active(
+    py: Python<'_>,
     client: &Client,
     runtime: &Arc<Runtime>,
     table_name: &str,
@@ -116,8 +117,10 @@ pub fn sync_wait_for_table_active(
     let client = client.clone();
     let table_name = table_name.to_string();
 
-    runtime.block_on(async {
-        execute_wait_for_table_active(client, &table_name, timeout_seconds).await
+    py.detach(|| {
+        runtime.block_on(async {
+            execute_wait_for_table_active(client, &table_name, timeout_seconds).await
+        })
     })
 }
 

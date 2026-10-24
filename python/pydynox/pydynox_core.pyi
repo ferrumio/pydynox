@@ -202,7 +202,7 @@ class DynamoDBClient:
         *,
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> None: ...
+    ) -> Coroutine[Any, Any, None]: ...
     def sync_delete_table(
         self,
         table_name: str,
@@ -219,7 +219,7 @@ class DynamoDBClient:
         self,
         table_name: str,
         timeout_seconds: int | None = None,
-    ) -> None: ...
+    ) -> Coroutine[Any, Any, None]: ...
     def sync_wait_for_table_deleted(
         self,
         table_name: str,
