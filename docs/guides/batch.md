@@ -37,6 +37,8 @@ DynamoDB returns only the attributes you list. Key attributes are not added auto
 
 On a Model, use the Python field names, also at the start of a nested path like `address.city`. Aliases are translated for you. A field you leave out gets its default value, or `None` if it has no default. If you leave out a `required=True` field, creating the model fails with `ValueError`. Include required fields in the projection, or use `as_dict=True`.
 
+Dots inside an alias stay literal. For example, if `address` has `alias="contact.addr"`, projecting `address.city` reads `city` inside the attribute named `contact.addr`.
+
 !!! note
     Projection reduces data transfer, not RCU cost. See [projections](projections.md).
 

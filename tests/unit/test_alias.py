@@ -405,12 +405,12 @@ class CustomerWithMapAlias(Model):
 @pytest.mark.parametrize(
     "path,expected",
     [
-        pytest.param("address", "addr", id="top_level_alias"),
-        pytest.param("address.city", "addr.city", id="nested_alias"),
-        pytest.param("address.geo.lat", "addr.geo.lat", id="deep_nested_alias"),
-        pytest.param("name", "name", id="no_alias"),
-        pytest.param("name.first", "name.first", id="nested_no_alias"),
-        pytest.param("unknown.address", "unknown.address", id="unknown_root"),
+        pytest.param("address", ["addr"], id="top_level_alias"),
+        pytest.param("address.city", ["addr", "city"], id="nested_alias"),
+        pytest.param("address.geo.lat", ["addr", "geo", "lat"], id="deep_nested_alias"),
+        pytest.param("name", ["name"], id="no_alias"),
+        pytest.param("name.first", ["name", "first"], id="nested_no_alias"),
+        pytest.param("unknown.address", ["unknown", "address"], id="unknown_root"),
     ],
 )
 def test_dynamo_path_translates_only_the_root(path, expected):
@@ -419,45 +419,53 @@ def test_dynamo_path_translates_only_the_root(path, expected):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
-async def test_batch_get_projection_with_nested_alias(sync):
+@pytest.mark.parametrize("alias", ["addr", "contact.addr"])
+@pytest.mark.parametrize("field", ["address", "address.city"])
+async def test_batch_get_projection_with_nested_alias(sync, alias, field):
     """batch_get projection uses the alias at the root of a nested path."""
+
+    class Customer(CustomerWithMapAlias):
+        address = MapAttribute(alias=alias)
+
     with MemoryBackend():
-        # GIVEN a customer whose address map is stored as "addr"
-        await CustomerWithMapAlias(
-            pk="C#1", name="Ann", address={"city": "Paris", "zip": "75001"}
-        ).save()
+        # GIVEN a customer whose address map is stored under an alias
+        await Customer(pk="C#1", name="Ann", address={"city": "Paris", "zip": "75001"}).save()
         keys = [{"pk": "C#1"}]
-        projection = ["pk", "address.city"]
+        projection = ["pk", field]
 
         # WHEN batch getting a nested field by its Python name
         if sync:
-            customers = CustomerWithMapAlias.sync_batch_get(keys, projection=projection)
+            customers = Customer.sync_batch_get(keys, projection=projection)
         else:
-            customers = await CustomerWithMapAlias.batch_get(keys, projection=projection)
+            customers = await Customer.batch_get(keys, projection=projection)
 
-        # THEN only the nested field comes back
+        # THEN the alias is kept literal and only the requested fields come back
         assert len(customers) == 1
-        assert customers[0].address == {"city": "Paris"}
+        expected = {"city": "Paris", "zip": "75001"} if field == "address" else {"city": "Paris"}
+        assert customers[0].address == expected
         assert customers[0].name is None
 
 
 @pytest.mark.parametrize("operation", ["query", "scan"])
-def test_query_and_scan_fields_translate_nested_alias(operation):
+@pytest.mark.parametrize("alias", ["addr", "contact.addr"])
+def test_query_and_scan_fields_translate_nested_alias(operation, alias):
     """query and scan fields use the alias at the root of a nested path."""
+
+    class Customer(CustomerWithMapAlias):
+        address = MapAttribute(alias=alias)
+
     # WHEN building the projection for a nested field by its Python name
     fields = ["pk", "address.city"]
     if operation == "query":
         _, _, projection_expr, attr_names, _, _ = _build_query_params(
-            CustomerWithMapAlias, "C#1", None, None, None, fields
+            Customer, "C#1", None, None, None, fields
         )
     else:
-        _, projection_expr, attr_names, _, _ = _build_scan_params(
-            CustomerWithMapAlias, None, None, fields
-        )
+        _, projection_expr, attr_names, _, _ = _build_scan_params(Customer, None, None, fields)
 
     # THEN the root is sent as the alias and the nested part stays the same
     assert projection_expr == "#proj0_0, #proj1_0.#proj1_1"
     assert attr_names is not None
     assert attr_names["#proj0_0"] == "pk"
-    assert attr_names["#proj1_0"] == "addr"
+    assert attr_names["#proj1_0"] == alias
     assert attr_names["#proj1_1"] == "city"

@@ -71,7 +71,7 @@ def _build_query_params(
     if fields:
         proj_parts = []
         for i, field in enumerate(fields):
-            parts = model_class._dynamo_path(field).split(".")
+            parts = model_class._dynamo_path(field)
             part_placeholders = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
@@ -118,7 +118,7 @@ def _build_scan_params(
     if fields:
         proj_parts = []
         for i, field in enumerate(fields):
-            parts = model_class._dynamo_path(field).split(".")
+            parts = model_class._dynamo_path(field)
             part_placeholders = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"

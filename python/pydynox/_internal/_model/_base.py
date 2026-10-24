@@ -478,15 +478,16 @@ class ModelBase(metaclass=ModelMeta):
         return key
 
     @classmethod
-    def _dynamo_path(cls, path: str) -> str:
-        """Translate an attribute path to DynamoDB names.
+    def _dynamo_path(cls, path: str) -> list[str]:
+        """Split an attribute path and translate its root to a DynamoDB name.
 
-        Only the top-level attribute can have an alias, so only the first part
-        of a dot path is translated: "address.city" becomes "addr.city" when
-        address has alias="addr".
+        Keep segments separate so dots inside an alias remain literal:
+        "address.city" becomes ["contact.addr", "city"] when address has
+        alias="contact.addr".
         """
-        root, dot, rest = path.partition(".")
-        return cls._py_to_dynamo.get(root, root) + dot + rest
+        parts = path.split(".")
+        parts[0] = cls._py_to_dynamo.get(parts[0], parts[0])
+        return parts
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the model to a dict.

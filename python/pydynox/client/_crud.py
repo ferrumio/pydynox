@@ -20,6 +20,8 @@ UpdateReturnValues = Literal["NONE", "ALL_OLD", "UPDATED_OLD", "ALL_NEW", "UPDAT
 
 def _build_projection(
     projection: list[str] | None,
+    *,
+    paths: list[list[str]] | None = None,
 ) -> tuple[str | None, dict[str, str] | None]:
     """Build projection expression and attribute names from a list of fields.
 
@@ -28,25 +30,26 @@ def _build_projection(
 
     Args:
         projection: List of attribute names to project.
+        paths: Internal pre-split paths. Segments may contain literal dots.
 
     Returns:
         Tuple of (projection_expression, expression_attribute_names).
-        Both are None if projection is None or empty.
+        Both are None when no paths are requested.
 
     Example:
         >>> _build_projection(["name", "address.city"])
         ("#p0, #p1.#p2", {"#p0": "name", "#p1": "address", "#p2": "city"})
     """
-    if not projection:
+    if paths is None:
+        paths = [field.split(".") for field in projection] if projection else []
+    if not paths:
         return None, None
 
     attr_names: dict[str, str] = {}
     placeholders: list[str] = []
     counter = 0
 
-    for field in projection:
-        # Handle nested attributes (e.g., "address.city")
-        parts = field.split(".")
+    for parts in paths:
         part_placeholders = []
         for part in parts:
             placeholder = f"#p{counter}"

@@ -49,6 +49,8 @@ class BatchOperations(_MixinBase):
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
         projection: list[str] | None = None,
+        *,
+        _projection_paths: list[list[str]] | None = None,
     ) -> list[dict[str, Any]]:
         """Async batch get items from a DynamoDB table.
 
@@ -66,7 +68,7 @@ class BatchOperations(_MixinBase):
         """
         _log_debug("batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        projection_expr, attr_names = _build_projection(projection)
+        projection_expr, attr_names = _build_projection(projection, paths=_projection_paths)
         return await self._client.batch_get(  # type: ignore[attr-defined, no-any-return]
             table, keys, consistent_read, projection_expr, attr_names
         )
@@ -108,6 +110,8 @@ class BatchOperations(_MixinBase):
         keys: list[dict[str, Any]],
         consistent_read: bool = False,
         projection: list[str] | None = None,
+        *,
+        _projection_paths: list[list[str]] | None = None,
     ) -> list[dict[str, Any]]:
         """Sync batch get items from a DynamoDB table.
 
@@ -125,7 +129,7 @@ class BatchOperations(_MixinBase):
         """
         _log_debug("sync_batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
-        projection_expr, attr_names = _build_projection(projection)
+        projection_expr, attr_names = _build_projection(projection, paths=_projection_paths)
         return self._client.sync_batch_get(  # type: ignore[attr-defined, no-any-return]
             table, keys, consistent_read, projection_expr, attr_names
         )

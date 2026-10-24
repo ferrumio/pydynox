@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 M = TypeVar("M", bound="Model")
 
 
-def _dynamo_projection(cls: type[M], projection: list[str] | None) -> list[str] | None:
+def _dynamo_projection(cls: type[M], projection: list[str] | None) -> list[list[str]] | None:
     if not projection:
         return None
     return [cls._dynamo_path(path) for path in projection]
@@ -50,7 +50,7 @@ async def batch_get(
         table,
         aliased_keys,
         consistent_read=consistent_read or False,
-        projection=_dynamo_projection(cls, projection),
+        _projection_paths=_dynamo_projection(cls, projection),
     )
 
     if as_dict:
@@ -99,7 +99,7 @@ def sync_batch_get(
         table,
         aliased_keys,
         consistent_read=consistent_read or False,
-        projection=_dynamo_projection(cls, projection),
+        _projection_paths=_dynamo_projection(cls, projection),
     )
 
     if as_dict:
