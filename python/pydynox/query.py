@@ -309,22 +309,25 @@ class AsyncQueryResult:
             self._last_evaluated_key = result["last_evaluated_key"]
             self._metrics = result["metrics"]
             self._page_index = 0
-            add_response_attributes(
-                span,
-                consumed_rcu=self._metrics.consumed_rcu,
-                request_id=self._metrics.request_id,
-            )
+            metrics = self._metrics
+            if metrics is not None:
+                add_response_attributes(
+                    span,
+                    consumed_rcu=metrics.consumed_rcu,
+                    request_id=metrics.request_id,
+                )
 
         # Log the query
-        _log_operation(
-            "query",
-            self._table,
-            self._metrics.duration_ms,
-            consumed_rcu=self._metrics.consumed_rcu,
-            items_count=self._metrics.items_count,
-        )
-        if self._metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
-            _log_warning("query", f"slow operation ({self._metrics.duration_ms:.1f}ms)")
+        if metrics is not None:
+            _log_operation(
+                "query",
+                self._table,
+                metrics.duration_ms,
+                consumed_rcu=metrics.consumed_rcu,
+                items_count=metrics.items_count,
+            )
+            if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+                _log_warning("query", f"slow operation ({metrics.duration_ms:.1f}ms)")
 
         # If no last_key, this is the final page
         if self._last_evaluated_key is None:
@@ -620,21 +623,24 @@ class AsyncScanResult:
             self._last_evaluated_key = result["last_evaluated_key"]
             self._metrics = result["metrics"]
             self._page_index = 0
-            add_response_attributes(
-                span,
-                consumed_rcu=self._metrics.consumed_rcu,
-                request_id=self._metrics.request_id,
-            )
+            metrics = self._metrics
+            if metrics is not None:
+                add_response_attributes(
+                    span,
+                    consumed_rcu=metrics.consumed_rcu,
+                    request_id=metrics.request_id,
+                )
 
-        _log_operation(
-            "scan",
-            self._table,
-            self._metrics.duration_ms,
-            consumed_rcu=self._metrics.consumed_rcu,
-            items_count=self._metrics.items_count,
-        )
-        if self._metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
-            _log_warning("scan", f"slow operation ({self._metrics.duration_ms:.1f}ms)")
+        if metrics is not None:
+            _log_operation(
+                "scan",
+                self._table,
+                metrics.duration_ms,
+                consumed_rcu=metrics.consumed_rcu,
+                items_count=metrics.items_count,
+            )
+            if metrics.duration_ms > _SLOW_QUERY_THRESHOLD_MS:
+                _log_warning("scan", f"slow operation ({metrics.duration_ms:.1f}ms)")
 
         if self._last_evaluated_key is None:
             self._exhausted = True

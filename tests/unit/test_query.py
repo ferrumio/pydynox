@@ -5,6 +5,7 @@ With async-first API:
 - sync_query() returns ModelQueryResult (sync)
 """
 
+import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -163,6 +164,41 @@ async def test_async_query_iteration(user_model, mock_client):
 
     assert len(users) == 1
     assert isinstance(users[0], user_model)
+
+
+@pytest.mark.asyncio
+async def test_async_query_logs_operation_with_metrics(user_model, mock_client, caplog):
+    """Async query logs the operation and slow warning when metrics are returned."""
+    mock_client._client.query_page.return_value = {
+        "items": [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+        "last_evaluated_key": None,
+        "metrics": MagicMock(duration_ms=150.0, consumed_rcu=2.0, items_count=1),
+    }
+
+    with caplog.at_level(logging.INFO, logger="pydynox"):
+        users = [user async for user in user_model.query(partition_key="USER#123")]
+
+    assert len(users) == 1
+    messages = [record.message for record in caplog.records]
+    assert "query table=users duration_ms=150.0 rcu=2.0 items=1" in messages
+    assert "query slow operation (150.0ms)" in messages
+
+
+@pytest.mark.asyncio
+async def test_async_query_skips_log_without_metrics(user_model, mock_client, caplog):
+    """Async query still returns items and skips operation logging when metrics are missing."""
+    mock_client._client.query_page.return_value = {
+        "items": [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+        "last_evaluated_key": None,
+        "metrics": None,
+    }
+
+    with caplog.at_level(logging.INFO, logger="pydynox"):
+        users = [user async for user in user_model.query(partition_key="USER#123")]
+
+    assert len(users) == 1
+    assert not any(record.message.startswith("query table=") for record in caplog.records)
+    assert not any("slow operation" in record.message for record in caplog.records)
 
 
 def test_query_last_evaluated_key_before_iteration(user_model):
