@@ -137,7 +137,8 @@ class Model(ModelBase, metaclass=ModelMeta):
     def sync_get(
         cls: type[M],
         consistent_read: bool | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         **keys: Any,
     ) -> dict[str, Any] | None: ...
 
@@ -288,7 +289,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         cls: type[M],
         keys: list[dict[str, Any]],
         consistent_read: bool | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         projection: list[str] | None = None,
     ) -> list[dict[str, Any]]: ...
 
@@ -353,7 +355,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         cls: type[M],
         keys: list[dict[str, Any]],
         consistent_read: bool | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         projection: list[str] | None = None,
     ) -> list[dict[str, Any]]: ...
 
@@ -415,7 +418,8 @@ class Model(ModelBase, metaclass=ModelMeta):
     async def get(
         cls: type[M],
         consistent_read: bool | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         **keys: Any,
     ) -> dict[str, Any] | None: ...
 
@@ -585,7 +589,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         fields: list[str] | None = None,
         **kwargs: Any,
     ) -> ModelQueryResult[dict[str, Any]]: ...
@@ -690,7 +695,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
         total_segments: int | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         fields: list[str] | None = None,
     ) -> ModelScanResult[dict[str, Any]]: ...
 
@@ -818,7 +824,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         total_segments: int,
         filter_condition: Condition | None = None,
         consistent_read: bool | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
     ) -> tuple[list[dict[str, Any]], OperationMetrics]: ...
 
     @overload
@@ -887,7 +894,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         scan_index_forward: bool = True,
         consistent_read: bool | None = None,
         last_evaluated_key: dict[str, Any] | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         fields: list[str] | None = None,
         **kwargs: Any,
     ) -> AsyncModelQueryResult[dict[str, Any]]: ...
@@ -992,7 +1000,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         last_evaluated_key: dict[str, Any] | None = None,
         segment: int | None = None,
         total_segments: int | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
         fields: list[str] | None = None,
     ) -> AsyncModelScanResult[dict[str, Any]]: ...
 
@@ -1120,7 +1129,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         total_segments: int,
         filter_condition: Condition | None = None,
         consistent_read: bool | None = None,
-        as_dict: Literal[True] = ...,
+        *,
+        as_dict: Literal[True],
     ) -> tuple[list[dict[str, Any]], OperationMetrics]: ...
 
     @overload
