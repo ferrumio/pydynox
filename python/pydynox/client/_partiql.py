@@ -23,8 +23,8 @@ class PartiqlOperations(_MixinBase):
     ) -> ListWithMetrics:
         """Execute a PartiQL statement (sync)."""
         _log_debug("sync_execute_statement", f"Executing: {statement[:50]}...")
-        self._acquire_rcu(1.0)  # type: ignore[attr-defined]
-        items, next_token_out, metrics = self._client.sync_execute_statement(  # type: ignore[attr-defined]
+        self._acquire_rcu(1.0)
+        items, next_token_out, metrics = self._client.sync_execute_statement(
             statement,
             parameters=parameters,
             consistent_read=consistent_read,
@@ -49,8 +49,8 @@ class PartiqlOperations(_MixinBase):
     ) -> ListWithMetrics:
         """Execute a PartiQL statement (async)."""
         _log_debug("execute_statement", f"Executing: {statement[:50]}...")
-        self._acquire_rcu(1.0)  # type: ignore[attr-defined]
-        result = await self._client.execute_statement(  # type: ignore[attr-defined]
+        self._acquire_rcu(1.0)
+        result = await self._client.execute_statement(
             statement,
             parameters=parameters,
             consistent_read=consistent_read,

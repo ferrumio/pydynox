@@ -36,12 +36,13 @@ T = TypeVar("T")
 __all__ = ["dynamodb_model", "from_pydantic"]
 
 
-def _check_pydantic() -> None:
-    """Check if pydantic is installed."""
+def _check_pydantic() -> type[Any]:
+    """Check if pydantic is installed and return its BaseModel class."""
     if BaseModel is None:
         raise ImportError(
             "pydantic is required for this feature. Install it with: pip install pydynox[pydantic]"
         )
+    return BaseModel
 
 
 def dynamodb_model(
@@ -88,9 +89,9 @@ def from_pydantic(
     Returns:
         The model class with DynamoDB methods added.
     """
-    _check_pydantic()
+    base_model = _check_pydantic()
 
-    if not issubclass(cls, BaseModel):
+    if not issubclass(cls, base_model):
         raise TypeError(f"{cls.__name__} must be a Pydantic BaseModel subclass")
 
     def to_dict(instance: T) -> dict[str, Any]:

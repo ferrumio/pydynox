@@ -72,7 +72,11 @@ async fn execute_transact_write(
     client
         .transact_write_items()
         .set_transact_items(Some(transact_items))
-        .set_client_request_token(client_request_token)
+        // The SDK's default token comes from a clock-seeded RNG, so processes started
+        // together can collide. Use a UUID v4 from OS entropy instead.
+        .set_client_request_token(Some(
+            client_request_token.unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+        ))
         .send()
         .await?;
 

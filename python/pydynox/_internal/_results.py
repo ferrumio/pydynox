@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pydynox.model import Model
 
 M = TypeVar("M", bound="Model")
-T = TypeVar("T")  # Result item type (Model or dict)
+T = TypeVar("T", covariant=True)  # Result item type (Model or dict)
 
 
 def _serialize_filter(
