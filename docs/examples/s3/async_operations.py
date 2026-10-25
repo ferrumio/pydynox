@@ -24,7 +24,9 @@ async def main():
     doc = Document(pk="DOC#async", sk="v1", name="async.txt")
     doc.content = S3File(b"Async content", name="async.txt")
     await doc.save()
-    print(f"Uploaded: {doc.content.key}")
+    uploaded = doc.content
+    assert uploaded is not None
+    print(f"Uploaded: {uploaded.key}")
 
     # Get
     loaded = await Document.get(pk="DOC#async", sk="v1")

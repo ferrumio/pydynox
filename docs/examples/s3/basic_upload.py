@@ -21,9 +21,11 @@ async def main():
     doc.content = S3File(b"PDF content here", name="report.pdf", content_type="application/pdf")
     await doc.save()
 
-    print(f"Uploaded to: s3://{doc.content.bucket}/{doc.content.key}")
-    print(f"Size: {doc.content.size} bytes")
-    print(f"ETag: {doc.content.etag}")
+    uploaded = doc.content
+    assert uploaded is not None
+    print(f"Uploaded to: s3://{uploaded.bucket}/{uploaded.key}")
+    print(f"Size: {uploaded.size} bytes")
+    print(f"ETag: {uploaded.etag}")
 
 
 asyncio.run(main())

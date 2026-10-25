@@ -30,8 +30,11 @@ async def main():
     await doc.save()
 
     # Access metadata
-    print(f"Author: {doc.content.metadata.get('author')}")
-    print(f"Version: {doc.content.metadata.get('version')}")
+    uploaded = doc.content
+    assert uploaded is not None
+    assert uploaded.metadata is not None
+    print(f"Author: {uploaded.metadata.get('author')}")
+    print(f"Version: {uploaded.metadata.get('version')}")
 
 
 asyncio.run(main())

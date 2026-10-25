@@ -27,7 +27,9 @@ async def main():
     doc.content = S3File(file_path)  # Name is taken from file
     await doc.save()
 
-    print(f"Uploaded: {doc.content.key}")
+    uploaded = doc.content
+    assert uploaded is not None
+    print(f"Uploaded: {uploaded.key}")
 
     # Cleanup
     file_path.unlink()
