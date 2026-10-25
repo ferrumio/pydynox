@@ -7,7 +7,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, cast, overload
 
 from pydynox.attributes.base import Attribute
 
@@ -15,6 +15,13 @@ if TYPE_CHECKING:
     from pydynox.generators import AutoGenerate
 
 MT = TypeVar("MT")
+
+
+class _PydanticModel(Protocol):
+    """The part of a Pydantic model class that MapAttribute uses."""
+
+    @classmethod
+    def model_validate(cls, obj: Any) -> Any: ...
 
 
 @dataclass
@@ -282,12 +289,12 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         if value is None:
             return None
         if self.model_class is None:
-            return value
+            return cast("dict[str, Any]", value)
         if self._is_pydantic:
-            return value.model_dump()
+            return cast("dict[str, Any]", value.model_dump())
         if self._is_dataclass:
             return dataclasses.asdict(value)
-        return value
+        return cast("dict[str, Any]", value)
 
     def deserialize(self, value: Any) -> Any | None:
         if value is None:
@@ -295,7 +302,8 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         if self.model_class is None or not isinstance(value, dict):
             return value
         if self._is_pydantic:
-            return self.model_class.model_validate(value)  # ty: ignore[unresolved-attribute]
+            # _is_pydantic means model_class has model_validate
+            return cast("type[_PydanticModel]", self.model_class).model_validate(value)
         model_class = self.model_class
         if not dataclasses.is_dataclass(model_class):
             return value
