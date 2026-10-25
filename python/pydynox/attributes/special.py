@@ -6,7 +6,7 @@ import dataclasses
 import json
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Generic, TypeVar, cast, overload
+from typing import Any, Generic, TypeVar, overload
 
 from pydynox.attributes.base import Attribute
 
@@ -100,12 +100,10 @@ class JSONAttribute(Attribute[J], Generic[J]):
     def _to_dict(self, value: Any) -> dict[str, Any] | list[Any]:
         """Convert a typed model instance to a dict for JSON serialization."""
         if self._type_adapter is not None:
-            return cast(
-                "dict[str, Any] | list[Any]", self._type_adapter.dump_python(value, mode="python")
-            )
+            return self._type_adapter.dump_python(value, mode="python")
         if self._is_dataclass:
             return dataclasses.asdict(value)
-        return cast("dict[str, Any] | list[Any]", value)
+        return value
 
     def _from_dict(self, data: Any) -> Any:
         """Convert raw data to a typed model instance."""

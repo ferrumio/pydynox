@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from pydynox._internal._atomic import (
     AtomicAdd,
@@ -99,8 +99,7 @@ class Attribute(Generic[T]):
             return self
         # Accessed on instance, return the value
         if self.attr_name is not None:
-            value: T | None = instance.__dict__.get(self.attr_name)
-            return value
+            return instance.__dict__.get(self.attr_name)
         return None
 
     def serialize(self, value: T | None) -> Any:
@@ -109,7 +108,7 @@ class Attribute(Generic[T]):
 
     def deserialize(self, value: Any) -> T | None:
         """Convert DynamoDB value to Python format."""
-        return cast("T | None", value)
+        return value
 
     def _snapshot_key(self, value: Any) -> str | None:
         """Return a comparable snapshot string for change tracking, or None if not applicable."""
