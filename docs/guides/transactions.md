@@ -70,7 +70,7 @@ await client.transact_write(operations, client_request_token=token)
 client.sync_transact_write(operations, client_request_token=token)
 ```
 
-The parameter is optional and keyword-only. Existing calls keep their current behavior. Omitting it or passing `None` lets the AWS SDK generate a token for each call; that generated token is reused by the SDK's own retries.
+The parameter is optional and keyword-only. Existing calls keep their current behavior. Omitting it or passing `None` makes pydynox generate a random UUID v4 token for each call; that generated token is reused by the SDK's own retries.
 
 ### Token rules
 

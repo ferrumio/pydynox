@@ -77,7 +77,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.create_table("users", partition_key=("pk", "S"))
         """
         _log_debug("create_table", f'Creating table "{table_name}"')
-        return self._client.create_table(  # type: ignore[attr-defined, no-any-return]
+        return self._client.create_table(  # type: ignore[no-any-return]
             table_name,
             partition_key,
             range_key=sort_key,  # Rust uses range_key
@@ -107,7 +107,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             exists = await client.table_exists("users")
         """
         _log_debug("table_exists", f'Checking if table "{table_name}" exists')
-        return self._client.table_exists(table_name)  # type: ignore[attr-defined, no-any-return]
+        return self._client.table_exists(table_name)  # type: ignore[no-any-return]
 
     def delete_table(
         self,
@@ -132,7 +132,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.delete_table("users", wait=True, timeout_seconds=60)
         """
         _log_debug("delete_table", f'Deleting table "{table_name}"')
-        return self._client.delete_table(  # type: ignore[attr-defined, no-any-return]
+        return self._client.delete_table(  # type: ignore[no-any-return]
             table_name, wait=wait, timeout_seconds=timeout_seconds
         )
 
@@ -154,7 +154,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.wait_for_table_active("users")
         """
         _log_debug("wait_for_table_active", f'Waiting for table "{table_name}" to become active')
-        return self._client.wait_for_table_active(  # type: ignore[attr-defined, no-any-return]
+        return self._client.wait_for_table_active(  # type: ignore[no-any-return]
             table_name, timeout_seconds=timeout_seconds
         )
 
@@ -179,7 +179,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.wait_for_table_deleted("users")
         """
         _log_debug("wait_for_table_deleted", f'Waiting for table "{table_name}" to be deleted')
-        return self._client.wait_for_table_deleted(  # type: ignore[attr-defined, no-any-return]
+        return self._client.wait_for_table_deleted(  # type: ignore[no-any-return]
             table_name, timeout_seconds=timeout_seconds
         )
 
@@ -224,7 +224,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             client.sync_create_table("users", partition_key=("pk", "S"))
         """
         _log_debug("sync_create_table", f'Creating table "{table_name}"')
-        self._client.sync_create_table(  # type: ignore[attr-defined]
+        self._client.sync_create_table(
             table_name,
             partition_key,
             range_key=sort_key,  # Rust uses range_key
@@ -255,7 +255,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
                 print("Table exists")
         """
         _log_debug("sync_table_exists", f'Checking if table "{table_name}" exists')
-        return self._client.sync_table_exists(table_name)  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_table_exists(table_name)  # type: ignore[no-any-return]
 
     def sync_delete_table(
         self,
@@ -276,9 +276,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             client.sync_delete_table("users", wait=True, timeout_seconds=60)
         """
         _log_debug("sync_delete_table", f'Deleting table "{table_name}"')
-        self._client.sync_delete_table(  # type: ignore[attr-defined]
-            table_name, wait=wait, timeout_seconds=timeout_seconds
-        )
+        self._client.sync_delete_table(table_name, wait=wait, timeout_seconds=timeout_seconds)
 
     def sync_wait_for_table_active(
         self,
@@ -297,9 +295,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
         _log_debug(
             "sync_wait_for_table_active", f'Waiting for table "{table_name}" to become active'
         )
-        self._client.sync_wait_for_table_active(  # type: ignore[attr-defined]
-            table_name, timeout_seconds=timeout_seconds
-        )
+        self._client.sync_wait_for_table_active(table_name, timeout_seconds=timeout_seconds)
 
     def sync_wait_for_table_deleted(
         self,
@@ -319,6 +315,4 @@ class TableOperations(_MixinBase):  # pragma: no cover
             client.sync_wait_for_table_deleted("users")
         """
         _log_debug("sync_wait_for_table_deleted", f'Waiting for table "{table_name}" to be deleted')
-        self._client.sync_wait_for_table_deleted(  # type: ignore[attr-defined]
-            table_name, timeout_seconds=timeout_seconds
-        )
+        self._client.sync_wait_for_table_deleted(table_name, timeout_seconds=timeout_seconds)

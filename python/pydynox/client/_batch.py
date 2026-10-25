@@ -33,8 +33,8 @@ class BatchOperations(_MixinBase):
         _log_debug(
             "batch_write", f'Batch writing to "{table}" ({put_count} puts, {delete_count} deletes)'
         )
-        self._acquire_wcu(float(put_count + delete_count))  # type: ignore[attr-defined]
-        await self._client.batch_write(  # type: ignore[attr-defined]
+        self._acquire_wcu(float(put_count + delete_count))
+        await self._client.batch_write(
             table,
             put_items or [],
             delete_keys or [],
@@ -67,9 +67,9 @@ class BatchOperations(_MixinBase):
                 ["name", "address.city"]. Key attributes are not added for you.
         """
         _log_debug("batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
-        self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
+        self._acquire_rcu(float(len(keys)))
         projection_expr, attr_names = _build_projection(projection, paths=_projection_paths)
-        return await self._client.batch_get(  # type: ignore[attr-defined, no-any-return]
+        return await self._client.batch_get(  # type: ignore[no-any-return]
             table, keys, consistent_read, projection_expr, attr_names
         )
 
@@ -94,8 +94,8 @@ class BatchOperations(_MixinBase):
             "sync_batch_write",
             f'Batch writing to "{table}" ({put_count} puts, {delete_count} deletes)',
         )
-        self._acquire_wcu(float(put_count + delete_count))  # type: ignore[attr-defined]
-        self._client.sync_batch_write(  # type: ignore[attr-defined]
+        self._acquire_wcu(float(put_count + delete_count))
+        self._client.sync_batch_write(
             table,
             put_items or [],
             delete_keys or [],
@@ -128,9 +128,9 @@ class BatchOperations(_MixinBase):
                 ["name", "address.city"]. Key attributes are not added for you.
         """
         _log_debug("sync_batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
-        self._acquire_rcu(float(len(keys)))  # type: ignore[attr-defined]
+        self._acquire_rcu(float(len(keys)))
         projection_expr, attr_names = _build_projection(projection, paths=_projection_paths)
-        return self._client.sync_batch_get(  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_batch_get(  # type: ignore[no-any-return]
             table, keys, consistent_read, projection_expr, attr_names
         )
 
@@ -151,7 +151,7 @@ class BatchOperations(_MixinBase):
             operations: List of put, update, delete, or condition check operations.
             client_request_token: Optional 1–36 character token for retrying the same
                 request. DynamoDB deduplicates identical requests for ten minutes
-                after the first request completes. None lets the SDK generate a token.
+                after the first request completes. None generates a random UUID v4 token.
 
         Raises:
             ValueError: If the token is empty or longer than 36 characters.
@@ -160,11 +160,9 @@ class BatchOperations(_MixinBase):
         """
         _log_debug("sync_transact_write", f"Running transaction ({len(operations)} operations)")
         if client_request_token is None:
-            self._client.sync_transact_write(operations)  # type: ignore[attr-defined]
+            self._client.sync_transact_write(operations)
         else:
-            self._client.sync_transact_write(  # type: ignore[attr-defined]
-                operations, client_request_token=client_request_token
-            )
+            self._client.sync_transact_write(operations, client_request_token=client_request_token)
 
     # ========== TRANSACT GET (SYNC) ==========
 
@@ -192,7 +190,7 @@ class BatchOperations(_MixinBase):
             ])
         """
         _log_debug("sync_transact_get", f"Transact getting ({len(gets)} keys)")
-        return self._client.sync_transact_get(gets)  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_transact_get(gets)  # type: ignore[no-any-return]
 
     # ========== TRANSACT WRITE (ASYNC - default) ==========
 
@@ -211,7 +209,7 @@ class BatchOperations(_MixinBase):
             operations: List of put, update, delete, or condition check operations.
             client_request_token: Optional 1–36 character token for retrying the same
                 request. DynamoDB deduplicates identical requests for ten minutes
-                after the first request completes. None lets the SDK generate a token.
+                after the first request completes. None generates a random UUID v4 token.
 
         Raises:
             ValueError: If the token is empty or longer than 36 characters.
@@ -220,11 +218,9 @@ class BatchOperations(_MixinBase):
         """
         _log_debug("transact_write", f"Running transaction ({len(operations)} operations)")
         if client_request_token is None:
-            await self._client.transact_write(operations)  # type: ignore[attr-defined]
+            await self._client.transact_write(operations)
         else:
-            await self._client.transact_write(  # type: ignore[attr-defined]
-                operations, client_request_token=client_request_token
-            )
+            await self._client.transact_write(operations, client_request_token=client_request_token)
 
     # ========== TRANSACT GET (ASYNC - default) ==========
 
@@ -241,4 +237,4 @@ class BatchOperations(_MixinBase):
             List of items (or None for items that don't exist).
         """
         _log_debug("transact_get", f"Transact getting ({len(gets)} keys)")
-        return await self._client.transact_get(gets)  # type: ignore[attr-defined, no-any-return]
+        return await self._client.transact_get(gets)  # type: ignore[no-any-return]

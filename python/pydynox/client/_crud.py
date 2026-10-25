@@ -79,7 +79,7 @@ class CrudOperations(_MixinBase):
     def _record_metrics(self, metrics: OperationMetrics, operation: str) -> None:
         """Record metrics for an operation."""
         self._last_metrics = metrics
-        self._total_metrics.add(metrics, operation)  # type: ignore[attr-defined]
+        self._total_metrics.add(metrics, operation)
 
     # ========== PUT ==========
 
@@ -137,15 +137,15 @@ class CrudOperations(_MixinBase):
             dict or None when return_values is set (the old item attributes).
             Metrics are always available via get_last_metrics().
         """
-        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_wcu(1.0)
         pk = _extract_pk(item)
         if pk:
-            self._record_write(table, pk)  # type: ignore[attr-defined]
+            self._record_write(table, pk)
 
         _log_debug("put_item", f'Saving item to "{table}" pk={pk}')
 
-        with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result = await self._client.put_item(  # type: ignore[attr-defined]
+        with trace_operation("put_item", table, self.get_region()) as span:
+            result = await self._client.put_item(
                 table,
                 item,
                 condition_expression=condition_expression,
@@ -226,15 +226,15 @@ class CrudOperations(_MixinBase):
             dict or None when return_values is set (the old item attributes).
             Metrics are always available via get_last_metrics().
         """
-        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_wcu(1.0)
         pk = _extract_pk(item)
         if pk:
-            self._record_write(table, pk)  # type: ignore[attr-defined]
+            self._record_write(table, pk)
 
         _log_debug("sync_put_item", f'Saving item to "{table}" pk={pk}')
 
-        with trace_operation("put_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            attributes, metrics = self._client.sync_put_item(  # type: ignore[attr-defined]
+        with trace_operation("put_item", table, self.get_region()) as span:
+            attributes, metrics = self._client.sync_put_item(
                 table,
                 item,
                 condition_expression=condition_expression,
@@ -280,18 +280,18 @@ class CrudOperations(_MixinBase):
         Returns:
             The item as a dict, or None if not found.
         """
-        self._acquire_rcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_rcu(1.0)
         pk = _extract_pk(key)
         if pk:
-            self._record_read(table, pk)  # type: ignore[attr-defined]
+            self._record_read(table, pk)
 
         _log_debug("get_item", f'Getting item from "{table}" key={key}')
 
         # Build projection expression
         projection_expr, attr_names = _build_projection(projection)
 
-        with trace_operation("get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result = await self._client.get_item(  # type: ignore[attr-defined]
+        with trace_operation("get_item", table, self.get_region()) as span:
+            result = await self._client.get_item(
                 table,
                 key,
                 consistent_read=consistent_read,
@@ -332,18 +332,18 @@ class CrudOperations(_MixinBase):
         Example:
             >>> item = client.sync_get_item("users", {"pk": "USER#1"}, projection=["name", "email"])
         """
-        self._acquire_rcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_rcu(1.0)
         pk = _extract_pk(key)
         if pk:
-            self._record_read(table, pk)  # type: ignore[attr-defined]
+            self._record_read(table, pk)
 
         _log_debug("sync_get_item", f'Getting item from "{table}" key={key}')
 
         # Build projection expression
         projection_expr, attr_names = _build_projection(projection)
 
-        with trace_operation("get_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result, metrics = self._client.sync_get_item(  # type: ignore[attr-defined]
+        with trace_operation("get_item", table, self.get_region()) as span:
+            result, metrics = self._client.sync_get_item(
                 table,
                 key,
                 consistent_read=consistent_read,
@@ -416,15 +416,15 @@ class CrudOperations(_MixinBase):
             dict or None when return_values is set (the deleted item attributes).
             Metrics are always available via get_last_metrics().
         """
-        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_wcu(1.0)
         pk = _extract_pk(key)
         if pk:
-            self._record_write(table, pk)  # type: ignore[attr-defined]
+            self._record_write(table, pk)
 
         _log_debug("delete_item", f'Deleting item from "{table}" key={key}')
 
-        with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result = await self._client.delete_item(  # type: ignore[attr-defined]
+        with trace_operation("delete_item", table, self.get_region()) as span:
+            result = await self._client.delete_item(
                 table,
                 key,
                 condition_expression=condition_expression,
@@ -504,15 +504,15 @@ class CrudOperations(_MixinBase):
             dict or None when return_values is set (the deleted item attributes).
             Metrics are always available via get_last_metrics().
         """
-        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_wcu(1.0)
         pk = _extract_pk(key)
         if pk:
-            self._record_write(table, pk)  # type: ignore[attr-defined]
+            self._record_write(table, pk)
 
         _log_debug("sync_delete_item", f'Deleting item from "{table}" key={key}')
 
-        with trace_operation("delete_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            attributes, metrics = self._client.sync_delete_item(  # type: ignore[attr-defined]
+        with trace_operation("delete_item", table, self.get_region()) as span:
+            attributes, metrics = self._client.sync_delete_item(
                 table,
                 key,
                 condition_expression=condition_expression,
@@ -601,15 +601,15 @@ class CrudOperations(_MixinBase):
             dict or None when return_values is set (the item attributes).
             Metrics are always available via get_last_metrics().
         """
-        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_wcu(1.0)
         pk = _extract_pk(key)
         if pk:
-            self._record_write(table, pk)  # type: ignore[attr-defined]
+            self._record_write(table, pk)
 
         _log_debug("update_item", f'Updating item in "{table}" key={key}')
 
-        with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result = await self._client.update_item(  # type: ignore[attr-defined]
+        with trace_operation("update_item", table, self.get_region()) as span:
+            result = await self._client.update_item(
                 table,
                 key,
                 updates=updates,
@@ -699,15 +699,15 @@ class CrudOperations(_MixinBase):
             dict or None when return_values is set (the item attributes).
             Metrics are always available via get_last_metrics().
         """
-        self._acquire_wcu(1.0)  # type: ignore[attr-defined]
+        self._acquire_wcu(1.0)
         pk = _extract_pk(key)
         if pk:
-            self._record_write(table, pk)  # type: ignore[attr-defined]
+            self._record_write(table, pk)
 
         _log_debug("sync_update_item", f'Updating item in "{table}" key={key}')
 
-        with trace_operation("update_item", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            attributes, metrics = self._client.sync_update_item(  # type: ignore[attr-defined]
+        with trace_operation("update_item", table, self.get_region()) as span:
+            attributes, metrics = self._client.sync_update_item(
                 table,
                 key,
                 updates=updates,
