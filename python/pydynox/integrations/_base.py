@@ -100,35 +100,35 @@ def _sync_get_method(cls: type[T], **keys: Any) -> T | None:
     return cls._pydynox_from_dict(cls, item)  # type: ignore
 
 
-async def _save_method(self: T) -> None:
+async def _save_method(self: object) -> None:
     """Save to DynamoDB (async)."""
     client = self.__class__._get_client()  # type: ignore
     item = self.__class__._pydynox_to_dict(self)  # type: ignore
     await client.put_item(self.__class__._pydynox_table, item)  # type: ignore
 
 
-def _sync_save_method(self: T) -> None:
+def _sync_save_method(self: object) -> None:
     """Save to DynamoDB (sync)."""
     client = self.__class__._get_client()  # type: ignore
     item = self.__class__._pydynox_to_dict(self)  # type: ignore
     client.sync_put_item(self.__class__._pydynox_table, item)  # type: ignore
 
 
-async def _delete_method(self: T) -> None:
+async def _delete_method(self: object) -> None:
     """Delete from DynamoDB (async)."""
     client = self.__class__._get_client()  # type: ignore
     key = self._get_key()  # type: ignore
     await client.delete_item(self.__class__._pydynox_table, key)  # type: ignore
 
 
-def _sync_delete_method(self: T) -> None:
+def _sync_delete_method(self: object) -> None:
     """Delete from DynamoDB (sync)."""
     client = self.__class__._get_client()  # type: ignore
     key = self._get_key()  # type: ignore
     client.sync_delete_item(self.__class__._pydynox_table, key)  # type: ignore
 
 
-async def _update_method(self: T, **kwargs: Any) -> None:
+async def _update_method(self: object, **kwargs: Any) -> None:
     """Update specific attributes (async)."""
     cls = self.__class__
 
@@ -150,7 +150,7 @@ async def _update_method(self: T, **kwargs: Any) -> None:
     await client.update_item(cls._pydynox_table, key, updates=kwargs)  # type: ignore
 
 
-def _sync_update_method(self: T, **kwargs: Any) -> None:
+def _sync_update_method(self: object, **kwargs: Any) -> None:
     """Update specific attributes (sync)."""
     cls = self.__class__
 
@@ -172,7 +172,7 @@ def _sync_update_method(self: T, **kwargs: Any) -> None:
     client.sync_update_item(cls._pydynox_table, key, updates=kwargs)  # type: ignore
 
 
-def _get_key_method(self: T) -> dict[str, Any]:
+def _get_key_method(self: object) -> dict[str, Any]:
     """Get the key dict for this instance."""
     cls = self.__class__
     key = {cls._pydynox_partition_key: getattr(self, cls._pydynox_partition_key)}  # type: ignore

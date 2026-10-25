@@ -35,7 +35,7 @@ class VectorOperations(_MixinBase):  # pragma: no cover
     ) -> VectorSearchResult[dict[str, Any]]:
         _log_debug("search_vectors", f'Searching vector index "{index_name}"')
         with trace_operation("search_vectors", table, self.get_region()) as span:
-            value = await self._client.search_vectors(  # type: ignore[attr-defined]
+            value = await self._client.search_vectors(
                 table,
                 index_name,
                 vector,
@@ -71,7 +71,7 @@ class VectorOperations(_MixinBase):  # pragma: no cover
     ) -> VectorSearchResult[dict[str, Any]]:
         _log_debug("sync_search_vectors", f'Searching vector index "{index_name}"')
         with trace_operation("search_vectors", table, self.get_region()) as span:
-            value = self._client.sync_search_vectors(  # type: ignore[attr-defined]
+            value = self._client.sync_search_vectors(
                 table,
                 index_name,
                 vector,
@@ -102,7 +102,7 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         timeout_seconds: int | None = None,
     ) -> Coroutine[Any, Any, None]:
         _log_debug("create_vector_index", f'Creating vector index on "{table}"')
-        return self._client.create_vector_index(  # type: ignore[attr-defined, no-any-return]
+        return self._client.create_vector_index(  # type: ignore[no-any-return]
             table, definition, wait=wait, timeout_seconds=timeout_seconds
         )
 
@@ -115,7 +115,7 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         timeout_seconds: int | None = None,
     ) -> None:
         _log_debug("sync_create_vector_index", f'Creating vector index on "{table}"')
-        self._client.sync_create_vector_index(  # type: ignore[attr-defined]
+        self._client.sync_create_vector_index(
             table, definition, wait=wait, timeout_seconds=timeout_seconds
         )
 
@@ -128,7 +128,7 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         timeout_seconds: int | None = None,
     ) -> Coroutine[Any, Any, None]:
         _log_debug("delete_vector_index", f'Deleting vector index "{index_name}"')
-        return self._client.delete_vector_index(  # type: ignore[attr-defined, no-any-return]
+        return self._client.delete_vector_index(  # type: ignore[no-any-return]
             table, index_name, wait=wait, timeout_seconds=timeout_seconds
         )
 
@@ -141,7 +141,7 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         timeout_seconds: int | None = None,
     ) -> None:
         _log_debug("sync_delete_vector_index", f'Deleting vector index "{index_name}"')
-        self._client.sync_delete_vector_index(  # type: ignore[attr-defined]
+        self._client.sync_delete_vector_index(
             table, index_name, wait=wait, timeout_seconds=timeout_seconds
         )
 
@@ -150,7 +150,7 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         table: str,
         index_name: str,
     ) -> Coroutine[Any, Any, dict[str, Any]]:
-        return self._client.describe_vector_index(  # type: ignore[attr-defined, no-any-return]
+        return self._client.describe_vector_index(  # type: ignore[no-any-return]
             table, index_name
         )
 
@@ -159,6 +159,6 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         table: str,
         index_name: str,
     ) -> dict[str, Any]:
-        return self._client.sync_describe_vector_index(  # type: ignore[attr-defined, no-any-return]
+        return self._client.sync_describe_vector_index(  # type: ignore[no-any-return]
             table, index_name
         )
