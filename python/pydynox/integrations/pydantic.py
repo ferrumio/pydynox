@@ -90,7 +90,7 @@ def from_pydantic(
     """
     _check_pydantic()
 
-    if not issubclass(cls, BaseModel):
+    if BaseModel is None or not issubclass(cls, BaseModel):
         raise TypeError(f"{cls.__name__} must be a Pydantic BaseModel subclass")
 
     def to_dict(instance: T) -> dict[str, Any]:
