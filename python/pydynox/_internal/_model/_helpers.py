@@ -250,7 +250,7 @@ def prepare_smart_save(
 
     if final_condition is not None:
         names = {}
-        values: dict[str, Any] = {}
+        values = {}
         expr = final_condition.serialize(names, values)
         attr_names = {v: k for k, v in names.items()}
         return SmartSaveResult(client, table, item, expr, attr_names, values, skip, False, None)
@@ -355,7 +355,7 @@ def prepare_update(
             aliased_kwargs[dynamo_name] = attr.serialize(value)
 
         if condition is not None:
-            cond_names: dict[str, str] = {}
+            cond_names = {}
             cond_values: dict[str, Any] = {}
             cond_expr = condition.serialize(cond_names, cond_values)
             attr_names = {v: k for k, v in cond_names.items()}

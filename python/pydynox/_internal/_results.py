@@ -72,7 +72,7 @@ def _build_query_params(
         proj_parts = []
         for i, field in enumerate(fields):
             parts = model_class._dynamo_path(field)
-            part_placeholders = []
+            part_placeholders: list[str] = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
                 proj_names[placeholder] = part
@@ -119,7 +119,7 @@ def _build_scan_params(
         proj_parts = []
         for i, field in enumerate(fields):
             parts = model_class._dynamo_path(field)
-            part_placeholders = []
+            part_placeholders: list[str] = []
             for part in parts:
                 placeholder = f"#proj{i}_{len(part_placeholders)}"
                 proj_names[placeholder] = part
@@ -171,7 +171,8 @@ class BaseModelResult(ABC, Generic[T]):
         if self._as_dict:
             # If as_dict is True, T will always be a dict, so casting is safe
             return cast(T, item)
-        return self._to_instance(item)
+        # Otherwise T is the model type that _to_instance builds
+        return cast(T, self._to_instance(item))
 
     @abstractmethod
     def _build_result(self) -> Any:
