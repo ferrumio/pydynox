@@ -50,8 +50,7 @@ class DecimalAttribute(Attribute[Decimal]):
 
     def deserialize(self, value: Any) -> Decimal | None:
         """Accept an exact decoded value, rejecting already rounded floats."""
-        result: Decimal | None = pydynox_core.validate_decimal(value)
-        return result
+        return pydynox_core.validate_decimal(value)
 
     def set(self, value: Any) -> AtomicSet:
         """Set an exact value through an update expression."""

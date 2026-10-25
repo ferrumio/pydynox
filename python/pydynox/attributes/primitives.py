@@ -7,7 +7,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, Protocol, Self, TypeGuard, TypeVar, overload
 
 from pydynox.attributes.base import Attribute
 
@@ -21,7 +21,12 @@ class _PydanticModel(Protocol):
     """The part of a Pydantic model class that MapAttribute uses."""
 
     @classmethod
-    def model_validate(cls, obj: Any) -> Any: ...
+    def model_validate(cls, obj: Any) -> Self: ...
+
+
+def _is_pydantic_class(model_class: object) -> TypeGuard[type[_PydanticModel]]:
+    """Check whether model_class is a Pydantic model class."""
+    return hasattr(model_class, "model_validate")
 
 
 @dataclass
@@ -282,28 +287,27 @@ class MapAttribute(Attribute[MT], Generic[MT]):
             alias=alias,
         )
         self.model_class = model_class
-        self._is_pydantic = model_class is not None and hasattr(model_class, "model_validate")
+        self._is_pydantic = _is_pydantic_class(model_class)
         self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
 
     def serialize(self, value: Any | None) -> dict[str, Any] | None:
         if value is None:
             return None
         if self.model_class is None:
-            return cast("dict[str, Any]", value)
+            return value
         if self._is_pydantic:
-            return cast("dict[str, Any]", value.model_dump())
+            return value.model_dump()
         if self._is_dataclass:
             return dataclasses.asdict(value)
-        return cast("dict[str, Any]", value)
+        return value
 
     def deserialize(self, value: Any) -> Any | None:
         if value is None:
             return None
         if self.model_class is None or not isinstance(value, dict):
             return value
-        if self._is_pydantic:
-            # _is_pydantic means model_class has model_validate
-            return cast("type[_PydanticModel]", self.model_class).model_validate(value)
+        if _is_pydantic_class(self.model_class):
+            return self.model_class.model_validate(value)
         model_class = self.model_class
         if not dataclasses.is_dataclass(model_class):
             return value

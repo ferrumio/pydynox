@@ -171,8 +171,7 @@ class BaseModelResult(ABC, Generic[T]):
         if self._as_dict:
             # If as_dict is True, T will always be a dict, so casting is safe
             return cast(T, item)
-        # Otherwise T is the model type that _to_instance builds
-        return cast(T, self._to_instance(item))
+        return self._to_instance(item)
 
     @abstractmethod
     def _build_result(self) -> Any:
