@@ -51,7 +51,7 @@ class ScanOperations(_MixinBase):
             ScanResult iterator.
         """
         return ScanResult(
-            self._client,  # type: ignore[attr-defined]
+            self._client,
             table,
             filter_expression=filter_expression,
             projection_expression=projection_expression,
@@ -61,7 +61,7 @@ class ScanOperations(_MixinBase):
             page_size=page_size,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
-            acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]
+            acquire_rcu=self._acquire_rcu,
             consistent_read=consistent_read,
             segment=segment,
             total_segments=total_segments,
@@ -102,7 +102,7 @@ class ScanOperations(_MixinBase):
             AsyncScanResult iterator.
         """
         return AsyncScanResult(
-            self._client,  # type: ignore[attr-defined]
+            self._client,
             table,
             filter_expression=filter_expression,
             projection_expression=projection_expression,
@@ -112,7 +112,7 @@ class ScanOperations(_MixinBase):
             page_size=page_size,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
-            acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]
+            acquire_rcu=self._acquire_rcu,
             consistent_read=consistent_read,
             segment=segment,
             total_segments=total_segments,
@@ -131,8 +131,8 @@ class ScanOperations(_MixinBase):
     ) -> tuple[int, OperationMetrics]:
         """Count items in a DynamoDB table (sync)."""
         _log_debug("sync_count", f'Counting items in "{table}"')
-        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            count, metrics = self._client.sync_count(  # type: ignore[attr-defined]
+        with trace_operation("scan", table, self.get_region()) as span:
+            count, metrics = self._client.sync_count(
                 table,
                 filter_expression=filter_expression,
                 expression_attribute_names=expression_attribute_names,
@@ -157,8 +157,8 @@ class ScanOperations(_MixinBase):
     ) -> tuple[int, OperationMetrics]:
         """Count items in a DynamoDB table (async)."""
         _log_debug("count", f'Counting items in "{table}"')
-        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result = await self._client.count(  # type: ignore[attr-defined]
+        with trace_operation("scan", table, self.get_region()) as span:
+            result = await self._client.count(
                 table,
                 filter_expression=filter_expression,
                 expression_attribute_names=expression_attribute_names,
@@ -208,8 +208,8 @@ class ScanOperations(_MixinBase):
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
         _log_debug("sync_parallel_scan", f'Parallel scanning "{table}" ({total_segments} segments)')
-        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            items, metrics = self._client.sync_parallel_scan(  # type: ignore[attr-defined]
+        with trace_operation("scan", table, self.get_region()) as span:
+            items, metrics = self._client.sync_parallel_scan(
                 table,
                 total_segments,
                 filter_expression=filter_expression,
@@ -258,8 +258,8 @@ class ScanOperations(_MixinBase):
             >>> print(f"Found {len(items)} items in {metrics.duration_ms:.2f}ms")
         """
         _log_debug("parallel_scan", f'Parallel scanning "{table}" ({total_segments} segments)')
-        with trace_operation("scan", table, self.get_region()) as span:  # type: ignore[attr-defined]
-            result = await self._client.parallel_scan(  # type: ignore[attr-defined]
+        with trace_operation("scan", table, self.get_region()) as span:
+            result = await self._client.parallel_scan(
                 table,
                 total_segments,
                 filter_expression=filter_expression,

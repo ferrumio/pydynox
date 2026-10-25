@@ -46,7 +46,7 @@ class QueryOperations(_MixinBase):
             QueryResult iterator.
         """
         return QueryResult(
-            self._client,  # type: ignore[attr-defined]
+            self._client,
             table,
             key_condition_expression,
             filter_expression=filter_expression,
@@ -58,7 +58,7 @@ class QueryOperations(_MixinBase):
             scan_index_forward=scan_index_forward,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
-            acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]
+            acquire_rcu=self._acquire_rcu,
             consistent_read=consistent_read,
         )
 
@@ -97,7 +97,7 @@ class QueryOperations(_MixinBase):
             AsyncQueryResult iterator.
         """
         return AsyncQueryResult(
-            self._client,  # type: ignore[attr-defined]
+            self._client,
             table,
             key_condition_expression,
             filter_expression=filter_expression,
@@ -109,6 +109,6 @@ class QueryOperations(_MixinBase):
             scan_index_forward=scan_index_forward,
             index_name=index_name,
             last_evaluated_key=last_evaluated_key,
-            acquire_rcu=self._acquire_rcu,  # type: ignore[attr-defined]
+            acquire_rcu=self._acquire_rcu,
             consistent_read=consistent_read,
         )
