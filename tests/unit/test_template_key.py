@@ -4,7 +4,8 @@ import sys
 
 import pytest
 from pydynox import Model, ModelConfig
-from pydynox.attributes import StringAttribute
+from pydynox._internal._indexes import _is_template_attr
+from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.testing import MemoryBackend
 
 
@@ -57,6 +58,22 @@ def test_no_template():
     assert not attr.has_template
     assert attr.placeholders == []
     assert attr.get_prefix() == ""
+
+
+@pytest.mark.parametrize(
+    "obj,expected",
+    [
+        pytest.param(
+            StringAttribute(partition_key=True, template="USER#{email}"), True, id="template"
+        ),
+        pytest.param(StringAttribute(partition_key=True), False, id="no_template"),
+        pytest.param(NumberAttribute(), False, id="no_template_support"),
+        pytest.param(None, False, id="none"),
+    ],
+)
+def test_is_template_attr(obj, expected):
+    """_is_template_attr is True only for attributes with a template."""
+    assert _is_template_attr(obj) is expected
 
 
 def test_model_with_template():

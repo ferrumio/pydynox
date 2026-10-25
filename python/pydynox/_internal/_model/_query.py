@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
+from pydynox._internal._indexes import _is_template_attr
 from pydynox._internal._results import (
     AsyncModelQueryResult,
     AsyncModelScanResult,
@@ -18,15 +19,6 @@ if TYPE_CHECKING:
     from pydynox.model import Model
 
 M = TypeVar("M", bound="Model")
-
-
-class _TemplateAttr(Protocol):
-    """Protocol for attributes with template support."""
-
-    has_template: bool
-    placeholders: list[str]
-
-    def build_key(self, values: dict[str, Any]) -> str: ...
 
 
 def _resolve_partition_key(cls: type[M], partition_key: Any | None, kwargs: dict[str, Any]) -> Any:
@@ -47,21 +39,19 @@ def _resolve_partition_key(cls: type[M], partition_key: Any | None, kwargs: dict
         raise ValueError(f"Hash key attribute {cls._partition_key} not found")
 
     # If no template, can't build from kwargs
-    if not (hasattr(hash_attr, "has_template") and hash_attr.has_template):
+    if not _is_template_attr(hash_attr):
         raise ValueError(
             f"partition_key is required. Model {cls.__name__} hash key has no template."
         )
 
-    tattr = cast(_TemplateAttr, hash_attr)
-
     # Build from template using kwargs
     values = {}
-    for placeholder in tattr.placeholders:
+    for placeholder in hash_attr.placeholders:
         if placeholder not in kwargs:
             raise ValueError(f"Missing value for template placeholder: {placeholder}")
         values[placeholder] = kwargs[placeholder]
 
-    return tattr.build_key(values)
+    return hash_attr.build_key(values)
 
 
 # ========== SYNC METHODS ==========

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydynox._internal._decimal import model_read_client
+from pydynox._internal._indexes import _is_template_attr
 from pydynox.hooks import HookType
 
 if TYPE_CHECKING:
@@ -304,21 +305,17 @@ class Collection:
         if pk_attr is None:
             return None
 
-        if not (hasattr(pk_attr, "has_template") and pk_attr.has_template):
+        if not _is_template_attr(pk_attr):
             return None
-
-        from pydynox._internal._indexes import _TemplateAttr
-
-        template_attr = cast(_TemplateAttr, pk_attr)
 
         # Build from template
         values = {}
-        for placeholder in template_attr.placeholders:
+        for placeholder in pk_attr.placeholders:
             if placeholder not in kwargs:
                 return None
             values[placeholder] = kwargs[placeholder]
 
-        return template_attr.build_key(values)
+        return pk_attr.build_key(values)
 
     def __repr__(self) -> str:
         names = ", ".join(m.__name__ for m in self._models)

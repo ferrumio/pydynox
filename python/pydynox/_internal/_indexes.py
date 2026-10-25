@@ -6,7 +6,7 @@ Public API is exported from pydynox.indexes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeGuard, TypeVar
 
 if TYPE_CHECKING:
     from pydynox.conditions import Condition
@@ -22,6 +22,11 @@ class _TemplateAttr(Protocol):
     placeholders: list[str]
 
     def build_key(self, values: dict[str, Any]) -> str: ...
+
+
+def _is_template_attr(obj: object) -> TypeGuard[_TemplateAttr]:
+    """Check if an attribute has a key template."""
+    return bool(getattr(obj, "has_template", False))
 
 
 class GlobalSecondaryIndex(Generic[M]):
@@ -152,15 +157,14 @@ class GlobalSecondaryIndex(Generic[M]):
             if attr is None:
                 raise ValueError(f"Attribute '{attr_name}' not found on {model_class.__name__}")
 
-            if hasattr(attr, "has_template") and attr.has_template:
-                tattr = cast(_TemplateAttr, attr)
+            if _is_template_attr(attr):
                 # Try to build from template placeholders
-                placeholders = tattr.placeholders
+                placeholders = attr.placeholders
                 missing = [p for p in placeholders if p not in key_values]
                 if not missing:
                     # All placeholders provided, build the key
                     values = {p: key_values[p] for p in placeholders}
-                    resolved[attr_name] = tattr.build_key(values)
+                    resolved[attr_name] = attr.build_key(values)
                     continue
 
             # Neither direct value nor template placeholders provided
