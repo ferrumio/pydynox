@@ -127,11 +127,12 @@ Add a `pyrightconfig.json` to your project root:
   "exclude": [".venv"],
   "venvPath": ".",
   "venv": ".venv",
+  "pythonVersion": "3.11",
   "typeCheckingMode": "strict"
 }
 ```
 
-`venvPath` and `venv` tell pyright where pydynox is installed. Change them if your virtual environment lives somewhere else. Then run `pyright`.
+`venvPath` and `venv` tell pyright where pydynox is installed. Change them if your virtual environment lives somewhere else. `pythonVersion` sets the Python version to check against. Without it, pyright uses the `python` on your `PATH`, which may be older than 3.11 if the virtual environment is not active. Then run `pyright`.
 
 ### ty
 
