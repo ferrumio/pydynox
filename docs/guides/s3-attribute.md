@@ -6,6 +6,10 @@ DynamoDB has a 400KB item limit. For larger files, use `S3Attribute` to store th
 
 ## How it works
 
+Before upload, reading the attribute returns the assigned `S3File`. After upload,
+it returns an `S3Value` with the stored metadata. An unset attribute returns `None`.
+Use `isinstance(value, S3Value)` before accessing uploaded metadata or download methods.
+
 When you save a model with an `S3Attribute`:
 
 1. The file is uploaded to S3
@@ -42,7 +46,7 @@ S3Value methods follow the async-first pattern. Async is the default (no prefix)
 
 ```python
 from pydynox import Model, ModelConfig
-from pydynox.attributes import S3Attribute, S3File, StringAttribute
+from pydynox.attributes import S3Attribute, S3File, S3Value, StringAttribute
 
 class Document(Model):
     model_config = ModelConfig(table="documents")
@@ -56,14 +60,17 @@ await doc.save()
 
 # Download
 doc = await Document.get(pk="DOC#1")
-data = await doc.content.get_bytes()
-await doc.content.save_to("/tmp/report.pdf")
-url = await doc.content.presigned_url(3600)
+assert doc is not None
+content = doc.content
+assert isinstance(content, S3Value)
+data = await content.get_bytes()
+await content.save_to("/tmp/report.pdf")
+url = await content.presigned_url(3600)
 
 # Sync alternative (use sync_ prefix)
-data = doc.content.sync_get_bytes()
-doc.content.sync_save_to("/tmp/report.pdf")
-url = doc.content.sync_presigned_url(3600)
+data = content.sync_get_bytes()
+content.sync_save_to("/tmp/report.pdf")
+url = content.sync_presigned_url(3600)
 ```
 
 ## Uploading files
@@ -114,10 +121,13 @@ doc.content = S3File(
 
 ## Downloading files
 
-After loading a model, `content` is an `S3Value`. Use async methods by default.
+After loading a model, a saved file is an `S3Value`. Check for it before downloading.
+Use async methods by default.
 
 ```python
 doc = await Document.get(pk="DOC#1")
+assert doc is not None
+assert isinstance(doc.content, S3Value)
 
 # Download to memory (careful with large files)
 data = await doc.content.get_bytes()
@@ -137,10 +147,12 @@ Use presigned URLs when:
 
 ## Accessing metadata
 
-Metadata is always available without downloading the file.
+Uploaded metadata is available without downloading the file.
 
 ```python
 doc = await Document.get(pk="DOC#1")
+assert doc is not None
+assert isinstance(doc.content, S3Value)
 
 # These don't make S3 calls
 print(doc.content.bucket)        # "my-bucket"

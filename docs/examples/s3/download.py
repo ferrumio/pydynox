@@ -3,7 +3,7 @@
 import asyncio
 
 from pydynox import Model, ModelConfig
-from pydynox.attributes import S3Attribute, S3File, StringAttribute
+from pydynox.attributes import S3Attribute, S3File, S3Value, StringAttribute
 
 
 class Document(Model):
@@ -23,7 +23,7 @@ async def main():
     # Get document
     doc = await Document.get(pk="DOC#DOWNLOAD")
 
-    if doc and doc.content:
+    if doc and isinstance(doc.content, S3Value):
         # Download to memory
         data = await doc.content.get_bytes()
         print(f"Downloaded {len(data)} bytes")

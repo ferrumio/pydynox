@@ -3,7 +3,7 @@
 import asyncio
 
 from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
-from pydynox.attributes import S3Attribute, S3File, StringAttribute
+from pydynox.attributes import S3Attribute, S3File, S3Value, StringAttribute
 
 # Setup client
 client = DynamoDBClient(region="us-east-1")
@@ -25,12 +25,12 @@ async def main():
     doc.content = S3File(b"Async content", name="async.txt")
     await doc.save()
     uploaded = doc.content
-    assert uploaded is not None
+    assert isinstance(uploaded, S3Value)
     print(f"Uploaded: {uploaded.key}")
 
     # Get
     loaded = await Document.get(pk="DOC#async", sk="v1")
-    if loaded and loaded.content:
+    if loaded and isinstance(loaded.content, S3Value):
         # S3Value methods are async-first (no prefix = async)
         data = await loaded.content.get_bytes()
         print(f"Downloaded: {len(data)} bytes")

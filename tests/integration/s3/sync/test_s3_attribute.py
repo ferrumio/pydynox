@@ -27,8 +27,9 @@ def document_model(dynamo, s3_bucket, localstack_endpoint):
 
 
 @pytest.mark.asyncio
-async def test_save_with_s3file(document_model):
-    """Model.save() uploads S3File to S3."""
+@pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
+async def test_save_with_s3file(document_model, sync):
+    """Reads expose the pending file until upload replaces it with metadata."""
     doc_id = str(uuid.uuid4())
 
     # GIVEN a document with S3File content
@@ -37,15 +38,44 @@ async def test_save_with_s3file(document_model):
         sk="v1",
         name="report.pdf",
     )
-    doc.content = S3File(b"PDF content here", name="report.pdf", content_type="application/pdf")
+    assert doc.content is None
+    assert isinstance(document_model.content, S3Attribute)
+    pending = S3File(b"PDF content here", name="report.pdf", content_type="application/pdf")
+    doc.content = pending
+    assert doc.content is pending
+    assert doc.content.data == b"PDF content here"
+    with pytest.raises(AttributeError, match="key"):
+        _ = doc.content.key
 
     # WHEN we save it
-    await doc.save()
+    if sync:
+        doc.sync_save()
+    else:
+        await doc.save()
 
     # THEN content becomes S3Value with metadata
     assert isinstance(doc.content, S3Value)
+    assert doc.content is not pending
+    assert pending.data == b"PDF content here"
+    assert doc.content.key.endswith("/report.pdf")
     assert doc.content.size == 16
     assert doc.content.content_type == "application/pdf"
+
+    # AND loading returns the uploaded metadata in either API
+    if sync:
+        loaded = document_model.sync_get(pk=f"DOC#{doc_id}", sk="v1")
+    else:
+        loaded = await document_model.get(pk=f"DOC#{doc_id}", sk="v1")
+    assert loaded is not None
+    assert isinstance(loaded.content, S3Value)
+    assert loaded.content.key == doc.content.key
+
+    # AND assigning another file returns to the pending state
+    replacement = S3File(b"replacement", name="replacement.txt")
+    loaded.content = replacement
+    assert loaded.content is replacement
+    loaded.content = None
+    assert loaded.content is None
 
 
 @pytest.mark.asyncio

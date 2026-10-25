@@ -3,7 +3,7 @@
 import asyncio
 
 from pydynox import Model, ModelConfig
-from pydynox.attributes import S3Attribute, S3File, StringAttribute
+from pydynox.attributes import S3Attribute, S3File, S3Value, StringAttribute
 
 
 class Document(Model):
@@ -31,7 +31,7 @@ async def main():
 
     # Access metadata
     uploaded = doc.content
-    assert uploaded is not None
+    assert isinstance(uploaded, S3Value)
     assert uploaded.metadata is not None
     print(f"Author: {uploaded.metadata.get('author')}")
     print(f"Version: {uploaded.metadata.get('version')}")

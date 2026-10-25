@@ -3,7 +3,7 @@
 # Re-export compression/encryption enums for convenience
 from pydynox._internal._compression import CompressionAlgorithm
 from pydynox._internal._encryption import EncryptionMode
-from pydynox._internal._s3 import S3File
+from pydynox._internal._s3 import S3File, S3Value
 from pydynox.attributes.base import Attribute
 from pydynox.attributes.compressed import CompressedAttribute
 from pydynox.attributes.decimal import DecimalAttribute
@@ -57,6 +57,7 @@ __all__ = [
     # S3
     "S3Attribute",
     "S3File",
+    "S3Value",
     # Version
     "VersionAttribute",
     # Vector

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self, overload
+from typing import TYPE_CHECKING, Any
 
 from pydynox._internal._s3 import S3File, S3Metrics, S3Operations, S3Value
 from pydynox.attributes.base import Attribute
@@ -11,11 +11,13 @@ if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
 
 
-class S3Attribute(Attribute[S3Value | None]):
+class S3Attribute(Attribute[S3File | S3Value]):
     """Attribute that stores large files in S3.
 
     The file is uploaded to S3 on save, and metadata is stored in DynamoDB.
-    On read, returns an S3Value with methods to download or get presigned URL.
+    Reads return S3File before upload, S3Value after upload or loading from
+    DynamoDB, and None when unset. Narrow to S3Value to download the file or
+    get a presigned URL.
 
     Example:
         class Document(Model):
@@ -28,16 +30,19 @@ class S3Attribute(Attribute[S3Value | None]):
         # Upload
         doc = Document(pk="DOC#1", name="report.pdf")
         doc.content = S3File(b"...", name="report.pdf", content_type="application/pdf")
-        doc.save()
+        await doc.save()
 
         # Download (async)
-        doc = Document.get(pk="DOC#1")
-        data = await doc.content.get_bytes()
-        url = await doc.content.presigned_url(3600)
+        doc = await Document.get(pk="DOC#1")
+        assert doc is not None
+        content = doc.content
+        assert isinstance(content, S3Value)
+        data = await content.get_bytes()
+        url = await content.presigned_url(3600)
 
         # Download (sync)
-        data = doc.content.sync_get_bytes()
-        url = doc.content.sync_presigned_url(3600)
+        data = content.sync_get_bytes()
+        url = content.sync_presigned_url(3600)
     """
 
     attr_type: str = "M"  # Stored as Map in DynamoDB
@@ -71,24 +76,6 @@ class S3Attribute(Attribute[S3Value | None]):
         self.prefix = prefix.rstrip("/") + "/" if prefix else ""
         self.region = region
         self._s3_ops: S3Operations | None = None
-
-    # Reads return S3Value, while writes also accept an S3File to upload on save.
-    # Declaring both __get__ and __set__ here keeps type checkers from narrowing
-    # the value to S3File after an assignment.
-    @overload
-    def __get__(self, instance: None, owner: type[Any]) -> Self: ...
-
-    @overload
-    def __get__(self, instance: Any, owner: type[Any]) -> S3Value | None: ...
-
-    def __get__(self, instance: Any, owner: type[Any]) -> Any:
-        """Get the attribute itself on the class, or the S3Value on an instance."""
-        return super().__get__(instance, owner)
-
-    def __set__(self, instance: Any, value: S3File | S3Value | None) -> None:
-        """Set the value. An S3File is uploaded to S3 on save."""
-        if instance is not None and self.attr_name is not None:
-            instance.__dict__[self.attr_name] = value
 
     def _get_s3_ops(self, client: DynamoDBClient) -> S3Operations:
         """Get or create S3Operations from DynamoDB client config."""

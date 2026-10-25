@@ -58,7 +58,7 @@ jobs:
       - name: Type check (ty)
         run: |
           source .venv/bin/activate
-          ty check python/pydynox/
+          ty check python/pydynox/ tests/typing/
 
   rust-lint:
     name: Rust lint
