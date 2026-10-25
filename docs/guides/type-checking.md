@@ -43,6 +43,8 @@ Each attribute returns a specific type:
 | `S3Attribute` | `S3Value` or `None` |
 | `VersionAttribute` | `int` or `None` |
 
+`S3Attribute` accepts an `S3File` when you assign it, but reading it returns an `S3Value` or `None`. After you save, use the `S3Value` to read `key`, `bucket`, and `etag`.
+
 ## CRUD Method Return Types
 
 ```python
