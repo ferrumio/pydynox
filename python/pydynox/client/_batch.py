@@ -151,7 +151,7 @@ class BatchOperations(_MixinBase):
             operations: List of put, update, delete, or condition check operations.
             client_request_token: Optional 1–36 character token for retrying the same
                 request. DynamoDB deduplicates identical requests for ten minutes
-                after the first request completes. None lets the SDK generate a token.
+                after the first request completes. None generates a random UUID v4 token.
 
         Raises:
             ValueError: If the token is empty or longer than 36 characters.
@@ -211,7 +211,7 @@ class BatchOperations(_MixinBase):
             operations: List of put, update, delete, or condition check operations.
             client_request_token: Optional 1–36 character token for retrying the same
                 request. DynamoDB deduplicates identical requests for ten minutes
-                after the first request completes. None lets the SDK generate a token.
+                after the first request completes. None generates a random UUID v4 token.
 
         Raises:
             ValueError: If the token is empty or longer than 36 characters.

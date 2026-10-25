@@ -54,8 +54,8 @@ class Transaction:
         Args:
             client: The DynamoDBClient to use.
             client_request_token: Optional 1–36 character token for retrying the same
-                transaction within ten minutes of its first completion. None lets
-                the SDK generate a token. Reuse the same payload when retrying.
+                transaction within ten minutes of its first completion. None generates
+                a random UUID v4 token for each commit. Reuse the same payload when retrying.
         """
         self._client = client
         self._client_request_token = client_request_token
@@ -270,8 +270,8 @@ class SyncTransaction:
         Args:
             client: The DynamoDBClient to use.
             client_request_token: Optional 1–36 character token for retrying the same
-                transaction within ten minutes of its first completion. None lets
-                the SDK generate a token. Reuse the same payload when retrying.
+                transaction within ten minutes of its first completion. None generates
+                a random UUID v4 token for each commit. Reuse the same payload when retrying.
         """
         self._client = client
         self._client_request_token = client_request_token
