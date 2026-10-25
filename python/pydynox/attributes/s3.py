@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self, overload
 
 from pydynox._internal._s3 import S3File, S3Metrics, S3Operations, S3Value
 from pydynox.attributes.base import Attribute
@@ -71,6 +71,24 @@ class S3Attribute(Attribute[S3Value | None]):
         self.prefix = prefix.rstrip("/") + "/" if prefix else ""
         self.region = region
         self._s3_ops: S3Operations | None = None
+
+    # Reads return S3Value, while writes also accept an S3File to upload on save.
+    # Declaring both __get__ and __set__ here keeps type checkers from narrowing
+    # the value to S3File after an assignment.
+    @overload
+    def __get__(self, instance: None, owner: type[Any]) -> Self: ...
+
+    @overload
+    def __get__(self, instance: Any, owner: type[Any]) -> S3Value | None: ...
+
+    def __get__(self, instance: Any, owner: type[Any]) -> Any:
+        """Get the attribute itself on the class, or the S3Value on an instance."""
+        return super().__get__(instance, owner)
+
+    def __set__(self, instance: Any, value: S3File | S3Value | None) -> None:
+        """Set the value. An S3File is uploaded to S3 on save."""
+        if instance is not None and self.attr_name is not None:
+            instance.__dict__[self.attr_name] = value
 
     def _get_s3_ops(self, client: DynamoDBClient) -> S3Operations:
         """Get or create S3Operations from DynamoDB client config."""

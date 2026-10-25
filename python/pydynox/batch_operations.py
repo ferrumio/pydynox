@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from typing import Any, Protocol
 
 
 class _AsyncBatchWriteClient(Protocol):
     """Client interface required by BatchWriter."""
 
-    async def batch_write(
+    def batch_write(
         self,
         table: str,
         put_items: list[dict[str, Any]] | None = None,
         delete_keys: list[dict[str, Any]] | None = None,
-    ) -> None: ...
+    ) -> Awaitable[None]: ...
 
 
 class _SyncBatchWriteClient(Protocol):

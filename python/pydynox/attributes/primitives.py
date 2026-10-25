@@ -7,9 +7,12 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from pydynox.attributes.base import Attribute
+
+if TYPE_CHECKING:
+    from pydynox.generators import AutoGenerate
 
 MT = TypeVar("MT")
 
@@ -98,7 +101,7 @@ class StringAttribute(Attribute[str]):
         self,
         partition_key: bool = False,
         sort_key: bool = False,
-        default: str | None = None,
+        default: str | AutoGenerate | None = None,
         required: bool = False,
         template: Any | None = None,
         discriminator: bool = False,
@@ -109,7 +112,8 @@ class StringAttribute(Attribute[str]):
         Args:
             partition_key: True if this is the partition key.
             sort_key: True if this is the sort key.
-            default: Default value when not provided.
+            default: Default value when not provided, or an AutoGenerate
+                strategy to generate the value on save.
             required: Whether this field is required.
             template: Template for building key. Supports strings ("USER#{email}")
                 and t-strings (t"USER#{email}") on Python 3.14+.

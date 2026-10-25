@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 from pydynox._internal._atomic import (
     AtomicAdd,
@@ -23,6 +23,9 @@ from pydynox._internal._conditions import (
     ConditionNotExists,
     ConditionPath,
 )
+
+if TYPE_CHECKING:
+    from pydynox.generators import AutoGenerate
 
 T = TypeVar("T")
 _A = TypeVar("_A", bound="Attribute[Any]")
@@ -48,7 +51,7 @@ class Attribute(Generic[T]):
         self,
         partition_key: bool = False,
         sort_key: bool = False,
-        default: T | None = None,
+        default: T | AutoGenerate | None = None,
         required: bool = False,
         discriminator: bool = False,
         alias: str | None = None,
@@ -58,7 +61,8 @@ class Attribute(Generic[T]):
         Args:
             partition_key: True if this is the partition key.
             sort_key: True if this is the sort key.
-            default: Default value when not provided.
+            default: Default value when not provided, or an AutoGenerate
+                strategy to generate the value on save.
             required: Whether this field is required (cannot be None).
             discriminator: True if this field is used for model inheritance.
             alias: DynamoDB attribute name. If set, this name is used in DynamoDB
