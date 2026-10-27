@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pydynox._internal._decimal import model_read_client
@@ -12,6 +13,7 @@ from pydynox._internal._indexes import (
 )
 from pydynox._internal._vector import VectorIndex
 from pydynox.attributes import Attribute, DecimalAttribute
+from pydynox.attributes.base import UNSET
 from pydynox.config import ModelConfig, get_default_client
 from pydynox.generators import generate_value, is_auto_generate
 from pydynox.hooks import HookType
@@ -22,6 +24,19 @@ if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
 
 M = TypeVar("M", bound="ModelBase")
+
+# Set by from_dict() while it builds an instance from stored data.
+_loading_stored: ContextVar[bool] = ContextVar("_loading_stored", default=False)
+
+
+def _initial_default(attr: Attribute[Any], loading: bool) -> Any:
+    """Return the default for a missing attribute.
+
+    New models use default_for_new when it is set. Stored data always uses default.
+    """
+    if not loading and attr.default_for_new is not UNSET:
+        return attr.default_for_new
+    return attr.default
 
 
 class ModelMeta(type):
@@ -241,19 +256,21 @@ class ModelBase(metaclass=ModelMeta):
         object.__setattr__(self, "_original", None)
         object.__setattr__(self, "_changed", set())
         object.__setattr__(self, "_json_snapshots", {})
+        loading = _loading_stored.get()
         # First pass: set all regular attributes
         for attr_name, attr in self._attributes.items():
             # Skip template keys in first pass - they'll be built later
             if _is_template_attr(attr):
                 continue
 
+            default = _initial_default(attr, loading)
             if attr_name in kwargs:
                 setattr(self, attr_name, kwargs[attr_name])
-            elif attr.default is not None:
-                if is_auto_generate(attr.default):
+            elif default is not None:
+                if is_auto_generate(default):
                     setattr(self, attr_name, None)
                 else:
-                    setattr(self, attr_name, attr.default)
+                    setattr(self, attr_name, default)
             elif attr.required:
                 raise ValueError(f"Attribute '{attr_name}' is required")
             else:
@@ -372,10 +389,11 @@ class ModelBase(metaclass=ModelMeta):
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
         for attr_name, attr in self._attributes.items():
-            if attr.default is not None and is_auto_generate(attr.default):
+            strategy = _initial_default(attr, loading=False)
+            if strategy is not None and is_auto_generate(strategy):
                 current_value = getattr(self, attr_name, None)
                 if current_value is None:
-                    generated = generate_value(attr.default)
+                    generated = generate_value(strategy)
                     setattr(self, attr_name, generated)
 
         # Rebuild template keys after auto-generate (placeholders may now have values)
@@ -544,7 +562,11 @@ class ModelBase(metaclass=ModelMeta):
             }
         else:
             model_values = deserialized
-        instance = target_cls(**model_values)
+        token = _loading_stored.set(True)
+        try:
+            instance = target_cls(**model_values)
+        finally:
+            _loading_stored.reset(token)
         # Store original for change tracking with Python names and deserialized values
         # so __setattr__ can compare correctly (it looks up by Python attr name)
         instance._original = deserialized.copy()
