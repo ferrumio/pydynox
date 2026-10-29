@@ -21,9 +21,9 @@
 //! the env vars are set (injected automatically by EKS/GitHub).
 //! Just use `DynamoDBClient()` without any parameters.
 
-use aws_config::BehaviorVersion;
 use aws_config::profile::ProfileFileCredentialsProvider;
 use aws_config::sts::AssumeRoleProvider;
+use aws_config::{BehaviorVersion, SdkConfig};
 use aws_sdk_dynamodb::config::Credentials;
 
 use super::config::AwsConfig;
@@ -44,7 +44,8 @@ pub enum CredentialProvider {
 ///
 /// Priority order:
 /// 1. Hardcoded credentials (access_key + secret_key)
-/// 2. AssumeRole (if role_arn is set)
+/// 2. AssumeRole (if role_arn is set). If a profile is also set, its
+///    credentials are used to call STS.
 /// 3. AWS profile (supports SSO profiles)
 /// 4. Default chain (env vars, instance profile, container, EKS IRSA, GitHub OIDC, etc.)
 pub async fn build_credential_provider(config: &AwsConfig) -> CredentialProvider {
@@ -62,7 +63,7 @@ pub async fn build_credential_provider(config: &AwsConfig) -> CredentialProvider
 
     // 2. AssumeRole (cross-account)
     if let Some(role) = &config.role_arn {
-        let base_config = aws_config::defaults(BehaviorVersion::latest()).load().await;
+        let base_config = assume_role_source_config(config.profile.as_deref()).await;
         let session_name = config
             .role_session_name
             .as_deref()
@@ -91,4 +92,18 @@ pub async fn build_credential_provider(config: &AwsConfig) -> CredentialProvider
     // Handles: env vars, ~/.aws/credentials, instance profile,
     // container credentials, EKS IRSA, GitHub OIDC, SSO
     CredentialProvider::Default
+}
+
+/// Config used to call STS for AssumeRole. A named profile, when given, is the
+/// source identity instead of the default chain.
+pub(crate) async fn assume_role_source_config(profile: Option<&str>) -> SdkConfig {
+    let mut loader = aws_config::defaults(BehaviorVersion::latest());
+    if let Some(profile_name) = profile {
+        loader = loader.credentials_provider(
+            ProfileFileCredentialsProvider::builder()
+                .profile_name(profile_name)
+                .build(),
+        );
+    }
+    loader.load().await
 }
