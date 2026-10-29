@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Generic, TypeVar, overload
 
-from pydynox.attributes.base import Attribute
+from pydynox.attributes.base import UNSET, Attribute, Unset
 
 E = TypeVar("E", bound=Enum)
 J = TypeVar("J")
@@ -55,6 +55,7 @@ class JSONAttribute(Attribute[J], Generic[J]):
         default: Any | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: Any | None | Unset = UNSET,
     ) -> None: ...
 
     @overload
@@ -67,6 +68,7 @@ class JSONAttribute(Attribute[J], Generic[J]):
         default: J | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: J | None | Unset = UNSET,
     ) -> None: ...
 
     def __init__(
@@ -78,6 +80,7 @@ class JSONAttribute(Attribute[J], Generic[J]):
         default: Any | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: Any | None | Unset = UNSET,
     ):
         super().__init__(
             partition_key=partition_key,
@@ -85,6 +88,7 @@ class JSONAttribute(Attribute[J], Generic[J]):
             default=default,
             required=required,
             alias=alias,
+            default_for_new=default_for_new,
         )
         self.model_class = model_class
         self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
@@ -202,6 +206,7 @@ class EnumAttribute(Attribute[E], Generic[E]):
         default: E | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: E | None | Unset = UNSET,
     ):
         """Create an enum attribute.
 
@@ -212,6 +217,8 @@ class EnumAttribute(Attribute[E], Generic[E]):
             default: Default enum value.
             required: Whether this field is required.
             alias: DynamoDB attribute name override.
+            default_for_new: Enum value used for new models when this attribute
+                is omitted. See Attribute.
         """
         super().__init__(
             partition_key=partition_key,
@@ -219,6 +226,7 @@ class EnumAttribute(Attribute[E], Generic[E]):
             default=default,
             required=required,
             alias=alias,
+            default_for_new=default_for_new,
         )
         self.enum_class = enum_class
 
