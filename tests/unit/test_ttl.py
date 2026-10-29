@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import ExpiresIn, StringAttribute, TTLAttribute
+from pydynox.testing import MemoryBackend
 
 
 @pytest.fixture
@@ -273,3 +274,174 @@ def test_model_from_dict_deserializes_ttl(mock_client):
     # THEN TTL is deserialized to datetime
     assert isinstance(session.expires_at, datetime)
     assert int(session.expires_at.timestamp()) == timestamp
+
+
+# --- extend_ttl alias and failure-path tests ---
+
+
+def test_extend_ttl_aliased_ttl(mock_client):
+    """extend_ttl writes to the DynamoDB alias and updates the instance."""
+
+    # GIVEN a model with an aliased TTL attribute
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+        expires_at = TTLAttribute(alias="ttl")
+
+    original_expiry = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    new_expiry = datetime(2031, 1, 1, tzinfo=timezone.utc)
+    session = Session(pk="S1", expires_at=original_expiry)
+
+    # WHEN extending the TTL
+    session.extend_ttl(new_expiry)
+
+    # THEN the update uses the alias and the instance holds the new value
+    mock_client.sync_update_item.assert_called_once()
+    updates = mock_client.sync_update_item.call_args.kwargs["updates"]
+    assert updates == {"ttl": int(new_expiry.timestamp())}
+    assert session.expires_at == new_expiry
+
+
+def test_extend_ttl_aliased_key_and_ttl(mock_client):
+    """extend_ttl maps both the aliased partition key and the aliased TTL field."""
+
+    # GIVEN a model with aliased key and TTL attributes
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        session_id = StringAttribute(partition_key=True, alias="sid")
+        expires_at = TTLAttribute(alias="ttl")
+
+    new_expiry = datetime(2031, 1, 1, tzinfo=timezone.utc)
+    session = Session(
+        session_id="S1",
+        expires_at=datetime(2030, 1, 1, tzinfo=timezone.utc),
+    )
+
+    # WHEN extending the TTL
+    session.extend_ttl(new_expiry)
+
+    # THEN the key and the update both use their DynamoDB aliases
+    mock_client.sync_update_item.assert_called_once()
+    call = mock_client.sync_update_item.call_args
+    assert call.args[0] == "sessions"
+    assert call.args[1] == {"sid": "S1"}
+    assert call.kwargs["updates"] == {"ttl": int(new_expiry.timestamp())}
+
+
+def test_extend_ttl_unaliased(mock_client):
+    """extend_ttl keeps the Python name when no alias is defined."""
+
+    # GIVEN a model with an unaliased TTL attribute
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+        expires_at = TTLAttribute()
+
+    new_expiry = datetime(2031, 1, 1, tzinfo=timezone.utc)
+    session = Session(pk="S1", expires_at=datetime(2030, 1, 1, tzinfo=timezone.utc))
+
+    # WHEN extending the TTL
+    session.extend_ttl(new_expiry)
+
+    # THEN the update uses the Python name and the instance holds the new value
+    mock_client.sync_update_item.assert_called_once()
+    updates = mock_client.sync_update_item.call_args.kwargs["updates"]
+    assert updates == {"expires_at": int(new_expiry.timestamp())}
+    assert session.expires_at == new_expiry
+
+
+def test_extend_ttl_failure_does_not_update_instance(mock_client):
+    """extend_ttl leaves the instance unchanged when the write fails."""
+
+    # GIVEN a model whose update call will fail
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+        expires_at = TTLAttribute(alias="ttl")
+
+    original_expiry = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    new_expiry = datetime(2031, 1, 1, tzinfo=timezone.utc)
+    session = Session(pk="S1", expires_at=original_expiry)
+    mock_client.sync_update_item.side_effect = RuntimeError("boom")
+
+    # WHEN the write fails
+    # THEN the error propagates and the instance keeps the old value
+    with pytest.raises(RuntimeError, match="boom"):
+        session.extend_ttl(new_expiry)
+
+    assert session.expires_at == original_expiry
+
+
+def test_extend_ttl_issue_repro():
+    """extend_ttl updates the aliased TTL field stored in the backend."""
+
+    # GIVEN a saved model with an aliased TTL attribute
+    class Session(Model):
+        model_config = ModelConfig(table="sessions")
+        pk = StringAttribute(partition_key=True)
+        expires_at = TTLAttribute(alias="ttl")
+
+    with MemoryBackend() as backend:
+        original_expiry = datetime(2030, 1, 1, tzinfo=timezone.utc)
+        session = Session(pk="SESSION#1", expires_at=original_expiry)
+        session.sync_save()
+
+        # WHEN extending the TTL
+        new_expiry = datetime(2031, 1, 1, tzinfo=timezone.utc)
+        session.extend_ttl(new_expiry)
+
+        # THEN the stored aliased field holds the new timestamp
+        stored = backend.client.sync_get_item("sessions", {"pk": "SESSION#1"})
+
+    assert stored["ttl"] == int(new_expiry.timestamp())
+    assert "expires_at" not in stored
+
+
+def test_extend_ttl_roundtrip():
+    """extend_ttl persists the aliased field and the model reads it back."""
+
+    # GIVEN a saved model with an aliased TTL attribute
+    class Session(Model):
+        model_config = ModelConfig(table="sessions")
+        pk = StringAttribute(partition_key=True)
+        expires_at = TTLAttribute(alias="ttl")
+
+    with MemoryBackend() as backend:
+        original_expiry = datetime(2030, 1, 1, tzinfo=timezone.utc)
+        session = Session(pk="S1", expires_at=original_expiry)
+        session.sync_save()
+
+        # WHEN extending the TTL
+        new_expiry = datetime(2031, 1, 1, tzinfo=timezone.utc)
+        session.extend_ttl(new_expiry)
+
+        # THEN the raw stored field is the aliased one with the new timestamp
+        stored = backend.client.sync_get_item("sessions", {"pk": "S1"})
+        assert stored["ttl"] == int(new_expiry.timestamp())
+        assert "expires_at" not in stored
+
+        # AND the model reads the new value back
+        loaded = Session.sync_get(pk="S1")
+
+    assert loaded is not None
+    assert loaded.expires_at == new_expiry
+
+
+def test_extend_ttl_naive_datetime_matches_timestamp(mock_client):
+    """extend_ttl serializes naive datetimes exactly like int(dt.timestamp())."""
+
+    # GIVEN a model with an aliased TTL attribute and a naive datetime
+    class Session(Model):
+        model_config = ModelConfig(table="sessions", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+        expires_at = TTLAttribute(alias="ttl")
+
+    naive_expiry = datetime(2031, 1, 1, 12, 0, 0)
+    session = Session(pk="S1", expires_at=datetime(2030, 1, 1, tzinfo=timezone.utc))
+
+    # WHEN extending the TTL with the naive datetime
+    session.extend_ttl(naive_expiry)
+
+    # THEN the serialized value matches the old int(dt.timestamp()) behavior
+    updates = mock_client.sync_update_item.call_args.kwargs["updates"]
+    assert list(updates.values()) == [int(naive_expiry.timestamp())]
