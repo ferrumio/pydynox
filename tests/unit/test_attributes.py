@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from enum import Enum
 
 import pytest
+from pydantic import BaseModel
 from pydynox.attributes import (  # noqa: I001
     BinaryAttribute,
     BooleanAttribute,
@@ -153,6 +154,24 @@ def test_typed_map_attribute_roundtrip_dataclass():
     deserialized = attr.deserialize(attr.serialize(original))
 
     assert deserialized == original
+
+
+class AddressPD(BaseModel):
+    street: str
+    city: str
+    zip: str
+
+
+def test_typed_map_attribute_serialize_pydantic():
+    """Typed MapAttribute serializes a Pydantic model to dict."""
+    attr = MapAttribute(AddressPD)
+    assert attr.serialize(AddressPD(**SAMPLE_DC_DICT)) == SAMPLE_DC_DICT
+
+
+def test_typed_map_attribute_deserialize_pydantic():
+    """Typed MapAttribute deserializes dict to a Pydantic model."""
+    attr = MapAttribute(AddressPD)
+    assert attr.deserialize(SAMPLE_DC_DICT) == AddressPD(**SAMPLE_DC_DICT)
 
 
 def test_untyped_map_attribute_passthrough():

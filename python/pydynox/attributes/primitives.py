@@ -287,7 +287,9 @@ class MapAttribute(Attribute[MT], Generic[MT]):
             alias=alias,
         )
         self.model_class = model_class
-        self._is_pydantic = _is_pydantic_class(model_class)
+        self._pydantic_class: type[_PydanticModel] | None = (
+            model_class if _is_pydantic_class(model_class) else None
+        )
         self._is_dataclass = model_class is not None and dataclasses.is_dataclass(model_class)
 
     def serialize(self, value: Any | None) -> dict[str, Any] | None:
@@ -295,7 +297,7 @@ class MapAttribute(Attribute[MT], Generic[MT]):
             return None
         if self.model_class is None:
             return value
-        if self._is_pydantic:
+        if self._pydantic_class is not None:
             return value.model_dump()
         if self._is_dataclass:
             return dataclasses.asdict(value)
@@ -306,8 +308,8 @@ class MapAttribute(Attribute[MT], Generic[MT]):
             return None
         if self.model_class is None or not isinstance(value, dict):
             return value
-        if _is_pydantic_class(self.model_class):
-            return self.model_class.model_validate(value)
+        if self._pydantic_class is not None:
+            return self._pydantic_class.model_validate(value)
         model_class = self.model_class
         if not dataclasses.is_dataclass(model_class):
             return value
