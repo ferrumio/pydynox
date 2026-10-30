@@ -32,6 +32,25 @@ def _get_consistent_read(model_class: type[M], explicit: bool | None) -> bool:
     return getattr(model_class.model_config, "consistent_read", False)
 
 
+def _build_projection(
+    model_class: type[M], fields: list[str] | None
+) -> tuple[str | None, dict[str, str]]:
+    """Build a projection expression. Returns (projection_expr, {placeholder: name})."""
+    proj_names: dict[str, str] = {}
+    if not fields:
+        return None, proj_names
+    proj_parts = []
+    for i, field in enumerate(fields):
+        parts = model_class._dynamo_path(field)
+        part_placeholders: list[str] = []
+        for part in parts:
+            placeholder = f"#proj{i}_{len(part_placeholders)}"
+            proj_names[placeholder] = part
+            part_placeholders.append(placeholder)
+        proj_parts.append(".".join(part_placeholders))
+    return ", ".join(proj_parts), proj_names
+
+
 def _build_query_params(
     model_class: type[M],
     partition_key_value: Any,
@@ -65,20 +84,7 @@ def _build_query_params(
 
     filter_expr = _serialize_filter(filter_condition, names, values)
 
-    # Build projection expression
-    projection_expr = None
-    proj_names: dict[str, str] = {}
-    if fields:
-        proj_parts = []
-        for i, field in enumerate(fields):
-            parts = model_class._dynamo_path(field)
-            part_placeholders: list[str] = []
-            for part in parts:
-                placeholder = f"#proj{i}_{len(part_placeholders)}"
-                proj_names[placeholder] = part
-                part_placeholders.append(placeholder)
-            proj_parts.append(".".join(part_placeholders))
-        projection_expr = ", ".join(proj_parts)
+    projection_expr, proj_names = _build_projection(model_class, fields)
 
     # Merge names: conditions use {name: placeholder}, projection uses {placeholder: name}
     # Convert condition names to {placeholder: name} format and merge with projection
@@ -112,20 +118,7 @@ def _build_scan_params(
 
     filter_expr = _serialize_filter(filter_condition, names, values)
 
-    # Build projection expression
-    projection_expr = None
-    proj_names: dict[str, str] = {}
-    if fields:
-        proj_parts = []
-        for i, field in enumerate(fields):
-            parts = model_class._dynamo_path(field)
-            part_placeholders: list[str] = []
-            for part in parts:
-                placeholder = f"#proj{i}_{len(part_placeholders)}"
-                proj_names[placeholder] = part
-                part_placeholders.append(placeholder)
-            proj_parts.append(".".join(part_placeholders))
-        projection_expr = ", ".join(proj_parts)
+    projection_expr, proj_names = _build_projection(model_class, fields)
 
     # Merge names: filter uses {name: placeholder}, projection uses {placeholder: name}
     # Convert filter names to {placeholder: name} format and merge with projection
