@@ -138,20 +138,22 @@ pydynox has two APIs:
 
 ### Model API (recommended)
 
+Model methods are async by default. Use the `sync_` prefix in sync code, like `Model.sync_get()`. See [Async-first](async-first.md).
+
 | Operation | boto3 | pydynox Model |
 |-----------|-------|---------------|
 | Get item | `table.get_item(Key={...})` | `Model.get(pk=..., sk=...)` |
 | Put item | `table.put_item(Item={...})` | `model.save()` |
 | Delete item | `table.delete_item(Key={...})` | `model.delete()` |
 | Update item | `table.update_item(...)` | `model.update(name="new")` |
-| Query | `table.query(...)` | `for item in Model.query(partition_key=...):` |
-| Scan | `table.scan()` | `for item in Model.scan():` |
+| Query | `table.query(...)` | `async for item in Model.query(partition_key=...):` |
+| Scan | `table.scan()` | `async for item in Model.scan():` |
 | Batch get | `dynamodb.batch_get_item(...)` | `Model.batch_get([keys])` |
 | Conditional | `ConditionExpression=...` | `model.save(condition=Model.pk.not_exists())` |
-| Projection | `ProjectionExpression=...` | `Model.get(..., fields=["name"])` |
+| Projection | `ProjectionExpression=...` | `Model.query(..., fields=["name"])` |
 | Consistent read | `ConsistentRead=True` | `Model.get(..., consistent_read=True)` |
 | Create table | `client.create_table(...)` | `Model.create_table()` |
-| Sync | `boto3` | `Model.sync_get(...)` |
+| Async | `aioboto3` | `await Model.get(...)` |
 
 ### Low-level API
 
@@ -162,10 +164,10 @@ For cases where you need full control or don't want to define models:
 | Get item | `table.get_item(Key={...})` | `client.get_item("table", {"pk": "123"})` |
 | Put item | `table.put_item(Item={...})` | `client.put_item("table", {"pk": "123", ...})` |
 | Delete item | `table.delete_item(Key={...})` | `client.delete_item("table", {"pk": "123"})` |
-| Query | `table.query(...)` | `client.query("table", key_condition=...)` |
+| Query | `table.query(...)` | `client.query("table", key_condition_expression=...)` |
 | Scan | `table.scan()` | `client.scan("table")` |
 | Batch write | `table.batch_writer()` | `client.batch_write("table", put_items=[...])` |
-| Transaction | `client.transact_write_items(...)` | `with Transaction(client) as txn:` |
+| Transaction | `client.transact_write_items(...)` | `async with Transaction(client) as txn:` |
 | Create table | `client.create_table(...)` | `client.create_table("table", ...)` |
 | Delete table | `client.delete_table(...)` | `client.delete_table("table")` |
 
@@ -173,13 +175,13 @@ For cases where you need full control or don't want to define models:
 
 pydynox adds some conveniences on top of DynamoDB:
 
-- **Compression** - `compress=True` on attributes
+- **Compression** - `CompressedAttribute`
 - **Field encryption** - KMS encryption per field
 - **Rate limiting** - Built-in throttling
 - **Size calculator** - Check item size before save
 - **Hooks** - `@before_save`, `@after_load` callbacks
-- **Auto-generate** - Auto IDs with `UUIDGenerator()`
-- **TTL helpers** - `expires_in()` methods
+- **Auto-generate** - Auto IDs with `AutoGenerate.UUID4`
+- **TTL helpers** - `ExpiresIn` and the `expires_in` property
 - **S3 for large items** - Store big data in S3 automatically
 - **Metrics** - RCU/WCU tracking per operation
 - **Optimistic locking** - `VersionAttribute`
