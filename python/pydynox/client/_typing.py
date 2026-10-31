@@ -7,14 +7,15 @@ allowing type checkers to resolve attributes used by mixin classes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pydynox import pydynox_core
     from pydynox._internal._metrics import ModelMetrics, OperationMetrics
     from pydynox.rate_limit import AdaptiveRate, FixedRate
 
     class _MixinBase:
-        _client: Any  # pydynox_core.DynamoDBClient (Rust extension)
+        _client: pydynox_core.DynamoDBClient
         _last_metrics: OperationMetrics | None
         _total_metrics: ModelMetrics
         _rate_limit: FixedRate | AdaptiveRate | None
