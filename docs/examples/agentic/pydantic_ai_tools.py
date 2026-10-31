@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pydantic_ai import Agent
 from pydantic_ai.models.bedrock import BedrockConverseModel
 from pydynox import DynamoDBClient, Model, ModelConfig, set_default_client
-from pydynox.attributes import NumberAttribute, S3Attribute, S3File, StringAttribute
+from pydynox.attributes import NumberAttribute, S3Attribute, S3File, S3Value, StringAttribute
 
 # Create client
 client = DynamoDBClient(region="us-east-1")
@@ -82,10 +82,10 @@ async def search_documents(ctx, query: str, limit: int = 10) -> list:
 
     return [
         {
-            "doc_id": doc.pk.replace("DOC#", ""),
+            "doc_id": (doc.pk or "").replace("DOC#", ""),
             "title": doc.title,
             "author": doc.author,
-            "size_kb": round(doc.size_bytes / 1024, 2),
+            "size_kb": round((doc.size_bytes or 0) / 1024, 2),
         }
         for doc in docs
     ]
@@ -120,11 +120,11 @@ async def get_document(ctx, doc_id: str, version: str = "latest") -> dict:
 
     return {
         "doc_id": doc_id,
-        "version": doc.sk.replace("VERSION#", ""),
+        "version": (doc.sk or "").replace("VERSION#", ""),
         "title": doc.title,
         "author": doc.author,
-        "size_kb": round(doc.size_bytes / 1024, 2),
-        "s3_key": doc.content.key if doc.content else None,
+        "size_kb": round((doc.size_bytes or 0) / 1024, 2),
+        "s3_key": doc.content.key if isinstance(doc.content, S3Value) else None,
     }
 
 
@@ -147,9 +147,9 @@ async def list_document_versions(ctx, doc_id: str) -> list:
 
     return [
         {
-            "version": doc.sk.replace("VERSION#", ""),
+            "version": (doc.sk or "").replace("VERSION#", ""),
             "author": doc.author,
-            "size_kb": round(doc.size_bytes / 1024, 2),
+            "size_kb": round((doc.size_bytes or 0) / 1024, 2),
         }
         for doc in docs
     ]
@@ -213,11 +213,13 @@ async def upload_document(
     doc.content = S3File(content_bytes, name=f"{doc_id}.txt", content_type="text/plain")
     await doc.save()
 
+    uploaded = doc.content
+    assert isinstance(uploaded, S3Value)
     return {
         "success": True,
         "doc_id": doc_id,
         "version": version,
-        "s3_key": doc.content.key,
+        "s3_key": uploaded.key,
         "size_kb": round(len(content_bytes) / 1024, 2),
     }
 
@@ -226,10 +228,10 @@ async def upload_document(
 if __name__ == "__main__":
     import asyncio
 
-    def create_tables():
+    async def create_tables():
         """Create DynamoDB tables if they don't exist."""
-        if not client.table_exists("documents"):
-            client.create_table(
+        if not await client.table_exists("documents"):
+            await client.create_table(
                 table_name="documents",
                 partition_key=("pk", "S"),
                 sort_key=("sk", "S"),
@@ -237,8 +239,8 @@ if __name__ == "__main__":
             )
             print("Table 'documents' created!")
 
-        if not client.table_exists("projects"):
-            client.create_table(
+        if not await client.table_exists("projects"):
+            await client.create_table(
                 table_name="projects",
                 partition_key=("pk", "S"),
                 sort_key=("sk", "S"),
@@ -298,7 +300,7 @@ if __name__ == "__main__":
 
     async def main():
         # Create tables first
-        create_tables()
+        await create_tables()
 
         # Seed data
         await seed_data()

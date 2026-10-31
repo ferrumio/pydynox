@@ -11,6 +11,7 @@ class Employee(Model):
     pk = StringAttribute(partition_key=True)
     sk = StringAttribute(sort_key=True)
     name = StringAttribute()
+    email = StringAttribute()
     department = StringAttribute()
     ssn = EncryptedAttribute(key_id="alias/hr-encryption-key")
 
@@ -48,5 +49,5 @@ def verify_ssn_last_four(employee_id: str, last_four: str) -> dict:
         return {"error": "Not found"}
 
     # SSN is decrypted automatically
-    matches = emp.ssn.endswith(last_four)
+    matches = emp.ssn is not None and emp.ssn.endswith(last_four)
     return {"verified": matches}

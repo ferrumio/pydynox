@@ -96,7 +96,7 @@ def search_employees_by_department(department: str) -> list:
 
     return [
         {
-            "employee_id": emp.pk.replace("EMP#", ""),
+            "employee_id": (emp.pk or "").replace("EMP#", ""),
             "name": emp.name,
             "email": emp.email,
         }
@@ -122,8 +122,8 @@ def get_time_off_balance(employee_id: str) -> dict:
         )
     )
 
-    approved_days = sum(r.days for r in requests if r.status == "approved")
-    pending_days = sum(r.days for r in requests if r.status == "pending")
+    approved_days = sum(r.days or 0 for r in requests if r.status == "approved")
+    pending_days = sum(r.days or 0 for r in requests if r.status == "pending")
 
     return {
         "employee_id": employee_id,
@@ -131,7 +131,7 @@ def get_time_off_balance(employee_id: str) -> dict:
         "pending_days": pending_days,
         "recent_requests": [
             {
-                "date": r.sk.replace("REQUEST#", ""),
+                "date": (r.sk or "").replace("REQUEST#", ""),
                 "type": r.request_type,
                 "days": r.days,
                 "status": r.status,
@@ -147,7 +147,7 @@ def submit_time_off_request(
     request_date: str,
     request_type: str,
     days: int,
-    notes: str = None,
+    notes: str | None = None,
 ) -> dict:
     """Submit a new time off request.
 
@@ -258,8 +258,8 @@ if __name__ == "__main__":
 
     def create_tables():
         """Create DynamoDB tables if they don't exist."""
-        if not client.table_exists("employees"):
-            client.create_table(
+        if not client.sync_table_exists("employees"):
+            client.sync_create_table(
                 table_name="employees",
                 partition_key=("pk", "S"),
                 sort_key=("sk", "S"),
@@ -267,8 +267,8 @@ if __name__ == "__main__":
             )
             print("Table 'employees' created!")
 
-        if not client.table_exists("timeoff"):
-            client.create_table(
+        if not client.sync_table_exists("timeoff"):
+            client.sync_create_table(
                 table_name="timeoff",
                 partition_key=("pk", "S"),
                 sort_key=("sk", "S"),
@@ -276,8 +276,8 @@ if __name__ == "__main__":
             )
             print("Table 'timeoff' created!")
 
-        if not client.table_exists("departments"):
-            client.create_table(
+        if not client.sync_table_exists("departments"):
+            client.sync_create_table(
                 table_name="departments",
                 partition_key=("pk", "S"),
                 sort_key=("sk", "S"),

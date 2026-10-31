@@ -18,13 +18,15 @@ class TimeOff(Model):
 @tool
 def get_time_off_balance(employee_id: str) -> dict:
     """Get employee's time off balance."""
-    requests = TimeOff.sync_query(
-        partition_key=f"EMP#{employee_id}",
+    requests = list(
+        TimeOff.sync_query(
+            partition_key=f"EMP#{employee_id}",
+        )
     )
 
     # Sum up days using NumberAttribute
-    approved_days = sum(r.days for r in requests if r.status == "approved")
-    pending_days = sum(r.days for r in requests if r.status == "pending")
+    approved_days = sum(r.days or 0 for r in requests if r.status == "approved")
+    pending_days = sum(r.days or 0 for r in requests if r.status == "pending")
 
     return {
         "approved_days_used": approved_days,

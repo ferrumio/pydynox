@@ -3,7 +3,7 @@
 from pydantic_ai import Agent
 from pydantic_ai.models.bedrock import BedrockConverseModel
 from pydynox import Model, ModelConfig
-from pydynox.attributes import NumberAttribute, S3Attribute, S3File, StringAttribute
+from pydynox.attributes import NumberAttribute, S3Attribute, S3File, S3Value, StringAttribute
 
 
 class Document(Model):
@@ -47,10 +47,12 @@ async def upload_document(
     doc.content = S3File(content_bytes, name=f"{doc_id}.txt", content_type="text/plain")
     await doc.save()
 
+    uploaded = doc.content
+    assert isinstance(uploaded, S3Value)
     return {
         "success": True,
         "doc_id": doc_id,
-        "s3_key": doc.content.key,
+        "s3_key": uploaded.key,
     }
 
 
@@ -61,8 +63,7 @@ async def get_document(ctx, doc_id: str, version: str = "latest") -> dict:
         docs = [
             doc
             async for doc in Document.query(
-                key_condition="pk = :pk",
-                expression_values={":pk": f"DOC#{doc_id}"},
+                partition_key=f"DOC#{doc_id}",
                 scan_index_forward=False,
                 limit=1,
             )
@@ -77,7 +78,7 @@ async def get_document(ctx, doc_id: str, version: str = "latest") -> dict:
 
     return {
         "doc_id": doc_id,
-        "version": doc.sk.replace("VERSION#", ""),
+        "version": (doc.sk or "").replace("VERSION#", ""),
         "title": doc.title,
-        "size_kb": round(doc.size_bytes / 1024, 2),
+        "size_kb": round((doc.size_bytes or 0) / 1024, 2),
     }
