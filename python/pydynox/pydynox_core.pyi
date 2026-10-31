@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Coroutine
+from collections.abc import Awaitable
 from decimal import Decimal
-from typing import Any, overload
+from typing import Any, TypedDict, overload
 
 from pydynox._internal._decimal import NumberSchema
 
@@ -20,6 +20,37 @@ class OperationMetrics:
     vector_write_bytes: float | None
 
     def __init__(self, duration_ms: float = 0.0) -> None: ...
+
+# Results resolved by DynamoDBClient awaitables (plain dicts at runtime)
+class _GetItemResult(TypedDict):
+    item: dict[str, Any] | None
+    metrics: OperationMetrics
+
+class _PageResult(TypedDict):
+    items: list[dict[str, Any]]
+    last_evaluated_key: dict[str, Any] | None
+    metrics: OperationMetrics
+
+class _CountResult(TypedDict):
+    count: int
+    metrics: OperationMetrics
+
+class _ParallelScanResult(TypedDict):
+    items: list[dict[str, Any]]
+    metrics: OperationMetrics
+
+class _StatementResult(TypedDict):
+    items: list[dict[str, Any]]
+    next_token: str | None
+    metrics: OperationMetrics
+
+class _VectorMatch(TypedDict):
+    item: dict[str, Any]
+    score: float
+
+class _VectorSearchResult(TypedDict):
+    matches: list[_VectorMatch]
+    metrics: OperationMetrics
 
 # Client
 class DynamoDBClient:
@@ -41,6 +72,8 @@ class DynamoDBClient:
     ) -> None: ...
     def get_region(self) -> str: ...
     def ping(self) -> bool: ...
+
+    # Basic operations. Async methods return awaitables; sync_ methods block.
     def put_item(
         self,
         table: str,
@@ -48,7 +81,19 @@ class DynamoDBClient:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
-    ) -> OperationMetrics: ...
+        return_values_on_condition_check_failure: bool = False,
+        return_values: str | None = None,
+    ) -> Awaitable[tuple[dict[str, Any] | None, OperationMetrics]]: ...
+    def sync_put_item(
+        self,
+        table: str,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: str | None = None,
+    ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
     def get_item(
         self,
         table: str,
@@ -58,7 +103,17 @@ class DynamoDBClient:
         expression_attribute_names: dict[str, str] | None = None,
         *,
         _number_schema: NumberSchema | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    ) -> Awaitable[_GetItemResult]: ...
+    def sync_get_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        consistent_read: bool = False,
+        projection: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        *,
+        _number_schema: NumberSchema | None = None,
+    ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
     def delete_item(
         self,
         table: str,
@@ -66,7 +121,19 @@ class DynamoDBClient:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
-    ) -> OperationMetrics: ...
+        return_values_on_condition_check_failure: bool = False,
+        return_values: str | None = None,
+    ) -> Awaitable[tuple[dict[str, Any] | None, OperationMetrics]]: ...
+    def sync_delete_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: str | None = None,
+    ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
     def update_item(
         self,
         table: str,
@@ -76,7 +143,23 @@ class DynamoDBClient:
         condition_expression: str | None = None,
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
-    ) -> OperationMetrics: ...
+        return_values_on_condition_check_failure: bool = False,
+        return_values: str | None = None,
+    ) -> Awaitable[tuple[dict[str, Any] | None, OperationMetrics]]: ...
+    def sync_update_item(
+        self,
+        table: str,
+        key: dict[str, Any],
+        updates: dict[str, Any] | None = None,
+        update_expression: str | None = None,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        return_values_on_condition_check_failure: bool = False,
+        return_values: str | None = None,
+    ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
+
+    # Query and scan
     def query_page(
         self,
         table: str,
@@ -92,7 +175,7 @@ class DynamoDBClient:
         consistent_read: bool = False,
         *,
         _number_schema: NumberSchema | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    ) -> Awaitable[_PageResult]: ...
     def sync_query_page(
         self,
         table: str,
@@ -124,7 +207,7 @@ class DynamoDBClient:
         total_segments: int | None = None,
         *,
         _number_schema: NumberSchema | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    ) -> Awaitable[_PageResult]: ...
     def sync_scan_page(
         self,
         table: str,
@@ -149,8 +232,49 @@ class DynamoDBClient:
         expression_attribute_values: dict[str, Any] | None = None,
         index_name: str | None = None,
         consistent_read: bool = False,
+    ) -> Awaitable[_CountResult]: ...
+    def sync_count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
     ) -> tuple[int, OperationMetrics]: ...
+    def parallel_scan(
+        self,
+        table: str,
+        total_segments: int,
+        filter_expression: str | None = None,
+        projection_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        consistent_read: bool = False,
+        *,
+        _number_schema: NumberSchema | None = None,
+    ) -> Awaitable[_ParallelScanResult]: ...
+    def sync_parallel_scan(
+        self,
+        table: str,
+        total_segments: int,
+        filter_expression: str | None = None,
+        projection_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        consistent_read: bool = False,
+        *,
+        _number_schema: NumberSchema | None = None,
+    ) -> tuple[list[dict[str, Any]], OperationMetrics]: ...
+
+    # Batch operations
     def batch_write(
+        self,
+        table: str,
+        put_items: list[dict[str, Any]],
+        delete_keys: list[dict[str, Any]],
+    ) -> Awaitable[None]: ...
+    def sync_batch_write(
         self,
         table: str,
         put_items: list[dict[str, Any]],
@@ -165,19 +289,37 @@ class DynamoDBClient:
         expression_attribute_names: dict[str, str] | None = None,
         *,
         _number_schema: NumberSchema | None = None,
-    ) -> Coroutine[Any, Any, list[dict[str, Any]]]: ...
-    async def transact_write(
+    ) -> Awaitable[list[dict[str, Any]]]: ...
+    def sync_batch_get(
+        self,
+        table: str,
+        keys: list[dict[str, Any]],
+        consistent_read: bool,
+        projection: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        *,
+        _number_schema: NumberSchema | None = None,
+    ) -> list[dict[str, Any]]: ...
+
+    # Transactions
+    def transact_write(
         self,
         operations: list[dict[str, Any]],
         *,
         client_request_token: str | None = None,
-    ) -> None: ...
+    ) -> Awaitable[None]: ...
     def sync_transact_write(
         self,
         operations: list[dict[str, Any]],
         *,
         client_request_token: str | None = None,
     ) -> None: ...
+    def transact_get(
+        self, gets: list[dict[str, Any]]
+    ) -> Awaitable[list[dict[str, Any] | None]]: ...
+    def sync_transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]: ...
+
+    # Table operations
     def create_table(
         self,
         table_name: str,
@@ -194,15 +336,33 @@ class DynamoDBClient:
         vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
         timeout_seconds: int | None = None,
+    ) -> Awaitable[None]: ...
+    def sync_create_table(
+        self,
+        table_name: str,
+        hash_key: tuple[str, str],
+        range_key: tuple[str, str] | None = None,
+        billing_mode: str = "PAY_PER_REQUEST",
+        read_capacity: int | None = None,
+        write_capacity: int | None = None,
+        table_class: str | None = None,
+        encryption: str | None = None,
+        kms_key_id: str | None = None,
+        global_secondary_indexes: list[dict[str, Any]] | None = None,
+        local_secondary_indexes: list[dict[str, Any]] | None = None,
+        vector_indexes: list[dict[str, Any]] | None = None,
+        wait: bool = False,
+        timeout_seconds: int | None = None,
     ) -> None: ...
-    def table_exists(self, table_name: str) -> bool: ...
+    def table_exists(self, table_name: str) -> Awaitable[bool]: ...
+    def sync_table_exists(self, table_name: str) -> bool: ...
     def delete_table(
         self,
         table_name: str,
         *,
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]: ...
+    ) -> Awaitable[None]: ...
     def sync_delete_table(
         self,
         table_name: str,
@@ -214,17 +374,24 @@ class DynamoDBClient:
         self,
         table_name: str,
         timeout_seconds: int | None = None,
+    ) -> Awaitable[None]: ...
+    def sync_wait_for_table_active(
+        self,
+        table_name: str,
+        timeout_seconds: int | None = None,
     ) -> None: ...
     def wait_for_table_deleted(
         self,
         table_name: str,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]: ...
+    ) -> Awaitable[None]: ...
     def sync_wait_for_table_deleted(
         self,
         table_name: str,
         timeout_seconds: int | None = None,
     ) -> None: ...
+
+    # Vector operations
     def search_vectors(
         self,
         table: str,
@@ -237,7 +404,7 @@ class DynamoDBClient:
         projection_expression: str | None = None,
         *,
         _number_schema: NumberSchema | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    ) -> Awaitable[_VectorSearchResult]: ...
     def sync_search_vectors(
         self,
         table: str,
@@ -250,14 +417,14 @@ class DynamoDBClient:
         projection_expression: str | None = None,
         *,
         _number_schema: NumberSchema | None = None,
-    ) -> dict[str, Any]: ...
+    ) -> _VectorSearchResult: ...
     def create_vector_index(
         self,
         table: str,
         definition: dict[str, Any],
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]: ...
+    ) -> Awaitable[None]: ...
     def sync_create_vector_index(
         self,
         table: str,
@@ -271,7 +438,7 @@ class DynamoDBClient:
         index_name: str,
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]: ...
+    ) -> Awaitable[None]: ...
     def sync_delete_vector_index(
         self,
         table: str,
@@ -283,109 +450,14 @@ class DynamoDBClient:
         self,
         table: str,
         index_name: str,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
+    ) -> Awaitable[dict[str, Any]]: ...
     def sync_describe_vector_index(
         self,
         table: str,
         index_name: str,
     ) -> dict[str, Any]: ...
 
-    # Async methods
-    def async_get_item(
-        self,
-        table: str,
-        key: dict[str, Any],
-        consistent_read: bool = False,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-    def async_put_item(
-        self,
-        table: str,
-        item: dict[str, Any],
-        condition_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-    ) -> Coroutine[Any, Any, OperationMetrics]: ...
-    def async_delete_item(
-        self,
-        table: str,
-        key: dict[str, Any],
-        condition_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-    ) -> Coroutine[Any, Any, OperationMetrics]: ...
-    def async_update_item(
-        self,
-        table: str,
-        key: dict[str, Any],
-        updates: dict[str, Any] | None = None,
-        update_expression: str | None = None,
-        condition_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-    ) -> Coroutine[Any, Any, OperationMetrics]: ...
-    def async_query_page(
-        self,
-        table: str,
-        key_condition_expression: str,
-        filter_expression: str | None = None,
-        projection_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        limit: int | None = None,
-        exclusive_start_key: dict[str, Any] | None = None,
-        scan_index_forward: bool | None = None,
-        index_name: str | None = None,
-        consistent_read: bool = False,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-    def async_scan_page(
-        self,
-        table: str,
-        filter_expression: str | None = None,
-        projection_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        limit: int | None = None,
-        exclusive_start_key: dict[str, Any] | None = None,
-        index_name: str | None = None,
-        consistent_read: bool = False,
-        segment: int | None = None,
-        total_segments: int | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-    def async_count(
-        self,
-        table: str,
-        filter_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        index_name: str | None = None,
-        consistent_read: bool = False,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-
-    # Parallel scan methods
-    def parallel_scan(
-        self,
-        table: str,
-        total_segments: int,
-        filter_expression: str | None = None,
-        projection_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        consistent_read: bool = False,
-        *,
-        _number_schema: NumberSchema | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-    def async_parallel_scan(
-        self,
-        table: str,
-        total_segments: int,
-        filter_expression: str | None = None,
-        projection_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        consistent_read: bool = False,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-
-    # PartiQL methods
+    # PartiQL
     def execute_statement(
         self,
         statement: str,
@@ -394,50 +466,7 @@ class DynamoDBClient:
         next_token: str | None = None,
         *,
         _number_schema: NumberSchema | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-    def async_execute_statement(
-        self,
-        statement: str,
-        parameters: list[Any] | None = None,
-        consistent_read: bool = False,
-        next_token: str | None = None,
-    ) -> Coroutine[Any, Any, dict[str, Any]]: ...
-    def sync_get_item(
-        self,
-        table: str,
-        key: dict[str, Any],
-        consistent_read: bool = False,
-        projection: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        *,
-        _number_schema: NumberSchema | None = None,
-    ) -> tuple[dict[str, Any] | None, OperationMetrics]: ...
-    def sync_batch_get(
-        self,
-        table: str,
-        keys: list[dict[str, Any]],
-        consistent_read: bool,
-        projection: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        *,
-        _number_schema: NumberSchema | None = None,
-    ) -> list[dict[str, Any]]: ...
-    def transact_get(
-        self, gets: list[dict[str, Any]]
-    ) -> Coroutine[Any, Any, list[dict[str, Any] | None]]: ...
-    def sync_transact_get(self, gets: list[dict[str, Any]]) -> list[dict[str, Any] | None]: ...
-    def sync_parallel_scan(
-        self,
-        table: str,
-        total_segments: int,
-        filter_expression: str | None = None,
-        projection_expression: str | None = None,
-        expression_attribute_names: dict[str, str] | None = None,
-        expression_attribute_values: dict[str, Any] | None = None,
-        consistent_read: bool = False,
-        *,
-        _number_schema: NumberSchema | None = None,
-    ) -> tuple[list[dict[str, Any]], OperationMetrics]: ...
+    ) -> Awaitable[_StatementResult]: ...
     def sync_execute_statement(
         self,
         statement: str,
@@ -452,10 +481,22 @@ class DynamoDBClient:
 class FixedRate:
     def __init__(
         self,
-        rcu: int | None = None,
-        wcu: int | None = None,
-        burst: int | None = None,
+        rcu: float | None = None,
+        wcu: float | None = None,
+        burst: float | None = None,
     ) -> None: ...
+    @property
+    def rcu(self) -> float | None: ...
+    @property
+    def wcu(self) -> float | None: ...
+    @property
+    def metrics(self) -> RateLimitMetrics: ...
+    @property
+    def consumed_rcu(self) -> float: ...
+    @property
+    def consumed_wcu(self) -> float: ...
+    @property
+    def throttle_count(self) -> int: ...
     def _acquire_rcu(self, rcu: float) -> None: ...
     def _acquire_wcu(self, wcu: float) -> None: ...
     def _on_throttle(self) -> None: ...
@@ -463,26 +504,44 @@ class FixedRate:
 class AdaptiveRate:
     def __init__(
         self,
-        max_rcu: int,
-        max_wcu: int | None = None,
-        min_rcu: int = 1,
-        min_wcu: int = 1,
+        max_rcu: float,
+        max_wcu: float | None = None,
+        min_rcu: float | None = None,
+        min_wcu: float | None = None,
     ) -> None: ...
+    @property
+    def current_rcu(self) -> float: ...
+    @property
+    def current_wcu(self) -> float | None: ...
+    @property
+    def max_rcu(self) -> float: ...
+    @property
+    def max_wcu(self) -> float | None: ...
+    @property
+    def consumed_rcu(self) -> float: ...
+    @property
+    def consumed_wcu(self) -> float: ...
+    @property
+    def throttle_count(self) -> int: ...
     def _acquire_rcu(self, rcu: float) -> None: ...
     def _acquire_wcu(self, wcu: float) -> None: ...
     def _on_throttle(self) -> None: ...
 
 class RateLimitMetrics:
-    rcu_acquired: float
-    wcu_acquired: float
-    throttle_count: int
+    @property
+    def consumed_rcu(self) -> float: ...
+    @property
+    def consumed_wcu(self) -> float: ...
+    @property
+    def throttle_count(self) -> int: ...
+    def reset(self) -> None: ...
 
 # Tracing
 def enable_sdk_debug() -> None: ...
 
 # Serialization
 def py_to_dynamo(value: Any) -> dict[str, Any]: ...
-def dynamo_to_py(value: dict[str, Any]) -> Any: ...
+def dynamo_to_py(attr: dict[str, Any]) -> Any: ...
 def item_to_dynamo(item: dict[str, Any]) -> dict[str, Any]: ...
 def item_from_dynamo(
     item: dict[str, Any], *, _number_schema: NumberSchema | None = None
@@ -493,7 +552,11 @@ class PydynoxException(Exception): ...
 class ResourceNotFoundException(PydynoxException): ...
 class ResourceInUseException(PydynoxException): ...
 class ValidationException(PydynoxException): ...
-class ConditionalCheckFailedException(PydynoxException): ...
+
+class ConditionalCheckFailedException(PydynoxException):
+    # Set on the instance when the failed write asked for the existing item.
+    item: dict[str, Any]
+
 class TransactionCanceledException(PydynoxException): ...
 class IdempotentParameterMismatchException(PydynoxException): ...
 class ProvisionedThroughputExceededException(PydynoxException): ...
@@ -505,7 +568,8 @@ class LockNotAcquired(PydynoxException): ...
 class LockLost(PydynoxException): ...
 class LockReleaseError(PydynoxException): ...
 class EncryptionException(PydynoxException): ...
-class S3AttributeException(PydynoxException): ...
+class S3Exception(PydynoxException): ...
+class S3AttributeException(S3Exception): ...
 
 # Distributed locks (internal bindings)
 class LockMetrics:
@@ -544,9 +608,9 @@ class NativeLease:
         lease_duration: float = 30.0,
         wait_timeout: float = 35.0,
     ) -> None: ...
-    def acquire(self) -> Coroutine[Any, Any, None]: ...
+    def acquire(self) -> Awaitable[None]: ...
     def sync_acquire(self) -> None: ...
-    def release(self) -> Coroutine[Any, Any, None]: ...
+    def release(self) -> Awaitable[None]: ...
     def sync_release(self) -> None: ...
     def cancel(self) -> None: ...
     def raise_if_lost(self) -> None: ...
@@ -598,6 +662,8 @@ class KmsMetrics:
     duration_ms: float
     kms_calls: int
 
+    def __init__(self, duration_ms: float = 0.0, kms_calls: int = 0) -> None: ...
+
 class EncryptResult:
     ciphertext: str
     metrics: KmsMetrics
@@ -633,10 +699,10 @@ class KmsEncryptor:
     def sync_encrypt_with_metrics(self, plaintext: str) -> EncryptResult: ...
     def sync_decrypt_with_metrics(self, ciphertext: str) -> DecryptResult: ...
     # Async methods (default)
-    def encrypt(self, plaintext: str) -> Coroutine[Any, Any, str]: ...
-    def decrypt(self, ciphertext: str) -> Coroutine[Any, Any, str]: ...
-    def encrypt_with_metrics(self, plaintext: str) -> Coroutine[Any, Any, EncryptResult]: ...
-    def decrypt_with_metrics(self, ciphertext: str) -> Coroutine[Any, Any, DecryptResult]: ...
+    def encrypt(self, plaintext: str) -> Awaitable[str]: ...
+    def decrypt(self, ciphertext: str) -> Awaitable[str]: ...
+    def encrypt_with_metrics(self, plaintext: str) -> Awaitable[EncryptResult]: ...
+    def decrypt_with_metrics(self, ciphertext: str) -> Awaitable[DecryptResult]: ...
     @staticmethod
     def is_encrypted(value: str) -> bool: ...
 
@@ -701,20 +767,16 @@ class S3Operations:
         data: bytes,
         content_type: str | None = None,
         metadata: dict[str, str] | None = None,
-    ) -> Coroutine[Any, Any, tuple[S3Metadata, S3Metrics]]: ...
-    def download_bytes(
-        self, bucket: str, key: str
-    ) -> Coroutine[Any, Any, tuple[bytes, S3Metrics]]: ...
+    ) -> Awaitable[tuple[S3Metadata, S3Metrics]]: ...
+    def download_bytes(self, bucket: str, key: str) -> Awaitable[tuple[bytes, S3Metrics]]: ...
     def presigned_url(
         self, bucket: str, key: str, expires_secs: int = 3600
-    ) -> Coroutine[Any, Any, tuple[str, S3Metrics]]: ...
-    def delete_object(self, bucket: str, key: str) -> Coroutine[Any, Any, S3Metrics]: ...
-    def head_object(
-        self, bucket: str, key: str
-    ) -> Coroutine[Any, Any, tuple[S3Metadata, S3Metrics]]: ...
+    ) -> Awaitable[tuple[str, S3Metrics]]: ...
+    def delete_object(self, bucket: str, key: str) -> Awaitable[S3Metrics]: ...
+    def head_object(self, bucket: str, key: str) -> Awaitable[tuple[S3Metadata, S3Metrics]]: ...
     def save_to_file(
         self, bucket: str, key: str, path: str
-    ) -> Coroutine[Any, Any, tuple[int, S3Metrics]]: ...
+    ) -> Awaitable[tuple[int, S3Metrics]]: ...
 
     # Sync methods (with sync_ prefix) - return tuples with metrics
     def sync_upload_bytes(
