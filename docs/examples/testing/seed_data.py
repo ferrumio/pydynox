@@ -32,9 +32,11 @@ async def test_with_seed_data(pydynox_memory_backend_factory):
     with pydynox_memory_backend_factory(seed=seed):
         # Data is already there!
         alice = await User.get(pk="USER#1")
+        assert alice is not None
         assert alice.name == "Alice"
 
         bob = await User.get(pk="USER#2")
+        assert bob is not None
         assert bob.name == "Bob"
 
 
@@ -72,4 +74,5 @@ def pydynox_seed():
 async def test_with_seeded_fixture(pydynox_memory_backend_seeded):
     """Uses seed data from pydynox_seed fixture."""
     admin = await User.get(pk="ADMIN#1")
+    assert admin is not None
     assert admin.name == "Admin"

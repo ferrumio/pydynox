@@ -6,8 +6,6 @@ from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.indexes import LocalSecondaryIndex
 
-client = get_default_client()
-
 
 class Order(Model):
     """Order model with LSI on created_at."""
@@ -28,6 +26,8 @@ class Order(Model):
 
 async def main():
     # Create table with LSI
+    client = get_default_client()
+    assert client is not None, "call set_default_client() first"
     if not await client.table_exists("orders_lsi_pagination"):
         await client.create_table(
             "orders_lsi_pagination",

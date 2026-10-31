@@ -22,8 +22,9 @@ async def main():
 
     # Load it back - returns datetime object
     loaded = await Event.get(pk="EVT#1")
-    print(loaded.created_at)  # datetime object
-    print(loaded.created_at.year)  # 2024
+    if loaded is not None and loaded.created_at is not None:
+        print(loaded.created_at)  # datetime object
+        print(loaded.created_at.year)  # 2024
 
 
 asyncio.run(main())

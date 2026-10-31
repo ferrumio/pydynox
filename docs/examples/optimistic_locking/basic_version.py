@@ -26,7 +26,8 @@ async def main():
 
     # Load from DB - version is preserved
     loaded = await Document.get(pk="DOC#VERSION")
-    print(loaded.version)  # 2
+    if loaded is not None:
+        print(loaded.version)  # 2
 
 
 asyncio.run(main())
