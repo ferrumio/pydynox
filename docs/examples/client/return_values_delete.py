@@ -27,10 +27,13 @@ deleted_item = client.sync_delete_item(
     return_values="ALL_OLD",
 )
 
-print(f"Deleted: {deleted_item['name']}")  # Alice
+if deleted_item is not None:
+    print(f"Deleted: {deleted_item['name']}")  # Alice
 
 # Metrics are available via get_last_metrics()
-print(f"Duration: {client.get_last_metrics().duration_ms:.1f}ms")
+metrics = client.get_last_metrics()
+if metrics is not None:
+    print(f"Duration: {metrics.duration_ms:.1f}ms")
 
 # If the item didn't exist, deleted_item is None
 deleted_item = client.sync_delete_item(
