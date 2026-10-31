@@ -38,7 +38,7 @@ def create_customer(customer_id: str, name: str, email: str) -> dict:
 
 
 @tool
-def update_customer(customer_id: str, name: str = None, email: str = None) -> dict:
+def update_customer(customer_id: str, name: str | None = None, email: str | None = None) -> dict:
     """Update customer details."""
     customer = Customer.sync_get(pk=f"CUSTOMER#{customer_id}", sk="PROFILE")
     if not customer:
@@ -68,7 +68,7 @@ def delete_customer(customer_id: str) -> dict:
 
 
 @tool
-def search_orders(customer_id: str, status: str = None, limit: int = 10) -> list:
+def search_orders(customer_id: str, status: str | None = None, limit: int = 10) -> list:
     """Search orders for a customer.
 
     Args:
@@ -76,20 +76,13 @@ def search_orders(customer_id: str, status: str = None, limit: int = 10) -> list
         status: Filter by status (optional).
         limit: Max results to return.
     """
-    query_params = {
-        "key_condition": "pk = :pk AND begins_with(sk, :prefix)",
-        "expression_values": {
-            ":pk": f"CUSTOMER#{customer_id}",
-            ":prefix": "ORDER#",
-        },
-        "limit": limit,
-    }
-
-    if status:
-        query_params["filter_condition"] = "status = :status"
-        query_params["expression_values"][":status"] = status
-
-    orders = list(Order.sync_query(**query_params))
+    status_filter = Order.status == status if status else None
+    orders = Order.sync_query(
+        partition_key=f"CUSTOMER#{customer_id}",
+        sort_key_condition=Order.sk.begins_with("ORDER#"),
+        filter_condition=status_filter,
+        limit=limit,
+    )
     return [{"order_id": o.order_id, "status": o.status} for o in orders]
 
 
@@ -108,8 +101,7 @@ def get_order_status(order_id: str) -> dict:
     """
     orders = list(
         Order.sync_scan(
-            filter_condition="order_id = :order_id",
-            expression_values={":order_id": order_id},
+            filter_condition=Order.order_id == order_id,
             limit=1,
         )
     )

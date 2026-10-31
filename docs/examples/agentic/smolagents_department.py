@@ -24,7 +24,7 @@ def search_by_department(department: str) -> list:
 
     return [
         {
-            "employee_id": emp.pk.replace("EMP#", ""),
+            "employee_id": (emp.pk or "").replace("EMP#", ""),
             "name": emp.name,
             "email": emp.email,
         }
