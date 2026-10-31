@@ -7,7 +7,7 @@ With async-first API:
 
 import pytest
 from pydynox import BatchWriter, Model, ModelConfig, SyncBatchWriter, get_default_client
-from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.attributes import ListAttribute, NumberAttribute, StringAttribute
 from pydynox.exceptions import ConditionalCheckFailedException
 from pydynox.testing import MemoryBackend
 
@@ -19,6 +19,14 @@ class User(Model):
     pk = StringAttribute(partition_key=True)
     name = StringAttribute()
     age = NumberAttribute(default=0)
+
+
+class Tagged(Model):
+    """Test model with a list attribute."""
+
+    model_config = ModelConfig(table="tagged")
+    pk = StringAttribute(partition_key=True)
+    tags = ListAttribute()
 
 
 class Aggregate(Model):
@@ -160,6 +168,47 @@ def test_atomic_increment_multiple_missing_attributes():
         assert found is not None
         assert found.total == 25
         assert found.count == 1
+
+
+def test_atomic_list_append_and_prepend():
+    """Test list_append in both argument orders."""
+    with MemoryBackend():
+        Tagged(pk="T#1", tags=["b"]).sync_save()
+        tagged = Tagged.sync_get(pk="T#1")
+        assert tagged is not None
+
+        tagged.sync_update(atomic=[Tagged.tags.append(["c"])])
+        tagged.sync_update(atomic=[Tagged.tags.prepend(["a"])])
+
+        found = Tagged.sync_get(pk="T#1")
+        assert found is not None
+        assert found.tags == ["a", "b", "c"]
+
+
+def test_sync_count_with_and_without_filter():
+    """Test count returns the number of matching items."""
+    with MemoryBackend():
+        User(pk="USER#1", name="Eve", age=30).sync_save()
+        User(pk="USER#2", name="Frank", age=20).sync_save()
+        User(pk="USER#3", name="Grace", age=40).sync_save()
+
+        total, _ = User.sync_count()
+        older, _ = User.sync_count(filter_condition=User.age > 25)
+
+        assert total == 3
+        assert older == 2
+
+
+@pytest.mark.asyncio
+async def test_async_count():
+    """Test async count on the memory backend."""
+    with MemoryBackend():
+        await User(pk="USER#1", name="Eve").save()
+        await User(pk="USER#2", name="Frank").save()
+
+        total, _ = await User.count()
+
+        assert total == 2
 
 
 def test_scan():

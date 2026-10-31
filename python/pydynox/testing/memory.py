@@ -1120,6 +1120,45 @@ class MemoryClient:
             "metrics": self._make_metrics(start, rcu=len(tbl) * 0.5),
         }
 
+    def sync_count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[int, FakeMetrics]:
+        """Count items in the in-memory table (sync)."""
+        result = self.scan(
+            table,
+            filter_expression=filter_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+            consistent_read=consistent_read,
+            index_name=index_name,
+        )
+        return result["count"], result["metrics"]
+
+    async def count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[int, FakeMetrics]:
+        """Count items in the in-memory table (async)."""
+        return self.sync_count(
+            table,
+            filter_expression=filter_expression,
+            expression_attribute_names=expression_attribute_names,
+            expression_attribute_values=expression_attribute_values,
+            index_name=index_name,
+            consistent_read=consistent_read,
+        )
+
     # ========== VECTOR SEARCH ==========
 
     def _find_vector_index(self, table: str, index_name: str) -> dict[str, Any]:
@@ -1774,6 +1813,7 @@ class MemoryClient:
         - SET attr = :value
         - SET attr = attr + :value (ADD)
         - SET attr = if_not_exists(attr, :zero) + :value (missing-safe ADD)
+        - SET attr = list_append(attr, :list) or list_append(:list, attr)
         - REMOVE attr
         """
         # Resolve attribute names
@@ -1804,6 +1844,20 @@ class MemoryClient:
                     if attr_values and value_key in attr_values:
                         default = attr_values.get(default_key, 0)
                         item[attr] = _add_numbers(item.get(attr, default), attr_values[value_key])
+                    continue
+
+                # Check for attr = list_append(a, b) where one side is the attribute
+                match = re.search(
+                    r"(\w+)\s*=\s*list_append\(\s*(:?\w+)\s*,\s*(:?\w+)\s*\)",
+                    assignment,
+                )
+                if match:
+                    attr = match.group(1)
+                    parts = [
+                        item.get(key, []) if key == attr else (attr_values or {}).get(key, [])
+                        for key in (match.group(2), match.group(3))
+                    ]
+                    item[attr] = parts[0] + parts[1]
                     continue
 
                 # Check for attr = attr + :value (increment)
