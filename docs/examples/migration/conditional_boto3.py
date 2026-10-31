@@ -1,9 +1,11 @@
 """boto3: Conditional write to DynamoDB."""
 
+from typing import Any
+
 import boto3
 from botocore.exceptions import ClientError
 
-dynamodb = boto3.resource("dynamodb")
+dynamodb: Any = boto3.resource("dynamodb")  # untyped without boto3-stubs
 table = dynamodb.Table("users")
 
 try:
