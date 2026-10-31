@@ -24,6 +24,6 @@ async def get_user_with_orders(user_id: str):
             key_condition_expression="#pk = :pk",
             expression_attribute_names={"#pk": "pk"},
             expression_attribute_values={":pk": f"USER#{user_id}"},
-        ).all(),
+        ).to_list(),
     )
     return {"user": user, "orders": orders}

@@ -15,14 +15,14 @@ class Counter(Model):
 async def increment_with_retry(pk: str, max_retries: int = 5) -> Counter:
     """Increment counter with retry on conflict."""
     for attempt in range(max_retries):
-        counter = await Counter.async_get(pk=pk)
+        counter = await Counter.get(pk=pk)
         if counter is None:
             counter = Counter(pk=pk, value="0")
 
-        counter.value = str(int(counter.value) + 1)
+        counter.value = str(int(counter.value or "0") + 1)
 
         try:
-            await counter.async_save()
+            await counter.save()
             return counter
         except ConditionalCheckFailedException:
             if attempt == max_retries - 1:
@@ -36,14 +36,15 @@ async def increment_with_retry(pk: str, max_retries: int = 5) -> Counter:
 async def main():
     # Create counter
     counter = Counter(pk="COUNTER#1", value="0")
-    await counter.async_save()
+    await counter.save()
 
     # Run 10 concurrent increments
     tasks = [increment_with_retry("COUNTER#1") for _ in range(10)]
     await asyncio.gather(*tasks)
 
     # Final value should be 10
-    final = await Counter.async_get(pk="COUNTER#1")
+    final = await Counter.get(pk="COUNTER#1")
+    assert final is not None
     print(f"Final value: {final.value}")  # 10
     print(f"Final version: {final.version}")  # 11 (1 create + 10 updates)
 

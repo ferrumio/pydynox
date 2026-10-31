@@ -28,11 +28,14 @@ old_item = client.sync_put_item(
     return_values="ALL_OLD",
 )
 
-print(f"Old name: {old_item['name']}")  # Alice
-print(f"Old age: {old_item['age']}")  # 25
+if old_item is not None:
+    print(f"Old name: {old_item['name']}")  # Alice
+    print(f"Old age: {old_item['age']}")  # 25
 
 # Metrics are available via get_last_metrics()
-print(f"Duration: {client.get_last_metrics().duration_ms:.1f}ms")
+metrics = client.get_last_metrics()
+if metrics is not None:
+    print(f"Duration: {metrics.duration_ms:.1f}ms")
 
 # If the item didn't exist before, old_item is None
 new_item = {"pk": "USER#NEW", "sk": "PROFILE", "name": "Charlie"}

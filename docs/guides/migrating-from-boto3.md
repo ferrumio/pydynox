@@ -151,7 +151,7 @@ pydynox has two APIs:
 | Projection | `ProjectionExpression=...` | `Model.get(..., fields=["name"])` |
 | Consistent read | `ConsistentRead=True` | `Model.get(..., consistent_read=True)` |
 | Create table | `client.create_table(...)` | `Model.create_table()` |
-| Async | `aioboto3` | `await Model.async_get(...)` |
+| Sync | `boto3` | `Model.sync_get(...)` |
 
 ### Low-level API
 

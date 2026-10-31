@@ -39,7 +39,8 @@ async def track_request(user_id: str, date: str, daily_limit: int = 1000) -> int
 
     # Consistent read, otherwise the count we just wrote may not be visible yet
     updated = await ApiUsage.get(pk=user_id, sk=date, consistent_read=True)
-    return updated.requests
+    assert updated is not None and updated.requests is not None
+    return int(updated.requests)
 
 
 async def main():
