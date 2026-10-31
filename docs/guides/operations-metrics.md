@@ -93,7 +93,7 @@ When you use `S3Attribute`, pydynox uploads and downloads files from S3. Track t
 
 - `save()` - uploads `S3File` values to S3
 - `delete()` - deletes associated S3 objects
-- `async_save()` / `async_delete()` - async versions
+- `sync_save()` / `sync_delete()` - sync versions
 
 ### Multipart uploads
 
