@@ -7,8 +7,8 @@ With async-first API:
 
 import pytest
 from pydynox import BatchWriter, Model, ModelConfig, SyncBatchWriter, get_default_client
-from pydynox.attributes import NumberAttribute, StringAttribute
-from pydynox.exceptions import ConditionalCheckFailedException
+from pydynox.attributes import ListAttribute, NumberAttribute, StringAttribute
+from pydynox.exceptions import ConditionalCheckFailedException, ValidationException
 from pydynox.testing import MemoryBackend
 
 
@@ -28,6 +28,15 @@ class Aggregate(Model):
     pk = StringAttribute(partition_key=True)
     total = NumberAttribute()
     count = NumberAttribute()
+
+
+class Tagged(Model):
+    """Test model with list attributes."""
+
+    model_config = ModelConfig(table="tagged")
+    pk = StringAttribute(partition_key=True)
+    tags = ListAttribute()
+    notes = ListAttribute()
 
 
 def test_memory_backend_context_manager():
@@ -160,6 +169,174 @@ def test_atomic_increment_multiple_missing_attributes():
         assert found is not None
         assert found.total == 25
         assert found.count == 1
+
+
+def test_atomic_if_not_exists_sets_only_missing_attribute():
+    """Test that if_not_exists sets a missing attribute and keeps an existing one."""
+    with MemoryBackend():
+        # GIVEN a saved item with no total attribute
+        aggregate = Aggregate(pk="WALLET#1")
+        aggregate.sync_save()
+
+        # WHEN we apply if_not_exists twice with different values
+        aggregate.sync_update(atomic=[Aggregate.total.if_not_exists(10)])
+        aggregate.sync_update(atomic=[Aggregate.total.if_not_exists(99)])
+
+        # THEN only the first value is stored
+        found = Aggregate.sync_get(pk="WALLET#1")
+        assert found is not None
+        assert found.total == 10
+
+
+def test_atomic_list_append_and_prepend():
+    """Test that append adds to the end and prepend adds to the start."""
+    with MemoryBackend():
+        # GIVEN a saved item with one tag
+        tagged = Tagged(pk="T#1", tags=["b"])
+        tagged.sync_save()
+
+        # WHEN we append and prepend atomically
+        tagged.sync_update(atomic=[Tagged.tags.append(["c", "d"])])
+        tagged.sync_update(atomic=[Tagged.tags.prepend(["a"])])
+
+        # THEN the stored list keeps both operations in order
+        found = Tagged.sync_get(pk="T#1")
+        assert found is not None
+        assert found.tags == ["a", "b", "c", "d"]
+
+
+@pytest.mark.asyncio
+async def test_async_atomic_list_append():
+    """Test async atomic list append."""
+    with MemoryBackend():
+        # GIVEN a saved item with an empty list
+        tagged = Tagged(pk="T#1", tags=[])
+        await tagged.save()
+
+        # WHEN we append atomically
+        await tagged.update(atomic=[Tagged.tags.append(["new"])])
+
+        # THEN the value is appended
+        found = await Tagged.get(pk="T#1")
+        assert found is not None
+        assert found.tags == ["new"]
+
+
+def test_atomic_list_append_on_missing_attribute_raises():
+    """Test that list_append on a missing attribute fails like DynamoDB."""
+    with MemoryBackend():
+        # GIVEN a saved item with a tag but no notes
+        Tagged(pk="T#1", tags=["keep"]).sync_save()
+        tagged = Tagged.sync_get(pk="T#1")
+        assert tagged is not None
+
+        # WHEN we append to tags and to the missing notes in one update
+        # THEN DynamoDB's validation error is raised
+        with pytest.raises(ValidationException, match="does not exist"):
+            tagged.sync_update(
+                atomic=[Tagged.tags.append(["new"]), Tagged.notes.append(["note"])],
+            )
+
+        # AND the stored item is unchanged
+        found = Tagged.sync_get(pk="T#1")
+        assert found is not None
+        assert found.tags == ["keep"]
+        assert found.notes is None
+
+
+def test_list_append_with_if_not_exists_starts_missing_list():
+    """Test list_append(if_not_exists(...)) on a missing attribute."""
+    with MemoryBackend() as backend:
+        # GIVEN an item with no tags
+        backend.client.sync_put_item("tagged", {"pk": "T#1"})
+
+        # WHEN we append with an if_not_exists fallback, twice
+        for value in ["a", "b"]:
+            backend.client.sync_update_item(
+                "tagged",
+                {"pk": "T#1"},
+                update_expression="SET #t = list_append(if_not_exists(#t, :empty), :v)",
+                expression_attribute_names={"#t": "tags"},
+                expression_attribute_values={":empty": [], ":v": [value]},
+            )
+
+        # THEN the list starts empty and grows in order
+        item = backend.client.sync_get_item("tagged", {"pk": "T#1"})
+        assert item is not None
+        assert item["tags"] == ["a", "b"]
+
+
+def test_list_append_rejects_non_list_operand():
+    """Test that list_append needs list operands like DynamoDB."""
+    with MemoryBackend() as backend:
+        # GIVEN an item where tags is a string
+        backend.client.sync_put_item("tagged", {"pk": "T#1", "tags": "oops"})
+
+        # WHEN we append to it
+        # THEN DynamoDB's operand type error is raised
+        with pytest.raises(ValidationException, match="list_append"):
+            backend.client.sync_update_item(
+                "tagged",
+                {"pk": "T#1"},
+                update_expression="SET tags = list_append(tags, :v)",
+                expression_attribute_values={":v": ["new"]},
+            )
+
+
+def test_sync_count_with_and_without_filter():
+    """Test sync count with and without a filter."""
+    with MemoryBackend():
+        # GIVEN three users of different ages
+        User(pk="USER#1", name="Eve", age=30).sync_save()
+        User(pk="USER#2", name="Frank", age=20).sync_save()
+        User(pk="USER#3", name="Grace", age=40).sync_save()
+
+        # WHEN we count all users and users older than 25
+        total, metrics = User.sync_count()
+        older, _ = User.sync_count(filter_condition=User.age > 25)
+
+        # THEN each count matches
+        assert total == 3
+        assert metrics.items_count == 3
+        assert older == 2
+
+
+@pytest.mark.asyncio
+async def test_async_count():
+    """Test async count, including an empty table."""
+    with MemoryBackend():
+        # GIVEN an empty table
+        empty, _ = await User.count()
+
+        # WHEN two users are saved
+        await User(pk="USER#1", name="Eve").save()
+        await User(pk="USER#2", name="Frank").save()
+        total, _ = await User.count()
+
+        # THEN the counts match
+        assert empty == 0
+        assert total == 2
+
+
+def test_client_count_accepts_dynamodb_client_arguments():
+    """Test direct client count with the same arguments as DynamoDBClient."""
+    with MemoryBackend() as backend:
+        # GIVEN two stored items
+        backend.client.sync_put_item("users", {"pk": "USER#1", "age": 30})
+        backend.client.sync_put_item("users", {"pk": "USER#2", "age": 20})
+
+        # WHEN we count with a filter, index name, and consistent read
+        count, _ = backend.client.sync_count(
+            "users",
+            filter_expression="#a > :min",
+            expression_attribute_names={"#a": "age"},
+            expression_attribute_values={":min": 25},
+            index_name="age-index",
+            consistent_read=True,
+        )
+
+        # THEN only the matching item is counted
+        assert count == 1
 
 
 def test_scan():
