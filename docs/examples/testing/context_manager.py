@@ -21,7 +21,8 @@ async def main():
         await user.save()
 
         found = await User.get(pk="USER#1")
-        print(f"Found: {found.name}")  # Output: Found: John
+        if found is not None:
+            print(f"Found: {found.name}")  # Output: Found: John
 
         # Inspect the data
         print(f"Tables: {list(backend.tables.keys())}")
@@ -34,6 +35,7 @@ async def test_with_seed():
 
     with MemoryBackend(seed=seed):
         user = await User.get(pk="USER#1")
+        assert user is not None
         assert user.name == "Seeded"
         print("Seed test passed!")
 

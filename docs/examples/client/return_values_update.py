@@ -63,6 +63,8 @@ print(f"Changed fields (old): {old_changed}")
 # {'age': 35}
 
 # Metrics are always available via get_last_metrics()
-print(f"Duration: {client.get_last_metrics().duration_ms:.1f}ms")
+metrics = client.get_last_metrics()
+if metrics is not None:
+    print(f"Duration: {metrics.duration_ms:.1f}ms")
 
 client.sync_delete_table(TABLE)

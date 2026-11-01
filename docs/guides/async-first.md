@@ -180,11 +180,14 @@ Run multiple operations at the same time:
 ```python
 import asyncio
 
+async def get_orders(user_id: str) -> list[Order]:
+    return [order async for order in Order.query(partition_key=user_id)]
+
 async def get_user_with_orders(user_id: str):
     # Both calls run concurrently - total time is max(user_time, orders_time)
     user, orders = await asyncio.gather(
         User.get(pk=user_id),
-        Order.query(partition_key=user_id).all(),
+        get_orders(user_id),
     )
     return user, orders
 ```

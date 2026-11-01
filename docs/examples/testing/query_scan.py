@@ -3,7 +3,6 @@
 import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, StringAttribute
-from pydynox.conditions import Attr
 
 
 class Order(Model):
@@ -38,7 +37,7 @@ async def test_query_with_filter(pydynox_memory_backend):
         order
         async for order in Order.query(
             partition_key="USER#1",
-            filter_condition=Attr("status").eq("pending"),
+            filter_condition=Order.status == "pending",
         )
     ]
     assert len(results) == 2
@@ -63,5 +62,5 @@ async def test_scan_with_filter(pydynox_memory_backend):
     await Order(pk="USER#3", sk="ORDER#001", status="pending", total=300).save()
 
     # Filter by total > 150
-    results = [order async for order in Order.scan(filter_condition=Attr("total").gt(150))]
+    results = [order async for order in Order.scan(filter_condition=Order.total > 150)]
     assert len(results) == 2
