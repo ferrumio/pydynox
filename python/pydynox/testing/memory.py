@@ -114,6 +114,69 @@ def _split_top_level(clause: str) -> list[str]:
     return parts
 
 
+def _parse_function_call(operand: str) -> tuple[str, list[str]] | None:
+    """Split `name(arg, ...)` into its name and top-level arguments.
+
+    Returns None unless the whole operand is one call, so
+    `if_not_exists(a, :zero) + :value` is not treated as a call.
+    """
+    match = re.match(r"(\w+)\s*\(", operand)
+    if not match:
+        return None
+    depth = 0
+    for index in range(match.end() - 1, len(operand)):
+        if operand[index] == "(":
+            depth += 1
+        elif operand[index] == ")":
+            depth -= 1
+            if depth == 0:
+                if operand[index + 1 :].strip():
+                    return None
+                args = _split_top_level(operand[match.end() : index])
+                return match.group(1), [arg.strip() for arg in args]
+    return None
+
+
+def _evaluate_set_operand(
+    operand: str, item: dict[str, Any], attr_values: dict[str, Any] | None
+) -> Any:
+    """Evaluate a SET operand: a path, a :value, if_not_exists(), or list_append().
+
+    Follows DynamoDB: a path to a missing attribute is a ValidationException,
+    and list_append needs two lists. if_not_exists guards a missing path.
+    """
+    operand = operand.strip()
+    call = _parse_function_call(operand)
+    if call is not None:
+        name, args = call
+        if name == "if_not_exists" and len(args) == 2:
+            if args[0] in item:
+                return item[args[0]]
+            return _evaluate_set_operand(args[1], item, attr_values)
+        if name == "list_append" and len(args) == 2:
+            left = _evaluate_set_operand(args[0], item, attr_values)
+            right = _evaluate_set_operand(args[1], item, attr_values)
+            if not isinstance(left, list) or not isinstance(right, list):
+                raise ValidationException(
+                    "Invalid UpdateExpression: Incorrect operand type for operator or "
+                    "function; operator or function: list_append"
+                )
+            return left + right
+        raise ValidationException(f"Invalid UpdateExpression: Invalid function name: {name}")
+    if operand.startswith(":"):
+        if not attr_values or operand not in attr_values:
+            raise ValidationException(
+                "Invalid UpdateExpression: An expression attribute value used in "
+                f"expression is not defined; attribute value: {operand}"
+            )
+        return attr_values[operand]
+    if operand not in item:
+        raise ValidationException(
+            "The provided expression refers to an attribute that does not exist in the item"
+        )
+    return item[operand]
+
+
 def _split_logical(condition: str, operator: str) -> list[str]:
     """Split a condition on a logical operator outside parentheses.
 
@@ -689,25 +752,25 @@ class MemoryClient:
             ):
                 raise ConditionalCheckFailedException("Condition check failed")
 
-        # Create item if not exists
-        if existing is None:
-            existing = copy.deepcopy(key)
-            tbl[key_str] = existing
+        # Work on a copy so a rejected update expression leaves the stored item unchanged
+        updated = copy.deepcopy(before) if before is not None else copy.deepcopy(key)
 
         # Apply updates
         if updates:
             self._validate_item(updates)
             for attr, value in updates.items():
-                existing[attr] = value
+                updated[attr] = value
 
         # Apply update expression
         if update_expression:
             self._apply_update_expression(
-                existing, update_expression, expression_attribute_names, expression_attribute_values
+                updated, update_expression, expression_attribute_names, expression_attribute_values
             )
 
+        tbl[key_str] = updated
+
         metrics = self._make_metrics(start, wcu=1)
-        metrics.vector_write_bytes = self._vector_write_bytes(table, before, existing)
+        metrics.vector_write_bytes = self._vector_write_bytes(table, before, updated)
         self._record_metrics(metrics, "update")
         return metrics
 
@@ -1119,6 +1182,68 @@ class MemoryClient:
             "last_evaluated_key": None,
             "metrics": self._make_metrics(start, rcu=len(tbl) * 0.5),
         }
+
+    # ========== COUNT ==========
+
+    def _do_count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[int, FakeMetrics]:
+        """Internal sync count implementation."""
+        result = self.scan(
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            consistent_read=consistent_read,
+            index_name=index_name,
+        )
+        metrics = result["metrics"]
+        metrics.items_count = result["count"]
+        return result["count"], metrics
+
+    def sync_count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[int, FakeMetrics]:
+        """Sync count."""
+        return self._do_count(
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            index_name,
+            consistent_read,
+        )
+
+    async def count(
+        self,
+        table: str,
+        filter_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+        index_name: str | None = None,
+        consistent_read: bool = False,
+    ) -> tuple[int, FakeMetrics]:
+        """Async count (default)."""
+        return self._do_count(
+            table,
+            filter_expression,
+            expression_attribute_names,
+            expression_attribute_values,
+            index_name,
+            consistent_read,
+        )
 
     # ========== VECTOR SEARCH ==========
 
@@ -1774,6 +1899,8 @@ class MemoryClient:
         - SET attr = :value
         - SET attr = attr + :value (ADD)
         - SET attr = if_not_exists(attr, :zero) + :value (missing-safe ADD)
+        - SET attr = if_not_exists(attr, :value)
+        - SET attr = list_append(attr, :list) or list_append(:list, attr)
         - REMOVE attr
         """
         # Resolve attribute names
@@ -1790,6 +1917,12 @@ class MemoryClient:
             for assignment in _split_top_level(set_clause):
                 assignment = assignment.strip()
                 if not assignment:
+                    continue
+
+                # Check for attr = list_append(...) or attr = if_not_exists(...)
+                target, _, operand = assignment.partition("=")
+                if _parse_function_call(operand.strip()) is not None:
+                    item[target.strip()] = _evaluate_set_operand(operand, item, attr_values)
                     continue
 
                 # Check for attr = if_not_exists(attr, :zero) + :value (missing-safe increment)
