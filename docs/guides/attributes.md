@@ -33,8 +33,30 @@ All attributes share these parameters:
 | `partition_key` | bool | False | Is this the partition key |
 | `sort_key` | bool | False | Is this the sort key |
 | `default` | Any | None | Default value or `AutoGenerate` strategy |
+| `default_for_new` | Any | UNSET | Default for new models only. Stored items use `default` |
 | `required` | bool | False | Field must have a value (not None) |
 | `alias` | str \| None | None | DynamoDB attribute name (saves storage) |
+
+### Different defaults for new and stored items
+
+Use `default_for_new` when you add a setting to a model that already has items.
+New models get `default_for_new`. Stored items that lack the field get `default`.
+
+=== "default_for_new.py"
+    ```python
+    --8<-- "docs/examples/models/default_for_new.py"
+    ```
+
+Rules:
+
+- When `default_for_new` is omitted, `default` is used for new and stored items.
+- `False`, `0`, and `None` are valid values. An explicit value always wins.
+- `from_dict()`, `get()`, `query()`, `scan()`, and batch reads use `default` for missing fields.
+  Partial projections also use `default`.
+- Reading a fallback value does not write it. A smart save (`save()` on a loaded item)
+  sends only changed fields, so the fallback is written only after you set the field.
+- A full-item write sends every field, including fallback values. This happens for new
+  items, for `save(full_replace=True)`, and for a loaded item with no changes.
 
 !!! tip
     Use `AutoGenerate` strategies for automatic ID and timestamp generation. See [Auto-generate strategies](auto-generate.md).

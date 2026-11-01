@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pydynox._internal._s3 import S3File, S3Metrics, S3Operations, S3Value
-from pydynox.attributes.base import Attribute
+from pydynox.attributes.base import UNSET, Attribute, Unset
 
 if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
@@ -56,6 +56,7 @@ class S3Attribute(Attribute[S3File | S3Value]):
         sort_key: bool = False,
         default: S3Value | None = None,
         required: bool = False,
+        default_for_new: S3Value | None | Unset = UNSET,
     ):
         """Create an S3Attribute.
 
@@ -67,11 +68,19 @@ class S3Attribute(Attribute[S3File | S3Value]):
             sort_key: Not supported for S3Attribute.
             default: Default value (usually None).
             required: Whether this field is required.
+            default_for_new: Value used for new models when this attribute is
+                omitted. See Attribute.
         """
         if partition_key or sort_key:
             raise ValueError("S3Attribute cannot be a partition_key or sort_key")
 
-        super().__init__(partition_key=False, sort_key=False, default=default, required=required)
+        super().__init__(
+            partition_key=False,
+            sort_key=False,
+            default=default,
+            required=required,
+            default_for_new=default_for_new,
+        )
         self.bucket = bucket
         self.prefix = prefix.rstrip("/") + "/" if prefix else ""
         self.region = region
