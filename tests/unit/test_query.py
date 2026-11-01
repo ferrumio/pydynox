@@ -202,64 +202,36 @@ async def test_async_query_skips_log_without_metrics(user_model, mock_client, ca
 
 
 @pytest.mark.asyncio
-async def test_async_query_continues_past_empty_intermediate_page(user_model, mock_client):
-    """AsyncModelQueryResult keeps fetching when a page is empty but has a LastEvaluatedKey."""
-    mock_client._client.query_page.side_effect = [
-        {
-            "items": [],
-            "last_evaluated_key": {"pk": "USER#123", "sk": "ORDER#999"},
-            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        },
-        {
-            "items": [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
-            "last_evaluated_key": None,
-            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
-        },
-    ]
-
-    result = user_model.query(partition_key="USER#123", page_size=1)
-    users = [user async for user in result]
-
-    assert len(users) == 1, f"expected 1 item after an empty intermediate page, got {users}"
-    assert mock_client._client.query_page.call_count == 2, (
-        "expected the second page to be fetched after an empty intermediate page "
-        "with a continuation key"
-    )
-
-
-@pytest.mark.asyncio
-async def test_async_query_continues_past_multiple_empty_intermediate_pages(
-    user_model, mock_client
+@pytest.mark.parametrize("empty_page_count", [1, 3], ids=["one_empty_page", "three_empty_pages"])
+async def test_async_query_continues_past_empty_intermediate_pages(
+    user_model, mock_client, empty_page_count
 ):
-    """AsyncModelQueryResult keeps fetching through several consecutive empty pages."""
-    mock_client._client.query_page.side_effect = [
+    """Async queries keep fetching through empty pages with continuation keys."""
+    # GIVEN empty pages followed by a page with a matching item
+    pages = [
         {
             "items": [],
-            "last_evaluated_key": {"pk": "USER#123", "sk": "ORDER#997"},
+            "last_evaluated_key": {"pk": "USER#123", "sk": f"ORDER#{page_index}"},
             "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        },
-        {
-            "items": [],
-            "last_evaluated_key": {"pk": "USER#123", "sk": "ORDER#998"},
-            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        },
-        {
-            "items": [],
-            "last_evaluated_key": {"pk": "USER#123", "sk": "ORDER#999"},
-            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        },
+        }
+        for page_index in range(empty_page_count)
+    ]
+    pages.append(
         {
             "items": [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
             "last_evaluated_key": None,
             "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
-        },
-    ]
+        }
+    )
+    mock_client._client.query_page.side_effect = pages
 
+    # WHEN all query results are collected
     result = user_model.query(partition_key="USER#123", page_size=1)
     users = [user async for user in result]
 
-    assert len(users) == 1
-    assert mock_client._client.query_page.call_count == 4
+    # THEN each empty page is skipped and the matching item is returned
+    assert [user.sk for user in users] == ["ORDER#1"]
+    assert mock_client._client.query_page.call_count == empty_page_count + 1
 
 
 @pytest.mark.asyncio
@@ -479,61 +451,36 @@ def test_sync_query_iteration(user_model, mock_client):
     assert isinstance(users[0], user_model)
 
 
-def test_sync_query_continues_past_empty_intermediate_page(user_model, mock_client):
-    """ModelQueryResult keeps fetching when a page is empty but has a LastEvaluatedKey."""
-    mock_client._client.sync_query_page.side_effect = [
+@pytest.mark.parametrize("empty_page_count", [1, 3], ids=["one_empty_page", "three_empty_pages"])
+def test_sync_query_continues_past_empty_intermediate_pages(
+    user_model, mock_client, empty_page_count
+):
+    """Sync queries keep fetching through empty pages with continuation keys."""
+    # GIVEN empty pages followed by a page with a matching item
+    pages = [
         (
             [],
-            {"pk": "USER#123", "sk": "ORDER#999"},
+            {"pk": "USER#123", "sk": f"ORDER#{page_index}"},
             MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        ),
+        )
+        for page_index in range(empty_page_count)
+    ]
+    pages.append(
         (
             [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
             None,
             MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
-        ),
-    ]
-
-    result = user_model.sync_query(partition_key="USER#123", page_size=1)
-    users = list(result)
-
-    assert len(users) == 1, f"expected 1 item after an empty intermediate page, got {users}"
-    assert mock_client._client.sync_query_page.call_count == 2, (
-        "expected the second page to be fetched after an empty intermediate page "
-        "with a continuation key"
+        )
     )
+    mock_client._client.sync_query_page.side_effect = pages
 
-
-def test_sync_query_continues_past_multiple_empty_intermediate_pages(user_model, mock_client):
-    """ModelQueryResult keeps fetching through several consecutive empty pages."""
-    mock_client._client.sync_query_page.side_effect = [
-        (
-            [],
-            {"pk": "USER#123", "sk": "ORDER#997"},
-            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        ),
-        (
-            [],
-            {"pk": "USER#123", "sk": "ORDER#998"},
-            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        ),
-        (
-            [],
-            {"pk": "USER#123", "sk": "ORDER#999"},
-            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
-        ),
-        (
-            [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
-            None,
-            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
-        ),
-    ]
-
+    # WHEN all query results are collected
     result = user_model.sync_query(partition_key="USER#123", page_size=1)
     users = list(result)
 
-    assert len(users) == 1
-    assert mock_client._client.sync_query_page.call_count == 4
+    # THEN each empty page is skipped and the matching item is returned
+    assert [user.sk for user in users] == ["ORDER#1"]
+    assert mock_client._client.sync_query_page.call_count == empty_page_count + 1
 
 
 def test_sync_query_stops_cleanly_after_trailing_empty_page(user_model, mock_client):
