@@ -2,6 +2,7 @@
 
 from pydantic_ai import Agent
 from pydantic_ai.models.bedrock import BedrockConverseModel
+from pydantic_ai.providers.bedrock import BedrockProvider
 from pydynox import Model, ModelConfig
 from pydynox.attributes import NumberAttribute, S3Attribute, S3File, S3Value, StringAttribute
 
@@ -18,8 +19,8 @@ class Document(Model):
 
 
 model = BedrockConverseModel(
-    model="us.anthropic.claude-sonnet-4-20250514-v1:0",
-    region_name="us-east-1",
+    model_name="us.anthropic.claude-sonnet-4-20250514-v1:0",
+    provider=BedrockProvider(region_name="us-east-1"),
 )
 
 agent = Agent(model, system_prompt="You are a document assistant.")

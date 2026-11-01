@@ -18,7 +18,11 @@ class Employee(Model):
 
 @tool
 def get_employee(employee_id: str) -> dict:
-    """Get employee info (excludes sensitive data)."""
+    """Get employee info (excludes sensitive data).
+
+    Args:
+        employee_id: The employee ID.
+    """
     emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
 
     if not emp:
