@@ -2,6 +2,7 @@
 
 import dataclasses
 from datetime import datetime, timezone
+from decimal import Decimal
 from enum import Enum
 
 import pytest
@@ -609,3 +610,78 @@ def test_number_set_attribute_roundtrip():
 
     # THEN original values should be preserved
     assert deserialized == original
+
+
+BIG = 2**53 + 1  # 9007199254740993, the first int a float can't hold
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        pytest.param([str(BIG), str(BIG - 1)], {BIG, BIG - 1}, id="big_int_strings"),
+        pytest.param([BIG, BIG - 1], {BIG, BIG - 1}, id="big_ints"),
+        pytest.param([-BIG, -(BIG - 1)], {-BIG, -(BIG - 1)}, id="big_negative_ints"),
+        pytest.param(
+            ["99999999999999999999999999999999999999"],
+            {99999999999999999999999999999999999999},
+            id="38_digits",
+        ),
+        pytest.param([Decimal(BIG), Decimal("2.5")], {BIG, 2.5}, id="decimals"),
+        pytest.param([str(BIG), "1.5", 2.5], {BIG, 1.5, 2.5}, id="mixed"),
+    ],
+)
+def test_number_set_attribute_deserialize_keeps_big_ints_exact(value, expected):
+    """NumberSetAttribute keeps whole numbers past 2**53 exact."""
+    # GIVEN a number set attribute
+    attr = NumberSetAttribute()
+
+    # WHEN we deserialize big whole numbers
+    result = attr.deserialize(value)
+
+    # THEN no member is rounded or merged with another
+    assert result == expected
+    assert len(result) == len(expected)
+
+
+def test_number_set_attribute_deserialize_keeps_float_shapes():
+    """Fractional and whole float values keep their old types."""
+    # GIVEN a number set attribute
+    attr = NumberSetAttribute()
+
+    # WHEN we deserialize fractional, whole-float and exponent values
+    result = attr.deserialize(["1.5", "2.0", 3.0, "1e3"])
+
+    # THEN fractions stay float and whole values become int
+    assert result == {1.5, 2, 3, 1000}
+    assert {type(v) for v in result if v != 1.5} == {int}
+
+
+def test_number_set_attribute_big_int_roundtrip():
+    """Serialize and deserialize keep two close big ints apart."""
+    # GIVEN a set of two ints that round to the same float
+    attr = NumberSetAttribute()
+    original = {BIG, BIG - 1}
+
+    # WHEN we serialize and deserialize
+    result = attr.deserialize(attr.serialize(original))
+
+    # THEN both members are still there, unchanged
+    assert result == original
+
+
+def test_number_set_attribute_model_read_keeps_big_ints():
+    """A model read keeps big ints in a number set exact."""
+    from pydynox.config import ModelConfig
+    from pydynox.model import Model
+
+    # GIVEN a model with a number set
+    class Item(Model):
+        model_config = ModelConfig(table="items")
+        pk = StringAttribute(partition_key=True)
+        ids = NumberSetAttribute()
+
+    # WHEN we load an item the way the client returns it
+    item = Item.from_dict({"pk": "ITEM#1", "ids": {BIG, BIG - 1}})
+
+    # THEN both ids are exact
+    assert item.ids == {BIG, BIG - 1}

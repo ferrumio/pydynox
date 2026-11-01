@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from pydynox.attributes.base import Attribute
@@ -100,12 +101,26 @@ class NumberSetAttribute(Attribute[set[int | float]]):
         """
         if value is None:
             return set()
-        result: set[int | float] = set()
-        for v in value:
-            num = float(v)
-            # Return int if it's a whole number
-            if num.is_integer():
-                result.add(int(num))
-            else:
-                result.add(num)
-        return result
+        return {_to_number(v) for v in value}
+
+
+def _to_number(value: Any) -> int | float:
+    """Convert one number set member to int or float.
+
+    Whole numbers stay exact. Going through float first would round integers
+    past 2**53, so two different members could become one.
+    """
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            pass
+    elif isinstance(value, Decimal) and value.is_finite() and value == value.to_integral_value():
+        return int(value)
+    num = float(value)
+    # Return int if it's a whole number
+    if num.is_integer():
+        return int(num)
+    return num
