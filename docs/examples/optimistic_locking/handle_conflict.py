@@ -8,7 +8,7 @@ from pydynox.exceptions import ConditionalCheckFailedException
 class Counter(Model):
     model_config = ModelConfig(table="counters")
     pk = StringAttribute(partition_key=True)
-    count = NumberAttribute()
+    value = NumberAttribute()
     version = VersionAttribute()
 
 
@@ -17,10 +17,10 @@ async def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
     for attempt in range(max_retries):
         counter = await Counter.get(pk=pk)
         if counter is None:
-            counter = Counter(pk=pk, count=0)
+            counter = Counter(pk=pk, value=0)
 
         # Increment
-        counter.count = counter.count + 1
+        counter.value = (counter.value or 0) + 1
 
         try:
             await counter.save()
@@ -35,7 +35,7 @@ async def increment_with_retry(pk: str, max_retries: int = 3) -> Counter:
 
 async def main():
     counter = await increment_with_retry("COUNTER#RETRY")
-    print(f"Count: {counter.count}, Version: {counter.version}")
+    print(f"Value: {counter.value}, Version: {counter.version}")
 
 
 asyncio.run(main())

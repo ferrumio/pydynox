@@ -28,7 +28,8 @@ async def main():
     # The SSN is encrypted in DynamoDB as "ENC:base64data..."
     # When you read it back, it's decrypted automatically
     loaded = await User.get(pk="USER#ENC", sk="PROFILE")
-    print(loaded.ssn)  # "123-45-6789"
+    if loaded is not None:
+        print(loaded.ssn)  # "123-45-6789"
 
 
 asyncio.run(main())

@@ -148,11 +148,11 @@ All operations happen atomically. Either all succeed or none do.
 | Method | Description | Example |
 |--------|-------------|---------|
 | `set(value)` | Set attribute to value | `User.name.set("Jane")` |
-| `add(n)` | Add to number, starting from zero if missing (use negative to subtract) | `User.count.add(1)` |
+| `add(n)` | Add to number, starting from zero if missing (use negative to subtract) | `User.login_count.add(1)` |
 | `remove()` | Delete the attribute | `User.temp.remove()` |
 | `append(items)` | Add items to end of list | `User.tags.append(["a", "b"])` |
 | `prepend(items)` | Add items to start of list | `User.tags.prepend(["a"])` |
-| `if_not_exists(value)` | Set only if attribute is missing | `User.count.if_not_exists(0)` |
+| `if_not_exists(value)` | Set only if attribute is missing | `User.login_count.if_not_exists(0)` |
 
 ## Error handling
 

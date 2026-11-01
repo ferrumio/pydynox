@@ -16,4 +16,6 @@ with SyncDistributedLock(client, table="script_locks", key="import:daily") as le
         transaction.put("import_results", {"job_id": "daily", "summary": summary})
 
 assert lease.metrics.write_requests == 2
-assert client.sync_get_item("import_results", {"job_id": "daily"})["summary"] == summary
+result = client.sync_get_item("import_results", {"job_id": "daily"})
+assert result is not None
+assert result["summary"] == summary

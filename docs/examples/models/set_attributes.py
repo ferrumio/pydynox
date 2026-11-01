@@ -31,12 +31,13 @@ async def main():
 
     # Load it back - returns Python sets
     loaded = await User.get(pk="USER#SET", sk="PROFILE")
-    print(loaded.tags)  # {'admin', 'verified', 'premium'}
-    print(loaded.scores)  # {100, 95, 88}
+    if loaded is not None and loaded.tags is not None and loaded.scores is not None:
+        print(loaded.tags)  # {'admin', 'verified', 'premium'}
+        print(loaded.scores)  # {100, 95, 88}
 
-    # Check membership
-    print("admin" in loaded.tags)  # True
-    print(100 in loaded.scores)  # True
+        # Check membership
+        print("admin" in loaded.tags)  # True
+        print(100 in loaded.scores)  # True
 
     # Sets don't allow duplicates
     user2 = User(pk="USER#SET2", sk="PROFILE", tags={"a", "a", "b"})

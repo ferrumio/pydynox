@@ -11,13 +11,18 @@ class Employee(Model):
     pk = StringAttribute(partition_key=True)
     sk = StringAttribute(sort_key=True)
     name = StringAttribute()
+    email = StringAttribute()
     department = StringAttribute()
     ssn = EncryptedAttribute(key_id="alias/hr-encryption-key")
 
 
 @tool
 def get_employee(employee_id: str) -> dict:
-    """Get employee info (excludes sensitive data)."""
+    """Get employee info (excludes sensitive data).
+
+    Args:
+        employee_id: The employee ID.
+    """
     emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
 
     if not emp:
@@ -48,5 +53,5 @@ def verify_ssn_last_four(employee_id: str, last_four: str) -> dict:
         return {"error": "Not found"}
 
     # SSN is decrypted automatically
-    matches = emp.ssn.endswith(last_four)
+    matches = emp.ssn is not None and emp.ssn.endswith(last_four)
     return {"verified": matches}
