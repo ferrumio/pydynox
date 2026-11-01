@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pydynox._internal._decimal import model_read_client
@@ -25,14 +24,14 @@ if TYPE_CHECKING:
 
 M = TypeVar("M", bound="ModelBase")
 
-# Set by from_dict() while it builds an instance from stored data.
-_loading_stored: ContextVar[bool] = ContextVar("_loading_stored", default=False)
+# Set on an instance by from_dict() before its __init__ runs.
+_LOADING_FROM_STORAGE = "_loading_from_storage"
 
 
 def _initial_default(attr: Attribute[Any], loading: bool) -> Any:
     """Return the default for a missing attribute.
 
-    New models use default_for_new when it is set. Stored data always uses default.
+    New objects use default_for_new when it is set. Loaded objects always use default.
     """
     if not loading and attr.default_for_new is not UNSET:
         return attr.default_for_new
@@ -256,7 +255,7 @@ class ModelBase(metaclass=ModelMeta):
         object.__setattr__(self, "_original", None)
         object.__setattr__(self, "_changed", set())
         object.__setattr__(self, "_json_snapshots", {})
-        loading = _loading_stored.get()
+        loading = self.__dict__.pop(_LOADING_FROM_STORAGE, False)
         # First pass: set all regular attributes
         for attr_name, attr in self._attributes.items():
             # Skip template keys in first pass - they'll be built later
@@ -388,8 +387,9 @@ class ModelBase(metaclass=ModelMeta):
 
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
+        loaded = self._original is not None
         for attr_name, attr in self._attributes.items():
-            strategy = _initial_default(attr, loading=False)
+            strategy = _initial_default(attr, loading=loaded)
             if strategy is not None and is_auto_generate(strategy):
                 current_value = getattr(self, attr_name, None)
                 if current_value is None:
@@ -562,11 +562,9 @@ class ModelBase(metaclass=ModelMeta):
             }
         else:
             model_values = deserialized
-        token = _loading_stored.set(True)
-        try:
-            instance = target_cls(**model_values)
-        finally:
-            _loading_stored.reset(token)
+        instance = target_cls.__new__(target_cls)
+        object.__setattr__(instance, _LOADING_FROM_STORAGE, True)
+        instance.__init__(**model_values)
         # Store original for change tracking with Python names and deserialized values
         # so __setattr__ can compare correctly (it looks up by Python attr name)
         instance._original = deserialized.copy()

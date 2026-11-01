@@ -1,10 +1,12 @@
 """Tests for default_for_new: creation defaults that differ from loading defaults."""
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydynox import Model, ModelConfig, clear_default_client
 from pydynox.attributes import BooleanAttribute, NumberAttribute, StringAttribute
+from pydynox.generators import AutoGenerate
 
 
 @pytest.fixture(autouse=True)
@@ -287,3 +289,107 @@ def test_model_without_default_for_new_uses_default_on_load(mock_client):
         enabled = BooleanAttribute(default=True)
 
     assert User.from_dict({"pk": "USER#1"}).enabled is True
+
+
+# ========== Regressions: save-time auto-generate and object-scoped loading ==========
+
+
+@pytest.fixture
+def item_model(mock_client):
+    class Item(Model):
+        model_config = ModelConfig(table="items", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+        token = StringAttribute(default_for_new=AutoGenerate.UUID4)
+        name = StringAttribute()
+
+    Item._client_instance = None
+    return Item
+
+
+@pytest.mark.asyncio
+async def test_async_save_loaded_item_does_not_generate_default_for_new(item_model, mock_client):
+    # GIVEN an old item stored without the auto-generated field
+    item = item_model.from_dict({"pk": "ITEM#1", "name": "old"})
+
+    # WHEN only the name changes and the item is saved
+    item.name = "new"
+    await item.save()
+
+    # THEN no new token is generated and only the changed field is sent
+    assert item.token is None
+    assert mock_client.update_item.call_args.kwargs["updates"] == {"name": "new"}
+
+
+def test_sync_save_loaded_item_does_not_generate_default_for_new(item_model, mock_client):
+    item = item_model.from_dict({"pk": "ITEM#1", "name": "old"})
+
+    item.name = "new"
+    item.sync_save()
+
+    assert item.token is None
+    assert mock_client.sync_update_item.call_args.kwargs["updates"] == {"name": "new"}
+
+
+@pytest.mark.asyncio
+async def test_async_save_new_item_generates_default_for_new(item_model):
+    item = item_model(pk="ITEM#2", name="new")
+
+    await item.save()
+
+    assert item.token is not None
+
+
+def test_sync_save_new_item_generates_default_for_new(item_model):
+    item = item_model(pk="ITEM#2", name="new")
+
+    item.sync_save()
+
+    assert item.token is not None
+
+
+def test_nested_model_in_custom_constructor_uses_default_for_new(mock_client):
+    class Child(Model):
+        model_config = ModelConfig(table="children", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+        enabled = BooleanAttribute(default=False, default_for_new=True)
+
+    class Parent(Model):
+        model_config = ModelConfig(table="parents", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.child = Child(pk="CHILD#nested")
+
+    # WHEN a parent is loaded and its constructor creates a new Child
+    parent = Parent.from_dict({"pk": "PARENT#1"})
+
+    # THEN the new Child uses the creation default
+    assert parent.child.enabled is True
+
+
+@pytest.mark.asyncio
+async def test_task_started_while_loading_does_not_inherit_loading_state(mock_client):
+    class Child(Model):
+        model_config = ModelConfig(table="children", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+        enabled = BooleanAttribute(default=False, default_for_new=True)
+
+    async def make_child_later() -> Child:
+        await asyncio.sleep(0)
+        return Child(pk="CHILD#task")
+
+    class Parent(Model):
+        model_config = ModelConfig(table="parents", client=mock_client)
+        pk = StringAttribute(partition_key=True)
+
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.later = asyncio.get_running_loop().create_task(make_child_later())
+
+    # WHEN a task created during loading constructs a new Child after from_dict returns
+    parent = Parent.from_dict({"pk": "PARENT#1"})
+    child = await parent.later
+
+    # THEN the new Child uses the creation default
+    assert child.enabled is True
