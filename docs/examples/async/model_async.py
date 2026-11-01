@@ -19,6 +19,8 @@ async def main():
 
     # Get by key
     user = await User.get(pk="USER#123", sk="PROFILE")
+    if user is None:
+        return
 
     # Update
     await user.update(name="Jane", age=31)

@@ -20,11 +20,13 @@ account = Account(pk="ACCOUNT#DECIMAL-SYNC", sk="BALANCE", balance=amount, visit
 account.sync_save()
 
 loaded = Account.sync_get(pk=account.pk, sk=account.sk)
+assert loaded is not None
 assert loaded.balance == amount
 assert type(loaded.balance) is Decimal
 assert type(loaded.visits) is int
 
 loaded.sync_update(atomic=[Account.balance.add(Decimal("0.000000001"))])
 updated = Account.sync_get(pk=account.pk, sk=account.sk)
+assert updated is not None
 assert updated.balance == Decimal("123456789.123456790")
 updated.sync_delete()

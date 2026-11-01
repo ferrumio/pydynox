@@ -17,7 +17,8 @@ class Account(Model):
 
 async def main():
     # Create account first
-    account = Account(pk="ACC#123", balance=500, status="active", verified=True)
+    balance = 500
+    account = Account(pk="ACC#123", balance=balance, status="active", verified=True)
     await account.save()
 
     # Only allow withdrawal if:
@@ -31,7 +32,7 @@ async def main():
         & (Account.balance >= withdrawal)
     )
 
-    account.balance = account.balance - withdrawal
+    account.balance = balance - withdrawal
     await account.save(condition=condition)
 
 

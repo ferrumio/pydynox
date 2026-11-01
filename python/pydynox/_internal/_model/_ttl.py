@@ -55,11 +55,13 @@ def extend_ttl(self: Model, new_expiration: datetime) -> None:
     if ttl_attr is None:
         raise ValueError(f"Model {self.__class__.__name__} has no TTLAttribute")
 
-    setattr(self, ttl_attr, new_expiration)
+    attr = self._attributes[ttl_attr]
+    dynamo_name = self._py_to_dynamo.get(ttl_attr, ttl_attr)
 
     client = self._get_client()
     table = self._get_table()
     key = self._get_key()
-    # Serialize datetime to epoch timestamp for DynamoDB
-    ttl_timestamp = int(new_expiration.timestamp())
-    client.sync_update_item(table, key, updates={ttl_attr: ttl_timestamp})
+    client.sync_update_item(table, key, updates={dynamo_name: attr.serialize(new_expiration)})
+
+    # Update the instance only after the write succeeds
+    setattr(self, ttl_attr, new_expiration)
