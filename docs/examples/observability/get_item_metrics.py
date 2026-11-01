@@ -14,8 +14,9 @@ async def main():
 
     # Access metrics via client.get_last_metrics()
     metrics = client.get_last_metrics()
-    print(metrics.duration_ms)  # 12.1
-    print(metrics.consumed_rcu)  # 0.5
+    if metrics is not None:
+        print(metrics.duration_ms)  # 12.1
+        print(metrics.consumed_rcu)  # 0.5
 
 
 asyncio.run(main())

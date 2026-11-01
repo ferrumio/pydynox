@@ -14,44 +14,50 @@ class User(Model):
 
     @before_save
     def validate_email(self):
-        if "@" not in self.email:
+        if not self.email or "@" not in self.email:
             raise ValueError("Invalid email")
 
     @before_save
     def normalize_email(self):
-        self.email = self.email.lower().strip()
+        if self.email:
+            self.email = self.email.lower().strip()
 
     @after_save
     def log_save(self):
         print(f"Saved user: {self.pk}")
 
 
-def test_before_save_validation(pydynox_memory_backend):
+@pytest.mark.asyncio
+async def test_before_save_validation(pydynox_memory_backend):
     """Test that before_save hook validates data."""
     user = User(pk="USER#1", email="invalid-email", name="John")
 
     with pytest.raises(ValueError, match="Invalid email"):
-        user.save()
+        await user.save()
 
     # User was not saved
-    assert User.get(pk="USER#1") is None
+    assert await User.get(pk="USER#1") is None
 
 
-def test_before_save_normalization(pydynox_memory_backend):
+@pytest.mark.asyncio
+async def test_before_save_normalization(pydynox_memory_backend):
     """Test that before_save hook normalizes data."""
     user = User(pk="USER#1", email="  JOHN@EXAMPLE.COM  ", name="John")
-    user.save()
+    await user.save()
 
-    found = User.get(pk="USER#1")
+    found = await User.get(pk="USER#1")
+    assert found is not None
     assert found.email == "john@example.com"
 
 
-def test_skip_hooks(pydynox_memory_backend):
+@pytest.mark.asyncio
+async def test_skip_hooks(pydynox_memory_backend):
     """Test skipping hooks for special cases."""
     # This would normally fail validation
     user = User(pk="USER#1", email="invalid", name="John")
-    user.save(skip_hooks=True)
+    await user.save(skip_hooks=True)
 
     # But with skip_hooks=True, it saves anyway
-    found = User.get(pk="USER#1")
+    found = await User.get(pk="USER#1")
+    assert found is not None
     assert found.email == "invalid"

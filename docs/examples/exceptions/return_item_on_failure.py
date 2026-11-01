@@ -2,13 +2,13 @@ from pydynox import DynamoDBClient
 from pydynox.pydynox_core import ConditionalCheckFailedException
 
 
-def optimistic_lock_with_item_return():
+async def optimistic_lock_with_item_return():
     """Update with version check, get existing item on failure."""
     client = DynamoDBClient()
 
     # Try to update with version check
     try:
-        client.update_item(
+        await client.update_item(
             "users",
             {"pk": "USER#123"},
             updates={"name": "Alice", "version": 2},
@@ -24,12 +24,12 @@ def optimistic_lock_with_item_return():
         print(f"Current version: {e.item['version']}")
 
 
-def prevent_overwrite_with_item_return():
+async def prevent_overwrite_with_item_return():
     """Create new item, get existing on conflict."""
     client = DynamoDBClient()
 
     try:
-        client.put_item(
+        await client.put_item(
             "users",
             {"pk": "USER#123", "name": "Bob", "email": "bob@example.com"},
             condition_expression="attribute_not_exists(pk)",

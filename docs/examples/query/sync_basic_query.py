@@ -3,8 +3,6 @@
 from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 
-client = get_default_client()
-
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
@@ -16,6 +14,8 @@ class Order(Model):
 
 def main():
     # Setup: create table and data
+    client = get_default_client()
+    assert client is not None, "call set_default_client() first"
     if not client.sync_table_exists("orders"):
         client.sync_create_table(
             "orders",

@@ -20,10 +20,11 @@ async def main():
     user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
     await user.save()
 
-    # Read
+    # Read - returns None if the item does not exist
     user = await User.get(pk="USER#123", sk="PROFILE")
-    if user:
-        print(user.name)  # John
+    if user is None:
+        return
+    print(user.name)  # John
 
     # Update - full
     user.name = "Jane"
