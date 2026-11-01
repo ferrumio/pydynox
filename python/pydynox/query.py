@@ -16,6 +16,36 @@ if TYPE_CHECKING:
 _SLOW_QUERY_THRESHOLD_MS = 100.0
 
 
+def _advance_past_empty_pages(result: Any) -> dict[str, Any]:
+    """Fetch pages (sync) until an item is available or all pages are exhausted."""
+    while True:
+        result._fetch_next_page()
+
+        if result._current_page:
+            item = result._current_page[result._page_index]
+            result._page_index += 1
+            result._total_returned += 1
+            return item
+
+        if result._exhausted:
+            raise StopIteration
+
+
+async def _advance_past_empty_pages_async(result: Any) -> dict[str, Any]:
+    """Fetch pages (async) until an item is available or all pages are exhausted."""
+    while True:
+        await result._fetch_next_page()
+
+        if result._current_page:
+            item = result._current_page[result._page_index]
+            result._page_index += 1
+            result._total_returned += 1
+            return item
+
+        if result._exhausted:
+            raise StopAsyncIteration
+
+
 class QueryResult:
     """Result of a DynamoDB query with automatic pagination.
 
@@ -103,17 +133,7 @@ class QueryResult:
         if self._exhausted:
             raise StopIteration
 
-        # Fetch next page
-        self._fetch_next_page()
-
-        # If no items after fetch, stop
-        if not self._current_page:
-            raise StopIteration
-
-        item = self._current_page[self._page_index]
-        self._page_index += 1
-        self._total_returned += 1
-        return item
+        return _advance_past_empty_pages(self)
 
     def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
@@ -255,17 +275,7 @@ class AsyncQueryResult:
         if self._exhausted:
             raise StopAsyncIteration
 
-        # Fetch next page
-        await self._fetch_next_page()
-
-        # If no items after fetch, stop
-        if not self._current_page:
-            raise StopAsyncIteration
-
-        item = self._current_page[self._page_index]
-        self._page_index += 1
-        self._total_returned += 1
-        return item
+        return await _advance_past_empty_pages_async(self)
 
     async def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
@@ -421,20 +431,7 @@ class ScanResult:
         if self._exhausted:
             raise StopIteration
 
-        # Keep fetching pages until we get items or exhaust all pages
-        while True:
-            self._fetch_next_page()
-
-            if self._current_page:
-                # Got items, return the first one
-                item = self._current_page[self._page_index]
-                self._page_index += 1
-                self._total_returned += 1
-                return item
-
-            if self._exhausted:
-                # No more pages to fetch
-                raise StopIteration
+        return _advance_past_empty_pages(self)
 
     def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
@@ -569,20 +566,7 @@ class AsyncScanResult:
         if self._exhausted:
             raise StopAsyncIteration
 
-        # Keep fetching pages until we get items or exhaust all pages
-        while True:
-            await self._fetch_next_page()
-
-            if self._current_page:
-                # Got items, return the first one
-                item = self._current_page[self._page_index]
-                self._page_index += 1
-                self._total_returned += 1
-                return item
-
-            if self._exhausted:
-                # No more pages to fetch
-                raise StopAsyncIteration
+        return await _advance_past_empty_pages_async(self)
 
     async def _fetch_next_page(self) -> None:
         """Fetch the next page of results from DynamoDB."""
