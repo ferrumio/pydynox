@@ -173,12 +173,6 @@ impl DynamoDBClient {
         max_retries: Option<u32>,
         proxy_url: Option<String>,
     ) -> PyResult<Self> {
-        // Set proxy env var if provided (AWS SDK reads from env)
-        if let Some(ref proxy) = proxy_url {
-            // SAFETY: called during client construction, before any async work starts
-            unsafe { std::env::set_var("HTTPS_PROXY", proxy) };
-        }
-
         let config = AwsConfig {
             region: region.clone(),
             access_key,

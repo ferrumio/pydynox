@@ -35,8 +35,8 @@ pub struct AwsConfig {
     // Retries
     pub max_retries: Option<u32>,
 
-    // Proxy (sets HTTPS_PROXY env var, stored for reference)
-    #[allow(dead_code)]
+    // Per-client HTTP proxy (applied to the SDK HTTP transport; never mutates
+    // process-wide HTTPS_PROXY / HTTP_PROXY environment variables).
     pub proxy_url: Option<String>,
 }
 
