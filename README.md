@@ -41,6 +41,19 @@ pip install pydynox[pydantic]       # Pydantic integration
 pip install pydynox[opentelemetry]  # OpenTelemetry tracing
 ```
 
+## Coding assistants
+
+Install the `using-pydynox` Agent Skill to help your coding assistant use pydynox
+in your application:
+
+```bash
+npx skills add ferrumio/pydynox --skill using-pydynox
+```
+
+It covers models, async and sync operations, queries, and tests. See the
+[Agent Skill guide](https://ferrumio.github.io/pydynox/guides/agent-skill/) for setup
+and examples.
+
 ## Quick start
 
 ### Define a model
