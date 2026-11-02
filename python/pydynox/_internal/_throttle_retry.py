@@ -33,7 +33,7 @@ __all__ = ["retry_on_throttle", "sync_retry_on_throttle"]
 
 def _backoff_for(attempt: int) -> float:
     """Backoff for a zero-based attempt number, capped at the maximum."""
-    return min(_INITIAL_BACKOFF_SECONDS * (2**attempt), _MAX_BACKOFF_SECONDS)
+    return min(_INITIAL_BACKOFF_SECONDS * (1 << attempt), _MAX_BACKOFF_SECONDS)
 
 
 def retry_on_throttle(
