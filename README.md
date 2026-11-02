@@ -50,7 +50,8 @@ in your application:
 npx skills add ferrumio/pydynox --skill using-pydynox
 ```
 
-It covers models, async and sync operations, queries, and tests. See the
+It covers models, pagination, indexes, conditional writes, transactions,
+integrations, and application tests, with async and sync examples. See the
 [Agent Skill guide](https://ferrumio.github.io/pydynox/guides/agent-skill/) for setup
 and examples.
 

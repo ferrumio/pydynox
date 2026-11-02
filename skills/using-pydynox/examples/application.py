@@ -18,6 +18,7 @@ from pydynox import (
     set_default_client,
 )
 from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.exceptions import ConditionalCheckFailedException, TransactionCanceledException
 from pydynox.testing import MemoryBackend
 
 
@@ -32,11 +33,26 @@ class Order(Model):
 async def crud(customer_id: str) -> None:
     order = Order(pk=f"CUSTOMER#{customer_id}", sk="ORDER#001", total_cents=1200)
     await order.save(condition=Order.pk.not_exists())
+    try:
+        await Order(pk=order.pk, sk=order.sk, total_cents=9999).save(
+            condition=Order.pk.not_exists()
+        )
+    except ConditionalCheckFailedException:
+        pass
+    else:
+        raise AssertionError("Create-only save replaced an existing order")
     found = await Order.get(pk=order.pk, sk=order.sk)
     assert found is not None and found.total_cents == 1200
     await found.update(status="paid", condition=(Order.status == "pending"))
+    await found.update(atomic=[Order.total_cents.add(100)])
+    try:
+        await found.update(status="cancelled", condition=(Order.status == "pending"))
+    except ConditionalCheckFailedException:
+        pass
+    else:
+        raise AssertionError("A stale state transition succeeded")
     paid = await Order.get(pk=order.pk, sk=order.sk)
-    assert paid is not None and paid.status == "paid"
+    assert paid is not None and paid.status == "paid" and paid.total_cents == 1300
     await paid.delete()
     assert await Order.get(pk=order.pk, sk=order.sk) is None
 
@@ -44,11 +60,24 @@ async def crud(customer_id: str) -> None:
 def sync_crud(customer_id: str) -> None:
     order = Order(pk=f"CUSTOMER#{customer_id}", sk="ORDER#001", total_cents=1200)
     order.sync_save(condition=Order.pk.not_exists())
+    try:
+        Order(pk=order.pk, sk=order.sk, total_cents=9999).sync_save(condition=Order.pk.not_exists())
+    except ConditionalCheckFailedException:
+        pass
+    else:
+        raise AssertionError("Create-only save replaced an existing order")
     found = Order.sync_get(pk=order.pk, sk=order.sk)
     assert found is not None and found.total_cents == 1200
     found.sync_update(status="paid", condition=(Order.status == "pending"))
+    found.sync_update(atomic=[Order.total_cents.add(100)])
+    try:
+        found.sync_update(status="cancelled", condition=(Order.status == "pending"))
+    except ConditionalCheckFailedException:
+        pass
+    else:
+        raise AssertionError("A stale state transition succeeded")
     paid = Order.sync_get(pk=order.pk, sk=order.sk)
-    assert paid is not None and paid.status == "paid"
+    assert paid is not None and paid.status == "paid" and paid.total_cents == 1300
     paid.sync_delete()
     assert Order.sync_get(pk=order.pk, sk=order.sk) is None
 
@@ -131,6 +160,20 @@ async def transaction(customer_id: str) -> None:
             tx.put(Order.model_config.table, item)
     orders = [order async for order in Order.query(partition_key=items[0]["pk"])]
     assert {order.sk for order in orders} == {item["sk"] for item in items}
+    rejected = dict(items[0], sk="ORDER#REJECTED")
+    try:
+        async with Transaction(client) as tx:
+            tx.condition_check(
+                Order.model_config.table,
+                {"pk": items[0]["pk"], "sk": items[0]["sk"]},
+                condition_expression="attribute_not_exists(pk)",
+            )
+            tx.put(Order.model_config.table, rejected)
+    except TransactionCanceledException:
+        pass
+    else:
+        raise AssertionError("A transaction with a failed condition committed")
+    assert await Order.get(pk=rejected["pk"], sk=rejected["sk"]) is None
 
 
 def sync_transaction(customer_id: str) -> None:
@@ -142,6 +185,20 @@ def sync_transaction(customer_id: str) -> None:
             tx.put(Order.model_config.table, item)
     orders = list(Order.sync_query(partition_key=items[0]["pk"]))
     assert {order.sk for order in orders} == {item["sk"] for item in items}
+    rejected = dict(items[0], sk="ORDER#REJECTED")
+    try:
+        with SyncTransaction(client) as tx:
+            tx.condition_check(
+                Order.model_config.table,
+                {"pk": items[0]["pk"], "sk": items[0]["sk"]},
+                condition_expression="attribute_not_exists(pk)",
+            )
+            tx.put(Order.model_config.table, rejected)
+    except TransactionCanceledException:
+        pass
+    else:
+        raise AssertionError("A transaction with a failed condition committed")
+    assert Order.sync_get(pk=rejected["pk"], sk=rejected["sk"]) is None
 
 
 async def async_examples(localstack: bool) -> None:
