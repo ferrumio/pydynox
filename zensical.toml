@@ -8,6 +8,7 @@ nav = [
     { "Home" = [
         "index.md",
         "getting-started.md",
+        "guides/agent-skill.md",
     ] },
     { "We are async-first" = "guides/async-first.md" },
     { "API Reference" = "api/pydynox/index.html" },
