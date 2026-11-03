@@ -155,7 +155,7 @@ No mocking needed. Your handler code runs exactly as it would in production, jus
 
 ## Without pytest
 
-You can use `MemoryBackend` directly as a context manager or decorator:
+You can use `MemoryBackend` directly as a context manager or decorator. The decorator works on sync and async functions. On an async function, the backend stays active until the coroutine finishes.
 
 === "context_manager.py"
     ```python
