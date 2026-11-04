@@ -7,6 +7,7 @@ on:
       - "src/**"
       - "python/**"
       - "tests/**"
+      - "skills/**"
       - "benchmarks/**"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -48,12 +49,12 @@ jobs:
       - name: Ruff check
         run: |
           source .venv/bin/activate
-          ruff check python/ tests/ benchmarks/
+          ruff check python/ tests/ benchmarks/ skills/
 
       - name: Ruff format
         run: |
           source .venv/bin/activate
-          ruff format --check python/ tests/ benchmarks/
+          ruff format --check python/ tests/ benchmarks/ skills/
 
       - name: Type check (ty)
         run: |

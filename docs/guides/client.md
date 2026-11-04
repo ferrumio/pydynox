@@ -168,7 +168,7 @@ See [rate limiting](rate-limiting.md) for details.
 | `connect_timeout` | float | Connection timeout (seconds) |
 | `read_timeout` | float | Read timeout (seconds) |
 | `max_retries` | int | Max retry attempts |
-| `proxy_url` | str | HTTP/HTTPS proxy URL |
+| `proxy_url` | str | HTTP/HTTPS proxy URL (per-client transport; does **not** set process `HTTPS_PROXY`) |
 | `rate_limit` | FixedRate/AdaptiveRate | Rate limiter |
 
 ## Methods
