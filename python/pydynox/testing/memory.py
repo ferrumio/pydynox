@@ -1677,14 +1677,15 @@ class MemoryClient:
             return attr not in item
 
         # Check comparisons
-        for op, func in [
+        comparisons: list[tuple[str, Callable[[Any, Any], bool]]] = [
             ("=", lambda a, b: a == b),
             ("<>", lambda a, b: a != b),
             ("<=", lambda a, b: a <= b),
             (">=", lambda a, b: a >= b),
             ("<", lambda a, b: a < b),
             (">", lambda a, b: a > b),
-        ]:
+        ]
+        for op, func in comparisons:
             match = re.search(rf"(\w+)\s*{re.escape(op)}\s*(:?\w+)", resolved_condition)
             if match:
                 attr = match.group(1)

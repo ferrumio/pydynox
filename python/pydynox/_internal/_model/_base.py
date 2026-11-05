@@ -162,7 +162,7 @@ class ModelMeta(type):
         if discriminator_attr and name != "ModelBase" and name != "Model":
             # Walk up the inheritance chain and register in all registries
             for base in bases:
-                current = base
+                current: type | None = base
                 while current is not None:
                     base_registry = getattr(current, "_discriminator_registry", None)
                     if base_registry is not None:
@@ -183,14 +183,14 @@ class ModelMeta(type):
 
         cls._metrics_storage = MetricsStorage()
 
-        for idx in indexes.values():
-            idx._bind_to_model(cls)
+        for gsi in indexes.values():
+            gsi._bind_to_model(cls)
 
-        for idx in local_indexes.values():
-            idx._bind_to_model(cls)
+        for lsi in local_indexes.values():
+            lsi._bind_to_model(cls)
 
-        for idx in vector_indexes.values():
-            idx._bind_to_model(cls)
+        for vector_index in vector_indexes.values():
+            vector_index._bind_to_model(cls)
 
         return cls
 
