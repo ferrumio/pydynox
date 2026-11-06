@@ -39,7 +39,12 @@ class CollectionResult:
         for item in items:
             for model_name, model_cls in self._models.items():
                 disc_attr = model_cls._discriminator_attr
-                if disc_attr and item.get(disc_attr) == model_name:
+                if not disc_attr:
+                    continue
+                # The stored item uses the alias when one is set.
+                disc_dynamo = model_cls._py_to_dynamo.get(disc_attr, disc_attr)
+                disc_value = item.get(disc_dynamo, item.get(disc_attr))
+                if disc_value == model_name:
                     instance = model_cls.from_dict(item)
                     skip = getattr(model_cls.model_config, "skip_hooks", False)
                     if not skip:
@@ -179,7 +184,9 @@ class Collection:
         if pk_attr is None:
             raise ValueError("Model has no partition key")
 
-        names: dict[str, str] = {"#pk": pk_attr}
+        first_model = self._models[0]
+        pk_dynamo = first_model._py_to_dynamo.get(pk_attr, pk_attr)
+        names: dict[str, str] = {"#pk": pk_dynamo}
         values: dict[str, Any] = {":pkv": partition_key}
 
         key_condition = "#pk = :pkv"
@@ -188,7 +195,7 @@ class Collection:
         if sk_begins_with:
             sk_attr = self._models[0]._sort_key
             if sk_attr:
-                names["#sk"] = sk_attr
+                names["#sk"] = first_model._py_to_dynamo.get(sk_attr, sk_attr)
                 values[":skprefix"] = sk_begins_with
                 key_condition += " AND begins_with(#sk, :skprefix)"
 
