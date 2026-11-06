@@ -260,3 +260,74 @@ def test_build_collection_query_params_pk_override_template():
 
     # Should use explicit pk, not template
     assert params.attr_values == {":pkv": "EXPLICIT#123"}
+
+
+ALIAS_CASES = pytest.mark.parametrize(
+    "key_alias, disc_alias, item, expected_names",
+    [
+        (True, False, {"p": "U", "s": "I", "kind": "AliasedUser"}, {"#pk": "p", "#sk": "s"}),
+        (False, True, {"pk": "U", "sk": "I", "_t": "AliasedUser"}, {"#pk": "pk", "#sk": "sk"}),
+        (True, True, {"p": "U", "s": "I", "_t": "AliasedUser"}, {"#pk": "p", "#sk": "s"}),
+        (False, False, {"pk": "U", "sk": "I", "kind": "AliasedUser"}, {"#pk": "pk", "#sk": "sk"}),
+    ],
+)
+
+
+def _aliased_models(client, key_alias=True, disc_alias=True):
+    class AliasedUser(Model):
+        model_config = ModelConfig(table="records", client=client)
+        pk = StringAttribute(partition_key=True, alias="p" if key_alias else None)
+        sk = StringAttribute(sort_key=True, alias="s" if key_alias else None)
+        kind = StringAttribute(discriminator=True, alias="_t" if disc_alias else None)
+
+    AliasedUser.__name__ = "AliasedUser"
+    return AliasedUser
+
+
+def _client_returning(items):
+    client = MagicMock(diagnostics=None)
+    client.sync_query.return_value = items
+
+    async def _aiter():
+        for item in items:
+            yield item
+
+    client.query.return_value = _aiter()
+    return client
+
+
+@ALIAS_CASES
+def test_collection_sync_query_uses_aliases(key_alias, disc_alias, item, expected_names):
+    client = _client_returning([item])
+    model = _aliased_models(client, key_alias, disc_alias)
+
+    result = Collection([model]).sync_query(pk="USER#1", sk_begins_with="ITEM#")
+
+    names = client.sync_query.call_args.kwargs["expression_attribute_names"]
+    assert names == expected_names
+    assert len(result.get(model)) == 1
+
+
+@ALIAS_CASES
+async def test_collection_async_query_uses_aliases(key_alias, disc_alias, item, expected_names):
+    client = _client_returning([item])
+    model = _aliased_models(client, key_alias, disc_alias)
+
+    result = await Collection([model]).query(pk="USER#1", sk_begins_with="ITEM#")
+
+    names = client.query.call_args.kwargs["expression_attribute_names"]
+    assert names == expected_names
+    assert len(result.get(model)) == 1
+
+
+def test_collection_result_ignores_items_with_other_discriminator_alias_value():
+    client = _client_returning([])
+    model = _aliased_models(client, key_alias=False, disc_alias=True)
+    items = [
+        {"pk": "USER#1", "sk": "A", "_t": "AliasedUser"},
+        {"pk": "USER#1", "sk": "B", "_t": "Other"},
+    ]
+
+    result = CollectionResult([model], items)
+
+    assert len(result.get(model)) == 1
