@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import inspect
 import math
 import re
 import time
@@ -247,6 +248,12 @@ class MemoryBackend:
         ...     user.save()
         ...     assert User.get(pk="USER#1") is not None
         >>>
+        >>> # As decorator on an async function
+        >>> @MemoryBackend()
+        ... async def test_user_crud_async():
+        ...     await User(pk="USER#1", name="John").save()
+        ...     assert await User.get(pk="USER#1") is not None
+        >>>
         >>> # With seed data
         >>> with MemoryBackend(seed={"users": [{"pk": "USER#1", "name": "John"}]}):
         ...     user = User.get(pk="USER#1")
@@ -300,7 +307,16 @@ class MemoryBackend:
                     nested._client_instance = None
 
     def __call__(self, func: F) -> F:
-        """Use as decorator."""
+        """Use as decorator on a sync or async function."""
+        if inspect.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Keep the backend active until the coroutine finishes.
+                with self:
+                    return await func(*args, **kwargs)
+
+            return cast(F, async_wrapper)
 
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
