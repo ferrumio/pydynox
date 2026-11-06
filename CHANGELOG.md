@@ -1,6 +1,57 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.8.1] - 2026-11-06
+
+
+### Bug Fixes
+
+- narrow template attributes with a TypeGuard helper (#542)
+- use profile as AssumeRole source credentials (#554)
+- use DynamoDB alias in extend_ttl() (#566)
+- sync pydynox_core stub with the extension and type _client (#570)
+- apply proxy_url on HTTP transport, not process env (#552) (#574)
+- keep big integers exact in NumberSetAttribute (#573)
+- keep MemoryBackend active in async decorated functions (#582)
+
+
+### CI/CD
+
+- bump pypa/gh-action-pypi-publish from 1.14.2 to 1.14.3 (#545)
+- bump CodSpeedHQ/action from 5.5.0 to 5.6.0 (#544)
+- bump actions/setup-python from 7.0.0 to 7.1.0 (#546)
+- bump astral-sh/setup-uv from 10.3.0 to 10.3.2 (#543)
+- bump github/codeql-action/upload-sarif from 4.39.0 to 4.39.1 (#549)
+- bump CodSpeedHQ/action from 5.6.0 to 5.6.1 (#579)
+- bump astral-sh/setup-uv from 10.3.2 to 10.3.3 (#578)
+
+
+### Documentation
+
+- update changelog for v1.8.0 (#540)
+- replace API names that do not exist (#572)
+- fix pyright errors in docs examples (#569)
+- fix pyright errors in agentic examples (#568)
+- rewrite type checking guide for strict mypy, pyright and ty (#567)
+- add an Agent Skill for pydynox applications (#577)
+
+
+### Miscellaneous
+
+- prepare v1.8.1 (#584)
+
+
+### Refactoring
+
+- fix remaining small mypy --strict errors (#541)
+
+
+### Deps
+
+- bump the dev-dependencies group with 2 updates (#548)
+- bump the rust-dependencies group with 4 updates (#547)
+- bump the rust-dependencies group with 5 updates (#580)
+- bump the dev-dependencies group with 2 updates (#581)
 ## [1.8.0] - 2026-10-25
 
 
