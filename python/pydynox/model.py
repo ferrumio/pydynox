@@ -198,6 +198,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         Raises:
             ConditionalCheckFailedException: If the condition is not met.
             ItemTooLargeException: If item exceeds max_size in model_config.
+                For a model loaded with a projection, only the fetched fields
+                count toward max_size.
             ValueError: If a model loaded with a projection is missing its key
                 or version, or changes a field fetched with a nested path.
 
@@ -483,6 +485,8 @@ class Model(ModelBase, metaclass=ModelMeta):
         Raises:
             ConditionalCheckFailedException: If the condition is not met.
             ItemTooLargeException: If item exceeds max_size in model_config.
+                For a model loaded with a projection, only the fetched fields
+                count toward max_size.
             ValueError: If a model loaded with a projection is missing its key
                 or version, or changes a field fetched with a nested path.
 
