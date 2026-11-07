@@ -352,11 +352,11 @@ def test_atomic_list_append_on_missing_attribute_raises():
         assert tagged is not None
 
         # WHEN we append to tags and to the missing notes in one update
+        atomic = [Tagged.tags.append(["new"]), Tagged.notes.append(["note"])]
+
         # THEN DynamoDB's validation error is raised
         with pytest.raises(ValidationException, match="does not exist"):
-            tagged.sync_update(
-                atomic=[Tagged.tags.append(["new"]), Tagged.notes.append(["note"])],
-            )
+            tagged.sync_update(atomic=atomic)
 
         # AND the stored item is unchanged
         found = Tagged.sync_get(pk="T#1")
