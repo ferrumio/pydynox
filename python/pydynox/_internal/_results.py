@@ -143,6 +143,7 @@ class BaseModelResult(ABC, Generic[T]):
     _result: Any
     _initialized: bool
     _as_dict: bool
+    _fields: list[str] | None
 
     @property
     def last_evaluated_key(self) -> dict[str, Any] | None:
@@ -153,7 +154,7 @@ class BaseModelResult(ABC, Generic[T]):
 
     def _to_instance(self, item: dict[str, Any]) -> Any:
         """Convert dict to model instance and run hooks."""
-        instance = self._model_class.from_dict(item)
+        instance = self._model_class._from_projection(item, self._fields)
         skip = getattr(self._model_class.model_config, "skip_hooks", False)
         if not skip:
             instance._run_hooks(HookType.AFTER_LOAD)

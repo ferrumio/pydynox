@@ -71,6 +71,26 @@ async for user in User.query(pk="USER#123", fields=["name", "status"]):
     print(user.name)
 ```
 
+### Saving a projected model
+
+A model loaded with `fields` or `projection` only knows the fields it fetched. The other fields are `None`. Defaults and `required=True` checks do not apply to them. A model you create yourself still gets defaults and required checks.
+
+`save()` on a projected model uses `UpdateItem` and writes only the fields you change. Fields you did not fetch keep their stored values. If you change nothing, `save()` writes nothing.
+
+=== "save_projection.py"
+    ```python
+    --8<-- "docs/examples/projections/save_projection.py"
+    ```
+
+A few rules keep the stored item safe:
+
+- Include the key fields in the projection. Without them, `save()` raises `ValueError`.
+- If the model has a `VersionAttribute`, include it too. Without it, `save()` raises `ValueError`.
+- A field loaded with a nested path, like `address.city`, holds only part of the attribute. Changing it and saving raises `ValueError`, because it would replace the whole attribute.
+- A transaction put replaces the whole item, so `save_model` raises `ValueError` for a projected model.
+- The `max_size` check in `model_config` only counts the fetched fields. Fields you did not fetch are kept in the stored item, so the stored item can be larger than `max_size`. DynamoDB's own 400 KB limit still applies.
+- `save(full_replace=True)` uses `PutItem` and replaces the stored item with the fetched fields only. Use it only when that is what you want.
+
 ### Sync usage
 
 Use `sync_query` and `sync_scan` for sync code:
