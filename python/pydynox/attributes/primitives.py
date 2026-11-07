@@ -295,13 +295,16 @@ class MapAttribute(Attribute[MT], Generic[MT]):
     def serialize(self, value: Any | None) -> dict[str, Any] | None:
         if value is None:
             return None
+        data: dict[str, Any]
         if self.model_class is None:
-            return value
-        if self._pydantic_class is not None:
-            return value.model_dump()
-        if self._is_dataclass:
-            return dataclasses.asdict(value)
-        return value
+            data = value
+        elif self._pydantic_class is not None:
+            data = value.model_dump()
+        elif self._is_dataclass:
+            data = dataclasses.asdict(value)
+        else:
+            data = value
+        return data
 
     def deserialize(self, value: Any) -> Any | None:
         if value is None:
