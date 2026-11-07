@@ -85,6 +85,10 @@ class Transaction:
         Args:
             model: The model instance to save.
             condition: Optional additional condition.
+
+        Raises:
+            ValueError: If the model was loaded with a projection, because a
+                put would replace the fields that were not fetched.
         """
         _prepare_model_save(self, model, condition)
 
@@ -301,6 +305,10 @@ class SyncTransaction:
         Args:
             model: The model instance to save.
             condition: Optional additional condition.
+
+        Raises:
+            ValueError: If the model was loaded with a projection, because a
+                put would replace the fields that were not fetched.
         """
         _prepare_model_save(self, model, condition)
 
