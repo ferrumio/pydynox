@@ -35,7 +35,7 @@ Pass `projection` to fetch only the attributes you need. It works like `projecti
 
 DynamoDB returns only the attributes you list. Key attributes are not added automatically, so include them if you need them.
 
-On a Model, use the Python field names, also at the start of a nested path like `address.city`. Aliases are translated for you. A field you leave out gets its default value, or `None` if it has no default. If you leave out a `required=True` field, creating the model fails with `ValueError`. Include required fields in the projection, or use `as_dict=True`.
+On a Model, use the Python field names, also at the start of a nested path like `address.city`. Aliases are translated for you. A field you leave out is `None`. Defaults and `required=True` checks do not apply to it. Calling `save()` on the model only writes the fields you change, so the fields you left out keep their stored values. See [saving a projected model](projections.md#saving-a-projected-model).
 
 Dots inside an alias stay literal. For example, if `address` has `alias="contact.addr"`, projecting `address.city` reads `city` inside the attribute named `contact.addr`.
 

@@ -59,6 +59,9 @@ async def save(
 
     result = prepare_smart_save(self, condition, skip_hooks, full_replace)
 
+    # A projected model with no changes has nothing to write.
+    wrote = not result.use_update or bool(result.updates)
+
     if result.use_update and result.updates:
         # Smart update: UpdateItem with only changed fields
         if result.condition_expr is not None:
@@ -74,7 +77,7 @@ async def save(
             await result.client.update_item(
                 result.table, result.key_or_item, updates=result.updates
             )
-    else:
+    elif not result.use_update:
         # Full replace: PutItem with all fields
         if result.condition_expr is not None:
             await result.client.put_item(
@@ -87,7 +90,7 @@ async def save(
         else:
             await result.client.put_item(result.table, result.key_or_item)
 
-    if result.client._last_metrics is not None:
+    if wrote and result.client._last_metrics is not None:
         op_type = "update" if result.use_update else "put"
         self.__class__._record_metrics(result.client._last_metrics, op_type)
 
@@ -96,7 +99,7 @@ async def save(
             s3_duration, s3_calls, s3_uploaded, s3_downloaded
         )
 
-    finalize_save(self, result.skip_hooks)
+    finalize_save(self, result.skip_hooks, full_item=not result.use_update)
 
 
 async def delete(

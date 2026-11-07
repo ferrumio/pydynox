@@ -46,6 +46,15 @@ def _project_item(item: dict[str, Any], paths: list[list[str]]) -> dict[str, Any
     return result
 
 
+def _projection_paths(projection_expression: str, names: dict[str, str] | None) -> list[list[str]]:
+    """Split a projection expression into attribute paths."""
+    names = names or {}
+    return [
+        [names.get(part.strip(), part.strip()) for part in path.split(".")]
+        for path in projection_expression.split(",")
+    ]
+
+
 def _decode_item(item: dict[str, Any], schema: NumberSchema | None) -> dict[str, Any]:
     """Match native number decoding without changing stored values."""
 
@@ -889,8 +898,12 @@ class MemoryClient:
             index_name,
         )
         metrics = result["metrics"]
-        metrics.items_count = len(result["items"])
-        return result["items"], result["last_evaluated_key"], metrics
+        items = result["items"]
+        if projection_expression:
+            paths = _projection_paths(projection_expression, expression_attribute_names)
+            items = [_project_item(item, paths) for item in items]
+        metrics.items_count = len(items)
+        return items, result["last_evaluated_key"], metrics
 
     def _do_scan_page(
         self,
@@ -920,8 +933,12 @@ class MemoryClient:
             index_name,
         )
         metrics = result["metrics"]
-        metrics.items_count = len(result["items"])
-        return result["items"], result["last_evaluated_key"], metrics
+        items = result["items"]
+        if projection_expression:
+            paths = _projection_paths(projection_expression, expression_attribute_names)
+            items = [_project_item(item, paths) for item in items]
+        metrics.items_count = len(items)
+        return items, result["last_evaluated_key"], metrics
 
     # ========== SYNC QUERY/SCAN (sync_ prefix) ==========
 

@@ -87,6 +87,9 @@ def save(
     # Collect KMS metrics from serialization
     kms_duration, kms_calls = _stop_kms_metrics_collection()
 
+    # A projected model with no changes has nothing to write.
+    wrote = not result.use_update or bool(result.updates)
+
     if result.use_update and result.updates:
         # Smart update: UpdateItem with only changed fields
         if result.condition_expr is not None:
@@ -100,7 +103,7 @@ def save(
             )
         else:
             result.client.sync_update_item(result.table, result.key_or_item, updates=result.updates)
-    else:
+    elif not result.use_update:
         # Full replace: PutItem with all fields
         if result.condition_expr is not None:
             result.client.sync_put_item(
@@ -114,7 +117,7 @@ def save(
             result.client.sync_put_item(result.table, result.key_or_item)
 
     # Record metrics from client
-    if result.client._last_metrics is not None:
+    if wrote and result.client._last_metrics is not None:
         op_type = "update" if result.use_update else "put"
         self.__class__._record_metrics(result.client._last_metrics, op_type)
 
@@ -129,7 +132,7 @@ def save(
         )
 
     # finalize: run AFTER_SAVE hooks and reset change tracking
-    finalize_save(self, result.skip_hooks)
+    finalize_save(self, result.skip_hooks, full_item=not result.use_update)
 
 
 def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:
