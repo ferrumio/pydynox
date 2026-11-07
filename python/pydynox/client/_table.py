@@ -18,7 +18,7 @@ from pydynox._internal._logging import _log_debug
 from pydynox.client._typing import _MixinBase
 
 if TYPE_CHECKING:  # pragma: no cover
-    from collections.abc import Coroutine
+    from collections.abc import Awaitable
 
 
 class TableOperations(_MixinBase):  # pragma: no cover
@@ -51,7 +51,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
         vector_indexes: list[dict[str, Any]] | None = None,
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]:
+    ) -> Awaitable[None]:
         """Create a new DynamoDB table. Returns an awaitable.
 
         Args:
@@ -77,7 +77,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.create_table("users", partition_key=("pk", "S"))
         """
         _log_debug("create_table", f'Creating table "{table_name}"')
-        return self._client.create_table(  # type: ignore[no-any-return]
+        return self._client.create_table(
             table_name,
             partition_key,
             range_key=sort_key,  # Rust uses range_key
@@ -94,7 +94,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             timeout_seconds=timeout_seconds,
         )
 
-    def table_exists(self, table_name: str) -> Coroutine[Any, Any, bool]:
+    def table_exists(self, table_name: str) -> Awaitable[bool]:
         """Check if a table exists. Returns an awaitable.
 
         Args:
@@ -107,7 +107,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             exists = await client.table_exists("users")
         """
         _log_debug("table_exists", f'Checking if table "{table_name}" exists')
-        return self._client.table_exists(table_name)  # type: ignore[no-any-return]
+        return self._client.table_exists(table_name)
 
     def delete_table(
         self,
@@ -115,7 +115,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
         *,
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]:
+    ) -> Awaitable[None]:
         """Delete a table. Returns an awaitable.
 
         Args:
@@ -132,15 +132,13 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.delete_table("users", wait=True, timeout_seconds=60)
         """
         _log_debug("delete_table", f'Deleting table "{table_name}"')
-        return self._client.delete_table(  # type: ignore[no-any-return]
-            table_name, wait=wait, timeout_seconds=timeout_seconds
-        )
+        return self._client.delete_table(table_name, wait=wait, timeout_seconds=timeout_seconds)
 
     def wait_for_table_active(
         self,
         table_name: str,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]:
+    ) -> Awaitable[None]:
         """Wait for a table to become active. Returns an awaitable.
 
         Args:
@@ -154,15 +152,13 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.wait_for_table_active("users")
         """
         _log_debug("wait_for_table_active", f'Waiting for table "{table_name}" to become active')
-        return self._client.wait_for_table_active(  # type: ignore[no-any-return]
-            table_name, timeout_seconds=timeout_seconds
-        )
+        return self._client.wait_for_table_active(table_name, timeout_seconds=timeout_seconds)
 
     def wait_for_table_deleted(
         self,
         table_name: str,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]:
+    ) -> Awaitable[None]:
         """Wait for a table to be deleted. Returns an awaitable.
 
         Completes right away if the table does not exist.
@@ -179,9 +175,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
             await client.wait_for_table_deleted("users")
         """
         _log_debug("wait_for_table_deleted", f'Waiting for table "{table_name}" to be deleted')
-        return self._client.wait_for_table_deleted(  # type: ignore[no-any-return]
-            table_name, timeout_seconds=timeout_seconds
-        )
+        return self._client.wait_for_table_deleted(table_name, timeout_seconds=timeout_seconds)
 
     # ========== SYNC METHODS (sync_ prefix) ==========
 
@@ -255,7 +249,7 @@ class TableOperations(_MixinBase):  # pragma: no cover
                 print("Table exists")
         """
         _log_debug("sync_table_exists", f'Checking if table "{table_name}" exists')
-        return self._client.sync_table_exists(table_name)  # type: ignore[no-any-return]
+        return self._client.sync_table_exists(table_name)
 
     def sync_delete_table(
         self,

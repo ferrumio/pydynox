@@ -17,14 +17,18 @@ class Employee(Model):
 
 @tool
 def search_by_department(department: str) -> list:
-    """Find all employees in a department."""
+    """Find all employees in a department.
+
+    Args:
+        department: Department name to search for.
+    """
     employees = Employee.sync_scan(
         filter_condition=Employee.department == department,
     )
 
     return [
         {
-            "employee_id": emp.pk.replace("EMP#", ""),
+            "employee_id": (emp.pk or "").replace("EMP#", ""),
             "name": emp.name,
             "email": emp.email,
         }
@@ -34,7 +38,12 @@ def search_by_department(department: str) -> list:
 
 @tool
 def transfer_employee(employee_id: str, new_department: str) -> dict:
-    """Transfer an employee to a new department."""
+    """Transfer an employee to a new department.
+
+    Args:
+        employee_id: The employee ID.
+        new_department: Department to transfer the employee to.
+    """
     emp = Employee.sync_get(pk=f"EMP#{employee_id}", sk="PROFILE")
 
     if not emp:

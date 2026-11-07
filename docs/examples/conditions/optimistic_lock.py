@@ -22,6 +22,8 @@ async def main():
 
     # Get current product
     product = await Product.get(pk="PROD#123")
+    if product is None or product.version is None:
+        return
     current_version = product.version
 
     # Update with version check

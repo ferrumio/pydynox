@@ -1,4 +1,6 @@
 import asyncio
+from random import uniform
+from uuid import uuid4
 
 from pydynox import Model, ModelConfig
 from pydynox.attributes import StringAttribute, VersionAttribute
@@ -12,41 +14,45 @@ class Counter(Model):
     version = VersionAttribute()
 
 
-async def increment_with_retry(pk: str, max_retries: int = 5) -> Counter:
+async def increment_with_retry(pk: str, max_retries: int = 20) -> Counter:
     """Increment counter with retry on conflict."""
     for attempt in range(max_retries):
-        counter = await Counter.async_get(pk=pk)
+        counter = await Counter.get(pk=pk, consistent_read=True)
         if counter is None:
             counter = Counter(pk=pk, value="0")
 
-        counter.value = str(int(counter.value) + 1)
+        counter.value = str(int(counter.value or "0") + 1)
 
         try:
-            await counter.async_save()
+            await counter.save()
             return counter
         except ConditionalCheckFailedException:
             if attempt == max_retries - 1:
                 raise
-            # Small delay before retry
-            await asyncio.sleep(0.01 * (attempt + 1))
+            # Random delays keep competing writers from retrying together.
+            delay = min(0.01 * 2**attempt, 0.5)
+            await asyncio.sleep(uniform(0, delay))
 
     raise RuntimeError("Should not reach here")
 
 
-async def main():
+async def main() -> None:
     # Create counter
-    counter = Counter(pk="COUNTER#1", value="0")
-    await counter.async_save()
+    pk = f"COUNTER#{uuid4()}"
+    counter = Counter(pk=pk, value="0")
+    await counter.save()
 
     # Run 10 concurrent increments
-    tasks = [increment_with_retry("COUNTER#1") for _ in range(10)]
+    tasks = [increment_with_retry(pk) for _ in range(10)]
     await asyncio.gather(*tasks)
 
     # Final value should be 10
-    final = await Counter.async_get(pk="COUNTER#1")
+    final = await Counter.get(pk=pk, consistent_read=True)
+    assert final is not None
+    assert final.value == "10"
+    assert final.version == 11
     print(f"Final value: {final.value}")  # 10
     print(f"Final version: {final.version}")  # 11 (1 create + 10 updates)
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())

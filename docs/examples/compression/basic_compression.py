@@ -21,7 +21,8 @@ async def main():
 
     # When you read it back, it's automatically decompressed
     loaded = await Article.get(pk="ARTICLE#123")
-    print(loaded.content)  # Original text, not compressed
+    if loaded is not None:
+        print(loaded.content)  # Original text, not compressed
 
 
 asyncio.run(main())

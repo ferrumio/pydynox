@@ -66,7 +66,7 @@ def delete_customer(customer_id: str) -> dict:
 
 # Write good docstrings
 @tool
-def search_orders(customer_id: str, status: str = None) -> list:
+def search_orders(customer_id: str, status: str | None = None) -> list:
     """Search orders for a customer.
 
     Use this when a customer asks about their orders,
@@ -79,16 +79,11 @@ def search_orders(customer_id: str, status: str = None) -> list:
     Returns:
         List of orders with order_id, status, and total.
     """
-    query_params = {
-        "key_condition": "pk = :pk",
-        "expression_values": {":pk": f"CUSTOMER#{customer_id}"},
-    }
-
-    if status:
-        query_params["filter_condition"] = "status = :status"
-        query_params["expression_values"][":status"] = status
-
-    orders = list(Order.sync_query(**query_params))
+    status_filter = Order.status == status if status else None
+    orders = Order.sync_query(
+        partition_key=f"CUSTOMER#{customer_id}",
+        filter_condition=status_filter,
+    )
     return [{"order_id": o.order_id, "status": o.status, "total": o.total} for o in orders]
 
 

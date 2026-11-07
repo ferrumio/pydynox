@@ -6,8 +6,6 @@ from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 from pydynox.indexes import GlobalSecondaryIndex
 
-client = get_default_client()
-
 
 class User(Model):
     """User model with status GSI that has a range key."""
@@ -31,6 +29,8 @@ class User(Model):
 
 async def main():
     # Create table with GSI
+    client = get_default_client()
+    assert client is not None, "call set_default_client() first"
     if not await client.table_exists("users_status"):
         await client.create_table(
             "users_status",

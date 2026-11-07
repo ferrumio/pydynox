@@ -1,6 +1,7 @@
 """Using boto3 and pydynox together during migration."""
 
 import asyncio
+from typing import Any
 
 import boto3
 from pydynox import Model, ModelConfig
@@ -21,7 +22,7 @@ def legacy_function(data: dict) -> None:
 
 async def main():
     # boto3 client for legacy code
-    dynamodb = boto3.resource("dynamodb")
+    dynamodb: Any = boto3.resource("dynamodb")  # untyped without boto3-stubs
     table = dynamodb.Table("users")
 
     # Read with boto3, use as pydynox Model

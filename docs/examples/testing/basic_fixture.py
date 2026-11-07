@@ -33,6 +33,7 @@ async def test_update_user(pydynox_memory_backend):
     await user.update(name="Janet", age=25)
 
     found = await User.get(pk="USER#1")
+    assert found is not None
     assert found.name == "Janet"
     assert found.age == 25
 

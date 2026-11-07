@@ -10,10 +10,12 @@ from pydynox._internal._vector import VectorMatch, VectorSearchResult
 from pydynox.client._typing import _MixinBase
 
 if TYPE_CHECKING:  # pragma: no cover
-    from collections.abc import Coroutine
+    from collections.abc import Awaitable
+
+    from pydynox.pydynox_core import _VectorSearchResult
 
 
-def _convert_search_result(value: dict[str, Any]) -> VectorSearchResult[dict[str, Any]]:
+def _convert_search_result(value: _VectorSearchResult) -> VectorSearchResult[dict[str, Any]]:
     matches = [VectorMatch(item=match["item"], score=match["score"]) for match in value["matches"]]
     return VectorSearchResult(matches, value["metrics"])
 
@@ -100,9 +102,9 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         *,
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]:
+    ) -> Awaitable[None]:
         _log_debug("create_vector_index", f'Creating vector index on "{table}"')
-        return self._client.create_vector_index(  # type: ignore[no-any-return]
+        return self._client.create_vector_index(
             table, definition, wait=wait, timeout_seconds=timeout_seconds
         )
 
@@ -126,9 +128,9 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         *,
         wait: bool = False,
         timeout_seconds: int | None = None,
-    ) -> Coroutine[Any, Any, None]:
+    ) -> Awaitable[None]:
         _log_debug("delete_vector_index", f'Deleting vector index "{index_name}"')
-        return self._client.delete_vector_index(  # type: ignore[no-any-return]
+        return self._client.delete_vector_index(
             table, index_name, wait=wait, timeout_seconds=timeout_seconds
         )
 
@@ -149,16 +151,12 @@ class VectorOperations(_MixinBase):  # pragma: no cover
         self,
         table: str,
         index_name: str,
-    ) -> Coroutine[Any, Any, dict[str, Any]]:
-        return self._client.describe_vector_index(  # type: ignore[no-any-return]
-            table, index_name
-        )
+    ) -> Awaitable[dict[str, Any]]:
+        return self._client.describe_vector_index(table, index_name)
 
     def sync_describe_vector_index(
         self,
         table: str,
         index_name: str,
     ) -> dict[str, Any]:
-        return self._client.sync_describe_vector_index(  # type: ignore[no-any-return]
-            table, index_name
-        )
+        return self._client.sync_describe_vector_index(table, index_name)

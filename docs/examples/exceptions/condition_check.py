@@ -2,11 +2,11 @@ from pydynox import DynamoDBClient
 from pydynox.pydynox_core import ConditionalCheckFailedException
 
 
-def update_if_exists():
+async def update_if_exists():
     client = DynamoDBClient()
 
     try:
-        client.update_item(
+        await client.update_item(
             "users",
             {"pk": "USER#123"},
             updates={"name": "John"},

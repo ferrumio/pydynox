@@ -23,5 +23,5 @@ async def collect_results():
         key_condition_expression="#pk = :pk",
         expression_attribute_names={"#pk": "pk"},
         expression_attribute_values={":pk": "USER#123"},
-    ).all()
+    ).to_list()
     return items

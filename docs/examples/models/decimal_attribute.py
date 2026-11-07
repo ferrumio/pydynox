@@ -22,12 +22,14 @@ async def main():
     await account.save()
 
     loaded = await Account.get(pk=account.pk, sk=account.sk)
+    assert loaded is not None
     assert loaded.balance == amount
     assert type(loaded.balance) is Decimal
     assert type(loaded.visits) is int
 
     await loaded.update(atomic=[Account.balance.add(Decimal("0.000000001"))])
     updated = await Account.get(pk=account.pk, sk=account.sk)
+    assert updated is not None
     assert updated.balance == Decimal("123456789.123456790")
     await updated.delete()
 

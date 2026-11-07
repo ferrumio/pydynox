@@ -31,6 +31,7 @@ def test_update(pydynox_memory_backend):
     user.sync_update(name="Jane", age=25)
 
     found = User.sync_get(pk="USER#1", sk="PROFILE")
+    assert found is not None
     assert found.name == "Jane"
     assert found.age == 25
 
@@ -58,6 +59,7 @@ def test_update_by_key(pydynox_memory_backend):
     User.sync_update_by_key(pk="USER#1", sk="PROFILE", name="Jane")
 
     found = User.sync_get(pk="USER#1", sk="PROFILE")
+    assert found is not None
     assert found.name == "Jane"
 
 

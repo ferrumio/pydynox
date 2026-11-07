@@ -24,7 +24,8 @@ async def main():
 
     # Load it back
     loaded = await Config.get(pk="CFG#1")
-    print(loaded.settings["theme"])  # "dark"
+    if loaded is not None and isinstance(loaded.settings, dict):
+        print(loaded.settings["theme"])  # "dark"
 
     # Works with lists too
     config2 = Config(pk="CFG#2", settings=["item1", "item2", "item3"])

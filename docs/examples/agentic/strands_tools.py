@@ -54,7 +54,7 @@ def get_customer_by_email(email: str) -> dict:
 
     customer = results[0]
     return {
-        "customer_id": customer.pk.replace("CUSTOMER#", ""),
+        "customer_id": (customer.pk or "").replace("CUSTOMER#", ""),
         "name": customer.name,
         "email": customer.email,
     }
@@ -185,8 +185,8 @@ if __name__ == "__main__":
 
     def create_tables():
         """Create DynamoDB tables if they don't exist."""
-        if not client.table_exists("customers"):
-            client.create_table(
+        if not client.sync_table_exists("customers"):
+            client.sync_create_table(
                 table_name="customers",
                 partition_key=("pk", "S"),
                 sort_key=("sk", "S"),
@@ -194,8 +194,8 @@ if __name__ == "__main__":
             )
             print("Table 'customers' created!")
 
-        if not client.table_exists("orders"):
-            client.create_table(
+        if not client.sync_table_exists("orders"):
+            client.sync_create_table(
                 table_name="orders",
                 partition_key=("pk", "S"),
                 sort_key=("sk", "S"),

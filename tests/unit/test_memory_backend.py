@@ -5,6 +5,9 @@ With async-first API:
 - sync_get(), sync_save(), sync_delete(), sync_update() are sync
 """
 
+import asyncio
+import inspect
+
 import pytest
 from pydynox import BatchWriter, Model, ModelConfig, SyncBatchWriter, get_default_client
 from pydynox.attributes import ListAttribute, NumberAttribute, StringAttribute
@@ -64,6 +67,124 @@ def test_memory_backend_decorator():
 
     assert result is not None
     assert result.name == "Jane"
+
+
+async def test_memory_backend_decorator_on_async_function():
+    """The backend stays active while the decorated coroutine runs."""
+
+    # GIVEN an async function decorated with MemoryBackend
+    @MemoryBackend()
+    async def inner():
+        await User(pk="USER#1", name="Jane").save()
+        return await User.get(pk="USER#1")
+
+    # WHEN it runs
+    result = await inner()
+
+    # THEN it can use the model and the backend is gone after it finishes
+    assert result is not None
+    assert result.name == "Jane"
+    assert get_default_client() is None
+
+
+async def test_memory_backend_decorator_stays_active_across_await():
+    """A real suspension point inside the coroutine must not end the backend."""
+
+    # GIVEN a decorated coroutine that yields to the event loop before using the model
+    @MemoryBackend()
+    async def inner():
+        client = get_default_client()
+        await asyncio.sleep(0)
+        assert get_default_client() is client
+        await User(pk="USER#1", name="Jane").save()
+        await asyncio.sleep(0)
+        return await User.get(pk="USER#1")
+
+    # WHEN it runs
+    result = await inner()
+
+    # THEN the data written before the await is still there after it
+    assert result is not None
+
+
+async def test_memory_backend_decorator_async_exception_cleans_up():
+    """An error raised in the coroutine still restores the client."""
+
+    # GIVEN a decorated coroutine that fails
+    @MemoryBackend()
+    async def inner():
+        await asyncio.sleep(0)
+        raise RuntimeError("boom")
+
+    # WHEN it runs THEN the error is raised and the backend is removed
+    with pytest.raises(RuntimeError, match="boom"):
+        await inner()
+    assert get_default_client() is None
+
+
+async def test_memory_backend_decorator_async_restores_previous_client():
+    """The default client from before the call comes back when the coroutine ends."""
+
+    # GIVEN a default client that is already set
+    @MemoryBackend()
+    async def inner():
+        return get_default_client()
+
+    with MemoryBackend():
+        previous = get_default_client()
+
+        # WHEN a decorated coroutine runs
+        used = await inner()
+
+        # THEN it used its own client and the previous one is back
+        assert used is not previous
+        assert get_default_client() is previous
+
+
+async def test_memory_backend_decorator_activates_when_awaited():
+    """Calling the function only creates a coroutine, so nothing is active yet."""
+
+    # GIVEN a decorated coroutine function
+    @MemoryBackend()
+    async def inner():
+        return get_default_client()
+
+    # WHEN it is called but not awaited
+    coroutine = inner()
+
+    # THEN the backend is not active until the coroutine runs
+    assert get_default_client() is None
+    assert await coroutine is not None
+    assert get_default_client() is None
+
+
+def test_memory_backend_decorator_keeps_function_kind_and_metadata():
+    """Test runners check the function kind, so the wrapper must not change it."""
+
+    @MemoryBackend()
+    async def async_inner():
+        """Async docstring."""
+
+    @MemoryBackend()
+    def sync_inner():
+        """Sync docstring."""
+
+    assert inspect.iscoroutinefunction(async_inner)
+    assert async_inner.__name__ == "async_inner"
+    assert async_inner.__doc__ == "Async docstring."
+    assert not inspect.iscoroutinefunction(sync_inner)
+    assert sync_inner.__name__ == "sync_inner"
+
+
+def test_memory_backend_decorator_on_async_function_with_asyncio_run():
+    """The example from the bug report works with asyncio.run()."""
+
+    @MemoryBackend()
+    async def save_and_read():
+        await User(pk="one", name="Jane").save()
+        return await User.get(pk="one")
+
+    assert asyncio.run(save_and_read()).pk == "one"
 
 
 def test_memory_backend_restores_client():

@@ -20,6 +20,7 @@ async def main():
     # Two processes load the same document
     process_a = await Document.get(pk="DOC#CONCURRENT")
     process_b = await Document.get(pk="DOC#CONCURRENT")
+    assert process_a is not None and process_b is not None
 
     # Both have version 1
     print(process_a.version)  # 1

@@ -20,8 +20,10 @@ class User(Model):
 
     @before_save
     def normalize(self):
-        self.email = self.email.lower().strip()
-        self.name = self.name.strip()
+        if self.email:
+            self.email = self.email.lower().strip()
+        if self.name:
+            self.name = self.name.strip()
 
     @after_save
     def log_save(self):

@@ -29,8 +29,9 @@ async def main():
 
     # Load it back - returns the enum
     loaded = await User.get(pk="USER#ENUM", sk="PROFILE")
-    print(loaded.status)  # Status.ACTIVE
-    print(loaded.status == Status.ACTIVE)  # True
+    if loaded is not None:
+        print(loaded.status)  # Status.ACTIVE
+        print(loaded.status == Status.ACTIVE)  # True
 
     # Default value works
     user2 = User(pk="USER#ENUM2", sk="PROFILE")

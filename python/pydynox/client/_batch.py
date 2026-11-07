@@ -69,7 +69,7 @@ class BatchOperations(_MixinBase):
         _log_debug("batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))
         projection_expr, attr_names = _build_projection(projection, paths=_projection_paths)
-        return await self._client.batch_get(  # type: ignore[no-any-return]
+        return await self._client.batch_get(
             table, keys, consistent_read, projection_expr, attr_names
         )
 
@@ -130,7 +130,7 @@ class BatchOperations(_MixinBase):
         _log_debug("sync_batch_get", f'Batch getting from "{table}" ({len(keys)} keys)')
         self._acquire_rcu(float(len(keys)))
         projection_expr, attr_names = _build_projection(projection, paths=_projection_paths)
-        return self._client.sync_batch_get(  # type: ignore[no-any-return]
+        return self._client.sync_batch_get(
             table, keys, consistent_read, projection_expr, attr_names
         )
 
@@ -190,7 +190,7 @@ class BatchOperations(_MixinBase):
             ])
         """
         _log_debug("sync_transact_get", f"Transact getting ({len(gets)} keys)")
-        return self._client.sync_transact_get(gets)  # type: ignore[no-any-return]
+        return self._client.sync_transact_get(gets)
 
     # ========== TRANSACT WRITE (ASYNC - default) ==========
 
@@ -237,4 +237,4 @@ class BatchOperations(_MixinBase):
             List of items (or None for items that don't exist).
         """
         _log_debug("transact_get", f"Transact getting ({len(gets)} keys)")
-        return await self._client.transact_get(gets)  # type: ignore[no-any-return]
+        return await self._client.transact_get(gets)

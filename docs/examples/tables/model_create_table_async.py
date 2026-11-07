@@ -39,10 +39,10 @@ async def main():
 
     # Save and query to verify GSI works
     user = User(pk="USER#1", sk="PROFILE", email="test@example.com", status="active", age=30)
-    await user.async_save()
+    await user.save()
 
     # Query by GSI
-    results = [u async for u in User.email_index.async_query(email="test@example.com")]
+    results = [u async for u in User.email_index.query(email="test@example.com")]
     assert len(results) == 1
     assert results[0].pk == "USER#1"
 

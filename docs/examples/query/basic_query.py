@@ -5,8 +5,6 @@ import asyncio
 from pydynox import Model, ModelConfig, get_default_client
 from pydynox.attributes import NumberAttribute, StringAttribute
 
-client = get_default_client()
-
 
 class Order(Model):
     model_config = ModelConfig(table="orders")
@@ -18,6 +16,8 @@ class Order(Model):
 
 async def main():
     # Setup: create table and data
+    client = get_default_client()
+    assert client is not None, "call set_default_client() first"
     if not await client.table_exists("orders"):
         await client.create_table(
             "orders",

@@ -48,7 +48,7 @@ class DecimalAttribute(Attribute[Decimal]):
         """Validate an exact value before sending it to DynamoDB."""
         return pydynox_core.validate_decimal(value)
 
-    def deserialize(self, value: Any) -> Decimal | None:
+    def deserialize(self, value: object) -> Decimal | None:
         """Accept an exact decoded value, rejecting already rounded floats."""
         return pydynox_core.validate_decimal(value)
 

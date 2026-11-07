@@ -24,8 +24,9 @@ async def main():
 
     # Get metrics from last operation
     last = User.get_last_metrics()
-    print(f"Save took {last.duration_ms}ms")
-    print(f"Consumed {last.consumed_wcu} WCU")
+    if last is not None:
+        print(f"Save took {last.duration_ms}ms")
+        print(f"Consumed {last.consumed_wcu} WCU")
 
     # Do more operations
     await User.get(pk="USER#1", sk="PROFILE")

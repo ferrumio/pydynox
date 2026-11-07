@@ -17,10 +17,10 @@ class User(Model):
 user = User(pk="USER#123", sk="PROFILE", name="John", age=30)
 user.sync_save()
 
-# Read
+# Read - returns None if the item does not exist
 user = User.sync_get(pk="USER#123", sk="PROFILE")
-if user:
-    print(user.name)  # John
+assert user is not None
+print(user.name)  # John
 
 # Update - full
 user.name = "Jane"

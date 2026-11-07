@@ -1,8 +1,10 @@
 """boto3: Get item from DynamoDB."""
 
+from typing import Any
+
 import boto3
 
-dynamodb = boto3.resource("dynamodb")
+dynamodb: Any = boto3.resource("dynamodb")  # untyped without boto3-stubs
 table = dynamodb.Table("users")
 
 response = table.get_item(Key={"pk": "USER#123", "sk": "PROFILE"})

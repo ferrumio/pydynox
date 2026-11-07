@@ -22,6 +22,7 @@ async def main():
 
     # Load stale copy
     stale = await Document.get(pk="DOC#DELETE")
+    assert stale is not None
 
     # Update again
     doc.content = "Updated again"

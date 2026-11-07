@@ -28,6 +28,8 @@ async def main():
 
     # Load it back - returns the dataclass, not a dict
     loaded = await Event.get(pk="EVT#1")
+    if loaded is None or loaded.payload is None:
+        return
     print(loaded.payload.region)  # "us-east-1"
     print(loaded.payload.score)  # 0.95
 

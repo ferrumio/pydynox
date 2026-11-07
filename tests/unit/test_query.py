@@ -201,6 +201,115 @@ async def test_async_query_skips_log_without_metrics(user_model, mock_client, ca
     assert not any("slow operation" in record.message for record in caplog.records)
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("empty_page_count", [1, 3], ids=["one_empty_page", "three_empty_pages"])
+async def test_async_query_continues_past_empty_intermediate_pages(
+    user_model, mock_client, empty_page_count
+):
+    """Async queries keep fetching through empty pages with continuation keys."""
+    # GIVEN empty pages followed by a page with a matching item
+    pages = [
+        {
+            "items": [],
+            "last_evaluated_key": {"pk": "USER#123", "sk": f"ORDER#{page_index}"},
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        }
+        for page_index in range(empty_page_count)
+    ]
+    pages.append(
+        {
+            "items": [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+            "last_evaluated_key": None,
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
+        }
+    )
+    mock_client._client.query_page.side_effect = pages
+
+    # WHEN all query results are collected
+    result = user_model.query(partition_key="USER#123", page_size=1)
+    users = [user async for user in result]
+
+    # THEN each empty page is skipped and the matching item is returned
+    assert [user.sk for user in users] == ["ORDER#1"]
+    assert mock_client._client.query_page.call_count == empty_page_count + 1
+
+
+@pytest.mark.asyncio
+async def test_async_query_stops_cleanly_after_trailing_empty_page(user_model, mock_client):
+    """AsyncModelQueryResult stops without extra fetches once the final page is empty."""
+    mock_client._client.query_page.side_effect = [
+        {
+            "items": [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+            "last_evaluated_key": {"pk": "USER#123", "sk": "ORDER#999"},
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
+        },
+        {
+            "items": [],
+            "last_evaluated_key": None,
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        },
+    ]
+
+    result = user_model.query(partition_key="USER#123", page_size=1)
+    users = [user async for user in result]
+
+    assert len(users) == 1
+    assert mock_client._client.query_page.call_count == 2
+    assert result.last_evaluated_key is None
+
+
+@pytest.mark.asyncio
+async def test_async_query_respects_limit_past_empty_intermediate_page(user_model, mock_client):
+    """The total `limit` is still enforced after an empty intermediate page."""
+    mock_client._client.query_page.side_effect = [
+        {
+            "items": [],
+            "last_evaluated_key": {"pk": "USER#123", "sk": "ORDER#999"},
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        },
+        {
+            "items": [
+                {"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10},
+                {"pk": "USER#123", "sk": "ORDER#2", "name": "Order 2", "age": 20},
+            ],
+            "last_evaluated_key": None,
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=2),
+        },
+    ]
+
+    result = user_model.query(partition_key="USER#123", limit=1)
+    users = [user async for user in result]
+
+    assert len(users) == 1
+    assert users[0].sk == "ORDER#1"
+
+
+@pytest.mark.asyncio
+async def test_async_query_passes_continuation_key_to_next_fetch(user_model, mock_client):
+    """The continuation key from an empty page is sent as the start key for the next fetch."""
+    continuation_key = {"pk": "USER#123", "sk": "ORDER#999"}
+    mock_client._client.query_page.side_effect = [
+        {
+            "items": [],
+            "last_evaluated_key": continuation_key,
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        },
+        {
+            "items": [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+            "last_evaluated_key": None,
+            "metrics": MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
+        },
+    ]
+
+    result = user_model.query(partition_key="USER#123", page_size=1)
+    users = [user async for user in result]
+
+    assert len(users) == 1
+    second_call_kwargs = mock_client._client.query_page.call_args_list[1].kwargs
+    assert second_call_kwargs["exclusive_start_key"] == continuation_key
+    assert result.last_evaluated_key is None
+
+
 def test_query_last_evaluated_key_before_iteration(user_model):
     """AsyncModelQueryResult.last_evaluated_key is None before iteration."""
     result = user_model.query(partition_key="USER#123")
@@ -340,6 +449,111 @@ def test_sync_query_iteration(user_model, mock_client):
 
     assert len(users) == 1
     assert isinstance(users[0], user_model)
+
+
+@pytest.mark.parametrize("empty_page_count", [1, 3], ids=["one_empty_page", "three_empty_pages"])
+def test_sync_query_continues_past_empty_intermediate_pages(
+    user_model, mock_client, empty_page_count
+):
+    """Sync queries keep fetching through empty pages with continuation keys."""
+    # GIVEN empty pages followed by a page with a matching item
+    pages = [
+        (
+            [],
+            {"pk": "USER#123", "sk": f"ORDER#{page_index}"},
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        )
+        for page_index in range(empty_page_count)
+    ]
+    pages.append(
+        (
+            [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+            None,
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
+        )
+    )
+    mock_client._client.sync_query_page.side_effect = pages
+
+    # WHEN all query results are collected
+    result = user_model.sync_query(partition_key="USER#123", page_size=1)
+    users = list(result)
+
+    # THEN each empty page is skipped and the matching item is returned
+    assert [user.sk for user in users] == ["ORDER#1"]
+    assert mock_client._client.sync_query_page.call_count == empty_page_count + 1
+
+
+def test_sync_query_stops_cleanly_after_trailing_empty_page(user_model, mock_client):
+    """ModelQueryResult stops without extra fetches once the final page is empty."""
+    mock_client._client.sync_query_page.side_effect = [
+        (
+            [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+            {"pk": "USER#123", "sk": "ORDER#999"},
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
+        ),
+        (
+            [],
+            None,
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        ),
+    ]
+
+    result = user_model.sync_query(partition_key="USER#123", page_size=1)
+    users = list(result)
+
+    assert len(users) == 1
+    assert mock_client._client.sync_query_page.call_count == 2
+    assert result.last_evaluated_key is None
+
+
+def test_sync_query_respects_limit_past_empty_intermediate_page(user_model, mock_client):
+    """The total `limit` is still enforced after an empty intermediate page."""
+    mock_client._client.sync_query_page.side_effect = [
+        (
+            [],
+            {"pk": "USER#123", "sk": "ORDER#999"},
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        ),
+        (
+            [
+                {"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10},
+                {"pk": "USER#123", "sk": "ORDER#2", "name": "Order 2", "age": 20},
+            ],
+            None,
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=2),
+        ),
+    ]
+
+    result = user_model.sync_query(partition_key="USER#123", limit=1)
+    users = list(result)
+
+    assert len(users) == 1
+    assert users[0].sk == "ORDER#1"
+
+
+def test_sync_query_passes_continuation_key_to_next_fetch(user_model, mock_client):
+    """The continuation key from an empty page is sent as the start key for the next fetch."""
+    continuation_key = {"pk": "USER#123", "sk": "ORDER#999"}
+    mock_client._client.sync_query_page.side_effect = [
+        (
+            [],
+            continuation_key,
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=0),
+        ),
+        (
+            [{"pk": "USER#123", "sk": "ORDER#1", "name": "Order 1", "age": 10}],
+            None,
+            MagicMock(duration_ms=1.0, consumed_rcu=1.0, items_count=1),
+        ),
+    ]
+
+    result = user_model.sync_query(partition_key="USER#123", page_size=1)
+    users = list(result)
+
+    assert len(users) == 1
+    second_call_kwargs = mock_client._client.sync_query_page.call_args_list[1].kwargs
+    assert second_call_kwargs["exclusive_start_key"] == continuation_key
+    assert result.last_evaluated_key is None
 
 
 def test_sync_query_as_dict_true_returns_dicts(user_model, mock_client):
