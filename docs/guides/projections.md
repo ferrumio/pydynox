@@ -88,6 +88,7 @@ A few rules keep the stored item safe:
 - If the model has a `VersionAttribute`, include it too. Without it, `save()` raises `ValueError`.
 - A field loaded with a nested path, like `address.city`, holds only part of the attribute. Changing it and saving raises `ValueError`, because it would replace the whole attribute.
 - A transaction put replaces the whole item, so `save_model` raises `ValueError` for a projected model.
+- The `max_size` check in `model_config` only counts the fetched fields. Fields you did not fetch are kept in the stored item, so the stored item can be larger than `max_size`. DynamoDB's own 400 KB limit still applies.
 - `save(full_replace=True)` uses `PutItem` and replaces the stored item with the fetched fields only. Use it only when that is what you want.
 
 ### Sync usage
