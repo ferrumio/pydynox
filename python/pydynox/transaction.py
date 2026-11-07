@@ -440,6 +440,12 @@ def _prepare_model_save(
     """Build a put operation from a model and track it for post-commit updates."""
     from pydynox.hooks import HookType
 
+    if model._is_partial:
+        raise ValueError(
+            f"Cannot put {type(model).__name__} in a transaction: it was loaded with a "
+            "projection, so a put would replace fields that were not fetched"
+        )
+
     model._run_hooks(HookType.BEFORE_SAVE)
     model._apply_auto_generate()
 

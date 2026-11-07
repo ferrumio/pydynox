@@ -827,8 +827,8 @@ async def _batch_get_accounts(sync: bool, projection: list[str], as_dict: bool =
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
-async def test_model_batch_get_projection_left_out_fields_get_default_or_none(sync):
-    """Left out fields get their default, or None when they have no default."""
+async def test_model_batch_get_projection_left_out_fields_are_none(sync):
+    """Left out fields are None, even when they have a default."""
     with MemoryBackend():
         # GIVEN a stored account where status and note differ from their defaults
         await Account(pk="A#1", name="Ann", status="blocked", note="vip").save()
@@ -836,25 +836,28 @@ async def test_model_batch_get_projection_left_out_fields_get_default_or_none(sy
         # WHEN batch getting without status and note
         accounts = await _batch_get_accounts(sync, ["pk", "name"])
 
-        # THEN status gets the default, not the stored value, and note is None
+        # THEN status does not get its default, and note is None
         assert len(accounts) == 1
         assert accounts[0].name == "Ann"
-        assert accounts[0].status == "active"
+        assert accounts[0].status is None
         assert accounts[0].note is None
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
-async def test_model_batch_get_projection_left_out_required_field_raises(sync):
-    """Leaving out a required field fails when the model is created."""
+async def test_model_batch_get_projection_left_out_required_field_is_none(sync):
+    """Leaving out a required field does not fail."""
     with MemoryBackend():
         # GIVEN a stored account
         await Account(pk="A#1", name="Ann").save()
 
         # WHEN batch getting without the required name
-        # THEN creating the model fails
-        with pytest.raises(ValueError, match="'name' is required"):
-            await _batch_get_accounts(sync, ["pk"])
+        accounts = await _batch_get_accounts(sync, ["pk"])
+
+        # THEN the model is created and name is None
+        assert len(accounts) == 1
+        assert accounts[0].pk == "A#1"
+        assert accounts[0].name is None
 
 
 @pytest.mark.asyncio
@@ -870,3 +873,49 @@ async def test_model_batch_get_projection_as_dict_has_only_projected_fields(sync
 
         # THEN only the projected field is in the dict
         assert items == [{"pk": "A#1"}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
+async def test_query_and_scan_pages_apply_projection_expression(sync):
+    """Query and scan pages return only the projected attributes."""
+    with MemoryBackend() as backend:
+        # GIVEN a stored item with a nested map
+        client = backend.client
+        item = {"pk": "USER#1", "name": "Ann", "age": 30, "addr": {"city": "Lisbon", "zip": "1000"}}
+        client.sync_put_item("users", item)
+        projection = "#n, #a.city"
+        names = {"#pk": "pk", "#n": "name", "#a": "addr"}
+        values = {":pk": "USER#1"}
+
+        # WHEN querying and scanning with a projection expression
+        if sync:
+            queried, _, query_metrics = client.sync_query_page(
+                "users",
+                "#pk = :pk",
+                expression_attribute_names=names,
+                expression_attribute_values=values,
+                projection_expression=projection,
+            )
+            scanned, _, _ = client.sync_scan_page(
+                "users", expression_attribute_names=names, projection_expression=projection
+            )
+        else:
+            query_page = await client.query_page(
+                "users",
+                "#pk = :pk",
+                expression_attribute_names=names,
+                expression_attribute_values=values,
+                projection_expression=projection,
+            )
+            scan_page = await client.scan_page(
+                "users", expression_attribute_names=names, projection_expression=projection
+            )
+            queried, query_metrics = query_page["items"], query_page["metrics"]
+            scanned = scan_page["items"]
+
+        # THEN only the projected paths come back
+        expected = {"name": "Ann", "addr": {"city": "Lisbon"}}
+        assert queried == [expected]
+        assert scanned == [expected]
+        assert query_metrics.items_count == 1
