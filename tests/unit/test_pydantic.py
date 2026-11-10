@@ -219,6 +219,85 @@ def test_update_updates_dynamodb():
     )
 
 
+def test_sync_update_sends_validated_values():
+    """sync_update() sends Pydantic-coerced values, not the raw kwargs."""
+    mock_client = MagicMock()
+
+    @dynamodb_model(table="records", partition_key="pk", client=mock_client)
+    class Record(BaseModel):
+        pk: str
+        count: int
+
+    record = Record(pk="one", count=1)
+    record.sync_update(count="2")
+
+    assert record.count == 2
+    sent = mock_client.sync_update_item.call_args.kwargs["updates"]
+    assert sent == {"count": 2}
+    assert isinstance(sent["count"], int)
+
+
+@pytest.mark.asyncio
+async def test_async_update_sends_validated_values():
+    """update() sends Pydantic-coerced values asynchronously."""
+    from unittest.mock import AsyncMock
+
+    mock_client = MagicMock()
+    mock_client.update_item = AsyncMock()
+
+    @dynamodb_model(table="records", partition_key="pk", client=mock_client)
+    class Record(BaseModel):
+        pk: str
+        count: int
+
+    record = Record(pk="one", count=1)
+    await record.update(count="3")
+
+    assert record.count == 3
+    sent = mock_client.update_item.call_args.kwargs["updates"]
+    assert sent == {"count": 3}
+
+
+def test_sync_update_sends_custom_validator_output():
+    """Custom field validators' outputs are what DynamoDB receives."""
+    from pydantic import field_validator
+
+    mock_client = MagicMock()
+
+    @dynamodb_model(table="records", partition_key="pk", client=mock_client)
+    class Record(BaseModel):
+        pk: str
+        label: str
+
+        @field_validator("label")
+        @classmethod
+        def upper_label(cls, value: str) -> str:
+            return value.upper()
+
+    record = Record(pk="one", label="ok")
+    record.sync_update(label="done")
+
+    assert record.label == "DONE"
+    assert mock_client.sync_update_item.call_args.kwargs["updates"] == {"label": "DONE"}
+
+
+def test_sync_update_rejects_invalid_input_before_client():
+    """Invalid updates must not reach the DynamoDB client."""
+    mock_client = MagicMock()
+
+    @dynamodb_model(table="records", partition_key="pk", client=mock_client)
+    class Record(BaseModel):
+        pk: str
+        count: int
+
+    record = Record(pk="one", count=1)
+    with pytest.raises(Exception):
+        record.sync_update(count="not-a-number")
+
+    mock_client.sync_update_item.assert_not_called()
+    assert record.count == 1
+
+
 def test_from_pydantic_creates_model():
     """from_pydantic() creates a DynamoDB-enabled model."""
 
