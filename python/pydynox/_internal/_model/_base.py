@@ -229,6 +229,9 @@ class ModelBase(metaclass=ModelMeta):
     _original: dict[str, Any] | None
     _changed: set[str]
     _json_snapshots: dict[str, str | None]
+    # Fields a projected read did not fetch, and fields it fetched only in part
+    _not_fetched: frozenset[str]
+    _partly_fetched: frozenset[str]
 
     def __init__(self, **kwargs: Any) -> None:
         config = getattr(type(self), "model_config", None)
@@ -241,6 +244,8 @@ class ModelBase(metaclass=ModelMeta):
         object.__setattr__(self, "_original", None)
         object.__setattr__(self, "_changed", set())
         object.__setattr__(self, "_json_snapshots", {})
+        object.__setattr__(self, "_not_fetched", frozenset())
+        object.__setattr__(self, "_partly_fetched", frozenset())
         # First pass: set all regular attributes
         for attr_name, attr in self._attributes.items():
             # Skip template keys in first pass - they'll be built later
@@ -297,7 +302,8 @@ class ModelBase(metaclass=ModelMeta):
         elif original is not None:
             changed = object.__getattribute__(self, "_changed")
             old_value = original.get(name)
-            if value != old_value:
+            # The stored value of a field that was not fetched is unknown.
+            if name in self._not_fetched or value != old_value:
                 changed.add(name)
             elif name in changed:
                 changed.discard(name)
@@ -320,6 +326,11 @@ class ModelBase(metaclass=ModelMeta):
         return len(self._changed) > 0
 
     @property
+    def _is_partial(self) -> bool:
+        """True if a projected read left out fields of the stored item."""
+        return bool(self._not_fetched or self._partly_fetched)
+
+    @property
     def changed_fields(self) -> list[str]:
         """Get list of attribute names that changed since loading from DB.
 
@@ -333,6 +344,19 @@ class ModelBase(metaclass=ModelMeta):
             >>> print(user.changed_fields)  # ["name", "email"]
         """
         return list(self._changed)
+
+    def _mark_saved(self, full_item: bool) -> None:
+        """Reset change tracking after save.
+
+        A full PutItem makes the stored item match this instance. An UpdateItem
+        only makes the changed fields known.
+        """
+        if full_item:
+            self._not_fetched = frozenset()
+            self._partly_fetched = frozenset()
+        else:
+            self._not_fetched = self._not_fetched - self._changed
+        self._reset_change_tracking()
 
     def _reset_change_tracking(self) -> None:
         """Reset change tracking after save. Stores current state as original."""
@@ -372,6 +396,9 @@ class ModelBase(metaclass=ModelMeta):
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
         for attr_name, attr in self._attributes.items():
+            # A field that was not fetched may already have a stored value.
+            if attr_name in self._not_fetched:
+                continue
             if attr.default is not None and is_auto_generate(attr.default):
                 current_value = getattr(self, attr_name, None)
                 if current_value is None:
@@ -391,12 +418,15 @@ class ModelBase(metaclass=ModelMeta):
             values = {}
             for placeholder in attr.placeholders:
                 val = getattr(self, placeholder, None)
+                if val is None and placeholder in self._not_fetched:
+                    # Keep the key as loaded: a placeholder was not fetched.
+                    break
                 if val is None:
                     raise ValueError(f"Cannot build {attr_name}: missing value for '{placeholder}'")
                 values[placeholder] = val
-
-            # Build and set the key
-            setattr(self, attr_name, attr.build_key(values))
+            else:
+                # Build and set the key
+                setattr(self, attr_name, attr.build_key(values))
 
     @classmethod
     def _get_client(cls) -> DynamoDBClient:
@@ -512,6 +542,32 @@ class ModelBase(metaclass=ModelMeta):
         If the model has a discriminator field, returns the correct subclass.
         Extra stored fields are ignored, including with strict_attributes enabled.
         """
+        return cls._load(data, None)
+
+    @classmethod
+    def _from_projection(cls: type[M], data: dict[str, Any], fields: list[str] | None) -> M:
+        """Create a model instance from an item read with a projection.
+
+        Fields outside the projection are None. Defaults and required checks
+        do not apply to them, and save() does not write them unless they change.
+        """
+        if not fields:
+            return cls.from_dict(data)
+        return cls._load(data, fields)
+
+    @classmethod
+    def _projected_fields(cls, fields: list[str]) -> tuple[frozenset[str], frozenset[str]]:
+        """Split projection paths into whole fields and fields fetched only in part."""
+        whole: set[str] = set()
+        nested: set[str] = set()
+        for path in fields:
+            root, _, rest = path.partition(".")
+            name = root if root in cls._attributes else cls._dynamo_to_py.get(root, root)
+            (nested if rest else whole).add(name)
+        return frozenset(whole), frozenset(nested - whole)
+
+    @classmethod
+    def _load(cls: type[M], data: dict[str, Any], fields: list[str] | None) -> M:
         # Check if we should return a subclass based on discriminator
         target_cls: type[M] = cls
 
@@ -544,11 +600,41 @@ class ModelBase(metaclass=ModelMeta):
             }
         else:
             model_values = deserialized
-        instance = target_cls(**model_values)
+
         # Store original for change tracking with Python names and deserialized values
         # so __setattr__ can compare correctly (it looks up by Python attr name)
-        instance._original = deserialized.copy()
+        original = deserialized.copy()
+        if fields is None:
+            instance = target_cls(**model_values)
+            not_fetched: frozenset[str] = frozenset()
+            partly_fetched: frozenset[str] = frozenset()
+        else:
+            whole, nested = target_cls._projected_fields(fields)
+            missing = [
+                name
+                for name in target_cls._attributes
+                if name not in whole and name not in deserialized
+            ]
+            # Passing None skips defaults and required checks. Template keys are
+            # left out so the constructor can build them from fetched values.
+            instance = target_cls(
+                **model_values,
+                **{
+                    name: None
+                    for name in missing
+                    if not _is_template_attr(target_cls._attributes[name])
+                },
+            )
+            not_fetched = frozenset(name for name in missing if getattr(instance, name) is None)
+            for name in missing:
+                if name not in not_fetched:
+                    original[name] = getattr(instance, name)
+            partly_fetched = frozenset(name for name in nested if name in deserialized)
+
+        instance._original = original
         instance._changed = set()
+        instance._not_fetched = not_fetched
+        instance._partly_fetched = partly_fetched
         instance._build_json_snapshots()
         return instance
 

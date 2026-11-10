@@ -85,6 +85,10 @@ class Transaction:
         Args:
             model: The model instance to save.
             condition: Optional additional condition.
+
+        Raises:
+            ValueError: If the model was loaded with a projection, because a
+                put would replace the fields that were not fetched.
         """
         _prepare_model_save(self, model, condition)
 
@@ -301,6 +305,10 @@ class SyncTransaction:
         Args:
             model: The model instance to save.
             condition: Optional additional condition.
+
+        Raises:
+            ValueError: If the model was loaded with a projection, because a
+                put would replace the fields that were not fetched.
         """
         _prepare_model_save(self, model, condition)
 
@@ -439,6 +447,12 @@ def _prepare_model_save(
 ) -> None:
     """Build a put operation from a model and track it for post-commit updates."""
     from pydynox.hooks import HookType
+
+    if model._is_partial:
+        raise ValueError(
+            f"Cannot put {type(model).__name__} in a transaction: it was loaded with a "
+            "projection, so a put would replace fields that were not fetched"
+        )
 
     model._run_hooks(HookType.BEFORE_SAVE)
     model._apply_auto_generate()
