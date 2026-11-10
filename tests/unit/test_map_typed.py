@@ -183,3 +183,20 @@ def test_assignment_still_tracked_for_typed_map():
 
     assert loaded.is_dirty is True
     assert "address" in loaded.changed_fields
+
+
+def test_map_with_plain_class_serializes_value_as_is():
+    """A model_class that is neither Pydantic nor a dataclass passes the value through."""
+
+    class PlainAddress:
+        pass
+
+    # GIVEN a MapAttribute typed with a plain class
+    attr = MapAttribute(PlainAddress)
+    value = {"city": "NYC"}
+
+    # WHEN we serialize a plain dict
+    result = attr.serialize(value)
+
+    # THEN the same value is returned unchanged
+    assert result is value

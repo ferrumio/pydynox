@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 if TYPE_CHECKING:
     from pydynox._internal._model._base import ModelBase
+    from pydynox.client import DynamoDBClient
 
 
 class NumberSchema(TypedDict):
@@ -15,7 +16,7 @@ class NumberSchema(TypedDict):
     fallback_fields: NotRequired[frozenset[str]]
 
 
-def model_read_client(client: Any, models: Sequence[type[ModelBase]]) -> Any:
+def model_read_client(client: DynamoDBClient, models: Sequence[type[ModelBase]]) -> DynamoDBClient:
     """Bind a schema to this read without changing the shared client."""
     fields = frozenset().union(*(model._decimal_fields for model in models))
     if not fields:
