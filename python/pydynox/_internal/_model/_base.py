@@ -37,6 +37,7 @@ class ModelMeta(type):
     _local_indexes: dict[str, LocalSecondaryIndex[Any]]
     _vector_indexes: dict[str, VectorIndex[Any]]
     _metrics_storage: "MetricsStorage"
+    _client_instance: "DynamoDBClient | None"
     _py_to_dynamo: dict[str, str]
     _dynamo_to_py: dict[str, str]
     _decimal_fields: set[str]
@@ -182,6 +183,11 @@ class ModelMeta(type):
         from pydynox._internal._metrics import MetricsStorage
 
         cls._metrics_storage = MetricsStorage()
+
+        # And its own client cache. Without this line a child inherits the
+        # parent's populated cache and `_get_client` answers with the parent's
+        # client before it looks at the child's own model_config (#563).
+        cls._client_instance = None
 
         for gsi in indexes.values():
             gsi._bind_to_model(cls)
