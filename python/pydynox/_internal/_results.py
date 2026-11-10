@@ -149,7 +149,8 @@ class BaseModelResult(ABC, Generic[T]):
         """The last evaluated key for pagination."""
         if self._result is None:
             return None
-        return self._result.last_evaluated_key
+        key: dict[str, Any] | None = self._result.last_evaluated_key
+        return key
 
     def _to_instance(self, item: dict[str, Any]) -> Any:
         """Convert dict to model instance and run hooks."""
@@ -164,7 +165,8 @@ class BaseModelResult(ABC, Generic[T]):
         if self._as_dict:
             # If as_dict is True, T will always be a dict, so casting is safe
             return cast(T, item)
-        return self._to_instance(item)
+        instance: T = self._to_instance(item)
+        return instance
 
     @abstractmethod
     def _build_result(self) -> Any:
