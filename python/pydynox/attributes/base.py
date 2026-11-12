@@ -31,6 +31,16 @@ T = TypeVar("T")
 _A = TypeVar("_A", bound="Attribute[Any]")
 
 
+class Unset:
+    """Marks an optional argument that was not passed."""
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+UNSET = Unset()
+
+
 class Attribute(Generic[T]):
     """Base attribute class for Model fields.
 
@@ -55,6 +65,7 @@ class Attribute(Generic[T]):
         required: bool = False,
         discriminator: bool = False,
         alias: str | None = None,
+        default_for_new: T | AutoGenerate | None | Unset = UNSET,
     ):
         """Create an attribute.
 
@@ -62,16 +73,21 @@ class Attribute(Generic[T]):
             partition_key: True if this is the partition key.
             sort_key: True if this is the sort key.
             default: Default value when not provided, or an AutoGenerate
-                strategy to generate the value on save.
+                strategy to generate the value on save. Also used when
+                loading stored items that do not contain this attribute.
             required: Whether this field is required (cannot be None).
             discriminator: True if this field is used for model inheritance.
             alias: DynamoDB attribute name. If set, this name is used in DynamoDB
                 instead of the Python attribute name. Useful for shorter names
                 to save storage costs.
+            default_for_new: Value used when a new model is created without
+                this attribute. Stored items that lack the attribute still use
+                `default`. When omitted, `default` is used everywhere.
         """
         self.partition_key = partition_key
         self.sort_key = sort_key
         self.default = default
+        self.default_for_new = default_for_new
         self.required = required
         self.discriminator = discriminator
         self.alias: str | None = alias

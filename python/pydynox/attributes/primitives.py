@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, Protocol, Self, TypeGuard, TypeVar, overload
 
-from pydynox.attributes.base import Attribute
+from pydynox.attributes.base import UNSET, Attribute, Unset
 
 if TYPE_CHECKING:
     from pydynox.generators import AutoGenerate
@@ -118,6 +118,7 @@ class StringAttribute(Attribute[str]):
         template: Any | None = None,
         discriminator: bool = False,
         alias: str | None = None,
+        default_for_new: str | AutoGenerate | None | Unset = UNSET,
     ):
         """Create a StringAttribute.
 
@@ -131,6 +132,8 @@ class StringAttribute(Attribute[str]):
                 and t-strings (t"USER#{email}") on Python 3.14+.
             discriminator: True if this field is used for model inheritance.
             alias: DynamoDB attribute name override.
+            default_for_new: Value used for new models when this attribute is
+                omitted. See Attribute.
         """
         super().__init__(
             partition_key=partition_key,
@@ -139,6 +142,7 @@ class StringAttribute(Attribute[str]):
             required=required,
             discriminator=discriminator,
             alias=alias,
+            default_for_new=default_for_new,
         )
         self.template = template
         self._template_parts: list[_TemplatePart] | None = None
@@ -255,6 +259,7 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         default: dict[str, Any] | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: dict[str, Any] | None | Unset = UNSET,
     ) -> None: ...
 
     @overload
@@ -267,6 +272,7 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         default: MT | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: MT | None | Unset = UNSET,
     ) -> None: ...
 
     def __init__(
@@ -278,6 +284,7 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         default: Any | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: Any | None | Unset = UNSET,
     ):
         super().__init__(
             partition_key=partition_key,
@@ -285,6 +292,7 @@ class MapAttribute(Attribute[MT], Generic[MT]):
             default=default,
             required=required,
             alias=alias,
+            default_for_new=default_for_new,
         )
         self.model_class = model_class
         self._pydantic_class: type[_PydanticModel] | None = (

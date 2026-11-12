@@ -9,7 +9,7 @@ from pydynox._internal._compression import (
     compress_string,
     decompress_string,
 )
-from pydynox.attributes.base import Attribute
+from pydynox.attributes.base import UNSET, Attribute, Unset
 
 
 class CompressedAttribute(Attribute[str]):
@@ -61,6 +61,7 @@ class CompressedAttribute(Attribute[str]):
         default: str | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: str | None | Unset = UNSET,
     ):
         """Create a compressed attribute.
 
@@ -74,6 +75,8 @@ class CompressedAttribute(Attribute[str]):
             default: Default value when not provided.
             required: Whether this field is required.
             alias: DynamoDB attribute name override.
+            default_for_new: Value used for new models when this attribute is
+                omitted. See Attribute.
         """
         super().__init__(
             partition_key=partition_key,
@@ -81,6 +84,7 @@ class CompressedAttribute(Attribute[str]):
             default=default,
             required=required,
             alias=alias,
+            default_for_new=default_for_new,
         )
         self.algorithm = algorithm
         self.level = level
