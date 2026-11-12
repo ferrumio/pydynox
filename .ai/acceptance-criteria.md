@@ -45,10 +45,17 @@ All 112+ examples must pass.
 ### 4. Python Type Checking
 
 ```bash
-uv run ty check python/
+uv run ty check python/pydynox/ tests/typing/
+uv run mypy --strict python/pydynox/
+uv run pyright python/pydynox/
 ```
 
-Must show "All checks passed!"
+All three must report zero errors. mypy runs in strict mode; pyright uses its
+default mode. Examples are not gated. ty also checks the typing regression files
+in `tests/typing/`.
+
+See [the CI workflow](../.github/workflows/ci.yml) for the tool versions and
+Python versions used in CI.
 
 ### 5. Python Extension Build
 
@@ -95,12 +102,11 @@ When adding new features:
 
 ## Quick Check Script
 
-Run all checks at once:
+Run the type checks in section 4 above, then run the remaining checks:
 
 ```bash
 # Python
 uv run ruff check . && uv run ruff format --check .
-uv run ty check python/
 uv run pytest tests/unit/ -v
 uv run pytest tests/integration/ -v
 uv run python tests/examples/run_all_examples.py
