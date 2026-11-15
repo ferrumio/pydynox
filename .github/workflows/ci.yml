@@ -44,7 +44,7 @@ jobs:
           source .venv/bin/activate
           # Pinned so a new linter release can't fail CI on unrelated PRs.
           # Keep in sync with the dev dependency group in pyproject.toml.
-          pip install ruff==0.14.13 ty==0.0.64 pytest pydantic opentelemetry-api
+          pip install ruff==0.14.13 ty==0.0.64 mypy==2.4.1 pyright==1.1.414 pytest pydantic opentelemetry-api
 
       - name: Ruff check
         run: |
@@ -60,6 +60,16 @@ jobs:
         run: |
           source .venv/bin/activate
           ty check python/pydynox/ tests/typing/
+
+      - name: Type check (mypy)
+        run: |
+          source .venv/bin/activate
+          mypy --strict python/pydynox/
+
+      - name: Type check (pyright)
+        run: |
+          source .venv/bin/activate
+          pyright python/pydynox/
 
   rust-lint:
     name: Rust lint

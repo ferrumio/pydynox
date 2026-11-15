@@ -316,7 +316,8 @@ pydynox/python/pydynox/
 
 ### Type Hints
 
-Always use type hints. ty MUST pass with zero errors.
+Always use type hints. Follow the
+[type-checking requirements](acceptance-criteria.md#4-python-type-checking).
 
 ```python
 # Good
@@ -335,7 +336,7 @@ Use `from __future__ import annotations` at the top of files.
 - All functions must have type hints for parameters and return values
 - Use `# type: ignore` only when absolutely necessary, and add a comment explaining why
 - Avoid `Any` type when possible. If you must use it, be specific about why
-- Run `uv run ty check python/pydynox/` before committing
+- Run the [required type checks](acceptance-criteria.md#4-python-type-checking) before committing
 
 ### Docstrings
 
@@ -419,8 +420,9 @@ All Python code MUST pass these checks before commit:
 ```bash
 uv run ruff check .          # Linting - must pass with zero errors
 uv run ruff format --check . # Formatting - must be formatted
-uv run ty check python/pydynox/ # Type checking - must pass with zero errors
 ```
+
+Also run the [required type checks](acceptance-criteria.md#4-python-type-checking).
 
 These are not optional. Fix all errors before submitting code.
 
@@ -430,7 +432,7 @@ Before committing Python code:
 
 1. `uv run ruff format .` - Format code
 2. `uv run ruff check --fix .` - Fix lint errors
-3. `uv run ty check python/pydynox/` - Check types
+3. Run the [required type checks](acceptance-criteria.md#4-python-type-checking)
 4. `uv run pytest` - Run tests
 
 All four must pass. No exceptions.
@@ -450,9 +452,8 @@ cargo clippy -- -D warnings
 uv run ruff check .
 uv run ruff format .
 
-# Type check Python code
-uv run ty check python/pydynox/
-
 # Build release
 uv run --with maturin maturin develop --release
 ```
+
+For type checking, use the [required checks](acceptance-criteria.md#4-python-type-checking).

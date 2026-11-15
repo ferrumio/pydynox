@@ -9,7 +9,8 @@ uv run ruff check tests/       # Lint tests
 uv run ruff format tests/      # Format tests
 ```
 
-Type hints in tests are optional. CI runs ty on `python/pydynox/`, not on tests.
+Type hints in tests are optional. See the
+[type-checking requirements](acceptance-criteria.md#4-python-type-checking) for CI targets.
 
 ## Test Structure
 

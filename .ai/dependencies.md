@@ -70,15 +70,8 @@ If you still want to add one:
 
 ### Dev Dependencies
 
-Dev dependencies are more relaxed. Current ones:
-
-- `pytest` - Testing
-- `pytest-asyncio` - Async tests
-- `pytest-benchmark` - Performance tests
-- `moto` - DynamoDB mocking
-- `boto3` - For comparison tests
-- `ruff` - Linting
-- `mypy` - Type checking
+Dev dependencies are more relaxed. See the `dev` dependency group in
+[`pyproject.toml`](../pyproject.toml) for the current tools and version requirements.
 
 ## Adding a New Dependency
 
