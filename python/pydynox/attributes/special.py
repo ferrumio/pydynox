@@ -99,11 +99,14 @@ class JSONAttribute(Attribute[J], Generic[J]):
 
     def _to_dict(self, value: Any) -> dict[str, Any] | list[Any]:
         """Convert a typed model instance to a dict for JSON serialization."""
+        data: dict[str, Any] | list[Any]
         if self._type_adapter is not None:
-            return self._type_adapter.dump_python(value, mode="python")
-        if self._is_dataclass:
-            return dataclasses.asdict(value)
-        return value
+            data = self._type_adapter.dump_python(value, mode="python")
+        elif self._is_dataclass:
+            data = dataclasses.asdict(value)
+        else:
+            data = value
+        return data
 
     def _from_dict(self, data: Any) -> Any:
         """Convert raw data to a typed model instance."""

@@ -1,6 +1,7 @@
 """Tests for typed JSONAttribute with Pydantic models and dataclasses."""
 
 import dataclasses
+import sys
 from typing import Any
 
 from pydynox import Model, ModelConfig
@@ -224,3 +225,20 @@ def test_assignment_still_tracked_for_typed_json():
 
     assert loaded.is_dirty is True
     assert "payload" in loaded.changed_fields
+
+
+def test_typed_json_without_pydantic_serializes_value_as_is(monkeypatch):
+    """A non-dataclass model_class without Pydantic installed dumps the raw value."""
+
+    class Settings:
+        pass
+
+    # GIVEN Pydantic cannot be imported
+    monkeypatch.setitem(sys.modules, "pydantic", None)
+    attr = JSONAttribute(Settings)
+
+    # WHEN we serialize a plain dict
+    result = attr.serialize({"theme": "dark"})
+
+    # THEN the value is dumped without conversion
+    assert result == '{"theme": "dark"}'

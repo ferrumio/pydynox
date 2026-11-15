@@ -221,7 +221,7 @@ class ModelBase(metaclass=ModelMeta):
     model_config: ClassVar[ModelConfig]
 
     @classmethod
-    def _get_read_client(cls) -> Any:
+    def _get_read_client(cls) -> DynamoDBClient:
         """Select exact fields internally, before the native result is decoded."""
         return model_read_client(cls._get_client(), [cls])
 

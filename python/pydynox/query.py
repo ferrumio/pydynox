@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 _SLOW_QUERY_THRESHOLD_MS = 100.0
 
 
-def _advance_past_empty_pages(result: Any) -> dict[str, Any]:
+def _advance_past_empty_pages(result: QueryResult | ScanResult) -> dict[str, Any]:
     """Fetch pages (sync) until an item is available or all pages are exhausted."""
     while True:
         result._fetch_next_page()
@@ -31,7 +31,9 @@ def _advance_past_empty_pages(result: Any) -> dict[str, Any]:
             raise StopIteration
 
 
-async def _advance_past_empty_pages_async(result: Any) -> dict[str, Any]:
+async def _advance_past_empty_pages_async(
+    result: AsyncQueryResult | AsyncScanResult,
+) -> dict[str, Any]:
     """Fetch pages (async) until an item is available or all pages are exhausted."""
     while True:
         await result._fetch_next_page()
