@@ -455,7 +455,7 @@ class ModelBase(metaclass=ModelMeta):
     def _build_template_keys(self) -> None:
         """Build template key values from placeholder attributes."""
         for attr_name, attr in self._attributes.items():
-            if not _is_template_attr(attr):
+            if attr_name in self._not_fetched or not _is_template_attr(attr):
                 continue
 
             # Collect values for all placeholders
@@ -664,29 +664,19 @@ class ModelBase(metaclass=ModelMeta):
         else:
             whole, partly_fetched = target_cls._projected_fields(fields)
             original = {name: _snapshot(value) for name, value in original.items()}
-            missing = [
+            not_fetched = frozenset(
                 name
                 for name in target_cls._attributes
                 if name not in whole and name not in deserialized
-            ]
-            # Passing None skips defaults and required checks. Template keys are
-            # left out so the constructor can build them from fetched values.
+            )
             instance = target_cls(
                 **model_values,
-                **{
-                    name: None
-                    for name in missing
-                    if not _is_template_attr(target_cls._attributes[name])
-                },
+                **{name: None for name in not_fetched},
             )
-            not_fetched = frozenset(name for name in missing if getattr(instance, name) is None)
-            for name in missing:
-                if name not in not_fetched:
-                    original[name] = getattr(instance, name)
 
         instance._original = original
         instance._changed = set()
-        instance._projected = bool(not_fetched or partly_fetched)
+        instance._projected = bool(fields)
         instance._not_fetched = not_fetched
         instance._partly_fetched = partly_fetched
         instance._build_json_snapshots()

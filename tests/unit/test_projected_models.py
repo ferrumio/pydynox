@@ -30,12 +30,22 @@ LOADERS = ["batch_get", "query", "scan"]
 MODES = [False, True]
 
 
-async def _load(model: Any, how: str, sync: bool, fields: list[str], pk: str = "USER#1") -> Any:
+async def _load(
+    model: Any,
+    how: str,
+    sync: bool,
+    fields: list[str],
+    pk: str = "USER#1",
+    sk: str | None = None,
+) -> Any:
     """Load one model through batch_get, query, or scan with a projection."""
     if how == "batch_get":
+        key = {"pk": pk}
+        if sk is not None:
+            key["sk"] = sk
         if sync:
-            return model.sync_batch_get([{"pk": pk}], projection=fields)[0]
-        return (await model.batch_get([{"pk": pk}], projection=fields))[0]
+            return model.sync_batch_get([key], projection=fields)[0]
+        return (await model.batch_get([key], projection=fields))[0]
     if how == "query":
         if sync:
             return model.sync_query(partition_key=pk, fields=fields).first()
@@ -142,20 +152,24 @@ async def test_setting_field_not_fetched_to_none_is_a_change(sync):
 
 
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
-async def test_full_replace_writes_only_fetched_fields(sync):
+@pytest.mark.parametrize(
+    "fields, expected",
+    [
+        (["pk", "name"], {"pk": "USER#1", "name": "Ann"}),
+        (["pk", "name", "age", "email"], STORED),
+    ],
+)
+async def test_full_replace_writes_only_fetched_fields(sync, fields, expected):
     with MemoryBackend() as backend:
         # GIVEN a user loaded with a projection
-        await User(**STORED).save()
-        user = await _load(User, "batch_get", sync, ["pk", "name"])
+        backend.client.sync_put_item("users", {**STORED, "legacy": "keep"})
+        user = await _load(User, "batch_get", sync, fields)
 
         # WHEN asking for a full replace
         await _save(user, sync, full_replace=True)
 
         # THEN the item is replaced with the fetched fields only
-        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == {
-            "pk": "USER#1",
-            "name": "Ann",
-        }
+        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == expected
 
 
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
@@ -172,20 +186,25 @@ async def test_save_without_fetched_key_raises(sync):
         assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == STORED
 
 
-def test_projection_that_fetches_every_field_is_a_full_load():
-    with MemoryBackend():
-        # GIVEN a stored user
-        User(**STORED).sync_save()
-
-        # WHEN loading every field
-        user = User.sync_query(
-            partition_key="USER#1", fields=["pk", "name", "age", "email"]
-        ).first()
-
-        # THEN the model is not partial
-        assert user is not None
-        assert not user._is_partial
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+async def test_full_schema_projection_keeps_attributes_outside_the_schema(how, sync):
+    with MemoryBackend() as backend:
+        stored = {**STORED, "legacy": "keep"}
+        backend.client.sync_put_item("users", stored)
+        user = await _load(User, how, sync, ["pk", "name", "age", "email"])
         assert user.age == 42
+
+        await _save(user, sync)
+        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == stored
+
+        user.name = "Bob"
+        await _save(user, sync)
+        await _save(user, sync)
+        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == {
+            **stored,
+            "name": "Bob",
+        }
 
 
 def test_fetched_field_missing_from_item_gets_default():
@@ -281,22 +300,57 @@ async def test_save_keeps_template_key_when_placeholder_not_fetched(sync):
         }
 
 
-def test_template_key_is_built_from_fetched_placeholder():
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+async def test_unfetched_template_key_stays_none(how, sync):
     with MemoryBackend() as backend:
-        # GIVEN an order loaded with the placeholder but without the key
         Order(order_id="1", status="new").sync_save()
-        order = Order.sync_scan(fields=["order_id", "status"]).first()
+        order = await _load(Order, how, sync, ["order_id", "status"], pk="ORDER#1")
+        assert order.pk is None
 
-        # WHEN saving a change
-        assert order is not None
-        assert order.pk == "ORDER#1"
         order.status = "paid"
-        order.sync_save()
+        with pytest.raises(ValueError, match="key attribute 'pk' was not fetched"):
+            await _save(order, sync)
+        assert order.pk is None
+        assert backend.client.sync_get_item("orders", {"pk": "ORDER#1"}) == {
+            "pk": "ORDER#1",
+            "order_id": "1",
+            "status": "new",
+        }
 
-        # THEN the built key finds the stored item
-        stored = backend.client.sync_get_item("orders", {"pk": "ORDER#1"})
-        assert stored is not None
-        assert stored["status"] == "paid"
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize("omitted", ["pk", "sk", "label"])
+async def test_unfetched_aliased_templates_stay_none(how, sync, omitted):
+    class Shipment(Model):
+        model_config = ModelConfig(table="shipments")
+        pk = StringAttribute(partition_key=True, template="ORDER#{order_id}", alias="partition")
+        sk = StringAttribute(sort_key=True, template="PROFILE", alias="sort")
+        label = StringAttribute(template="LABEL#{order_id}", alias="display")
+        order_id = StringAttribute()
+        status = StringAttribute()
+
+    with MemoryBackend() as backend:
+        Shipment(order_id="1", status="new").sync_save()
+        key = {"partition": "ORDER#1", "sort": "PROFILE"}
+        stored = backend.client.sync_get_item("shipments", key)
+        fields = [
+            name for name in ("pk", "sk", "label", "order_id", "status") if name != omitted
+        ]
+        shipment = await _load(Shipment, how, sync, fields, pk="ORDER#1", sk="PROFILE")
+        assert getattr(shipment, omitted) is None
+
+        shipment.status = "paid"
+        if omitted in ("pk", "sk"):
+            with pytest.raises(ValueError, match=f"key attribute '{omitted}' was not fetched"):
+                await _save(shipment, sync)
+            assert backend.client.sync_get_item("shipments", key) == stored
+        else:
+            await _save(shipment, sync)
+            await _save(shipment, sync)
+            assert backend.client.sync_get_item("shipments", key) == {**stored, "status": "paid"}
+        assert getattr(shipment, omitted) is None
 
 
 class Document(Model):
@@ -385,32 +439,23 @@ def test_save_after_update_tracks_saved_fields():
         assert "age" in user._not_fetched
 
 
-async def test_async_transaction_refuses_projected_model():
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize("fields", [["pk", "name"], ["pk", "name", "age", "email"]])
+async def test_transaction_refuses_projected_model(how, sync, fields):
     with MemoryBackend() as backend:
-        # GIVEN a user loaded with a projection
-        await User(**STORED).save()
-        user = (await User.batch_get([{"pk": "USER#1"}], projection=["pk", "name"]))[0]
+        stored = {**STORED, "legacy": "keep"}
+        backend.client.sync_put_item("users", stored)
+        user = await _load(User, how, sync, fields)
 
-        # WHEN putting it in a transaction
-        # THEN it fails, because a put would replace the full item
         with pytest.raises(ValueError, match="loaded with a projection"):
-            async with Transaction(backend.client) as txn:
-                txn.save_model(user)
-        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == STORED
-
-
-def test_sync_transaction_refuses_projected_model():
-    with MemoryBackend() as backend:
-        # GIVEN a user loaded with a projection
-        User(**STORED).sync_save()
-        user = User.sync_scan(fields=["pk", "name"]).first()
-
-        # WHEN putting it in a transaction
-        # THEN it fails, because a put would replace the full item
-        with pytest.raises(ValueError, match="loaded with a projection"):
-            with SyncTransaction(backend.client) as txn:
-                txn.save_model(user)
-        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == STORED
+            if sync:
+                with SyncTransaction(backend.client) as txn:
+                    txn.save_model(user)
+            else:
+                async with Transaction(backend.client) as txn:
+                    txn.save_model(user)
+        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == stored
 
 
 class Account(Model):
