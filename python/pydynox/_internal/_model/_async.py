@@ -59,16 +59,14 @@ async def save(
 
     result = prepare_smart_save(self, condition, skip_hooks, full_replace)
 
-    # A projected model with no changes has nothing to write.
-    wrote = not result.use_update or bool(result.updates)
-
-    if result.use_update and result.updates:
+    if result.use_update and result.writes:
         # Smart update: UpdateItem with only changed fields
         if result.condition_expr is not None:
             await result.client.update_item(
                 result.table,
                 result.key_or_item,
-                updates=result.updates,
+                updates=result.updates or None,
+                update_expression=result.update_expression,
                 condition_expression=result.condition_expr,
                 expression_attribute_names=result.attr_names,
                 expression_attribute_values=result.attr_values,
@@ -90,7 +88,7 @@ async def save(
         else:
             await result.client.put_item(result.table, result.key_or_item)
 
-    if wrote and result.client._last_metrics is not None:
+    if result.writes and result.client._last_metrics is not None:
         op_type = "update" if result.use_update else "put"
         self.__class__._record_metrics(result.client._last_metrics, op_type)
 

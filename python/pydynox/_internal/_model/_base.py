@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pydynox._internal._decimal import model_read_client
@@ -22,6 +24,18 @@ if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
 
 M = TypeVar("M", bound="ModelBase")
+
+# The projection of the read that is calling from_dict, so a from_dict override
+# that calls super() still loads a projected item as a projected model.
+_PROJECTION: ContextVar[tuple[type, list[str]] | None] = ContextVar("_PROJECTION", default=None)
+
+
+def _snapshot(value: Any) -> Any:
+    """Copy a value so later in-place changes to it can be detected."""
+    try:
+        return copy.deepcopy(value)
+    except Exception:
+        return value
 
 
 class ModelMeta(type):
@@ -235,7 +249,10 @@ class ModelBase(metaclass=ModelMeta):
     _original: dict[str, Any] | None
     _changed: set[str]
     _json_snapshots: dict[str, str | None]
-    # Fields a projected read did not fetch, and fields it fetched only in part
+    # A projected read leaves out fields of the stored item. The model stays
+    # projected after a save, because the stored item still has those fields.
+    _projected: bool
+    # Fields the read did not fetch, and fields it fetched only in part
     _not_fetched: frozenset[str]
     _partly_fetched: frozenset[str]
 
@@ -250,6 +267,7 @@ class ModelBase(metaclass=ModelMeta):
         object.__setattr__(self, "_original", None)
         object.__setattr__(self, "_changed", set())
         object.__setattr__(self, "_json_snapshots", {})
+        object.__setattr__(self, "_projected", False)
         object.__setattr__(self, "_not_fetched", frozenset())
         object.__setattr__(self, "_partly_fetched", frozenset())
         # First pass: set all regular attributes
@@ -334,7 +352,7 @@ class ModelBase(metaclass=ModelMeta):
     @property
     def _is_partial(self) -> bool:
         """True if a projected read left out fields of the stored item."""
-        return bool(self._not_fetched or self._partly_fetched)
+        return self._projected
 
     @property
     def changed_fields(self) -> list[str]:
@@ -355,9 +373,10 @@ class ModelBase(metaclass=ModelMeta):
         """Reset change tracking after save.
 
         A full PutItem makes the stored item match this instance. An UpdateItem
-        only makes the changed fields known.
+        only makes the changed fields known, so the model stays projected.
         """
         if full_item:
+            self._projected = False
             self._not_fetched = frozenset()
             self._partly_fetched = frozenset()
         else:
@@ -366,9 +385,28 @@ class ModelBase(metaclass=ModelMeta):
 
     def _reset_change_tracking(self) -> None:
         """Reset change tracking after save. Stores current state as original."""
-        self._original = {name: getattr(self, name) for name in self._attributes}
+        values = {name: getattr(self, name) for name in self._attributes}
+        if self._projected:
+            values = {name: _snapshot(value) for name, value in values.items()}
+        self._original = values
         self._changed = set()
         self._build_json_snapshots()
+
+    def _detect_projected_mutations(self) -> None:
+        """Detect in-place changes to the fields a projected read fetched.
+
+        A full save sends every field, so it stores in-place changes such as
+        list.append(). A projected save only sends changed fields, so it must
+        find them here. Typed JSON and map fields are checked by their snapshots.
+        """
+        original = self._original
+        if original is None:
+            return
+        for name in self._attributes:
+            if name in self._not_fetched or name in self._json_snapshots or name not in original:
+                continue
+            if getattr(self, name) != original[name]:
+                self._changed.add(name)
 
     def _build_json_snapshots(self) -> None:
         """Build JSON string snapshots for typed JSONAttributes and MapAttributes.
@@ -548,7 +586,11 @@ class ModelBase(metaclass=ModelMeta):
         If the model has a discriminator field, returns the correct subclass.
         Extra stored fields are ignored, including with strict_attributes enabled.
         """
-        return cls._load(data, None)
+        projection = _PROJECTION.get()
+        fields = None
+        if projection is not None and issubclass(cls, projection[0]):
+            fields = projection[1]
+        return cls._load(data, fields)
 
     @classmethod
     def _from_projection(cls: type[M], data: dict[str, Any], fields: list[str] | None) -> M:
@@ -559,7 +601,12 @@ class ModelBase(metaclass=ModelMeta):
         """
         if not fields:
             return cls.from_dict(data)
-        return cls._load(data, fields)
+        # Go through from_dict so an override runs, as it does for a full read.
+        token = _PROJECTION.set((cls, fields))
+        try:
+            return cls.from_dict(data)
+        finally:
+            _PROJECTION.reset(token)
 
     @classmethod
     def _projected_fields(cls, fields: list[str]) -> tuple[frozenset[str], frozenset[str]]:
@@ -615,7 +662,8 @@ class ModelBase(metaclass=ModelMeta):
             not_fetched: frozenset[str] = frozenset()
             partly_fetched: frozenset[str] = frozenset()
         else:
-            whole, nested = target_cls._projected_fields(fields)
+            whole, partly_fetched = target_cls._projected_fields(fields)
+            original = {name: _snapshot(value) for name, value in original.items()}
             missing = [
                 name
                 for name in target_cls._attributes
@@ -635,10 +683,10 @@ class ModelBase(metaclass=ModelMeta):
             for name in missing:
                 if name not in not_fetched:
                     original[name] = getattr(instance, name)
-            partly_fetched = frozenset(name for name in nested if name in deserialized)
 
         instance._original = original
         instance._changed = set()
+        instance._projected = bool(not_fetched or partly_fetched)
         instance._not_fetched = not_fetched
         instance._partly_fetched = partly_fetched
         instance._build_json_snapshots()

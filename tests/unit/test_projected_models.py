@@ -5,9 +5,11 @@ from typing import Any
 import pytest
 from pydynox import AutoGenerate, Model, ModelConfig, SyncTransaction, Transaction
 from pydynox.attributes import (
+    ListAttribute,
     MapAttribute,
     NumberAttribute,
     StringAttribute,
+    StringSetAttribute,
     VersionAttribute,
 )
 from pydynox.exceptions import ConditionalCheckFailedException
@@ -409,3 +411,184 @@ def test_sync_transaction_refuses_projected_model():
             with SyncTransaction(backend.client) as txn:
                 txn.save_model(user)
         assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == STORED
+
+
+class Account(Model):
+    model_config = ModelConfig(table="accounts")
+    pk = StringAttribute(partition_key=True)
+    tags = ListAttribute()
+    prefs = MapAttribute()
+    labels = StringSetAttribute()
+    details = MapAttribute()
+    name = StringAttribute()
+
+
+ACCOUNT = {
+    "pk": "P#1",
+    "tags": ["a"],
+    "prefs": {"theme": "dark"},
+    "labels": {"x"},
+    "details": {"zip": "123"},
+    "name": "Ann",
+}
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+async def test_in_place_mutation_of_fetched_fields_is_saved(how, sync):
+    with MemoryBackend() as backend:
+        # GIVEN a stored account loaded with a projection
+        await Account(**ACCOUNT).save()
+        account = await _load(Account, how, sync, ["pk", "tags", "prefs", "labels"], pk="P#1")
+
+        # WHEN mutating the fetched collections in place
+        account.tags.append("b")
+        account.prefs["theme"] = "light"
+        account.labels.add("y")
+        await _save(account, sync)
+
+        # THEN the changes are stored and the fields that were not fetched are kept
+        stored = backend.client.sync_get_item("accounts", {"pk": "P#1"})
+        assert stored["tags"] == ["a", "b"]
+        assert stored["prefs"] == {"theme": "light"}
+        assert set(stored["labels"]) == {"x", "y"}
+        assert stored["details"] == {"zip": "123"}
+        assert stored["name"] == "Ann"
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+async def test_in_place_mutation_is_saved_after_a_save(sync):
+    with MemoryBackend() as backend:
+        # GIVEN a projected account that was saved once
+        await Account(**ACCOUNT).save()
+        account = await _load(Account, "scan", sync, ["pk", "tags"], pk="P#1")
+        account.tags.append("b")
+        await _save(account, sync)
+
+        # WHEN mutating it in place again
+        account.tags.append("c")
+        await _save(account, sync)
+
+        # THEN the second change is stored too
+        stored = backend.client.sync_get_item("accounts", {"pk": "P#1"})
+        assert stored["tags"] == ["a", "b", "c"]
+        assert stored["name"] == "Ann"
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+async def test_condition_is_checked_when_nothing_changed(how, sync):
+    with MemoryBackend() as backend:
+        # GIVEN a stored user loaded with a projection and no changes
+        await User(**STORED).save()
+        user = await _load(User, how, sync, ["pk", "name"])
+
+        # WHEN saving with a condition that is false
+        # THEN it raises and the stored item is untouched
+        with pytest.raises(ConditionalCheckFailedException):
+            await _save(user, sync, condition=User.name == "Bob")
+        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == STORED
+
+        # AND a condition that is true saves without changing the item
+        await _save(user, sync, condition=User.name == "Ann")
+        assert backend.client.sync_get_item("users", {"pk": "USER#1"}) == STORED
+
+
+class Custom(Model):
+    model_config = ModelConfig(table="customs")
+    pk = StringAttribute(partition_key=True)
+    name = StringAttribute(required=True)
+    age = NumberAttribute(default=0)
+
+    loaded: list[dict[str, Any]] = []
+
+    @classmethod
+    def from_dict(cls, data):
+        cls.loaded.append(dict(data))
+        return super().from_dict(data)
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+async def test_projected_read_calls_custom_from_dict(how, sync):
+    with MemoryBackend() as backend:
+        # GIVEN a model that overrides from_dict
+        await Custom(pk="C#1", name="Ann", age=42).save()
+        Custom.loaded.clear()
+
+        # WHEN loading it with a projection
+        custom = await _load(Custom, how, sync, ["pk", "name"], pk="C#1")
+
+        # THEN the override ran and the model is still a projected one
+        assert Custom.loaded == [{"pk": "C#1", "name": "Ann"}]
+        assert custom.age is None
+        custom.name = "Bob"
+        await _save(custom, sync)
+        assert backend.client.sync_get_item("customs", {"pk": "C#1"})["age"] == 42
+
+
+def test_custom_from_dict_does_not_leak_projection_to_other_models():
+    with MemoryBackend():
+        # GIVEN a from_dict override that builds another model
+        class Other(Model):
+            model_config = ModelConfig(table="others")
+            pk = StringAttribute(partition_key=True)
+            name = StringAttribute(required=True)
+
+        class Wrapper(Model):
+            model_config = ModelConfig(table="wrappers")
+            pk = StringAttribute(partition_key=True)
+
+            @classmethod
+            def from_dict(cls, data):
+                with pytest.raises(ValueError, match="required"):
+                    Other.from_dict({"pk": "O#1"})
+                return super().from_dict(data)
+
+        Wrapper(pk="W#1").sync_save()
+
+        # WHEN loading the wrapper with a projection
+        wrapper = Wrapper.sync_scan(fields=["pk"]).first()
+
+        # THEN the other model still validates required fields
+        assert wrapper is not None
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+async def test_save_refuses_nested_field_missing_from_the_item(how, sync):
+    with MemoryBackend() as backend:
+        # GIVEN details holds zip, and the projection asks for a missing nested path
+        await Account(**ACCOUNT).save()
+        account = await _load(Account, how, sync, ["pk", "details.city"], pk="P#1")
+        assert account.details is None
+
+        # WHEN replacing details and saving
+        account.details = {"city": "new"}
+
+        # THEN it raises instead of deleting zip
+        with pytest.raises(ValueError, match="nested projection"):
+            await _save(account, sync)
+        stored = backend.client.sync_get_item("accounts", {"pk": "P#1"})
+        assert stored["details"] == {"zip": "123"}
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+async def test_second_save_keeps_attributes_outside_the_schema(how, sync):
+    with MemoryBackend() as backend:
+        # GIVEN a stored user with an attribute the model does not declare
+        stored = {**STORED, "legacy": "keep"}
+        backend.client.sync_put_item("users", stored)
+        user = await _load(User, how, sync, ["pk", "name"])
+
+        # WHEN saving every field that was not fetched, then saving again
+        user.age = 43
+        user.email = "new@example.com"
+        await _save(user, sync)
+        await _save(user, sync)
+
+        # THEN the attribute outside the schema is still stored
+        item = backend.client.sync_get_item("users", {"pk": "USER#1"})
+        assert item["legacy"] == "keep"
+        assert item["age"] == 43

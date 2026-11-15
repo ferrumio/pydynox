@@ -75,7 +75,9 @@ async for user in User.query(pk="USER#123", fields=["name", "status"]):
 
 A model loaded with `fields` or `projection` only knows the fields it fetched. The other fields are `None`. Defaults and `required=True` checks do not apply to them. A model you create yourself still gets defaults and required checks.
 
-`save()` on a projected model uses `UpdateItem` and writes only the fields you change. Fields you did not fetch keep their stored values. If you change nothing, `save()` writes nothing.
+`save()` on a projected model uses `UpdateItem` and writes only the fields you change. This includes in-place changes to fetched fields, like `list.append()` or `set.add()`. Fields you did not fetch keep their stored values, and so do stored attributes the model does not declare. If you change nothing, `save()` writes nothing. With a `condition`, it still checks the condition and raises `ConditionalCheckFailedException` when it is false. The model stays projected after `save()`, so a second `save()` is as safe as the first.
+
+If you override `from_dict()`, it runs for projected reads too. Call `super().from_dict(data)` to get a projected model.
 
 === "save_projection.py"
     ```python
@@ -86,7 +88,7 @@ A few rules keep the stored item safe:
 
 - Include the key fields in the projection. Without them, `save()` raises `ValueError`.
 - If the model has a `VersionAttribute`, include it too. Without it, `save()` raises `ValueError`.
-- A field loaded with a nested path, like `address.city`, holds only part of the attribute. Changing it and saving raises `ValueError`, because it would replace the whole attribute.
+- A field loaded with a nested path, like `address.city`, holds only part of the attribute. This is also true when the item has no such path, and the field is `None`. Changing it and saving raises `ValueError`, because it would replace the whole attribute.
 - A transaction put replaces the whole item, so `save_model` raises `ValueError` for a projected model.
 - The `max_size` check in `model_config` only counts the fetched fields. Fields you did not fetch are kept in the stored item, so the stored item can be larger than `max_size`. DynamoDB's own 400 KB limit still applies.
 - `save(full_replace=True)` uses `PutItem` and replaces the stored item with the fetched fields only. Use it only when that is what you want.

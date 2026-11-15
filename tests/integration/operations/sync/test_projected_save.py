@@ -4,7 +4,14 @@ import uuid
 
 import pytest
 from pydynox import Model, ModelConfig
-from pydynox.attributes import NumberAttribute, StringAttribute
+from pydynox.attributes import (
+    ListAttribute,
+    MapAttribute,
+    NumberAttribute,
+    StringAttribute,
+    StringSetAttribute,
+)
+from pydynox.exceptions import ConditionalCheckFailedException
 
 LOADERS = ["batch_get", "query", "scan"]
 
@@ -20,6 +27,36 @@ def user_cls(dynamo):
         email = StringAttribute()
 
     return User
+
+
+@pytest.fixture
+def account_cls(dynamo):
+    class Account(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        tags = ListAttribute()
+        prefs = MapAttribute()
+        labels = StringSetAttribute()
+        details = MapAttribute()
+        name = StringAttribute()
+
+    return Account
+
+
+def _store_account(dynamo):
+    item = {
+        "pk": f"SPROJSAVE#{uuid.uuid4().hex}",
+        "sk": "ACCOUNT",
+        "tags": ["a"],
+        "prefs": {"theme": "dark"},
+        "labels": {"x"},
+        "details": {"zip": "123"},
+        "name": "Ann",
+        "legacy": "keep",
+    }
+    dynamo.sync_put_item("test_table", item)
+    return item
 
 
 def _store(dynamo):
@@ -93,3 +130,106 @@ def test_sync_new_model_still_validates(user_cls):
 
     # AND defaults still apply
     assert user_cls(pk="SPROJSAVE#new", sk="PROFILE", name="Ann").age == 0
+
+
+@pytest.mark.parametrize("how", LOADERS)
+def test_sync_projected_model_saves_in_place_changes(dynamo, account_cls, how):
+    # GIVEN an account loaded with a projection
+    item = _store_account(dynamo)
+    key = {"pk": item["pk"], "sk": item["sk"]}
+    account = _load(account_cls, how, item, ["pk", "sk", "tags", "prefs", "labels"])
+
+    # WHEN changing the fetched collections in place
+    account.tags.append("b")
+    account.prefs["theme"] = "light"
+    account.labels.add("y")
+    account.sync_save()
+
+    # THEN the changes are stored and the other fields are kept
+    stored = dynamo.sync_get_item("test_table", key)
+    assert stored["tags"] == ["a", "b"]
+    assert stored["prefs"] == {"theme": "light"}
+    assert set(stored["labels"]) == {"x", "y"}
+    assert stored["details"] == {"zip": "123"}
+    assert stored["name"] == "Ann"
+
+
+@pytest.mark.parametrize("how", LOADERS)
+def test_sync_projected_model_checks_condition_without_changes(dynamo, user_cls, how):
+    # GIVEN a user loaded with a projection and no changes
+    item = _store(dynamo)
+    key = {"pk": item["pk"], "sk": item["sk"]}
+    user = _load(user_cls, how, item, ["pk", "sk", "name"])
+
+    # WHEN saving with a condition that is false
+    # THEN it raises and the item is untouched
+    with pytest.raises(ConditionalCheckFailedException):
+        user.sync_save(condition=user_cls.name == "Bob")
+    assert dynamo.sync_get_item("test_table", key) == item
+
+    # AND a true condition saves without changing the item
+    user.sync_save(condition=user_cls.name == "Ann")
+    assert dynamo.sync_get_item("test_table", key) == item
+
+
+@pytest.mark.parametrize("how", LOADERS)
+def test_sync_projected_read_calls_custom_from_dict(dynamo, how):
+    # GIVEN a model that overrides from_dict
+    seen = []
+
+    class Custom(Model):
+        model_config = ModelConfig(table="test_table", client=dynamo)
+        pk = StringAttribute(partition_key=True)
+        sk = StringAttribute(sort_key=True)
+        name = StringAttribute(required=True)
+        age = NumberAttribute(default=0)
+
+        @classmethod
+        def from_dict(cls, data):
+            seen.append(dict(data))
+            return super().from_dict(data)
+
+    item = _store(dynamo)
+
+    # WHEN loading it with a projection
+    custom = _load(Custom, how, item, ["pk", "sk", "name"])
+
+    # THEN the override ran and the model is projected
+    assert len(seen) == 1
+    assert custom.age is None
+
+
+@pytest.mark.parametrize("how", LOADERS)
+def test_sync_projected_model_refuses_missing_nested_field(dynamo, account_cls, how):
+    # GIVEN details holds zip and the projection asks for a missing nested path
+    item = _store_account(dynamo)
+    key = {"pk": item["pk"], "sk": item["sk"]}
+    account = _load(account_cls, how, item, ["pk", "sk", "details.city"])
+
+    # WHEN replacing details and saving
+    account.details = {"city": "new"}
+
+    # THEN it raises instead of deleting zip
+    with pytest.raises(ValueError, match="nested projection"):
+        account.sync_save()
+    assert dynamo.sync_get_item("test_table", key)["details"] == {"zip": "123"}
+
+
+@pytest.mark.parametrize("how", LOADERS)
+def test_sync_second_save_keeps_attributes_outside_the_schema(dynamo, account_cls, how):
+    # GIVEN an item with an attribute the model does not declare
+    item = _store_account(dynamo)
+    key = {"pk": item["pk"], "sk": item["sk"]}
+    account = _load(account_cls, how, item, ["pk", "sk"])
+
+    # WHEN saving every field that was not fetched, then saving again
+    account.tags = ["t"]
+    account.prefs = {"theme": "x"}
+    account.labels = {"z"}
+    account.details = {"zip": "9"}
+    account.name = "Bob"
+    account.sync_save()
+    account.sync_save()
+
+    # THEN the attribute outside the schema is still stored
+    assert dynamo.sync_get_item("test_table", key)["legacy"] == "keep"

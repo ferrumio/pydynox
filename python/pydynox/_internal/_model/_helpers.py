@@ -37,6 +37,18 @@ class SmartSaveResult(NamedTuple):
     skip_hooks: bool
     use_update: bool
     updates: dict[str, Any] | None
+    update_expression: str | None = None
+
+    @property
+    def writes(self) -> bool:
+        """True if save() sends a request. A projected model with no changes does not."""
+        return not self.use_update or bool(self.updates) or self.update_expression is not None
+
+
+# A projected model with no changes still has to check its condition. DynamoDB
+# has no check-only update, but removing an attribute that does not exist is a no-op.
+_NOOP_UPDATE = "REMOVE #pydynox_noop"
+_NOOP_NAME = "__pydynox_noop__"
 
 
 class UpdateResult(NamedTuple):
@@ -221,6 +233,8 @@ def prepare_smart_save(
 
     # Detect in-place mutations on typed JSONAttributes before deciding
     self._detect_json_mutations()
+    if partial:
+        self._detect_projected_mutations()
 
     # Decide: UpdateItem (smart) or PutItem (full)
     # Use UpdateItem if: has original (loaded from DB), has changes, not full_replace.
@@ -268,8 +282,21 @@ def prepare_smart_save(
                 new_key = old_key.replace(":v", ":cond")
                 renamed_values[new_key] = val
                 renamed_expr = renamed_expr.replace(old_key, new_key)
+            update_expression = None
+            if not updates:
+                update_expression = _NOOP_UPDATE
+                attr_names["#pydynox_noop"] = _NOOP_NAME
             return SmartSaveResult(
-                client, table, key, renamed_expr, attr_names, renamed_values, skip, True, updates
+                client,
+                table,
+                key,
+                renamed_expr,
+                attr_names,
+                renamed_values,
+                skip,
+                True,
+                updates,
+                update_expression,
             )
 
         return SmartSaveResult(client, table, key, None, None, None, skip, True, updates)
