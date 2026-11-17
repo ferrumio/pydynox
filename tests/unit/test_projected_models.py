@@ -582,7 +582,9 @@ async def test_save_keeps_template_key_when_placeholder_not_fetched(sync):
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
 @pytest.mark.parametrize("how", LOADERS)
 @pytest.mark.parametrize("missing_placeholder", [False, True])
-async def test_save_rejects_changes_to_skipped_template_dependencies(how, sync, missing_placeholder):
+async def test_save_rejects_changes_to_skipped_template_dependencies(
+    how, sync, missing_placeholder
+):
     class IndexedOrder(Model):
         model_config = ModelConfig(table="indexed_orders")
         pk = StringAttribute(partition_key=True)
@@ -768,9 +770,7 @@ async def test_unfetched_aliased_templates_stay_none(how, sync, omitted):
         Shipment(order_id="1", status="new").sync_save()
         key = {"partition": "ORDER#1", "sort": "PROFILE"}
         stored = backend.client.sync_get_item("shipments", key)
-        fields = [
-            name for name in ("pk", "sk", "label", "order_id", "status") if name != omitted
-        ]
+        fields = [name for name in ("pk", "sk", "label", "order_id", "status") if name != omitted]
         shipment = await _load(Shipment, how, sync, fields, pk="ORDER#1", sk="PROFILE")
         assert getattr(shipment, omitted) is None
 
