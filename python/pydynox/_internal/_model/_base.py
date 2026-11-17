@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 from contextvars import ContextVar
+from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pydynox._internal._decimal import model_read_client
@@ -407,6 +408,8 @@ class ModelBase(metaclass=ModelMeta):
                 continue
             if getattr(self, name) != original[name]:
                 self._changed.add(name)
+            else:
+                self._changed.discard(name)
 
     def _build_json_snapshots(self) -> None:
         """Build JSON string snapshots for typed JSONAttributes and MapAttributes.
@@ -426,7 +429,7 @@ class ModelBase(metaclass=ModelMeta):
         """Detect in-place mutations on typed JSONAttributes and MapAttributes.
 
         Compares current serialized JSON against stored snapshots.
-        Adds mutated attributes to _changed set.
+        Reconciles fetched attributes in the _changed set.
         """
         if not self._json_snapshots:
             return
@@ -436,6 +439,8 @@ class ModelBase(metaclass=ModelMeta):
             current_json = attr._snapshot_key(current_value)
             if current_json != old_json:
                 self._changed.add(attr_name)
+            elif attr_name not in self._not_fetched:
+                self._changed.discard(attr_name)
 
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
@@ -454,9 +459,15 @@ class ModelBase(metaclass=ModelMeta):
 
     def _build_template_keys(self) -> None:
         """Build template key values from placeholder attributes."""
-        for attr_name, attr in self._attributes.items():
-            if not _is_template_attr(attr):
-                continue
+        templates = {
+            name: attr for name, attr in self._attributes.items() if _is_template_attr(attr)
+        }
+        dependencies = {
+            name: [placeholder for placeholder in attr.placeholders if placeholder in templates]
+            for name, attr in templates.items()
+        }
+        for attr_name in TopologicalSorter(dependencies).static_order():
+            attr = templates[attr_name]
             if attr_name in self._not_fetched or any(
                 placeholder in self._partly_fetched
                 or (placeholder in self._not_fetched and getattr(self, placeholder, None) is None)

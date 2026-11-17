@@ -1,5 +1,6 @@
 """Unit tests for models loaded with a projection (batch_get, query, scan)."""
 
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -8,6 +9,7 @@ import pytest
 from pydynox import AutoGenerate, Model, ModelConfig, SyncTransaction, Transaction
 from pydynox._internal._s3 import S3File, S3Value
 from pydynox.attributes import (
+    JSONAttribute,
     ListAttribute,
     MapAttribute,
     NumberAttribute,
@@ -106,6 +108,8 @@ def s3_storage():
         ("missing_version", "version attribute 'version' was not fetched"),
         ("nested", "Cannot save 'address'"),
         ("hook", "Cannot save 'gsi_pk'"),
+        ("chained_template", "Cannot save 'gsi_pk'"),
+        ("deep_chained_template", "Cannot save 'gsi_pk'"),
     ],
 )
 async def test_projected_rejection_precedes_s3_upload(how, sync, rejection, error, s3_storage):
@@ -120,13 +124,19 @@ async def test_projected_rejection_precedes_s3_upload(how, sync, rejection, erro
         address = MapAttribute()
         gsi_pk = StringAttribute(
             template=(
-                "ADDR#{address}"
+                "G#{label}"
+                if rejection == "chained_template"
+                else "G#{middle}"
+                if rejection == "deep_chained_template"
+                else "ADDR#{address}"
                 if rejection == "partial_template"
                 else "STATE#{tenant}#{status}"
                 if rejection == "missing_placeholder"
                 else "STATE#{status}"
             )
         )
+        middle = StringAttribute(template="MID#{label}")
+        label = StringAttribute(template="STATE#{status}")
         content = S3Attribute(bucket="files", prefix="docs/")
         version = VersionAttribute()
 
@@ -142,6 +152,8 @@ async def test_projected_rejection_precedes_s3_upload(how, sync, rejection, erro
             pk="D#1",
             status="new",
             tenant="T#1",
+            middle="MID#STATE#new",
+            label="STATE#new",
             address={"city": "Lisbon", "street": "Main"},
             content=S3File(b"original", name="report.pdf"),
         )
@@ -159,8 +171,15 @@ async def test_projected_rejection_precedes_s3_upload(how, sync, rejection, erro
             fields.append("address.city")
         if rejection in ("partial_template", "missing_placeholder"):
             fields.append("gsi_pk")
+        if rejection in ("chained_template", "deep_chained_template"):
+            fields.extend(["middle", "label"])
         attachment = await _load(Attachment, how, sync, fields, pk="D#1")
-        if rejection in ("template", "missing_placeholder"):
+        if rejection in (
+            "template",
+            "missing_placeholder",
+            "chained_template",
+            "deep_chained_template",
+        ):
             attachment.status = "paid"
         elif rejection in ("partial_template", "nested"):
             attachment.address["city"] = "Porto"
@@ -180,6 +199,16 @@ async def test_projected_rejection_precedes_s3_upload(how, sync, rejection, erro
         assert attachment.version == version
         assert hook_calls == ["before_save"]
         assert backend.client.sync_get_item("attachments", {"pk": "D#1"}) == stored
+
+        if rejection in ("chained_template", "deep_chained_template"):
+            attachment.status = "new"
+            await _save(attachment, sync)
+            saved = backend.client.sync_get_item("attachments", {"pk": "D#1"})
+            assert saved["gsi_pk"] == stored["gsi_pk"]
+            assert saved["middle"] == stored["middle"]
+            assert saved["label"] == stored["label"]
+            assert saved["version"] == 2
+            assert objects["files", saved["content"]["key"]] == b"replacement"
 
 
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
@@ -232,6 +261,84 @@ async def test_s3_save_prepares_hooks_keys_and_uploaded_metadata(sync, s3_storag
         metrics = GeneratedAttachment.get_total_metrics()
         assert metrics.s3_calls == 1
         assert metrics.s3_bytes_uploaded == len(b"replacement")
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize("reverse", [False, True])
+async def test_chained_templates_save_in_dependency_order(how, sync, reverse, s3_storage):
+    objects, ops = s3_storage
+    templates = {
+        "label": StringAttribute(template="STATE#{status}"),
+        "middle": StringAttribute(template="MID#{label}", alias="intermediate"),
+        "gsi_pk": StringAttribute(template="G#{middle}", alias="state_key"),
+    }
+    if reverse:
+        templates = dict(reversed(templates.items()))
+    ChainedAttachment = type(
+        "ChainedAttachment",
+        (Model,),
+        {
+            "model_config": ModelConfig(table="chained_attachments"),
+            "pk": StringAttribute(partition_key=True),
+            **templates,
+            "status": StringAttribute(),
+            "content": S3Attribute(bucket="files"),
+            "note": StringAttribute(default="keep"),
+            "version": VersionAttribute(),
+        },
+    )
+    ChainedAttachment._attributes["content"]._s3_ops = ops
+    with MemoryBackend() as backend:
+        await _save(
+            ChainedAttachment(
+                pk="D#1", status="new", content=S3File(b"original", name="report.pdf")
+            ),
+            sync,
+        )
+        stored = backend.client.sync_get_item("chained_attachments", {"pk": "D#1"})
+        assert stored["state_key"] == "G#MID#STATE#new"
+        attachment = await _load(
+            ChainedAttachment,
+            how,
+            sync,
+            ["pk", "status", "label", "middle", "gsi_pk", "version"],
+            pk="D#1",
+        )
+        attachment.status = "paid"
+        attachment.content = S3File(b"replacement", name="report.pdf")
+        await _save(attachment, sync)
+        stored = backend.client.sync_get_item("chained_attachments", {"pk": "D#1"})
+        assert stored["label"] == "STATE#paid"
+        assert stored["intermediate"] == "MID#STATE#paid"
+        assert stored["state_key"] == "G#MID#STATE#paid"
+        assert stored["note"] == "keep"
+        assert stored["version"] == 2
+        assert objects["files", stored["content"]["key"]] == b"replacement"
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+async def test_cyclic_templates_fail_before_upload(sync, s3_storage):
+    objects, ops = s3_storage
+
+    class CyclicAttachment(Model):
+        model_config = ModelConfig(table="cyclic_attachments")
+        pk = StringAttribute(partition_key=True)
+        first = StringAttribute(template="FIRST#{second}")
+        second = StringAttribute(template="SECOND#{first}")
+        content = S3Attribute(bucket="files")
+
+    CyclicAttachment._attributes["content"]._s3_ops = ops
+    with MemoryBackend() as backend:
+        attachment = CyclicAttachment(
+            pk="D#1", first="first", second="second", content=S3File(b"data", name="report.pdf")
+        )
+        with pytest.raises(ValueError, match="cycle"):
+            await _save(attachment, sync)
+        assert objects == {}
+        ops.sync_upload_bytes.assert_not_called()
+        ops.upload_bytes.assert_not_awaited()
+        assert backend.client.sync_get_item("cyclic_attachments", {"pk": "D#1"}) is None
 
 
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
@@ -773,7 +880,10 @@ async def test_nested_projection_rejection_preserves_version_for_retry(how, sync
         assert profile.version == 1
         assert backend.client.sync_get_item("versioned_profiles", {"pk": "P#1"}) == stored
 
-        profile.address = {"city": "Lisbon"}
+        if in_place:
+            profile.address["city"] = "Lisbon"
+        else:
+            profile.address = {"city": "Lisbon"}
         profile.title = "new"
         await _save(profile, sync)
         assert profile.version == 2
@@ -782,6 +892,84 @@ async def test_nested_projection_rejection_preserves_version_for_retry(how, sync
             "title": "new",
             "version": 2,
         }
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize("kind", ["map", "json", "typed_map", "typed_json", "list", "set"])
+async def test_restored_template_dependency_allows_retry(how, sync, kind):
+    @dataclass
+    class Address:
+        city: str
+
+    class SnapshotProfile(Model):
+        model_config = ModelConfig(table="snapshot_profiles")
+        pk = StringAttribute(partition_key=True)
+        payload = {
+            "map": MapAttribute(),
+            "json": JSONAttribute(),
+            "typed_map": MapAttribute(Address),
+            "typed_json": JSONAttribute(Address),
+            "list": ListAttribute(),
+            "set": StringSetAttribute(),
+        }[kind]
+        label = StringAttribute(template="PAYLOAD#{payload}")
+        title = StringAttribute()
+        unknown_map = MapAttribute(Address)
+        unknown_json = JSONAttribute(Address)
+        version = VersionAttribute()
+
+    value = (
+        Address("Lisbon")
+        if kind.startswith("typed_")
+        else ["Lisbon"]
+        if kind == "list"
+        else {"Lisbon"}
+        if kind == "set"
+        else {"city": "Lisbon"}
+    )
+
+    def change_city(profile, city):
+        if kind.startswith("typed_"):
+            profile.payload.city = city
+        elif kind == "list":
+            profile.payload[0] = city
+        elif kind == "set":
+            profile.payload.clear()
+            profile.payload.add(city)
+        else:
+            profile.payload["city"] = city
+
+    with MemoryBackend() as backend:
+        await SnapshotProfile(
+            pk="P#1",
+            payload=value,
+            title="old",
+            unknown_map=Address("keep"),
+            unknown_json=Address("keep"),
+        ).save()
+        stored = backend.client.sync_get_item("snapshot_profiles", {"pk": "P#1"})
+        profile = await _load(
+            SnapshotProfile, how, sync, ["pk", "payload", "title", "version"], pk="P#1"
+        )
+        change_city(profile, "Porto")
+        with pytest.raises(ValueError, match="Cannot save 'label'.*'payload'"):
+            await _save(profile, sync)
+        assert profile.version == 1
+        assert backend.client.sync_get_item("snapshot_profiles", {"pk": "P#1"}) == stored
+
+        change_city(profile, "Lisbon")
+        profile.title = "new"
+        profile.unknown_map = None
+        profile.unknown_json = None
+        await _save(profile, sync)
+        saved = backend.client.sync_get_item("snapshot_profiles", {"pk": "P#1"})
+        assert saved["payload"] == stored["payload"]
+        assert saved["label"] == stored["label"]
+        assert saved["title"] == "new"
+        assert saved["version"] == 2
+        assert saved.get("unknown_map") is None
+        assert saved.get("unknown_json") is None
 
 
 def test_save_after_update_tracks_saved_fields():
