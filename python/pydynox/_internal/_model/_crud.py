@@ -12,6 +12,7 @@ from pydynox._internal._model._helpers import (
     prepare_delete,
     prepare_delete_by_key,
     prepare_get,
+    prepare_save,
     prepare_smart_save,
     prepare_update,
     prepare_update_by_key,
@@ -69,10 +70,10 @@ def save(
     full_replace: bool = False,
 ) -> None:
     """Save model to DynamoDB. Uses smart update by default (only changed fields)."""
+    skip = prepare_save(self, skip_hooks, full_replace)
     # Start S3 metrics collection for uploads
     _start_s3_metrics_collection()
 
-    # S3 upload before prepare (needs to happen before to_dict)
     self._sync_upload_s3_files()
 
     # Collect S3 metrics from uploads
@@ -81,8 +82,7 @@ def save(
     # Start KMS metrics collection for serialization
     _start_kms_metrics_collection()
 
-    # prepare: run BEFORE_SAVE hooks, auto-generate, version condition, size check
-    result = prepare_smart_save(self, condition, skip_hooks, full_replace)
+    result = prepare_smart_save(self, condition, skip, full_replace)
 
     # Collect KMS metrics from serialization
     kms_duration, kms_calls = _stop_kms_metrics_collection()

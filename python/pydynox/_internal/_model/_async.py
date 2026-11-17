@@ -12,6 +12,7 @@ from pydynox._internal._model._helpers import (
     prepare_delete,
     prepare_delete_by_key,
     prepare_get,
+    prepare_save,
     prepare_smart_save,
     prepare_update,
     prepare_update_by_key,
@@ -53,11 +54,12 @@ async def save(
     full_replace: bool = False,
 ) -> None:
     """Async save model to DynamoDB (default). Uses smart update (only changed fields)."""
+    skip = prepare_save(self, skip_hooks, full_replace)
     _start_s3_metrics_collection()
     await self._upload_s3_files()
     s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
 
-    result = prepare_smart_save(self, condition, skip_hooks, full_replace)
+    result = prepare_smart_save(self, condition, skip, full_replace)
 
     if result.use_update and result.writes:
         # Smart update: UpdateItem with only changed fields

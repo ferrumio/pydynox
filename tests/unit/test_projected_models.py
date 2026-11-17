@@ -1,18 +1,23 @@
 """Unit tests for models loaded with a projection (batch_get, query, scan)."""
 
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydynox import AutoGenerate, Model, ModelConfig, SyncTransaction, Transaction
+from pydynox._internal._s3 import S3File, S3Value
 from pydynox.attributes import (
     ListAttribute,
     MapAttribute,
     NumberAttribute,
+    S3Attribute,
     StringAttribute,
     StringSetAttribute,
     VersionAttribute,
 )
 from pydynox.exceptions import ConditionalCheckFailedException
+from pydynox.hooks import before_save
 from pydynox.testing import MemoryBackend
 
 
@@ -60,6 +65,173 @@ async def _save(instance: Any, sync: bool, **kwargs: Any) -> None:
         instance.sync_save(**kwargs)
     else:
         await instance.save(**kwargs)
+
+
+@pytest.fixture
+def s3_storage():
+    objects = {}
+
+    def upload(bucket, key, data, content_type, metadata):
+        objects[bucket, key] = data
+        result = SimpleNamespace(
+            bucket=bucket,
+            key=key,
+            size=len(data),
+            etag=data.hex(),
+            content_type=content_type,
+            last_modified=None,
+            version_id=None,
+            metadata=metadata,
+        )
+        metrics = SimpleNamespace(
+            duration_ms=1.0, calls=1, bytes_uploaded=len(data), bytes_downloaded=0
+        )
+        return result, metrics
+
+    ops = MagicMock()
+    ops.sync_upload_bytes.side_effect = upload
+    ops.upload_bytes = AsyncMock(side_effect=upload)
+    return objects, ops
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize(
+    ("rejection", "error"),
+    [
+        ("template", "Cannot save 'gsi_pk'"),
+        ("missing_placeholder", "Cannot save 'gsi_pk'"),
+        ("partial_template", "Cannot save 'gsi_pk'"),
+        ("missing_key", "key attribute 'pk' was not fetched"),
+        ("missing_version", "version attribute 'version' was not fetched"),
+        ("nested", "Cannot save 'address'"),
+        ("hook", "Cannot save 'gsi_pk'"),
+    ],
+)
+async def test_projected_rejection_precedes_s3_upload(how, sync, rejection, error, s3_storage):
+    objects, ops = s3_storage
+    hook_calls = []
+
+    class Attachment(Model):
+        model_config = ModelConfig(table="attachments")
+        pk = StringAttribute(partition_key=True)
+        status = StringAttribute()
+        tenant = StringAttribute()
+        address = MapAttribute()
+        gsi_pk = StringAttribute(
+            template=(
+                "ADDR#{address}"
+                if rejection == "partial_template"
+                else "STATE#{tenant}#{status}"
+                if rejection == "missing_placeholder"
+                else "STATE#{status}"
+            )
+        )
+        content = S3Attribute(bucket="files", prefix="docs/")
+        version = VersionAttribute()
+
+        @before_save
+        def change_status(self):
+            hook_calls.append("before_save")
+            if getattr(self, "_change_status", False):
+                self.status = "paid"
+
+    Attachment._attributes["content"]._s3_ops = ops
+    with MemoryBackend() as backend:
+        attachment = Attachment(
+            pk="D#1",
+            status="new",
+            tenant="T#1",
+            address={"city": "Lisbon", "street": "Main"},
+            content=S3File(b"original", name="report.pdf"),
+        )
+        await _save(attachment, sync)
+        stored = backend.client.sync_get_item("attachments", {"pk": "D#1"})
+        original_objects = dict(objects)
+        ops.reset_mock()
+        hook_calls.clear()
+        fields = ["pk", "status", "version"]
+        if rejection == "missing_key":
+            fields.remove("pk")
+        elif rejection == "missing_version":
+            fields.remove("version")
+        elif rejection in ("partial_template", "nested"):
+            fields.append("address.city")
+        if rejection in ("partial_template", "missing_placeholder"):
+            fields.append("gsi_pk")
+        attachment = await _load(Attachment, how, sync, fields, pk="D#1")
+        if rejection in ("template", "missing_placeholder"):
+            attachment.status = "paid"
+        elif rejection in ("partial_template", "nested"):
+            attachment.address["city"] = "Porto"
+        elif rejection == "hook":
+            attachment._change_status = True
+        replacement = S3File(b"replacement", name="report.pdf")
+        attachment.content = replacement
+        version = attachment.version
+
+        with pytest.raises(ValueError, match=error):
+            await _save(attachment, sync)
+
+        assert objects == original_objects
+        ops.sync_upload_bytes.assert_not_called()
+        ops.upload_bytes.assert_not_awaited()
+        assert attachment.content is replacement
+        assert attachment.version == version
+        assert hook_calls == ["before_save"]
+        assert backend.client.sync_get_item("attachments", {"pk": "D#1"}) == stored
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+async def test_s3_save_prepares_hooks_keys_and_uploaded_metadata(sync, s3_storage):
+    objects, ops = s3_storage
+    hook_calls = []
+
+    class GeneratedAttachment(Model):
+        model_config = ModelConfig(table="generated_attachments")
+        pk = StringAttribute(partition_key=True, template="DOC#{doc_id}")
+        doc_id = StringAttribute(default=AutoGenerate.UUID4)
+        content = S3Attribute(bucket="files", prefix="docs/")
+        label = StringAttribute(template="FILE#{content}")
+        note = StringAttribute(default="keep")
+        version = VersionAttribute()
+
+        @before_save
+        def supply_file(self):
+            hook_calls.append("before_save")
+            if self.content is None:
+                self.content = S3File(b"original", name="report.pdf")
+
+    GeneratedAttachment._attributes["content"]._s3_ops = ops
+    with MemoryBackend() as backend:
+        attachment = GeneratedAttachment()
+        await _save(attachment, sync)
+        assert isinstance(attachment.content, S3Value)
+        assert attachment.content.key == f"docs/DOC/{attachment.doc_id}/report.pdf"
+        assert objects["files", attachment.content.key] == b"original"
+        assert attachment.label == f"FILE#{attachment.content}"
+        assert hook_calls == ["before_save"]
+        hook_calls.clear()
+        GeneratedAttachment.reset_metrics()
+        pk = attachment.pk
+        attachment = await _load(
+            GeneratedAttachment, "batch_get", sync, ["pk", "doc_id", "label", "version"], pk=pk
+        )
+        attachment.content = S3File(b"replacement", name="report.pdf")
+        await _save(attachment, sync)
+
+        assert isinstance(attachment.content, S3Value)
+        assert objects["files", attachment.content.key] == b"replacement"
+        assert attachment.label == f"FILE#{attachment.content}"
+        assert hook_calls == ["before_save"]
+        stored = backend.client.sync_get_item("generated_attachments", {"pk": pk})
+        assert stored["content"]["etag"] == b"replacement".hex()
+        assert stored["label"] == attachment.label
+        assert stored["note"] == "keep"
+        assert stored["version"] == 2
+        metrics = GeneratedAttachment.get_total_metrics()
+        assert metrics.s3_calls == 1
+        assert metrics.s3_bytes_uploaded == len(b"replacement")
 
 
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])

@@ -114,54 +114,30 @@ def finalize_get(cls: type[M], item: dict[str, Any] | None) -> M | None:
     return instance
 
 
-def prepare_save(self: Model, condition: Condition | None, skip_hooks: bool | None) -> SaveResult:
-    """Prepare save operation.
-
-    Returns (client, table, item, condition_expr, attr_names, attr_values, skip).
-    """
+def prepare_save(self: Model, skip_hooks: bool | None, full_replace: bool) -> bool:
+    """Run hooks and validate model values before uploading files."""
     skip = self._should_skip_hooks(skip_hooks)
 
     if not skip:
         self._run_hooks(HookType.BEFORE_SAVE)
 
+    self._detect_json_mutations()
+    partial = self._is_partial
+    if partial:
+        self._detect_projected_mutations()
+
     self._apply_auto_generate()
 
-    version_attr = self._get_version_attr_name()
-    version_condition, new_version = self._build_version_condition()
-
-    final_condition = condition
-    if version_condition is not None:
-        final_condition = (
-            final_condition & version_condition if final_condition else version_condition
-        )
-
-    if version_attr is not None:
-        setattr(self, version_attr, new_version)
-
-    max_size = (
-        getattr(self.model_config, "max_size", None) if hasattr(self, "model_config") else None
-    )
-    if max_size is not None:
-        size = self.calculate_size()
-        if size.bytes > max_size:
-            raise ItemTooLargeException(
-                size=size.bytes,
-                max_size=max_size,
-                item_key=self._get_key(),
-            )
-
-    client = self._get_client()
-    table = self._get_table()
-    item = self.to_dict()
-
-    if final_condition is not None:
-        names: dict[str, str] = {}
-        values: dict[str, Any] = {}
-        expr = final_condition.serialize(names, values)
-        attr_names = {v: k for k, v in names.items()}
-        return SaveResult(client, table, item, expr, attr_names, values, skip)
-
-    return SaveResult(client, table, item, None, None, None, skip)
+    if partial:
+        _check_partial_save(self, self._get_version_attr_name())
+    if not full_replace:
+        for field_name in self._changed:
+            if field_name in self._partly_fetched:
+                raise ValueError(
+                    f"Cannot save '{field_name}': it was loaded with a nested projection, "
+                    "so saving it would replace the whole attribute"
+                )
+    return skip
 
 
 def finalize_save(self: Model, skip: bool, full_item: bool = True) -> None:
@@ -186,7 +162,7 @@ def _check_partial_save(self: Model, version_attr: str | None) -> None:
 
 
 def prepare_smart_save(
-    self: Model, condition: Condition | None, skip_hooks: bool | None, full_replace: bool
+    self: Model, condition: Condition | None, skip: bool, full_replace: bool
 ) -> SmartSaveResult:
     """Prepare smart save - uses UpdateItem for changed fields only.
 
@@ -194,29 +170,9 @@ def prepare_smart_save(
     A model loaded with a projection always uses UpdateItem unless full_replace is set.
     With no changes, updates is empty and nothing should be written.
     """
-    skip = self._should_skip_hooks(skip_hooks)
-
-    if not skip:
-        self._run_hooks(HookType.BEFORE_SAVE)
-
-    # Detect in-place mutations on typed JSONAttributes before deciding
-    self._detect_json_mutations()
-    partial = self._is_partial
-    if partial:
-        self._detect_projected_mutations()
-
-    self._apply_auto_generate()
+    self._build_template_keys()
 
     version_attr = self._get_version_attr_name()
-    if partial:
-        _check_partial_save(self, version_attr)
-    if not full_replace:
-        for field_name in self._changed:
-            if field_name in self._partly_fetched:
-                raise ValueError(
-                    f"Cannot save '{field_name}': it was loaded with a nested projection, "
-                    "so saving it would replace the whole attribute"
-                )
     version_condition, new_version = self._build_version_condition()
 
     final_condition = condition
@@ -248,7 +204,7 @@ def prepare_smart_save(
     # A projected model also uses UpdateItem with no changes, so PutItem
     # never replaces the fields it did not fetch.
     has_changes = self._original is not None and len(self._changed) > 0
-    use_update = (partial or has_changes) and not full_replace
+    use_update = (self._is_partial or has_changes) and not full_replace
 
     if use_update:
         # Smart update: only send changed fields
