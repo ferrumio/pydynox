@@ -379,6 +379,83 @@ async def test_save_rejects_mutated_skipped_template_dependency(sync):
 
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
 @pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize("fetch_template", [False, True])
+@pytest.mark.parametrize(
+    ("status_path", "change"),
+    [
+        ("status.code", "assign"),
+        ("status.code", "in_place"),
+        ("status.code", "sibling"),
+        ("status.missing", "assign"),
+        ("status.missing", "sibling"),
+    ],
+)
+async def test_save_keeps_template_with_partially_fetched_dependency(
+    how, sync, fetch_template, status_path, change
+):
+    class IndexedProfile(Model):
+        model_config = ModelConfig(table="indexed_profiles")
+        pk = StringAttribute(partition_key=True)
+        status = MapAttribute()
+        tenant = StringAttribute()
+        gsi_pk = StringAttribute(template="STATE#{status}#{tenant}", alias="state_key")
+        note = StringAttribute()
+        version = VersionAttribute()
+
+    with MemoryBackend() as backend:
+        await IndexedProfile(
+            pk="P#1", status={"code": "new", "region": "eu"}, tenant="T#1", note="old"
+        ).save()
+        stored = backend.client.sync_get_item("indexed_profiles", {"pk": "P#1"})
+        fields = ["pk", status_path, "tenant", "note", "version"]
+        if fetch_template:
+            fields.append("gsi_pk")
+        profile = await _load(IndexedProfile, how, sync, fields, pk="P#1")
+        expected_key = stored["state_key"] if fetch_template else None
+        assert profile.status == ({"code": "new"} if status_path == "status.code" else None)
+
+        await _save(profile, sync)
+        assert profile.gsi_pk == expected_key
+        assert backend.client.sync_get_item("indexed_profiles", {"pk": "P#1"}) == {
+            **stored,
+            "version": 2,
+        }
+
+        profile.note = "updated"
+        await _save(profile, sync)
+        assert profile.gsi_pk == expected_key
+        saved = {**stored, "note": "updated", "version": 3}
+        assert backend.client.sync_get_item("indexed_profiles", {"pk": "P#1"}) == saved
+
+        if change == "in_place":
+            profile.status["code"] = "paid"
+        elif change == "sibling":
+            profile.tenant = "T#2"
+        else:
+            profile.status = {"code": "paid"}
+        dependency = "tenant" if change == "sibling" else "status"
+        with pytest.raises(ValueError, match=f"Cannot save 'gsi_pk'.*'{dependency}'"):
+            await _save(profile, sync)
+        assert profile.gsi_pk == expected_key
+        assert profile.version == 3
+        assert backend.client.sync_get_item("indexed_profiles", {"pk": "P#1"}) == saved
+
+        profile = await _load(
+            IndexedProfile, how, sync, ["pk", "status", "tenant", "gsi_pk", "version"], pk="P#1"
+        )
+        profile.status["code"] = "paid"
+        await _save(profile, sync)
+        full_status = {**stored["status"], "code": "paid"}
+        assert backend.client.sync_get_item("indexed_profiles", {"pk": "P#1"}) == {
+            **saved,
+            "status": full_status,
+            "state_key": f"STATE#{full_status}#T#1",
+            "version": 4,
+        }
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
 async def test_unfetched_template_key_stays_none(how, sync):
     with MemoryBackend() as backend:
         Order(order_id="1", status="new").sync_save()

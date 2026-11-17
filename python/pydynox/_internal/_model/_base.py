@@ -458,14 +458,16 @@ class ModelBase(metaclass=ModelMeta):
             if not _is_template_attr(attr):
                 continue
             if attr_name in self._not_fetched or any(
-                placeholder in self._not_fetched and getattr(self, placeholder, None) is None
+                placeholder in self._partly_fetched
+                or (placeholder in self._not_fetched and getattr(self, placeholder, None) is None)
                 for placeholder in attr.placeholders
             ):
                 for placeholder in attr.placeholders:
                     if placeholder in self._changed:
                         raise ValueError(
                             f"Cannot save '{attr_name}': its template depends on changed field "
-                            f"'{placeholder}', but the template or its dependencies were not fetched"
+                            f"'{placeholder}', but the template or its dependencies "
+                            "were not fully fetched"
                         )
                 continue
 
