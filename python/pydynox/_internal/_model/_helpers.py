@@ -41,7 +41,7 @@ class SmartSaveResult(NamedTuple):
 
     @property
     def writes(self) -> bool:
-        """True if save() sends a request. A projected model with no changes does not."""
+        """True if save() sends a write or a conditional no-change request."""
         return not self.use_update or bool(self.updates) or self.update_expression is not None
 
 
@@ -168,7 +168,7 @@ def prepare_smart_save(
 
     Returns SmartSaveResult tuple with use_update flag indicating which operation to use.
     A model loaded with a projection always uses UpdateItem unless full_replace is set.
-    With no changes, updates is empty and nothing should be written.
+    With no updates or condition, no request is needed.
     """
     self._build_template_keys()
 

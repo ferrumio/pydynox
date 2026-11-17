@@ -250,8 +250,8 @@ class ModelBase(metaclass=ModelMeta):
     _original: dict[str, Any] | None
     _changed: set[str]
     _json_snapshots: dict[str, str | None]
-    # A projected read leaves out fields of the stored item. The model stays
-    # projected after a save, because the stored item still has those fields.
+    # A nonempty projection cannot prove that all stored fields were read.
+    # Keep projection protection after a save too.
     _projected: bool
     # Fields the read did not fetch, and fields it fetched only in part
     _not_fetched: frozenset[str]
@@ -352,7 +352,7 @@ class ModelBase(metaclass=ModelMeta):
 
     @property
     def _is_partial(self) -> bool:
-        """True if a projected read left out fields of the stored item."""
+        """True if the model was loaded with any nonempty projection."""
         return self._projected
 
     @property

@@ -57,15 +57,17 @@ def _project_item(item: dict[str, Any], paths: Sequence[Sequence[str | int]]) ->
             return [compact(child) for child in value]
         return value
 
-    return compact(result)
+    return cast(dict[str, Any], compact(result))
 
 
-def _projection_paths(projection_expression: str, names: dict[str, str] | None) -> list[list[str | int]]:
+def _projection_paths(
+    projection_expression: str, names: dict[str, str] | None
+) -> list[list[str | int]]:
     """Split a projection expression into attribute paths."""
     names = names or {}
     return [
         [
-            names.get(name, name) if name else int(index)
+            cast(str, names.get(name, name)) if name else int(index)
             for name, index in re.findall(r"([^\s.\[\]]+)|\[(\d+)\]", path)
         ]
         for path in projection_expression.split(",")
@@ -1765,8 +1767,11 @@ class MemoryClient:
         # Resolve attribute names
         resolved = condition
         if attr_names:
-            for placeholder, real_name in attr_names.items():
-                resolved = resolved.replace(placeholder, real_name)
+            resolved = re.sub(
+                r"#[A-Za-z0-9_]+",
+                lambda match: attr_names.get(match.group(), match.group()),
+                condition,
+            )
 
         # Split by AND
         parts = re.split(r"\s+AND\s+", resolved, flags=re.IGNORECASE)

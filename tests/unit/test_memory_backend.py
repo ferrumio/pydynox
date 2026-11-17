@@ -963,3 +963,27 @@ async def test_query_and_scan_pages_apply_projection_expression(sync, projection
         assert queried == [expected]
         assert scanned == [expected]
         assert query_metrics.items_count == 1
+
+
+@pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
+async def test_query_list_projection_aliases_do_not_replace_longer_key_alias(sync):
+    """A projection alias can be a prefix of the key condition's alias."""
+    with MemoryBackend() as backend:
+        # GIVEN aliases whose dictionary order puts the shorter name first
+        client = backend.client
+        client.sync_put_item("users", {"pk": "USER#1", "profiles": [{"name": "Ann"}]})
+        kwargs = {
+            "projection_expression": "#p[0].#n",
+            "expression_attribute_names": {"#p": "profiles", "#n": "name", "#pk": "pk"},
+            "expression_attribute_values": {":pk": "USER#1"},
+        }
+
+        # WHEN querying with a list projection and a longer key alias
+        if sync:
+            items, _, _ = client.sync_query_page("users", "#pk = :pk", **kwargs)
+        else:
+            page = await client.query_page("users", "#pk = :pk", **kwargs)
+            items = page["items"]
+
+        # THEN alias resolution keeps the matching row
+        assert items == [{"profiles": [{"name": "Ann"}]}]
