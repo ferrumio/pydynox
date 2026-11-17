@@ -8,6 +8,7 @@ import inspect
 import math
 import re
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Context, Decimal, localcontext
@@ -29,28 +30,44 @@ if TYPE_CHECKING:
     from pydynox._internal._metrics import OperationMetrics
 
 
-def _project_item(item: dict[str, Any], paths: list[list[str]]) -> dict[str, Any]:
+def _project_item(item: dict[str, Any], paths: Sequence[Sequence[str | int]]) -> dict[str, Any]:
     """Keep only the requested attributes, like a DynamoDB projection."""
-    result: dict[str, Any] = {}
+    result: dict[str | int, Any] = {}
     for parts in paths:
         source: Any = item
         for part in parts:
-            if not isinstance(source, dict) or part not in source:
+            if isinstance(source, dict) and isinstance(part, str) and part in source:
+                source = source[part]
+            elif isinstance(source, list) and isinstance(part, int) and 0 <= part < len(source):
+                source = source[part]
+            else:
                 break
-            source = source[part]
         else:
             target = result
             for part in parts[:-1]:
                 target = target.setdefault(part, {})
             target[parts[-1]] = copy.deepcopy(source)
-    return result
+
+    def compact(value: Any) -> Any:
+        if isinstance(value, dict):
+            if value and all(isinstance(key, int) for key in value):
+                return [compact(value[index]) for index in sorted(value)]
+            return {key: compact(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [compact(child) for child in value]
+        return value
+
+    return compact(result)
 
 
-def _projection_paths(projection_expression: str, names: dict[str, str] | None) -> list[list[str]]:
+def _projection_paths(projection_expression: str, names: dict[str, str] | None) -> list[list[str | int]]:
     """Split a projection expression into attribute paths."""
     names = names or {}
     return [
-        [names.get(part.strip(), part.strip()) for part in path.split(".")]
+        [
+            names.get(name, name) if name else int(index)
+            for name, index in re.findall(r"([^\s.\[\]]+)|\[(\d+)\]", path)
+        ]
         for path in projection_expression.split(",")
     ]
 

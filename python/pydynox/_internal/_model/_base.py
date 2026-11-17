@@ -455,22 +455,28 @@ class ModelBase(metaclass=ModelMeta):
     def _build_template_keys(self) -> None:
         """Build template key values from placeholder attributes."""
         for attr_name, attr in self._attributes.items():
-            if attr_name in self._not_fetched or not _is_template_attr(attr):
+            if not _is_template_attr(attr):
+                continue
+            if attr_name in self._not_fetched or any(
+                placeholder in self._not_fetched and getattr(self, placeholder, None) is None
+                for placeholder in attr.placeholders
+            ):
+                for placeholder in attr.placeholders:
+                    if placeholder in self._changed:
+                        raise ValueError(
+                            f"Cannot save '{attr_name}': its template depends on changed field "
+                            f"'{placeholder}', but the template or its dependencies were not fetched"
+                        )
                 continue
 
             # Collect values for all placeholders
             values = {}
             for placeholder in attr.placeholders:
                 val = getattr(self, placeholder, None)
-                if val is None and placeholder in self._not_fetched:
-                    # Keep the key as loaded: a placeholder was not fetched.
-                    break
                 if val is None:
                     raise ValueError(f"Cannot build {attr_name}: missing value for '{placeholder}'")
                 values[placeholder] = val
-            else:
-                # Build and set the key
-                setattr(self, attr_name, attr.build_key(values))
+            setattr(self, attr_name, attr.build_key(values))
 
     @classmethod
     def _get_client(cls) -> DynamoDBClient:

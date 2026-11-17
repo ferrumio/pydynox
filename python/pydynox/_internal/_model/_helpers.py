@@ -199,12 +199,24 @@ def prepare_smart_save(
     if not skip:
         self._run_hooks(HookType.BEFORE_SAVE)
 
+    # Detect in-place mutations on typed JSONAttributes before deciding
+    self._detect_json_mutations()
+    partial = self._is_partial
+    if partial:
+        self._detect_projected_mutations()
+
     self._apply_auto_generate()
 
     version_attr = self._get_version_attr_name()
-    partial = self._is_partial
     if partial:
         _check_partial_save(self, version_attr)
+    if not full_replace:
+        for field_name in self._changed:
+            if field_name in self._partly_fetched:
+                raise ValueError(
+                    f"Cannot save '{field_name}': it was loaded with a nested projection, "
+                    "so saving it would replace the whole attribute"
+                )
     version_condition, new_version = self._build_version_condition()
 
     final_condition = condition
@@ -231,25 +243,12 @@ def prepare_smart_save(
     client = self._get_client()
     table = self._get_table()
 
-    # Detect in-place mutations on typed JSONAttributes before deciding
-    self._detect_json_mutations()
-    if partial:
-        self._detect_projected_mutations()
-
     # Decide: UpdateItem (smart) or PutItem (full)
     # Use UpdateItem if: has original (loaded from DB), has changes, not full_replace.
     # A projected model also uses UpdateItem with no changes, so PutItem
     # never replaces the fields it did not fetch.
     has_changes = self._original is not None and len(self._changed) > 0
     use_update = (partial or has_changes) and not full_replace
-
-    if use_update:
-        for field_name in self._changed:
-            if field_name in self._partly_fetched:
-                raise ValueError(
-                    f"Cannot save '{field_name}': it was loaded with a nested projection, "
-                    "so saving it would replace the whole attribute"
-                )
 
     if use_update:
         # Smart update: only send changed fields

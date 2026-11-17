@@ -877,15 +877,60 @@ async def test_model_batch_get_projection_as_dict_has_only_projected_fields(sync
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("sync", [False, True], ids=["async", "sync"])
-async def test_query_and_scan_pages_apply_projection_expression(sync):
+@pytest.mark.parametrize(
+    ("projection", "expected"),
+    [
+        ("#n, #a.city", {"name": "Ann", "addr": {"city": "Lisbon"}}),
+        ("#t[0]", {"tags": ["a"]}),
+        ("#t[2], #t[0]", {"tags": ["a", "c"]}),
+        ("#a.#t[1]", {"addr": {"tags": ["y"]}}),
+        (
+            "#p[1].#n, #p[0].#a.city, #p[1].#a.city",
+            {
+                "profiles": [
+                    {"addr": {"city": "Lisbon"}},
+                    {"name": "Bob", "addr": {"city": "Porto"}},
+                ]
+            },
+        ),
+        ("#m[1][0], #m[0][1]", {"matrix": [[2], [3]]}),
+        ("#l[0]", {"literal.tags[raw]": ["literal"]}),
+        ("#t[99]", {}),
+        ("#t[0].#n", {}),
+        ("#p[0].missing", {}),
+        ("empty[0], missing[0]", {}),
+        ("#t", {"tags": ["a", "b", "c"]}),
+    ],
+)
+async def test_query_and_scan_pages_apply_projection_expression(sync, projection, expected):
     """Query and scan pages return only the projected attributes."""
     with MemoryBackend() as backend:
         # GIVEN a stored item with a nested map
         client = backend.client
-        item = {"pk": "USER#1", "name": "Ann", "age": 30, "addr": {"city": "Lisbon", "zip": "1000"}}
+        item = {
+            "pk": "USER#1",
+            "name": "Ann",
+            "age": 30,
+            "addr": {"city": "Lisbon", "zip": "1000", "tags": ["x", "y"]},
+            "tags": ["a", "b", "c"],
+            "profiles": [
+                {"name": "Ann", "addr": {"city": "Lisbon"}},
+                {"name": "Bob", "addr": {"city": "Porto"}},
+            ],
+            "matrix": [[1, 2], [3, 4]],
+            "literal.tags[raw]": ["literal", "other"],
+            "empty": [],
+        }
         client.sync_put_item("users", item)
-        projection = "#n, #a.city"
-        names = {"#pk": "pk", "#n": "name", "#a": "addr"}
+        names = {
+            "#pk": "pk",
+            "#n": "name",
+            "#a": "addr",
+            "#t": "tags",
+            "#p": "profiles",
+            "#m": "matrix",
+            "#l": "literal.tags[raw]",
+        }
         values = {":pk": "USER#1"}
 
         # WHEN querying and scanning with a projection expression
@@ -915,7 +960,6 @@ async def test_query_and_scan_pages_apply_projection_expression(sync):
             scanned = scan_page["items"]
 
         # THEN only the projected paths come back
-        expected = {"name": "Ann", "addr": {"city": "Lisbon"}}
         assert queried == [expected]
         assert scanned == [expected]
         assert query_metrics.items_count == 1

@@ -302,6 +302,83 @@ async def test_save_keeps_template_key_when_placeholder_not_fetched(sync):
 
 @pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
 @pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize("missing_placeholder", [False, True])
+async def test_save_rejects_changes_to_skipped_template_dependencies(how, sync, missing_placeholder):
+    class IndexedOrder(Model):
+        model_config = ModelConfig(table="indexed_orders")
+        pk = StringAttribute(partition_key=True)
+        status = StringAttribute()
+        tenant = StringAttribute()
+        gsi_pk = StringAttribute(
+            template="STATE#{tenant}#{status}" if missing_placeholder else "STATE#{status}",
+            alias="state_key",
+        )
+        note = StringAttribute()
+        version = VersionAttribute()
+
+    with MemoryBackend() as backend:
+        await IndexedOrder(pk="O#1", status="new", tenant="T#1", note="old").save()
+        stored = backend.client.sync_get_item("indexed_orders", {"pk": "O#1"})
+        fields = ["pk", "status", "note", "version"]
+        if missing_placeholder:
+            fields.append("gsi_pk")
+        order = await _load(IndexedOrder, how, sync, fields, pk="O#1")
+        expected_key = stored["state_key"] if missing_placeholder else None
+        assert order.gsi_pk == expected_key
+
+        order.status = "paid"
+        with pytest.raises(ValueError, match="Cannot save 'gsi_pk'.*'status'"):
+            await _save(order, sync)
+        assert order.version == 1
+        assert order.gsi_pk == expected_key
+        assert backend.client.sync_get_item("indexed_orders", {"pk": "O#1"}) == stored
+
+        order.status = "new"
+        order.note = "updated"
+        await _save(order, sync)
+        assert order.gsi_pk == expected_key
+        assert backend.client.sync_get_item("indexed_orders", {"pk": "O#1"}) == {
+            **stored,
+            "note": "updated",
+            "version": 2,
+        }
+
+        order = await _load(
+            IndexedOrder, how, sync, ["pk", "status", "tenant", "gsi_pk", "version"], pk="O#1"
+        )
+        order.status = "paid"
+        await _save(order, sync)
+        expected_key = "STATE#T#1#paid" if missing_placeholder else "STATE#paid"
+        assert backend.client.sync_get_item("indexed_orders", {"pk": "O#1"}) == {
+            **stored,
+            "status": "paid",
+            "state_key": expected_key,
+            "note": "updated",
+            "version": 3,
+        }
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+async def test_save_rejects_mutated_skipped_template_dependency(sync):
+    class TaggedOrder(Model):
+        model_config = ModelConfig(table="tagged_orders")
+        pk = StringAttribute(partition_key=True)
+        tags = ListAttribute()
+        label = StringAttribute(template="TAGS#{tags}")
+
+    with MemoryBackend() as backend:
+        await TaggedOrder(pk="O#1", tags=["new"]).save()
+        stored = backend.client.sync_get_item("tagged_orders", {"pk": "O#1"})
+        order = await _load(TaggedOrder, "scan", sync, ["pk", "tags"], pk="O#1")
+        order.tags.append("paid")
+        with pytest.raises(ValueError, match="Cannot save 'label'.*'tags'"):
+            await _save(order, sync)
+        assert order.label is None
+        assert backend.client.sync_get_item("tagged_orders", {"pk": "O#1"}) == stored
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
 async def test_unfetched_template_key_stays_none(how, sync):
     with MemoryBackend() as backend:
         Order(order_id="1", status="new").sync_save()
@@ -417,6 +494,45 @@ async def test_save_refuses_field_fetched_with_nested_path(sync):
         with pytest.raises(ValueError, match="Cannot save 'address'"):
             await _save(profile, sync)
         assert backend.client.sync_get_item("profiles", {"pk": "P#1"}) == stored
+
+
+@pytest.mark.parametrize("sync", MODES, ids=["async", "sync"])
+@pytest.mark.parametrize("how", LOADERS)
+@pytest.mark.parametrize("in_place", [False, True])
+async def test_nested_projection_rejection_preserves_version_for_retry(how, sync, in_place):
+    class VersionedProfile(Model):
+        model_config = ModelConfig(table="versioned_profiles")
+        pk = StringAttribute(partition_key=True)
+        title = StringAttribute()
+        address = MapAttribute()
+        version = VersionAttribute()
+
+    with MemoryBackend() as backend:
+        await VersionedProfile(
+            pk="P#1", title="old", address={"city": "Lisbon", "street": "Main"}
+        ).save()
+        stored = backend.client.sync_get_item("versioned_profiles", {"pk": "P#1"})
+        profile = await _load(
+            VersionedProfile, how, sync, ["pk", "title", "address.city", "version"], pk="P#1"
+        )
+        if in_place:
+            profile.address["city"] = "Porto"
+        else:
+            profile.address = {"city": "Porto"}
+        with pytest.raises(ValueError, match="Cannot save 'address'"):
+            await _save(profile, sync)
+        assert profile.version == 1
+        assert backend.client.sync_get_item("versioned_profiles", {"pk": "P#1"}) == stored
+
+        profile.address = {"city": "Lisbon"}
+        profile.title = "new"
+        await _save(profile, sync)
+        assert profile.version == 2
+        assert backend.client.sync_get_item("versioned_profiles", {"pk": "P#1"}) == {
+            **stored,
+            "title": "new",
+            "version": 2,
+        }
 
 
 def test_save_after_update_tracks_saved_fields():
