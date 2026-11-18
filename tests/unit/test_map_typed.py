@@ -3,6 +3,7 @@
 import dataclasses
 from typing import Any
 
+import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import MapAttribute, StringAttribute
 from pydynox.testing import MemoryBackend
@@ -200,3 +201,58 @@ def test_map_with_plain_class_serializes_value_as_is():
 
     # THEN the same value is returned unchanged
     assert result is value
+
+
+@dataclasses.dataclass
+class Order:
+    quantity: int
+    note: str | None = None
+    total: int = dataclasses.field(init=False)
+
+    def __post_init__(self) -> None:
+        self.total = self.quantity * 10
+
+
+class Cart(Model):
+    model_config = ModelConfig(table="carts")
+    pk = StringAttribute(partition_key=True)
+    order = MapAttribute(Order)
+
+
+@pytest.mark.parametrize("note", [None, "gift"])
+def test_typed_map_round_trips_init_false_field(note):
+    """deserialize leaves init=False fields to __post_init__, not the constructor."""
+    attr = MapAttribute(Order)
+    original = Order(quantity=3, note=note)
+
+    restored = attr.deserialize(attr.serialize(original))
+
+    assert restored == original
+    assert restored.total == 30
+
+
+def test_typed_map_recomputes_stored_init_false_field():
+    """A stored value for an init=False field is ignored and rebuilt by __post_init__."""
+    attr = MapAttribute(Order)
+
+    restored = attr.deserialize({"quantity": 2, "note": None, "total": 999})
+
+    assert restored.total == 20
+
+
+def test_typed_map_round_trips_plain_dataclass():
+    """A dataclass without init=False fields still round-trips."""
+    attr = MapAttribute(Address)
+
+    assert attr.deserialize(attr.serialize(SAMPLE_ADDRESS)) == SAMPLE_ADDRESS
+
+
+@MemoryBackend()
+def test_typed_map_init_false_field_survives_save_and_get():
+    """A dataclass with an init=False field loads back after a save."""
+    Cart(pk="CART#1", order=Order(quantity=4)).sync_save()
+
+    loaded = Cart.sync_get(pk="CART#1")
+
+    assert loaded.order == Order(quantity=4)
+    assert loaded.order.total == 40

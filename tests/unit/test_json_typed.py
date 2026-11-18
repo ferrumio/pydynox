@@ -4,6 +4,7 @@ import dataclasses
 import sys
 from typing import Any
 
+import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import JSONAttribute, StringAttribute
 from pydynox.testing import MemoryBackend
@@ -242,3 +243,59 @@ def test_typed_json_without_pydantic_serializes_value_as_is(monkeypatch):
 
     # THEN the value is dumped without conversion
     assert result == '{"theme": "dark"}'
+
+
+@dataclasses.dataclass
+class Score:
+    points: int
+    player: str | None = None
+    doubled: int = dataclasses.field(init=False)
+
+    def __post_init__(self) -> None:
+        self.doubled = self.points * 2
+
+
+class Match(Model):
+    model_config = ModelConfig(table="matches")
+    pk = StringAttribute(partition_key=True)
+    score = JSONAttribute(Score)
+
+
+@pytest.mark.parametrize("player", [None, "ana"])
+def test_typed_json_round_trips_init_false_field(player):
+    """deserialize leaves init=False fields to __post_init__, not the constructor."""
+    attr = JSONAttribute(Score)
+    original = Score(points=3, player=player)
+
+    restored = attr.deserialize(attr.serialize(original))
+
+    assert restored == original
+    assert restored.doubled == 6
+
+
+def test_typed_json_recomputes_stored_init_false_field():
+    """A stored value for an init=False field is ignored and rebuilt by __post_init__."""
+    attr = JSONAttribute(Score)
+
+    restored = attr.deserialize('{"points": 5, "player": null, "doubled": 999}')
+
+    assert restored.doubled == 10
+
+
+def test_typed_json_round_trips_plain_dataclass():
+    """A dataclass without init=False fields still round-trips."""
+    attr = JSONAttribute(Payload)
+    original = Payload(region="us-east-1", score=0.95)
+
+    assert attr.deserialize(attr.serialize(original)) == original
+
+
+@MemoryBackend()
+def test_typed_json_init_false_field_survives_save_and_get():
+    """A dataclass with an init=False field loads back after a save."""
+    Match(pk="MATCH#1", score=Score(points=4)).sync_save()
+
+    loaded = Match.sync_get(pk="MATCH#1")
+
+    assert loaded.score == Score(points=4)
+    assert loaded.score.doubled == 8
