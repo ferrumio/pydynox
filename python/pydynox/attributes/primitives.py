@@ -316,7 +316,7 @@ class MapAttribute(Attribute[MT], Generic[MT]):
         model_class = self.model_class
         if not dataclasses.is_dataclass(model_class):
             return value
-        fields = {f.name for f in dataclasses.fields(model_class)}
+        fields = {f.name for f in dataclasses.fields(model_class) if f.init}
         return self.model_class(**{k: v for k, v in value.items() if k in fields})
 
     def _snapshot_key(self, value: Any) -> str | None:

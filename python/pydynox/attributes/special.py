@@ -115,6 +115,9 @@ class JSONAttribute(Attribute[J], Generic[J]):
         model_class = self.model_class
         if model_class is None:
             return data
+        if dataclasses.is_dataclass(model_class) and isinstance(data, dict):
+            skipped = {f.name for f in dataclasses.fields(model_class) if not f.init}
+            data = {k: v for k, v in data.items() if k not in skipped}
         return model_class(**data)
 
     def serialize(self, value: Any | None) -> str | None:
