@@ -1,9 +1,13 @@
 """Tests for typed JSONAttribute with Pydantic models and dataclasses."""
 
 import dataclasses
+import json
 import sys
+from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
+import pytest
 from pydynox import Model, ModelConfig
 from pydynox.attributes import JSONAttribute, StringAttribute
 from pydynox.testing import MemoryBackend
@@ -242,3 +246,89 @@ def test_typed_json_without_pydantic_serializes_value_as_is(monkeypatch):
 
     # THEN the value is dumped without conversion
     assert result == '{"theme": "dark"}'
+
+
+# --- Pydantic JSON-mode serialization ---
+
+
+def _pydantic_models():
+    pydantic = pytest.importorskip("pydantic")
+
+    class OnlyDate(pydantic.BaseModel):
+        created_at: datetime
+
+    class OnlyId(pydantic.BaseModel):
+        request_id: UUID
+
+    class Both(pydantic.BaseModel):
+        created_at: datetime
+        request_id: UUID
+
+    class Item(pydantic.BaseModel):
+        name: str
+        at: datetime
+
+    class Names(pydantic.RootModel[list[str]]):
+        pass
+
+    return OnlyDate, OnlyId, Both, Item, Names
+
+
+_TS = datetime(2026, 1, 1, tzinfo=timezone.utc)
+_ID = UUID("12345678-1234-5678-1234-567812345678")
+
+
+def test_pydantic_datetime_round_trip():
+    only_date = _pydantic_models()[0]
+    attr = JSONAttribute(only_date)
+    value = only_date(created_at=_TS)
+    serialized = attr.serialize(value)
+    assert isinstance(json.loads(serialized)["created_at"], str)
+    assert attr.deserialize(serialized) == value
+
+
+def test_pydantic_uuid_round_trip():
+    only_id = _pydantic_models()[1]
+    attr = JSONAttribute(only_id)
+    value = only_id(request_id=_ID)
+    serialized = attr.serialize(value)
+    assert json.loads(serialized)["request_id"] == str(_ID)
+    assert attr.deserialize(serialized) == value
+
+
+def test_pydantic_datetime_and_uuid_round_trip():
+    both = _pydantic_models()[2]
+    attr = JSONAttribute(both)
+    value = both(created_at=_TS, request_id=_ID)
+    assert attr.deserialize(attr.serialize(value)) == value
+
+
+@MemoryBackend()
+def test_pydantic_datetime_and_uuid_model_round_trip():
+    both = _pydantic_models()[2]
+
+    class Doc(Model):
+        model_config = ModelConfig(table="docs")
+        pk = StringAttribute(partition_key=True)
+        payload = JSONAttribute(both)
+
+    value = both(created_at=_TS, request_id=_ID)
+    Doc(pk="1", payload=value).sync_save()
+    loaded = Doc.sync_get(pk="1")
+    assert loaded.payload == value
+    assert loaded.payload.request_id == _ID
+
+
+def test_pydantic_root_model_and_containers_round_trip():
+    _, _, _, item, names = _pydantic_models()
+    root = names(["a", "b"])
+    attr = JSONAttribute(names)
+    assert attr.deserialize(attr.serialize(root)) == root
+
+    items = [item(name="x", at=_TS)]
+    list_attr = JSONAttribute(list[item])
+    assert list_attr.deserialize(list_attr.serialize(items)) == items
+
+    mapping = {"k": item(name="y", at=_TS)}
+    dict_attr = JSONAttribute(dict[str, item])
+    assert dict_attr.deserialize(dict_attr.serialize(mapping)) == mapping
