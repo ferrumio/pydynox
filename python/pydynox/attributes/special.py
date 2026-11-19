@@ -101,7 +101,7 @@ class JSONAttribute(Attribute[J], Generic[J]):
         """Convert a typed model instance to a dict for JSON serialization."""
         data: dict[str, Any] | list[Any]
         if self._type_adapter is not None:
-            data = self._type_adapter.dump_python(value, mode="python")
+            data = self._type_adapter.dump_python(value, mode="json")
         elif self._is_dataclass:
             data = dataclasses.asdict(value)
         else:
@@ -120,7 +120,8 @@ class JSONAttribute(Attribute[J], Generic[J]):
     def serialize(self, value: Any | None) -> str | None:
         """Convert value to JSON string.
 
-        For typed models, calls model_dump() or dataclasses.asdict() first.
+        For typed Pydantic models, uses Pydantic JSON mode (datetime, UUID become strings).
+        For dataclasses, calls dataclasses.asdict() first.
 
         Args:
             value: Dict, list, or typed model instance to serialize.
