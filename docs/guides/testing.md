@@ -174,6 +174,7 @@ The memory backend supports:
 | `update()` | ✓ |
 | `query()` | ✓ |
 | `scan()` | ✓ |
+| `count()` | ✓ |
 | `batch_write()` | ✓ |
 | `batch_get()` | ✓ |
 | Vector search | ✓ |
