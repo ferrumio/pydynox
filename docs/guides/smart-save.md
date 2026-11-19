@@ -14,6 +14,8 @@ Note that it doesn't save on WCUs as DynamoDB still charges based on the size of
 
 When you load an item from DynamoDB, pydynox stores a snapshot of the original values. When you call `save()`, it compares current values with the original and only sends the changed fields using `UpdateItem`.
 
+For partial reads, see [saving a projected model](projections.md#saving-a-projected-model).
+
 === "basic.py"
     ```python
     --8<-- "docs/examples/smart_save/basic.py"

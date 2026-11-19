@@ -183,9 +183,10 @@ class Model(ModelBase, metaclass=ModelMeta):
     ) -> None:
         """Save the model to DynamoDB (sync).
 
-        Uses smart update by default: only sends changed fields to DynamoDB,
-        saving WCU costs. For items loaded from DB, uses UpdateItem. For new
-        items, uses PutItem.
+        Uses UpdateItem for changed fields on loaded models and PutItem for new
+        models or full replacements. A projected model never falls back to
+        PutItem unless full_replace=True. See the field projections guide for
+        projected-save rules, including saves without user changes.
 
         Args:
             condition: Optional condition that must be true for the write.
@@ -196,6 +197,11 @@ class Model(ModelBase, metaclass=ModelMeta):
         Raises:
             ConditionalCheckFailedException: If the condition is not met.
             ItemTooLargeException: If item exceeds max_size in model_config.
+                For a model loaded with a projection, only fetched fields and
+                explicitly assigned fields count toward max_size.
+            ValueError: If a model loaded with a projection is missing its key
+                or version, changes a field fetched with a nested path, or
+                changes a dependency of a template that cannot be rebuilt.
 
         Example:
             >>> user = User(pk="USER#1", sk="PROFILE", name="John")
@@ -318,8 +324,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             keys: List of key dicts (each with partition_key and optional sort_key).
             consistent_read: Use strongly consistent read.
             as_dict: If True, return dicts instead of Model instances.
-            projection: List of attribute names to fetch. Other fields get their
-                default or None. Required fields must be included.
+            projection: List of attribute names to fetch. Other fields are None,
+                and save() only writes the fields you change.
                 Key attributes are not added for you.
 
         Returns:
@@ -384,8 +390,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             keys: List of key dicts (each with partition_key and optional sort_key).
             consistent_read: Use strongly consistent read.
             as_dict: If True, return dicts instead of Model instances.
-            projection: List of attribute names to fetch. Other fields get their
-                default or None. Required fields must be included.
+            projection: List of attribute names to fetch. Other fields are None,
+                and save() only writes the fields you change.
                 Key attributes are not added for you.
 
         Returns:
@@ -464,9 +470,10 @@ class Model(ModelBase, metaclass=ModelMeta):
     ) -> None:
         """Save the model to DynamoDB (async, default).
 
-        Uses smart update by default: only sends changed fields to DynamoDB,
-        saving WCU costs. For items loaded from DB, uses UpdateItem. For new
-        items, uses PutItem.
+        Uses UpdateItem for changed fields on loaded models and PutItem for new
+        models or full replacements. A projected model never falls back to
+        PutItem unless full_replace=True. See the field projections guide for
+        projected-save rules, including saves without user changes.
 
         Args:
             condition: Optional condition that must be true for the write.
@@ -477,6 +484,11 @@ class Model(ModelBase, metaclass=ModelMeta):
         Raises:
             ConditionalCheckFailedException: If the condition is not met.
             ItemTooLargeException: If item exceeds max_size in model_config.
+                For a model loaded with a projection, only fetched fields and
+                explicitly assigned fields count toward max_size.
+            ValueError: If a model loaded with a projection is missing its key
+                or version, changes a field fetched with a nested path, or
+                changes a dependency of a template that cannot be rebuilt.
 
         Example:
             >>> user = User(pk="USER#1", sk="PROFILE", name="John")
@@ -639,7 +651,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             consistent_read: Use strongly consistent read.
             last_evaluated_key: Start key for pagination.
             as_dict: If True, return dicts instead of Model instances.
-            fields: List of fields to return. Saves RCU.
+            fields: List of fields to return. Other fields are None, and save()
+                only writes the fields you change.
             **kwargs: Template placeholder values (e.g., user_id="123").
 
         Returns:
@@ -739,7 +752,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             segment: Segment number for parallel scan.
             total_segments: Total segments for parallel scan.
             as_dict: If True, return dicts instead of Model instances.
-            fields: List of fields to return. Saves RCU.
+            fields: List of fields to return. Other fields are None, and save()
+                only writes the fields you change.
 
         Returns:
             Iterable result that auto-paginates.
@@ -944,7 +958,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             consistent_read: Use strongly consistent read.
             last_evaluated_key: Start key for pagination.
             as_dict: If True, return dicts instead of Model instances.
-            fields: List of fields to return. Saves RCU.
+            fields: List of fields to return. Other fields are None, and save()
+                only writes the fields you change.
             **kwargs: Template placeholder values (e.g., user_id="123").
 
         Returns:
@@ -1044,7 +1059,8 @@ class Model(ModelBase, metaclass=ModelMeta):
             segment: Segment number for parallel scan.
             total_segments: Total segments for parallel scan.
             as_dict: If True, return dicts instead of Model instances.
-            fields: List of fields to return. Saves RCU.
+            fields: List of fields to return. Other fields are None, and save()
+                only writes the fields you change.
 
         Returns:
             Async iterable result that auto-paginates.

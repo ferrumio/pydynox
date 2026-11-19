@@ -8,6 +8,7 @@ import inspect
 import math
 import re
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Context, Decimal, localcontext
@@ -29,21 +30,48 @@ if TYPE_CHECKING:
     from pydynox._internal._metrics import OperationMetrics
 
 
-def _project_item(item: dict[str, Any], paths: list[list[str]]) -> dict[str, Any]:
+def _project_item(item: dict[str, Any], paths: Sequence[Sequence[str | int]]) -> dict[str, Any]:
     """Keep only the requested attributes, like a DynamoDB projection."""
-    result: dict[str, Any] = {}
+    result: dict[str | int, Any] = {}
     for parts in paths:
         source: Any = item
         for part in parts:
-            if not isinstance(source, dict) or part not in source:
+            if isinstance(source, dict) and isinstance(part, str) and part in source:
+                source = source[part]
+            elif isinstance(source, list) and isinstance(part, int) and 0 <= part < len(source):
+                source = source[part]
+            else:
                 break
-            source = source[part]
         else:
             target = result
             for part in parts[:-1]:
                 target = target.setdefault(part, {})
             target[parts[-1]] = copy.deepcopy(source)
-    return result
+
+    def compact(value: Any) -> Any:
+        if isinstance(value, dict):
+            if value and all(isinstance(key, int) for key in value):
+                return [compact(value[index]) for index in sorted(value)]
+            return {key: compact(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [compact(child) for child in value]
+        return value
+
+    return cast(dict[str, Any], compact(result))
+
+
+def _projection_paths(
+    projection_expression: str, names: dict[str, str] | None
+) -> list[list[str | int]]:
+    """Split a projection expression into attribute paths."""
+    names = names or {}
+    return [
+        [
+            cast(str, names.get(name, name)) if name else int(index)
+            for name, index in re.findall(r"([^\s.\[\]]+)|\[(\d+)\]", path)
+        ]
+        for path in projection_expression.split(",")
+    ]
 
 
 def _decode_item(item: dict[str, Any], schema: NumberSchema | None) -> dict[str, Any]:
@@ -889,8 +917,12 @@ class MemoryClient:
             index_name,
         )
         metrics = result["metrics"]
-        metrics.items_count = len(result["items"])
-        return result["items"], result["last_evaluated_key"], metrics
+        items = result["items"]
+        if projection_expression:
+            paths = _projection_paths(projection_expression, expression_attribute_names)
+            items = [_project_item(item, paths) for item in items]
+        metrics.items_count = len(items)
+        return items, result["last_evaluated_key"], metrics
 
     def _do_scan_page(
         self,
@@ -920,8 +952,12 @@ class MemoryClient:
             index_name,
         )
         metrics = result["metrics"]
-        metrics.items_count = len(result["items"])
-        return result["items"], result["last_evaluated_key"], metrics
+        items = result["items"]
+        if projection_expression:
+            paths = _projection_paths(projection_expression, expression_attribute_names)
+            items = [_project_item(item, paths) for item in items]
+        metrics.items_count = len(items)
+        return items, result["last_evaluated_key"], metrics
 
     # ========== SYNC QUERY/SCAN (sync_ prefix) ==========
 
@@ -1731,8 +1767,11 @@ class MemoryClient:
         # Resolve attribute names
         resolved = condition
         if attr_names:
-            for placeholder, real_name in attr_names.items():
-                resolved = resolved.replace(placeholder, real_name)
+            resolved = re.sub(
+                r"#[A-Za-z0-9_]+",
+                lambda match: attr_names.get(match.group(), match.group()),
+                condition,
+            )
 
         # Split by AND
         parts = re.split(r"\s+AND\s+", resolved, flags=re.IGNORECASE)

@@ -6,7 +6,7 @@ Generate IDs and timestamps automatically when saving items.
 
 - Generate UUIDs, ULIDs, KSUIDs for unique identifiers
 - Generate timestamps in epoch or ISO 8601 format
-- Values generated on `save()` only when attribute is `None`
+- Values generated on `save()` only when attribute is `None`, subject to the [projected model rules](projections.md#saving-a-projected-model)
 - Thread-safe for concurrent async operations
 - Fast Rust implementation
 

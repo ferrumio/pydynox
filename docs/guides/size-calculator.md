@@ -82,6 +82,8 @@ Item key: {'pk': 'POST#1', 'sk': 'COMMENT#1'}
 
 The check happens before calling DynamoDB. This saves you a round trip and gives a clearer error message.
 
+For partial reads, see the [projected model size-check limit](projections.md#saving-a-projected-model).
+
 ## How DynamoDB calculates size
 
 DynamoDB counts bytes differently for each type:
