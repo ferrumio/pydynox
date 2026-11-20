@@ -7,7 +7,7 @@ import struct
 from collections.abc import Sequence
 from typing import Any
 
-from pydynox.attributes.base import Attribute
+from pydynox.attributes.base import UNSET, Attribute, Unset
 
 
 class VectorAttribute(Attribute[list[float]]):
@@ -22,6 +22,7 @@ class VectorAttribute(Attribute[list[float]]):
         default: list[float] | None = None,
         required: bool = False,
         alias: str | None = None,
+        default_for_new: list[float] | None | Unset = UNSET,
     ) -> None:
         if isinstance(dimensions, bool) or not isinstance(dimensions, int):
             raise TypeError("dimensions must be an integer")
@@ -32,6 +33,7 @@ class VectorAttribute(Attribute[list[float]]):
             default=default,
             required=required,
             alias=alias,
+            default_for_new=default_for_new,
         )
         self.dimensions = dimensions
 
