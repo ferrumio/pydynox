@@ -132,14 +132,16 @@ async def _update_method(self: object, **kwargs: Any) -> None:
     """Update specific attributes (async)."""
     cls = self.__class__
 
-    # Validate if validator provided (Pydantic)
+    # Validate if validator provided (Pydantic). Send the validated mapping
+    # so DynamoDB stores coerced types (e.g. count="2" → 2), not raw kwargs.
     if cls._pydynox_validate_update:  # type: ignore
-        validated = cls._pydynox_validate_update(self, kwargs)  # type: ignore
-        for attr_name, value in kwargs.items():
-            setattr(self, attr_name, validated.get(attr_name, value))
+        updates = cls._pydynox_validate_update(self, kwargs)  # type: ignore
+        for attr_name, value in updates.items():
+            setattr(self, attr_name, value)
     else:
         # Simple update (dataclass)
-        for attr_name, value in kwargs.items():
+        updates = kwargs
+        for attr_name, value in updates.items():
             if not hasattr(self, attr_name):
                 raise AttributeError(f"'{cls.__name__}' has no attribute '{attr_name}'")
             setattr(self, attr_name, value)
@@ -147,21 +149,23 @@ async def _update_method(self: object, **kwargs: Any) -> None:
     # Update in DynamoDB
     client = cls._get_client()  # type: ignore
     key = self._get_key()  # type: ignore
-    await client.update_item(cls._pydynox_table, key, updates=kwargs)  # type: ignore
+    await client.update_item(cls._pydynox_table, key, updates=updates)  # type: ignore
 
 
 def _sync_update_method(self: object, **kwargs: Any) -> None:
     """Update specific attributes (sync)."""
     cls = self.__class__
 
-    # Validate if validator provided (Pydantic)
+    # Validate if validator provided (Pydantic). Send the validated mapping
+    # so DynamoDB stores coerced types (e.g. count="2" → 2), not raw kwargs.
     if cls._pydynox_validate_update:  # type: ignore
-        validated = cls._pydynox_validate_update(self, kwargs)  # type: ignore
-        for attr_name, value in kwargs.items():
-            setattr(self, attr_name, validated.get(attr_name, value))
+        updates = cls._pydynox_validate_update(self, kwargs)  # type: ignore
+        for attr_name, value in updates.items():
+            setattr(self, attr_name, value)
     else:
         # Simple update (dataclass)
-        for attr_name, value in kwargs.items():
+        updates = kwargs
+        for attr_name, value in updates.items():
             if not hasattr(self, attr_name):
                 raise AttributeError(f"'{cls.__name__}' has no attribute '{attr_name}'")
             setattr(self, attr_name, value)
@@ -169,7 +173,7 @@ def _sync_update_method(self: object, **kwargs: Any) -> None:
     # Update in DynamoDB
     client = cls._get_client()  # type: ignore
     key = self._get_key()  # type: ignore
-    client.sync_update_item(cls._pydynox_table, key, updates=kwargs)  # type: ignore
+    client.sync_update_item(cls._pydynox_table, key, updates=updates)  # type: ignore
 
 
 def _get_key_method(self: object) -> dict[str, Any]:
