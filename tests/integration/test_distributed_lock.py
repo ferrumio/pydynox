@@ -303,8 +303,9 @@ def fault_proxy(upstream, target, mode):
             if inject:
                 committed.set()
                 if mode == "lost_response":
-                    # Native per-request timeout is 0.4s for these tests.
-                    time.sleep(0.55)
+                    # Keep the response unavailable until test cleanup, so the
+                    # native request must time out regardless of scheduling.
+                    allow.wait()
             try:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/x-amz-json-1.0")
@@ -331,11 +332,9 @@ def test_native_http_timeout_after_commit(localstack_endpoint, lock_table, lock_
     with fault_proxy(localstack_endpoint, operation, "lost_response") as proxy:
         endpoint, triggered, committed, _, counts = proxy
         client = make_client(endpoint)
-        with SyncDistributedLock(
-            client, table=lock_table, key=lock_key, lease_duration=1.2
-        ) as lease:
+        with SyncDistributedLock(client, table=lock_table, key=lock_key, lease_duration=3) as lease:
             if operation == "UpdateItem":
-                deadline = time.monotonic() + 3
+                deadline = time.monotonic() + 6
                 while lease.metrics.renewals < 1 and time.monotonic() < deadline:
                     time.sleep(0.01)
                 assert lease.metrics.renewals >= 1

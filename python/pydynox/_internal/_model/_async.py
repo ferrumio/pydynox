@@ -12,6 +12,7 @@ from pydynox._internal._model._helpers import (
     prepare_delete,
     prepare_delete_by_key,
     prepare_get,
+    prepare_save,
     prepare_smart_save,
     prepare_update,
     prepare_update_by_key,
@@ -53,19 +54,21 @@ async def save(
     full_replace: bool = False,
 ) -> None:
     """Async save model to DynamoDB (default). Uses smart update (only changed fields)."""
+    skip = prepare_save(self, skip_hooks, full_replace)
     _start_s3_metrics_collection()
     await self._upload_s3_files()
     s3_duration, s3_calls, s3_uploaded, s3_downloaded = _stop_s3_metrics_collection()
 
-    result = prepare_smart_save(self, condition, skip_hooks, full_replace)
+    result = prepare_smart_save(self, condition, skip, full_replace)
 
-    if result.use_update and result.updates:
+    if result.use_update and result.writes:
         # Smart update: UpdateItem with only changed fields
         if result.condition_expr is not None:
             await result.client.update_item(
                 result.table,
                 result.key_or_item,
-                updates=result.updates,
+                updates=result.updates or None,
+                update_expression=result.update_expression,
                 condition_expression=result.condition_expr,
                 expression_attribute_names=result.attr_names,
                 expression_attribute_values=result.attr_values,
@@ -74,7 +77,7 @@ async def save(
             await result.client.update_item(
                 result.table, result.key_or_item, updates=result.updates
             )
-    else:
+    elif not result.use_update:
         # Full replace: PutItem with all fields
         if result.condition_expr is not None:
             await result.client.put_item(
@@ -87,7 +90,7 @@ async def save(
         else:
             await result.client.put_item(result.table, result.key_or_item)
 
-    if result.client._last_metrics is not None:
+    if result.writes and result.client._last_metrics is not None:
         op_type = "update" if result.use_update else "put"
         self.__class__._record_metrics(result.client._last_metrics, op_type)
 
@@ -96,7 +99,7 @@ async def save(
             s3_duration, s3_calls, s3_uploaded, s3_downloaded
         )
 
-    finalize_save(self, result.skip_hooks)
+    finalize_save(self, result.skip_hooks, full_item=not result.use_update)
 
 
 async def delete(

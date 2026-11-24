@@ -12,6 +12,7 @@ from pydynox._internal._model._helpers import (
     prepare_delete,
     prepare_delete_by_key,
     prepare_get,
+    prepare_save,
     prepare_smart_save,
     prepare_update,
     prepare_update_by_key,
@@ -69,10 +70,10 @@ def save(
     full_replace: bool = False,
 ) -> None:
     """Save model to DynamoDB. Uses smart update by default (only changed fields)."""
+    skip = prepare_save(self, skip_hooks, full_replace)
     # Start S3 metrics collection for uploads
     _start_s3_metrics_collection()
 
-    # S3 upload before prepare (needs to happen before to_dict)
     self._sync_upload_s3_files()
 
     # Collect S3 metrics from uploads
@@ -81,26 +82,26 @@ def save(
     # Start KMS metrics collection for serialization
     _start_kms_metrics_collection()
 
-    # prepare: run BEFORE_SAVE hooks, auto-generate, version condition, size check
-    result = prepare_smart_save(self, condition, skip_hooks, full_replace)
+    result = prepare_smart_save(self, condition, skip, full_replace)
 
     # Collect KMS metrics from serialization
     kms_duration, kms_calls = _stop_kms_metrics_collection()
 
-    if result.use_update and result.updates:
+    if result.use_update and result.writes:
         # Smart update: UpdateItem with only changed fields
         if result.condition_expr is not None:
             result.client.sync_update_item(
                 result.table,
                 result.key_or_item,
-                updates=result.updates,
+                updates=result.updates or None,
+                update_expression=result.update_expression,
                 condition_expression=result.condition_expr,
                 expression_attribute_names=result.attr_names,
                 expression_attribute_values=result.attr_values,
             )
         else:
             result.client.sync_update_item(result.table, result.key_or_item, updates=result.updates)
-    else:
+    elif not result.use_update:
         # Full replace: PutItem with all fields
         if result.condition_expr is not None:
             result.client.sync_put_item(
@@ -114,7 +115,7 @@ def save(
             result.client.sync_put_item(result.table, result.key_or_item)
 
     # Record metrics from client
-    if result.client._last_metrics is not None:
+    if result.writes and result.client._last_metrics is not None:
         op_type = "update" if result.use_update else "put"
         self.__class__._record_metrics(result.client._last_metrics, op_type)
 
@@ -129,7 +130,7 @@ def save(
         )
 
     # finalize: run AFTER_SAVE hooks and reset change tracking
-    finalize_save(self, result.skip_hooks)
+    finalize_save(self, result.skip_hooks, full_item=not result.use_update)
 
 
 def delete(self: Model, condition: Condition | None = None, skip_hooks: bool | None = None) -> None:

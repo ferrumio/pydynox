@@ -31,8 +31,8 @@ async def batch_get(
         keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
-        projection: List of attribute names to fetch. Other fields get their
-            default or None. Required fields must be included.
+        projection: List of attribute names to fetch. Other fields are None,
+            and save() only writes the fields you change.
 
     Returns:
         List of model instances or dicts.
@@ -57,7 +57,7 @@ async def batch_get(
         return items
 
     # Convert to model instances
-    instances = [cls.from_dict(item) for item in items]
+    instances = [cls._from_projection(item, projection) for item in items]
 
     skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
     if not skip:
@@ -80,8 +80,8 @@ def sync_batch_get(
         keys: List of key dicts (each with partition_key and optional sort_key).
         consistent_read: If True, use strongly consistent read.
         as_dict: If True, return dicts instead of Model instances.
-        projection: List of attribute names to fetch. Other fields get their
-            default or None. Required fields must be included.
+        projection: List of attribute names to fetch. Other fields are None,
+            and save() only writes the fields you change.
 
     Returns:
         List of model instances or dicts.
@@ -106,7 +106,7 @@ def sync_batch_get(
         return items
 
     # Convert to model instances
-    instances = [cls.from_dict(item) for item in items]
+    instances = [cls._from_projection(item, projection) for item in items]
 
     skip = cls.model_config.skip_hooks if hasattr(cls, "model_config") else False
     if not skip:

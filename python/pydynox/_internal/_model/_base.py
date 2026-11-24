@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import copy
+from contextvars import ContextVar
+from graphlib import TopologicalSorter
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
 from pydynox._internal._decimal import model_read_client
@@ -22,6 +25,18 @@ if TYPE_CHECKING:
     from pydynox.client import DynamoDBClient
 
 M = TypeVar("M", bound="ModelBase")
+
+# The projection of the read that is calling from_dict, so a from_dict override
+# that calls super() still loads a projected item as a projected model.
+_PROJECTION: ContextVar[tuple[type, list[str]] | None] = ContextVar("_PROJECTION", default=None)
+
+
+def _snapshot(value: Any) -> Any:
+    """Copy a value so later in-place changes to it can be detected."""
+    try:
+        return copy.deepcopy(value)
+    except Exception:
+        return value
 
 
 class ModelMeta(type):
@@ -235,6 +250,12 @@ class ModelBase(metaclass=ModelMeta):
     _original: dict[str, Any] | None
     _changed: set[str]
     _json_snapshots: dict[str, str | None]
+    # A nonempty projection cannot prove that all stored fields were read.
+    # Keep projection protection after a save too.
+    _projected: bool
+    # Fields the read did not fetch, and fields it fetched only in part
+    _not_fetched: frozenset[str]
+    _partly_fetched: frozenset[str]
 
     def __init__(self, **kwargs: Any) -> None:
         config = getattr(type(self), "model_config", None)
@@ -247,6 +268,9 @@ class ModelBase(metaclass=ModelMeta):
         object.__setattr__(self, "_original", None)
         object.__setattr__(self, "_changed", set())
         object.__setattr__(self, "_json_snapshots", {})
+        object.__setattr__(self, "_projected", False)
+        object.__setattr__(self, "_not_fetched", frozenset())
+        object.__setattr__(self, "_partly_fetched", frozenset())
         # First pass: set all regular attributes
         for attr_name, attr in self._attributes.items():
             # Skip template keys in first pass - they'll be built later
@@ -303,7 +327,8 @@ class ModelBase(metaclass=ModelMeta):
         elif original is not None:
             changed = object.__getattribute__(self, "_changed")
             old_value = original.get(name)
-            if value != old_value:
+            # The stored value of a field that was not fetched is unknown.
+            if name in self._not_fetched or value != old_value:
                 changed.add(name)
             elif name in changed:
                 changed.discard(name)
@@ -326,6 +351,11 @@ class ModelBase(metaclass=ModelMeta):
         return len(self._changed) > 0
 
     @property
+    def _is_partial(self) -> bool:
+        """True if the model was loaded with any nonempty projection."""
+        return self._projected
+
+    @property
     def changed_fields(self) -> list[str]:
         """Get list of attribute names that changed since loading from DB.
 
@@ -340,11 +370,46 @@ class ModelBase(metaclass=ModelMeta):
         """
         return list(self._changed)
 
+    def _mark_saved(self, full_item: bool) -> None:
+        """Reset change tracking after save.
+
+        A full PutItem makes the stored item match this instance. An UpdateItem
+        only makes the changed fields known, so the model stays projected.
+        """
+        if full_item:
+            self._projected = False
+            self._not_fetched = frozenset()
+            self._partly_fetched = frozenset()
+        else:
+            self._not_fetched = self._not_fetched - self._changed
+        self._reset_change_tracking()
+
     def _reset_change_tracking(self) -> None:
         """Reset change tracking after save. Stores current state as original."""
-        self._original = {name: getattr(self, name) for name in self._attributes}
+        values = {name: getattr(self, name) for name in self._attributes}
+        if self._projected:
+            values = {name: _snapshot(value) for name, value in values.items()}
+        self._original = values
         self._changed = set()
         self._build_json_snapshots()
+
+    def _detect_projected_mutations(self) -> None:
+        """Detect in-place changes to the fields a projected read fetched.
+
+        A full save sends every field, so it stores in-place changes such as
+        list.append(). A projected save only sends changed fields, so it must
+        find them here. Typed JSON and map fields are checked by their snapshots.
+        """
+        original = self._original
+        if original is None:
+            return
+        for name in self._attributes:
+            if name in self._not_fetched or name in self._json_snapshots or name not in original:
+                continue
+            if getattr(self, name) != original[name]:
+                self._changed.add(name)
+            else:
+                self._changed.discard(name)
 
     def _build_json_snapshots(self) -> None:
         """Build JSON string snapshots for typed JSONAttributes and MapAttributes.
@@ -364,7 +429,7 @@ class ModelBase(metaclass=ModelMeta):
         """Detect in-place mutations on typed JSONAttributes and MapAttributes.
 
         Compares current serialized JSON against stored snapshots.
-        Adds mutated attributes to _changed set.
+        Reconciles fetched attributes in the _changed set.
         """
         if not self._json_snapshots:
             return
@@ -374,10 +439,15 @@ class ModelBase(metaclass=ModelMeta):
             current_json = attr._snapshot_key(current_value)
             if current_json != old_json:
                 self._changed.add(attr_name)
+            elif attr_name not in self._not_fetched:
+                self._changed.discard(attr_name)
 
     def _apply_auto_generate(self) -> None:
         """Apply auto-generate strategies to None attributes."""
         for attr_name, attr in self._attributes.items():
+            # A field that was not fetched may already have a stored value.
+            if attr_name in self._not_fetched:
+                continue
             if attr.default is not None and is_auto_generate(attr.default):
                 current_value = getattr(self, attr_name, None)
                 if current_value is None:
@@ -389,8 +459,27 @@ class ModelBase(metaclass=ModelMeta):
 
     def _build_template_keys(self) -> None:
         """Build template key values from placeholder attributes."""
-        for attr_name, attr in self._attributes.items():
-            if not _is_template_attr(attr):
+        templates = {
+            name: attr for name, attr in self._attributes.items() if _is_template_attr(attr)
+        }
+        dependencies = {
+            name: [placeholder for placeholder in attr.placeholders if placeholder in templates]
+            for name, attr in templates.items()
+        }
+        for attr_name in TopologicalSorter(dependencies).static_order():
+            attr = templates[attr_name]
+            if attr_name in self._not_fetched or any(
+                placeholder in self._partly_fetched
+                or (placeholder in self._not_fetched and getattr(self, placeholder, None) is None)
+                for placeholder in attr.placeholders
+            ):
+                for placeholder in attr.placeholders:
+                    if placeholder in self._changed:
+                        raise ValueError(
+                            f"Cannot save '{attr_name}': its template depends on changed field "
+                            f"'{placeholder}', but the template or its dependencies "
+                            "were not fully fetched"
+                        )
                 continue
 
             # Collect values for all placeholders
@@ -400,8 +489,6 @@ class ModelBase(metaclass=ModelMeta):
                 if val is None:
                     raise ValueError(f"Cannot build {attr_name}: missing value for '{placeholder}'")
                 values[placeholder] = val
-
-            # Build and set the key
             setattr(self, attr_name, attr.build_key(values))
 
     @classmethod
@@ -518,6 +605,41 @@ class ModelBase(metaclass=ModelMeta):
         If the model has a discriminator field, returns the correct subclass.
         Extra stored fields are ignored, including with strict_attributes enabled.
         """
+        projection = _PROJECTION.get()
+        fields = None
+        if projection is not None and issubclass(cls, projection[0]):
+            fields = projection[1]
+        return cls._load(data, fields)
+
+    @classmethod
+    def _from_projection(cls: type[M], data: dict[str, Any], fields: list[str] | None) -> M:
+        """Create a model instance from an item read with a projection.
+
+        Fields outside the projection are None. Defaults and required checks
+        do not apply to them, and save() does not write them unless they change.
+        """
+        if not fields:
+            return cls.from_dict(data)
+        # Go through from_dict so an override runs, as it does for a full read.
+        token = _PROJECTION.set((cls, fields))
+        try:
+            return cls.from_dict(data)
+        finally:
+            _PROJECTION.reset(token)
+
+    @classmethod
+    def _projected_fields(cls, fields: list[str]) -> tuple[frozenset[str], frozenset[str]]:
+        """Split projection paths into whole fields and fields fetched only in part."""
+        whole: set[str] = set()
+        nested: set[str] = set()
+        for path in fields:
+            root, _, rest = path.partition(".")
+            name = root if root in cls._attributes else cls._dynamo_to_py.get(root, root)
+            (nested if rest else whole).add(name)
+        return frozenset(whole), frozenset(nested - whole)
+
+    @classmethod
+    def _load(cls: type[M], data: dict[str, Any], fields: list[str] | None) -> M:
         # Check if we should return a subclass based on discriminator
         target_cls: type[M] = cls
 
@@ -550,11 +672,32 @@ class ModelBase(metaclass=ModelMeta):
             }
         else:
             model_values = deserialized
-        instance = target_cls(**model_values)
+
         # Store original for change tracking with Python names and deserialized values
         # so __setattr__ can compare correctly (it looks up by Python attr name)
-        instance._original = deserialized.copy()
+        original = deserialized.copy()
+        if fields is None:
+            instance = target_cls(**model_values)
+            not_fetched: frozenset[str] = frozenset()
+            partly_fetched: frozenset[str] = frozenset()
+        else:
+            whole, partly_fetched = target_cls._projected_fields(fields)
+            original = {name: _snapshot(value) for name, value in original.items()}
+            not_fetched = frozenset(
+                name
+                for name in target_cls._attributes
+                if name not in whole and name not in deserialized
+            )
+            instance = target_cls(
+                **model_values,
+                **{name: None for name in not_fetched},
+            )
+
+        instance._original = original
         instance._changed = set()
+        instance._projected = bool(fields)
+        instance._not_fetched = not_fetched
+        instance._partly_fetched = partly_fetched
         instance._build_json_snapshots()
         return instance
 
