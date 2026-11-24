@@ -7,7 +7,7 @@ from typing import Any
 
 from pydynox import pydynox_core
 from pydynox._internal._atomic import AtomicAdd, AtomicIfNotExists, AtomicSet
-from pydynox.attributes.base import Attribute
+from pydynox.attributes.base import UNSET, Attribute, Unset
 
 
 class DecimalAttribute(Attribute[Decimal]):
@@ -31,7 +31,10 @@ class DecimalAttribute(Attribute[Decimal]):
         required: bool = False,
         discriminator: bool = False,
         alias: str | None = None,
+        default_for_new: Decimal | int | None | Unset = UNSET,
     ):
+        if not isinstance(default_for_new, Unset):
+            default_for_new = pydynox_core.validate_decimal(default_for_new)
         super().__init__(
             partition_key=partition_key,
             sort_key=sort_key,
@@ -39,6 +42,7 @@ class DecimalAttribute(Attribute[Decimal]):
             required=required,
             discriminator=discriminator,
             alias=alias,
+            default_for_new=default_for_new,
         )
 
     def __set__(self, instance: Any, value: Decimal | int | None) -> None:
